@@ -10,6 +10,7 @@ interface CategorySidebarProps {
   counts: Record<CategoryId, CategoryDataCount>
   onChange: (id: 'all' | CategoryId) => void
   freshness?: FreshnessMap
+  disabled?: boolean
 }
 
 function HealthIndicator({ health, tooltip }: { health: string; tooltip: string }) {
@@ -29,7 +30,7 @@ function HealthIndicator({ health, tooltip }: { health: string; tooltip: string 
   )
 }
 
-export function CategorySidebar({ active, counts, onChange, freshness }: CategorySidebarProps) {
+export function CategorySidebar({ active, counts, onChange, freshness, disabled }: CategorySidebarProps) {
   const [collapsed, setCollapsed] = useState(false)
 
   const totalWithData = Object.values(counts).reduce((s, c) => s + c.withData, 0)
@@ -37,7 +38,7 @@ export function CategorySidebar({ active, counts, onChange, freshness }: Categor
 
   const baseItemClasses = 'flex items-center gap-2 px-2.5 py-2 rounded-lg transition-colors text-left w-full'
   const activeClasses = 'bg-indigo-600 text-white'
-  const inactiveClasses = 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 cursor-pointer'
+  const inactiveClasses = 'text-slate-400 hover:bg-slate-800/50 hover:text-slate-200 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:bg-transparent disabled:hover:text-slate-400'
 
   return (
     <div className={`flex flex-col h-fit bg-slate-900/30 border border-slate-800 rounded-xl transition-all duration-200 ${collapsed ? 'w-14' : 'w-52'}`}>
@@ -70,6 +71,7 @@ export function CategorySidebar({ active, counts, onChange, freshness }: Categor
         <button
           className={`${baseItemClasses} ${active === 'all' ? activeClasses : inactiveClasses} mb-0.5`}
           onClick={() => onChange('all')}
+          disabled={disabled}
           title={collapsed ? `All (${totalWithData}/${totalAll})` : undefined}
         >
           <span className="text-base">📊</span>
@@ -97,14 +99,14 @@ export function CategorySidebar({ active, counts, onChange, freshness }: Categor
            const hasData = count.withData > 0
 
            return (
-             <a
-               key={cat.id}
-               href={`#${cat.id}`}
-               className={`${baseItemClasses} ${isActive ? activeClasses : inactiveClasses}`}
-               onClick={(e) => {
-                 e.preventDefault()
-                 onChange(cat.id)
-               }}
+              <a
+                key={cat.id}
+                href={`#${cat.id}`}
+                className={`${baseItemClasses} ${isActive ? activeClasses : inactiveClasses} ${disabled ? 'pointer-events-none opacity-50' : ''}`}
+                onClick={(e) => {
+                  e.preventDefault()
+                  if (!disabled) onChange(cat.id)
+                }}
                title={collapsed ? `${cat.icon} ${cat.label} (${count.withData}/${count.total})` : undefined}
              >
                <span className="text-base">{cat.icon}</span>

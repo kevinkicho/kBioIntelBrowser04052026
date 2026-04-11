@@ -74,6 +74,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
   const [fetchedAt, setFetchedAt] = useState<Partial<Record<CategoryId, Date>>>({})
   const [hideEmpty, setHideEmpty] = useState(true)
 
+  const isBusy = useMemo(() =>
+    ALL_CATEGORY_IDS.some(id => categoryStatus[id] === 'loading'),
+    [categoryStatus]
+  )
+
   // Build freshness map from current state
   const freshnessMap = useMemo(() => {
     const map = {} as FreshnessMap
@@ -400,7 +405,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
         <div className="col-span-2 flex justify-center py-8">
           <button
             onClick={() => loadCategory(catId)}
-            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+            disabled={isBusy}
+            className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Load data
           </button>
@@ -430,7 +436,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
           <p className="text-red-400 text-sm mb-3">Failed to load data</p>
           <button
             onClick={() => loadCategory(catId)}
-            className="text-indigo-400 hover:text-indigo-300 text-sm underline"
+            disabled={isBusy}
+            className="text-indigo-400 hover:text-indigo-300 text-sm underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Retry
           </button>
@@ -476,11 +483,16 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
   }
 
   return (
-    <div className="flex gap-4 md:gap-6">
+    <div className="flex gap-4 md:gap-6 relative">
+      {isBusy && (
+        <div className="absolute top-0 left-0 right-0 h-1 z-50 overflow-hidden">
+          <div className="h-full bg-indigo-500 animate-progress-bar" />
+        </div>
+      )}
       {/* Main content - takes full width, sidebar pushes it from right */}
       <div className="flex-1 min-w-0">
         <div className="mb-4 flex items-center justify-between">
-          <ViewToggle active={view} onChange={setView} />
+          <ViewToggle active={view} onChange={setView} disabled={isBusy} />
           <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
         </div>
 
@@ -489,7 +501,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
           <select
             value={activeCategory}
             onChange={(e) => scrollToCategory(e.target.value as CategoryId)}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm"
+            disabled={isBusy}
+            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm disabled:opacity-50"
           >
             <option value="all">All Categories</option>
             {CATEGORIES.map(cat => (
@@ -503,11 +516,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
         <div className="mb-6">
           <MoleculeSummary
             data={summaryData}
-            onCategoryClick={(id) => {
+            onCategoryClick={isBusy ? () => {} : (id) => {
               setView('panels')
               scrollToCategory(id as CategoryId)
             }}
-            onMetricClick={(categoryId, panelId) => {
+            onMetricClick={isBusy ? () => {} : (categoryId, panelId) => {
               const catId = categoryId as CategoryId
               setQuickViewPanel({ categoryId: catId, panelId })
               if (categoryStatus[catId] === 'idle') {
@@ -528,10 +541,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
         {view === 'panels' ? (
           <div>
             <div className="mb-4 flex items-center gap-3">
-              <PanelSearch value={searchQuery} onChange={setSearchQuery} />
+              <PanelSearch value={searchQuery} onChange={setSearchQuery} disabled={isBusy} />
               <button
                 onClick={() => setHideEmpty(!hideEmpty)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 ${
+                disabled={isBusy}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
                   hideEmpty
                     ? 'bg-indigo-600 border-indigo-500 text-white'
                     : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
@@ -575,7 +589,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
                   if (categoryStatus[id] === 'idle') loadCategory(id)
                 }
               }}
-              className="mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition-colors"
+              disabled={isBusy}
+              className="mt-3 bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Load all data for network graph
             </button>
@@ -614,7 +629,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
                   <p className="text-red-400 mb-3">Failed to load data for this component.</p>
                   <button
                     onClick={() => loadCategory(catId)}
-                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors"
+                    disabled={isBusy}
+                    className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     Retry
                   </button>
@@ -638,6 +654,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
           counts={dataCounts}
           onChange={scrollToCategory}
           freshness={freshnessMap}
+          disabled={isBusy}
         />
       </aside>
     </div>

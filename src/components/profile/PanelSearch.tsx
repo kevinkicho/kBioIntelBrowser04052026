@@ -3,19 +3,21 @@
 interface PanelSearchProps {
   value: string
   onChange: (value: string) => void
+  disabled?: boolean
 }
 
-export function PanelSearch({ value, onChange }: PanelSearchProps) {
+export function PanelSearch({ value, onChange, disabled }: PanelSearchProps) {
   return (
     <div className="relative">
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         placeholder="Search panels..."
-        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+        className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed"
       />
-      {value && (
+      {value && !disabled && (
         <button
           aria-label="clear search"
           onClick={() => onChange('')}

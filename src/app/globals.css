@@ -40,3 +40,12 @@ body {
   animation: zoomIn95 0.2s ease-out;
 }
 
+@keyframes progress-bar {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.animate-progress-bar {
+  animation: progress-bar 1.5s ease-in-out infinite;
+  width: 50%;
+}
+
