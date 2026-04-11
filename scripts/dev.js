@@ -1,0 +1,25 @@
+#!/usr/bin/env node
+const { spawn } = require('child_process')
+const fs = require('fs')
+const path = require('path')
+
+const nextDir = path.join(__dirname, '..', '.next')
+try { fs.rmSync(nextDir, { recursive: true, force: true }) } catch {}
+
+const next = spawn('npx', ['next', 'dev', '-p', '0'], {
+  stdio: 'inherit',
+  shell: true
+})
+
+function cleanup() {
+  console.log('\nShutting down...')
+  next.kill()
+  process.exit(0)
+}
+
+process.on('SIGINT', cleanup)
+process.on('SIGTERM', cleanup)
+
+next.on('close', (code) => {
+  process.exit(code || 0)
+})

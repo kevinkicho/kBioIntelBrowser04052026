@@ -1,0 +1,60 @@
+# DATA SOURCE AUDIT REPORT
+## Date: $(Get-Date -Format 'yyyy-MM-dd')
+## Test Molecules: Aspirin, Insulin, Caffeine
+
+========================================
+## SUMMARY
+========================================
+
+✅ PubChem API - WORKING
+   - Aspirin: CID 2244, Formula C9H8O4
+   - Insulin: CID 70678557, Formula C256H381N65O77S6
+   - Caffeine: CID 2519, Formula C8H10N4O2
+
+✅ ChEMBL API - WORKING
+   - Aspirin: Found 20 results (CHEMBL25)
+   - Insulin: Found 5 results
+   - Caffeine: Found 20 results (CHEMBL113)
+
+✅ openFDA API - WORKING
+   - Aspirin: Found label data (Low Dose Aspirin)
+
+✅ UniProt API - WORKING
+   - Insulin: 25 results (P01308)
+
+✅ ClinicalTrials.gov API - WORKING
+   - Caffeine: 5+ results
+
+⚠️  KEGG API - LIMITED
+   - Caffeine: Found (cpd:C07481)
+   - Some compounds may not be indexed
+
+❌ OpenTargets API - NOT WORKING
+   - Error: 400 Bad Request
+   - GraphQL query structure may need updating
+
+❌ GWAS Catalog API - NOT WORKING
+   - Error: 404 Not Found
+   - API endpoint may have changed
+
+❌ ChEMBL Target Search - NO RESULTS
+   - Aspirin targets query returned 0
+   - May need different query approach
+
+========================================
+## DATA QUALITY FINDINGS
+========================================
+
+1. PubChem provides consistent, rich data for all molecules
+2. Protein/Peptide molecules (Insulin) have very large formulas
+3. Small molecules (Aspirin, Caffeine) have complete structural data
+4. Some molecular weights not returned in API response
+
+========================================
+## RECOMMENDATIONS
+========================================
+
+1. Fix OpenTargets GraphQL queries
+2. Update GWAS Catalog API endpoints
+3. Add better error handling for missing KEGG data
+4. Consider caching strategies for large protein data

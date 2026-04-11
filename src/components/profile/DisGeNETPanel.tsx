@@ -1,0 +1,58 @@
+import { memo } from 'react'
+import { Panel } from '@/components/ui/Panel'
+import { PaginatedList } from '@/components/ui/PaginatedList'
+import type { MoleculeData } from '@/lib/types'
+
+interface DisGeNETPanelProps {
+  data: MoleculeData
+  panelId?: string
+  lastFetched?: Date
+}
+
+export const DisGeNETPanel = memo(function DisGeNETPanel({ data, panelId, lastFetched }: DisGeNETPanelProps) {
+  const associations = data.disgenetAssociations ?? []
+
+  if (associations.length === 0) {
+    return (
+      <Panel title="DisGeNET" panelId={panelId} lastFetched={lastFetched}>
+        <p className="text-slate-500 text-sm">No disease-gene associations found for this molecule.</p>
+      </Panel>
+    )
+  }
+
+  return (
+    <Panel title="DisGeNET Gene-Disease Associations" panelId={panelId} lastFetched={lastFetched}>
+      <PaginatedList className="space-y-2">
+        {associations.map((assoc, idx) => (
+          <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
+            <div className="flex items-start justify-between gap-2">
+              <div>
+                <a
+                  href={`https://www.disgenet.org/browser/0/1/${assoc.diseaseId}/`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                >
+                  {assoc.diseaseName}
+                </a>
+                <p className="text-xs text-slate-400 mt-1">
+                  Score: {assoc.score?.toFixed(3) ?? 'N/A'}
+                  {assoc.confidenceScore && ` | Confidence: ${assoc.confidenceScore.toFixed(2)}`}
+                </p>
+              </div>
+              <span className="text-xs px-2 py-1 bg-blue-900/50 text-blue-300 rounded whitespace-nowrap">
+                {assoc.source}
+              </span>
+            </div>
+            {assoc.pmids && assoc.pmids.length > 0 && (
+              <p className="text-xs text-slate-500 mt-1">
+                {assoc.pmids.slice(0, 3).join(', ')}
+                {assoc.pmids.length > 3 && ` +${assoc.pmids.length - 3} more`}
+              </p>
+            )}
+          </div>
+        ))}
+      </PaginatedList>
+    </Panel>
+  )
+})
