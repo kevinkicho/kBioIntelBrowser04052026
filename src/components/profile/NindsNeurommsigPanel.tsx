@@ -32,7 +32,7 @@ export function NindsNeurommsigPanel({ data, isLoading }: NindsNeurommsigPanelPr
         <CardTitle>NINDS NeuroMMSig Signatures</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] rounded-md border">
+        <ScrollArea className="max-h-[400px] rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>

@@ -31,7 +31,7 @@ export function NiaidImmportPanel({ data, isLoading }: NiaidImmportPanelProps) {
         <CardTitle>NIAID ImmPort Studies</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] rounded-md border">
+        <ScrollArea className="max-h-[400px] rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>

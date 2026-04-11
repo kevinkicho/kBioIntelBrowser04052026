@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
+import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { ViewToggle } from '@/components/profile/ViewToggle'
 import { CategorySidebar } from '@/components/profile/CategorySidebar'
@@ -56,6 +56,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
   const router = useRouter()
   const initialTab = searchParams.get('tab')
   const initialView = searchParams.get('view')
+  const pendingRef = useRef<Set<CategoryId>>(new Set())
 
   const [view, setView] = useState<'panels' | 'graph'>(
     initialView === 'graph' ? 'graph' : 'panels'
@@ -98,6 +99,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
 
 
   const loadCategory = useCallback(async (catId: CategoryId) => {
+    if (pendingRef.current.has(catId)) return
+    if (categoryStatus[catId] === 'loaded' || categoryStatus[catId] === 'loading') return
+    pendingRef.current.add(catId)
     setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
     try {
       const data = await fetchCategoryData(cid, catId)
@@ -106,8 +110,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
       setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
     } catch {
       setCategoryStatus(prev => ({ ...prev, [catId]: 'error' }))
+    } finally {
+      pendingRef.current.delete(catId)
     }
-  }, [cid])
+  }, [cid, categoryStatus])
 
   // Scroll to category section
   const scrollToCategory = useCallback((catId: CategoryId | 'all') => {

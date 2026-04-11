@@ -31,7 +31,7 @@ export function NcatsTranslatorPanel({ data, isLoading }: NcatsTranslatorPanelPr
         <CardTitle>NCATS Biomedical Translator</CardTitle>
       </CardHeader>
       <CardContent>
-        <ScrollArea className="h-[400px] rounded-md border">
+        <ScrollArea className="max-h-[400px] rounded-md border">
           <Table>
             <TableHeader>
               <TableRow>
