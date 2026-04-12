@@ -47,3 +47,32 @@ export function buildStructureImageUrl(cid: number): string {
 export function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return promise.catch(() => fallback)
 }
+
+const API_TIMEOUTS: Record<string, number> = {
+  'molecular-chemical': 15000,
+  'bioactivity-targets': 12000,
+  'genomics-disease': 15000,
+  'interactions-pathways': 12000,
+  'protein-structure': 12000,
+  'clinical-safety': 10000,
+  'pharmaceutical': 10000,
+  'research-literature': 10000,
+  'nih-high-impact': 10000,
+}
+
+const DEFAULT_API_TIMEOUT = 10000
+
+export function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
+  const timeout = ms ?? DEFAULT_API_TIMEOUT
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`API call timed out after ${timeout}ms`)), timeout)
+    promise.then(
+      (val) => { clearTimeout(timer); resolve(val) },
+      (err) => { clearTimeout(timer); reject(err) },
+    )
+  })
+}
+
+export function getCategoryTimeout(categoryId: string): number {
+  return API_TIMEOUTS[categoryId] ?? DEFAULT_API_TIMEOUT
+}
