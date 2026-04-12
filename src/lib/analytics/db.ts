@@ -12,8 +12,8 @@ function getDb(): DatabaseType.Database | null {
   if (_db) return _db
   if (_dbAvailable === false) return null
   try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const Database = require('better-sqlite3') as typeof DatabaseType
+    // Use eval('require') to bypass webpack bundling for native module
+    const Database = eval('require')('better-sqlite3') as typeof DatabaseType
     if (!fs.existsSync(DB_DIR)) {
       fs.mkdirSync(DB_DIR, { recursive: true })
     }
@@ -162,6 +162,19 @@ export function getRecentErrors(limit = 50): ApiMetricRow[] {
     ORDER BY timestamp DESC
     LIMIT ?
   `).all(limit) as ApiMetricRow[]
+}
+
+export function getDbStatus(): Record<string, unknown> {
+  const db = getDb()
+  if (!db) return { error: 'Database not available', dbPath: DB_PATH, dbAvailable: _dbAvailable }
+  const count = db.prepare('SELECT COUNT(*) as c FROM api_metrics').get() as { c: number }
+  const recent = db.prepare('SELECT source, timestamp FROM api_metrics ORDER BY timestamp DESC LIMIT 5').all()
+  return { 
+    dbOpen: true, 
+    dbPath: DB_PATH, 
+    totalRows: count.c, 
+    recentRows: recent,
+  }
 }
 
 export function purgeOldMetrics(maxAgeDays = 90): number {

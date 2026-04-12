@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSummary, getDailyTrend, getRecentErrors, purgeOldMetrics } from '@/lib/analytics/db'
+import { getSummary, getDailyTrend, getRecentErrors, purgeOldMetrics, getDbStatus } from '@/lib/analytics/db'
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,6 +16,8 @@ export async function GET(request: NextRequest) {
         return NextResponse.json(getDailyTrend(since || new Date(Date.now() - 30 * 86400000).toISOString()))
       case 'errors':
         return NextResponse.json(getRecentErrors(100))
+      case 'debug':
+        return NextResponse.json(getDbStatus())
       default:
         return NextResponse.json({ error: 'Unknown view' }, { status: 400 })
     }
