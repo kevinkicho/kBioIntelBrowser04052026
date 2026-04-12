@@ -128,6 +128,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
     }
     setActiveCategory(catId)
     if (categoryStatus[catId] === 'idle') loadCategory(catId)
+    // Scroll to the section after a short delay to allow rendering
+    requestAnimationFrame(() => {
+      const el = document.getElementById(catId)
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    })
   }, [categoryStatus, loadCategory])
 
   // Auto-load the active category when it changes
