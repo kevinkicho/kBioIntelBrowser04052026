@@ -195,7 +195,7 @@ npm install
 npm run dev
 ```
 
-App runs on **http://localhost:3000** by default (configurable via `PORT` env var).
+App runs on **http://localhost:52167** by default (configurable via `PORT` env var).
 
 ### Optional Environment Variables
 

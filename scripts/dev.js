@@ -6,7 +6,7 @@ const path = require('path')
 const nextDir = path.join(__dirname, '..', '.next')
 try { fs.rmSync(nextDir, { recursive: true, force: true }) } catch {}
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 52167
 const next = spawn('npx', ['next', 'dev', '-p', String(PORT)], {
   stdio: 'inherit',
   shell: true
