@@ -23,6 +23,7 @@ import { ChangeAlerts } from '@/components/profile/ChangeAlerts'
 import { ResearchBrief } from '@/components/profile/ResearchBrief'
 import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetection'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
+import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
 
 interface Props {
   cid: number
@@ -75,6 +76,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
   const [hideEmpty, setHideEmpty] = useState(true)
 
   const isBusy = useMemo(() =>
+    ALL_CATEGORY_IDS.some(id => categoryStatus[id] === 'loading'),
+    [categoryStatus]
+  )
+
+  const showLoadingOverlay = useMemo(() =>
     ALL_CATEGORY_IDS.some(id => categoryStatus[id] === 'loading'),
     [categoryStatus]
   )
@@ -489,10 +495,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
 
   return (
     <div className="flex gap-4 md:gap-6 relative">
-      {isBusy && (
-        <div className="absolute top-0 left-0 right-0 h-1 z-50 overflow-hidden">
-          <div className="h-full bg-indigo-500 animate-progress-bar" />
-        </div>
+      {showLoadingOverlay && (
+        <LoadingOverlay categoryStatus={categoryStatus} dataCounts={dataCounts} />
       )}
       {/* Main content - takes full width, sidebar pushes it from right */}
       <div className="flex-1 min-w-0">
