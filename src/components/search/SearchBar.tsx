@@ -4,7 +4,11 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientFetch } from '@/lib/clientFetch'
 
-export function SearchBar() {
+interface SearchBarProps {
+  onNavigating?: (navigating: boolean) => void
+}
+
+export function SearchBar({ onNavigating }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
@@ -13,6 +17,10 @@ export function SearchBar() {
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
+
+  useEffect(() => {
+    onNavigating?.(isNavigating)
+  }, [isNavigating, onNavigating])
 
   useEffect(() => {
     if (query.length < 2) {
