@@ -35,9 +35,12 @@ function getDb(): DatabaseType.Database | null {
       CREATE INDEX IF NOT EXISTS idx_metrics_timestamp ON api_metrics(timestamp);
       CREATE INDEX IF NOT EXISTS idx_metrics_source_timestamp ON api_metrics(source, timestamp);
     `)
+    // Checkpoint WAL to ensure data from previous sessions is visible
+    _db.pragma('wal_checkpoint(TRUNCATE)')
     _dbAvailable = true
     return _db
-  } catch {
+  } catch (err) {
+    console.error('[analytics] Failed to open database:', err)
     _dbAvailable = false
     return null
   }
