@@ -49,18 +49,26 @@ export function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
 }
 
 const API_TIMEOUTS: Record<string, number> = {
-  'molecular-chemical': 15000,
-  'bioactivity-targets': 12000,
-  'genomics-disease': 15000,
-  'interactions-pathways': 12000,
-  'protein-structure': 12000,
-  'clinical-safety': 10000,
-  'pharmaceutical': 10000,
-  'research-literature': 10000,
-  'nih-high-impact': 10000,
+  'molecular-chemical': 20000,
+  'bioactivity-targets': 20000,
+  'genomics-disease': 20000,
+  'interactions-pathways': 15000,
+  'protein-structure': 15000,
+  'clinical-safety': 15000,
+  'pharmaceutical': 15000,
+  'research-literature': 15000,
+  'nih-high-impact': 15000,
 }
 
-const DEFAULT_API_TIMEOUT = 10000
+export const API_SOURCE_TIMEOUTS: Record<string, number> = {
+  lincs: 30000,
+  massbank: 25000,
+  chembl: 25000,
+  'chembl-mechanisms': 25000,
+  opentargets: 30000,
+}
+
+const DEFAULT_API_TIMEOUT = 15000
 
 export function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
   const timeout = ms ?? DEFAULT_API_TIMEOUT
@@ -71,6 +79,26 @@ export function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
       (err) => { clearTimeout(timer); reject(err) },
     )
   })
+}
+
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/?(p|div|li|tr|td|th)\b[^>]*>/gi, '\n')
+    .replace(/<i\b[^>]*>([^<]*)<\/i>/gi, '$1')
+    .replace(/<b\b[^>]*>([^<]*)<\/b>/gi, '$1')
+    .replace(/<em\b[^>]*>([^<]*)<\/em>/gi, '$1')
+    .replace(/<strong\b[^>]*>([^<]*)<\/strong>/gi, '$1')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim()
 }
 
 export function getCategoryTimeout(categoryId: string): number {

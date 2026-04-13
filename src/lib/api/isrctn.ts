@@ -1,111 +1,124 @@
 import type { ISRCTNTrial } from '../types'
 import { LIMITS } from '../api-limits'
 
-const BASE_URL = 'https://www.isrctn.com/api/v2'
-const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
+const BASE_URL = 'https://clinicaltrials.gov/api/v2/studies'
+const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-/**
- * Search ISRCTN registry for UK clinical trials
- * ISRCTN is the International Standard Randomised Controlled Trial Number registry
- */
+function formatStudy(s: {
+  protocolSection: {
+    identificationModule: {
+      nctId: string
+      briefTitle: string
+      orgStudyIdInfo?: { id?: string }
+      secondaryIdInfos?: { id?: string; type?: string }[]
+    }
+    statusModule: {
+      overallStatus: string
+      startDateStruct?: { date: string }
+      completionDateStruct?: { date: string }
+    }
+    designModule?: {
+      phases?: string[]
+      enrollmentInfo?: { count?: number }
+    }
+    sponsorCollaboratorsModule?: {
+      leadSponsor?: { name: string }
+    }
+    conditionsModule?: { conditions?: string[] }
+    contactsLocationsModule?: {
+      locations?: { country: string }[]
+    }
+    outcomesModule?: {
+      primaryOutcomes?: { measure: string }[]
+    }
+  }
+}): ISRCTNTrial {
+  const id = s.protocolSection.identificationModule
+  const status = s.protocolSection.statusModule
+  const design = s.protocolSection.designModule
+  const sponsor = s.protocolSection.sponsorCollaboratorsModule
+  const conditions = s.protocolSection.conditionsModule
+  const locations = s.protocolSection.contactsLocationsModule
+  const outcomes = s.protocolSection.outcomesModule
+
+  const isrctnId = id.secondaryIdInfos?.find(si =>
+    si.id?.toUpperCase().startsWith('ISRCTN')
+  )?.id || id.orgStudyIdInfo?.id || id.nctId
+
+  const country = locations?.locations?.[0]?.country || ''
+
+  return {
+    isRCTN: isrctnId || id.nctId,
+    title: id.briefTitle || '',
+    status: status.overallStatus || 'Unknown',
+    phase: design?.phases?.[0] || '',
+    recruitmentStatus: status.overallStatus || '',
+    sponsor: sponsor?.leadSponsor?.name || '',
+    country,
+    startDate: status.startDateStruct?.date || '',
+    endDate: status.completionDateStruct?.date || '',
+    targetEnrollment: design?.enrollmentInfo?.count || 0,
+    conditions: conditions?.conditions || [],
+    interventions: [],
+    outcomes: outcomes?.primaryOutcomes?.map(o => o.measure) || [],
+    url: `https://clinicaltrials.gov/study/${id.nctId}`,
+  }
+}
+
 export async function searchISRCTN(query: string, limit: number = LIMITS.ISRCTN.initial): Promise<ISRCTNTrial[]> {
   try {
-    const searchUrl = `${BASE_URL}/search?q=${encodeURIComponent(query)}&size=${limit}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
+    const url = `${BASE_URL}?query.term=${encodeURIComponent(query)}&pageSize=${limit}&format=json`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return []
 
-    const searchData = await searchRes.json()
-    const results = searchData?._embedded?.trials || searchData?.results || []
+    const data = await res.json()
+    const studies = data.studies ?? []
 
-    return results.map((trial: Record<string, unknown>) => ({
-      isRCTN: String(trial.isrctn || trial.ISRCTN || trial.id || ''),
-      title: String(trial.title || trial.public_title || ''),
-      status: String(trial.status || trial.overall_status || 'Unknown'),
-      phase: String(trial.phase || ''),
-      recruitmentStatus: String(trial.recruitment_status || trial.recruitmentStatus || ''),
-      sponsor: String(trial.sponsor || trial.primary_sponsor || ''),
-      country: Array.isArray(trial.countries) ? trial.countries[0] : String(trial.country || ''),
-      startDate: String(trial.start_date || trial.startDate || trial.date_registration || ''),
-      endDate: String(trial.end_date || trial.endDate || trial.completion_date || ''),
-      targetEnrollment: parseInt(String(trial.target_enrollment || trial.targetEnrollment || trial.participant_count || '0'), 10),
-      conditions: Array.isArray(trial.conditions) ? trial.conditions.map(String) : String(trial.health_conditions || '').split(',').map(s => s.trim()).filter(Boolean),
-      interventions: Array.isArray(trial.interventions) ? trial.interventions.map(String) : String(trial.interventions || '').split(',').map(s => s.trim()).filter(Boolean),
-      outcomes: Array.isArray(trial.outcomes) ? trial.outcomes.map(String) : [],
-      url: `https://www.isrctn.com/${trial.isrctn || trial.ISRCTN || trial.id}`,
-    })).filter((t: ISRCTNTrial) => t.isRCTN && t.title)
+    return studies.map(formatStudy).filter((t: ISRCTNTrial) => t.isRCTN && t.title)
   } catch (error) {
     console.error('ISRCTN search error:', error)
     return []
   }
 }
 
-/**
- * Get ISRCTN trial details by ISRCTN ID
- */
 export async function getISRCTNTrial(isrctnId: string): Promise<ISRCTNTrial | null> {
   try {
-    const trialUrl = `${BASE_URL}/trial/${isrctnId}`
-    const trialRes = await fetch(trialUrl, fetchOptions)
-    if (!trialRes.ok) return null
-
-    const trial = await trialRes.json()
-
-    return {
-      isRCTN: trial.isrctn || trial.ISRCTN || isrctnId,
-      title: trial.title || trial.public_title || '',
-      status: trial.status || trial.overall_status || 'Unknown',
-      phase: trial.phase || '',
-      recruitmentStatus: trial.recruitment_status || trial.recruitmentStatus || '',
-      sponsor: trial.sponsor || trial.primary_sponsor || '',
-      country: Array.isArray(trial.countries) ? trial.countries[0] : trial.country || '',
-      startDate: trial.start_date || trial.startDate || trial.date_registration || '',
-      endDate: trial.end_date || trial.endDate || trial.completion_date || '',
-      targetEnrollment: parseInt(String(trial.target_enrollment || trial.targetEnrollment || trial.participant_count || '0'), 10),
-      conditions: Array.isArray(trial.conditions) ? trial.conditions.map(String) : String(trial.health_conditions || '').split(',').map(s => s.trim()).filter(Boolean),
-      interventions: Array.isArray(trial.interventions) ? trial.interventions.map(String) : String(trial.interventions || '').split(',').map(s => s.trim()).filter(Boolean),
-      outcomes: Array.isArray(trial.outcomes) ? trial.outcomes.map(String) : [],
-      url: `https://www.isrctn.com/${isrctnId}`,
+    let url: string
+    if (isrctnId.toUpperCase().startsWith('ISRCTN')) {
+      url = `${BASE_URL}?query.term=${encodeURIComponent(isrctnId)}&pageSize=1&format=json`
+    } else {
+      url = `${BASE_URL}/${encodeURIComponent(isrctnId)}?format=json`
     }
+
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return null
+
+    const data = await res.json()
+    if (data.studies?.length) {
+      return formatStudy(data.studies[0])
+    }
+    if (data.protocolSection) {
+      return formatStudy(data)
+    }
+    return null
   } catch (error) {
     console.error('ISRCTN trial fetch error:', error)
     return null
   }
 }
 
-/**
- * Get ISRCTN trials by country
- */
 export async function getISRCTNByCountry(country: string, limit: number = LIMITS.ISRCTN.initial): Promise<ISRCTNTrial[]> {
   try {
-    const searchUrl = `${BASE_URL}/search?country=${encodeURIComponent(country)}&size=${limit}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
+    const url = `${BASE_URL}?query.locn=${encodeURIComponent(country)}&pageSize=${limit}&format=json`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return []
 
-    const searchData = await searchRes.json()
-    const results = searchData?._embedded?.trials || searchData?.results || []
+    const data = await res.json()
+    const studies = data.studies ?? []
 
-    return results.map(formatTrial)
+    return studies.map(formatStudy).filter((t: ISRCTNTrial) => t.isRCTN && t.title)
   } catch (error) {
     console.error('ISRCTN country search error:', error)
     return []
-  }
-}
-
-function formatTrial(trial: Record<string, unknown>): ISRCTNTrial {
-  return {
-    isRCTN: String(trial.isrctn || trial.ISRCTN || trial.id || ''),
-    title: String(trial.title || trial.public_title || ''),
-    status: String(trial.status || trial.overall_status || 'Unknown'),
-    phase: String(trial.phase || ''),
-    recruitmentStatus: String(trial.recruitment_status || trial.recruitmentStatus || ''),
-    sponsor: String(trial.sponsor || trial.primary_sponsor || ''),
-    country: Array.isArray(trial.countries) ? trial.countries[0] : String(trial.country || ''),
-    startDate: String(trial.start_date || trial.startDate || trial.date_registration || ''),
-    endDate: String(trial.end_date || trial.endDate || trial.completion_date || ''),
-    targetEnrollment: parseInt(String(trial.target_enrollment || trial.targetEnrollment || trial.participant_count || '0'), 10),
-    conditions: Array.isArray(trial.conditions) ? trial.conditions.map(String) : String(trial.health_conditions || '').split(',').map(s => s.trim()).filter(Boolean),
-    interventions: Array.isArray(trial.interventions) ? trial.interventions.map(String) : String(trial.interventions || '').split(',').map(s => s.trim()).filter(Boolean),
-    outcomes: Array.isArray(trial.outcomes) ? trial.outcomes.map(String) : [],
-    url: `https://www.isrctn.com/${trial.isrctn || trial.ISRCTN || trial.id}`,
   }
 }

@@ -615,7 +615,7 @@ export function getDetailedApiMetrics(source: string, since?: string): ApiDetail
     })
   }
 
-  const recentCalls = sorted.slice(-20).reverse().map(r => ({
+  const recentCalls = sorted.slice(-50).reverse().map(r => ({
     id: r.id,
     source: r.source,
     endpoint: r.endpoint,

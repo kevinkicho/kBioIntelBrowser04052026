@@ -8,50 +8,41 @@ describe('getDrugGeneInteractionsByName', () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        matchedTerms: [
-          {
-            interactions: [
+        data: {
+          drugs: {
+            nodes: [
               {
-                geneName: 'PTGS2',
-                interactionTypes: ['inhibitor'],
-                sources: ['DrugBank', 'ChEMBL'],
-                score: 8.5,
+                conceptId: 'rxcui:1191',
+                name: 'ASPIRIN',
+                interactions: [
+                  {
+                    gene: { name: 'PTGS2', conceptId: 'ncbi:5743' },
+                    interactionTypes: [{ type: 'inhibitor' }],
+                    sources: [{ sourceDbName: 'DrugBank' }, { sourceDbName: 'ChEMBL' }],
+                  },
+                ],
               },
             ],
           },
-        ],
+        },
       }),
     })
     const results = await getDrugGeneInteractionsByName('aspirin')
     expect(results).toHaveLength(1)
     expect(results[0].geneName).toBe('PTGS2')
+    expect(results[0].geneSymbol).toBe('PTGS2')
+    expect(results[0].drugName).toBe('aspirin')
     expect(results[0].interactionType).toBe('inhibitor')
     expect(results[0].source).toBe('DrugBank, ChEMBL')
-    expect(results[0].score).toBe(8.5)
     expect(results[0].url).toContain('dgidb.org/genes/PTGS2')
   })
 
-  test('uses Number() coercion for score', async () => {
+  test('returns empty array when no matched drugs', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        matchedTerms: [
-          {
-            interactions: [
-              { geneName: 'ACE', interactionTypes: [], sources: [], score: '3.2' },
-            ],
-          },
-        ],
+        data: { drugs: { nodes: [] } },
       }),
-    })
-    const results = await getDrugGeneInteractionsByName('lisinopril')
-    expect(results[0].score).toBe(3.2)
-  })
-
-  test('returns empty array when no matched terms', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ matchedTerms: [] }),
     })
     expect(await getDrugGeneInteractionsByName('unknownxyz')).toEqual([])
   })
@@ -66,15 +57,72 @@ describe('getDrugGeneInteractionsByName', () => {
     expect(await getDrugGeneInteractionsByName('aspirin')).toEqual([])
   })
 
-  test('limits results to 10', async () => {
-    const manyInteractions = Array.from({ length: 15 }, (_, i) => ({
-      geneName: `GENE${i}`, interactionTypes: [], sources: [], score: 0,
+  test('returns empty array when GraphQL errors present', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        errors: [{ message: 'some error' }],
+      }),
+    })
+    expect(await getDrugGeneInteractionsByName('aspirin')).toEqual([])
+  })
+
+  test('deduplicates interactions by gene+type', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          drugs: {
+            nodes: [
+              {
+                conceptId: 'rxcui:1191',
+                name: 'ASPIRIN',
+                interactions: [
+                  {
+                    gene: { name: 'PTGS2' },
+                    interactionTypes: [{ type: 'inhibitor' }],
+                    sources: [{ sourceDbName: 'DrugBank' }],
+                  },
+                  {
+                    gene: { name: 'PTGS2' },
+                    interactionTypes: [{ type: 'inhibitor' }],
+                    sources: [{ sourceDbName: 'ChEMBL' }],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      }),
+    })
+    const results = await getDrugGeneInteractionsByName('aspirin')
+    const ptgs2Items = results.filter(r => r.geneName === 'PTGS2')
+    expect(ptgs2Items.length).toBe(1)
+  })
+
+  test('limits results to 20', async () => {
+    const manyInteractions = Array.from({ length: 25 }, (_, i) => ({
+      gene: { name: `GENE${i}` },
+      interactionTypes: [{ type: 'inhibitor' }],
+      sources: [{ sourceDbName: 'DrugBank' }],
     }))
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ matchedTerms: [{ interactions: manyInteractions }] }),
+      json: async () => ({
+        data: {
+          drugs: {
+            nodes: [
+              {
+                conceptId: 'rxcui:1191',
+                name: 'ASPIRIN',
+                interactions: manyInteractions,
+              },
+            ],
+          },
+        },
+      }),
     })
     const results = await getDrugGeneInteractionsByName('aspirin')
-    expect(results).toHaveLength(10)
+    expect(results).toHaveLength(20)
   })
 })

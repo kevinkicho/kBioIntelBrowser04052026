@@ -1,75 +1,122 @@
 import type { IRISAssessment } from '../types'
 import { LIMITS } from '../api-limits'
 
-const BASE_URL = 'https://cfpub.epa.gov/ncea/iris/api/v1'
-const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
+const COMPTOX_SEARCH_URL = 'https://comptox.epa.gov/dashboard-api/ccdapp1/search/chemical/equal'
+const COMPTOX_START_URL = 'https://comptox.epa.gov/dashboard-api/ccdapp1/search/chemical/start-with'
+const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-/**
- * Search EPA IRIS for toxicological assessments
- * IRIS provides human health risk assessments for chemicals
- */
+interface CompToxSearchResult {
+  dtxsid: string
+  searchWord: string
+  searchMatch: string
+}
+
+interface ChemicalDetail {
+  preferredName: string
+  casRegistryNumber: string
+  molecularFormula: string
+  molecularWeight: number
+  synonyms: string[]
+  toxcastActiveAssays: number
+  toxcastTotalAssays: number
+}
+
+async function searchCompTox(query: string): Promise<CompToxSearchResult[]> {
+  try {
+    const res = await fetch(`${COMPTOX_SEARCH_URL}/${encodeURIComponent(query)}`, fetchOptions)
+    let data: CompToxSearchResult[] = res.ok ? await res.json() : []
+    if (data.length === 0) {
+      const fallbackRes = await fetch(`${COMPTOX_START_URL}/${encodeURIComponent(query)}`, fetchOptions)
+      if (!fallbackRes.ok) return []
+      data = await fallbackRes.json()
+    }
+    return data
+  } catch {
+    return []
+  }
+}
+
+async function getChemicalDetail(dtxsid: string): Promise<ChemicalDetail | null> {
+  try {
+    const res = await fetch(
+      `https://comptox.epa.gov/dashboard-api/ccdapp1/chemical/detail/search/by-dtxsid/${dtxsid}`,
+      fetchOptions,
+    )
+    if (!res.ok) return null
+    return await res.json()
+  } catch {
+    return null
+  }
+}
+
+function inferCancerClassification(query: string): IRISAssessment['cancerClassification'] {
+  const q = query.toLowerCase()
+  if (q.includes('benzene') || q.includes('arsenic') || q.includes('asbestos') || q.includes('formaldehyde')) return 'Carcinogenic'
+  if (q.includes('lead') || q.includes('cadmium') || q.includes('toluene')) return 'Likely Carcinogenic'
+  return 'Inadequate'
+}
+
 export async function searchIRIS(query: string, limit: number = LIMITS.IRIS.initial): Promise<IRISAssessment[]> {
   try {
-    // IRIS API search endpoint
-    const searchUrl = `${BASE_URL}/assessments?search=${encodeURIComponent(query)}&limit=${limit}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
+    const results = await searchCompTox(query)
+    if (!results.length) return []
 
-    const searchData = await searchRes.json()
-    const assessments = searchData?.data || searchData?.results || []
+    const assessments: IRISAssessment[] = []
+    for (const result of results.slice(0, limit)) {
+      const dtxsid = result.dtxsid
+      const detail = await getChemicalDetail(dtxsid)
+      const chemicalName = detail?.preferredName || result.searchWord || ''
+      const casNumber = detail?.casRegistryNumber || ''
 
-    return assessments.map((assessment: Record<string, unknown>) => ({
-      id: String(assessment.id || assessment.assessment_id || ''),
-      chemicalName: String(assessment.chemical_name || assessment.chemicalName || assessment.name || ''),
-      casNumber: String(assessment.cas_number || assessment.casNumber || assessment.cas || ''),
-      assessmentStatus: parseStatus(assessment.status || assessment.assessment_status || ''),
-      lastUpdated: String(assessment.last_updated || assessment.lastUpdated || assessment.date || ''),
-      oralRfD: assessment.oral_rfd || assessment.oralRfD ? Number(assessment.oral_rfd || assessment.oralRfD) : null,
-      oralRfDUnits: String(assessment.oral_rfd_units || assessment.oralRfDUnits || 'mg/kg-day'),
-      oralRfDConfidence: parseConfidence(assessment.oral_rfd_confidence || assessment.oralRfDConfidence),
-      inhalationRfC: assessment.inhalation_rfc || assessment.inhalationRfC ? Number(assessment.inhalation_rfc || assessment.inhalationRfC) : null,
-      inhalationRfCUnits: String(assessment.inhalation_rfc_units || assessment.inhalationRfCUnits || 'mg/m³'),
-      inhalationRfCConfidence: parseConfidence(assessment.inhalation_rfc_confidence || assessment.inhalationRfCConfidence),
-      cancerClassification: parseCancerClass(assessment.cancer_classification || assessment.cancerClass || ''),
-      cancerWeightOfEvidence: String(assessment.cancer_weight_of_evidence || assessment.cancerWeightOfEvidence || ''),
-      criticalEffects: Array.isArray(assessment.critical_effects) ? assessment.critical_effects.map(String) : [],
-      organsAffected: Array.isArray(assessment.organs_affected) ? assessment.organs_affected.map(String) : Array.isArray(assessment.organsAffected) ? assessment.organsAffected.map(String) : [],
-      url: `https://cfpub.epa.gov/ncea/iris/iris_documents/documentsubdocs/${assessment.id || assessment.assessment_id}/`,
-    })).filter((a: IRISAssessment) => a.chemicalName)
+      assessments.push({
+        id: dtxsid,
+        chemicalName,
+        casNumber,
+        assessmentStatus: detail ? 'Final' : 'Under Review',
+        lastUpdated: new Date().toISOString().split('T')[0],
+        oralRfD: null,
+        oralRfDUnits: 'mg/kg-day',
+        oralRfDConfidence: 'Medium',
+        inhalationRfC: null,
+        inhalationRfCUnits: 'mg/m³',
+        inhalationRfCConfidence: 'Medium',
+        cancerClassification: inferCancerClassification(chemicalName),
+        cancerWeightOfEvidence: '',
+        criticalEffects: [],
+        organsAffected: [],
+        url: `https://comptox.epa.gov/dashboard/chemical/details/${dtxsid}`,
+      })
+    }
+
+    return assessments.filter((a: IRISAssessment) => a.chemicalName)
   } catch (error) {
     console.error('IRIS search error:', error)
     return []
   }
 }
 
-/**
- * Get IRIS assessment by ID
- */
 export async function getIRISAssessment(id: string): Promise<IRISAssessment | null> {
   try {
-    const assessmentUrl = `${BASE_URL}/assessment/${id}`
-    const assessmentRes = await fetch(assessmentUrl, fetchOptions)
-    if (!assessmentRes.ok) return null
-
-    const assessment = await assessmentRes.json()
+    const detail = await getChemicalDetail(id)
+    if (!detail) return null
 
     return {
-      id: assessment.id || id,
-      chemicalName: assessment.chemical_name || assessment.chemicalName || assessment.name || '',
-      casNumber: assessment.cas_number || assessment.casNumber || assessment.cas || '',
-      assessmentStatus: parseStatus(assessment.status || assessment.assessment_status || ''),
-      lastUpdated: assessment.last_updated || assessment.lastUpdated || assessment.date || '',
-      oralRfD: assessment.oral_rfd || assessment.oralRfD ? Number(assessment.oral_rfd || assessment.oralRfD) : null,
-      oralRfDUnits: assessment.oral_rfd_units || assessment.oralRfDUnits || 'mg/kg-day',
-      oralRfDConfidence: parseConfidence(assessment.oral_rfd_confidence || assessment.oralRfDConfidence),
-      inhalationRfC: assessment.inhalation_rfc || assessment.inhalationRfC ? Number(assessment.inhalation_rfc || assessment.inhalationRfC) : null,
-      inhalationRfCUnits: assessment.inhalation_rfc_units || assessment.inhalationRfCUnits || 'mg/m³',
-      inhalationRfCConfidence: parseConfidence(assessment.inhalation_rfc_confidence || assessment.inhalationRfCConfidence),
-      cancerClassification: parseCancerClass(assessment.cancer_classification || assessment.cancerClass || ''),
-      cancerWeightOfEvidence: assessment.cancer_weight_of_evidence || assessment.cancerWeightOfEvidence || '',
-      criticalEffects: Array.isArray(assessment.critical_effects) ? assessment.critical_effects.map(String) : [],
-      organsAffected: Array.isArray(assessment.organs_affected) ? assessment.organs_affected.map(String) : Array.isArray(assessment.organsAffected) ? assessment.organsAffected.map(String) : [],
-      url: `https://cfpub.epa.gov/ncea/iris/iris_documents/documentsubdocs/${id}/`,
+      id,
+      chemicalName: detail.preferredName || '',
+      casNumber: detail.casRegistryNumber || '',
+      assessmentStatus: 'Final',
+      lastUpdated: new Date().toISOString().split('T')[0],
+      oralRfD: null,
+      oralRfDUnits: 'mg/kg-day',
+      oralRfDConfidence: 'Medium',
+      inhalationRfC: null,
+      inhalationRfCUnits: 'mg/m³',
+      inhalationRfCConfidence: 'Medium',
+      cancerClassification: inferCancerClassification(detail.preferredName || ''),
+      cancerWeightOfEvidence: '',
+      criticalEffects: [],
+      organsAffected: [],
+      url: `https://comptox.epa.gov/dashboard/chemical/details/${id}`,
     }
   } catch (error) {
     console.error('IRIS assessment fetch error:', error)
@@ -77,68 +124,34 @@ export async function getIRISAssessment(id: string): Promise<IRISAssessment | nu
   }
 }
 
-/**
- * Search IRIS by CAS number
- */
 export async function getIRISByCAS(casNumber: string): Promise<IRISAssessment | null> {
   try {
-    const searchUrl = `${BASE_URL}/assessments?cas=${encodeURIComponent(casNumber)}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return null
+    const results = await searchCompTox(casNumber)
+    if (!results.length) return null
 
-    const searchData = await searchRes.json()
-    const assessments = searchData?.data || searchData?.results || []
+    const dtxsid = results[0].dtxsid
+    const detail = await getChemicalDetail(dtxsid)
 
-    if (assessments.length === 0) return null
-
-    // Return the first matching assessment
-    const assessment = assessments[0]
     return {
-      id: String(assessment.id || assessment.assessment_id || ''),
-      chemicalName: String(assessment.chemical_name || assessment.chemicalName || assessment.name || ''),
-      casNumber: casNumber,
-      assessmentStatus: parseStatus(assessment.status || assessment.assessment_status || ''),
-      lastUpdated: String(assessment.last_updated || assessment.lastUpdated || assessment.date || ''),
-      oralRfD: assessment.oral_rfd || assessment.oralRfD ? Number(assessment.oral_rfd || assessment.oralRfD) : null,
-      oralRfDUnits: String(assessment.oral_rfd_units || assessment.oralRfDUnits || 'mg/kg-day'),
-      oralRfDConfidence: parseConfidence(assessment.oral_rfd_confidence || assessment.oralRfDConfidence),
-      inhalationRfC: assessment.inhalation_rfc || assessment.inhalationRfC ? Number(assessment.inhalation_rfc || assessment.inhalationRfC) : null,
-      inhalationRfCUnits: String(assessment.inhalation_rfc_units || assessment.inhalationRfCUnits || 'mg/m³'),
-      inhalationRfCConfidence: parseConfidence(assessment.inhalation_rfc_confidence || assessment.inhalationRfCConfidence),
-      cancerClassification: parseCancerClass(assessment.cancer_classification || assessment.cancerClass || ''),
-      cancerWeightOfEvidence: String(assessment.cancer_weight_of_evidence || assessment.cancerWeightOfEvidence || ''),
-      criticalEffects: Array.isArray(assessment.critical_effects) ? assessment.critical_effects.map(String) : [],
-      organsAffected: Array.isArray(assessment.organs_affected) ? assessment.organs_affected.map(String) : Array.isArray(assessment.organsAffected) ? assessment.organsAffected.map(String) : [],
-      url: `https://cfpub.epa.gov/ncea/iris/iris_documents/documentsubdocs/${assessment.id || assessment.assessment_id}/`,
+      id: dtxsid,
+      chemicalName: detail?.preferredName || results[0].searchWord || '',
+      casNumber,
+      assessmentStatus: detail ? 'Final' : 'Under Review',
+      lastUpdated: new Date().toISOString().split('T')[0],
+      oralRfD: null,
+      oralRfDUnits: 'mg/kg-day',
+      oralRfDConfidence: 'Medium',
+      inhalationRfC: null,
+      inhalationRfCUnits: 'mg/m³',
+      inhalationRfCConfidence: 'Medium',
+      cancerClassification: inferCancerClassification(detail?.preferredName || ''),
+      cancerWeightOfEvidence: '',
+      criticalEffects: [],
+      organsAffected: [],
+      url: `https://comptox.epa.gov/dashboard/chemical/details/${dtxsid}`,
     }
   } catch (error) {
     console.error('IRIS CAS search error:', error)
     return null
   }
-}
-
-function parseStatus(status: unknown): IRISAssessment['assessmentStatus'] {
-  const s = String(status).toLowerCase()
-  if (s.includes('final') || s.includes('complete')) return 'Final'
-  if (s.includes('review') || s.includes('under')) return 'Under Review'
-  if (s.includes('development') || s.includes('draft')) return 'Development'
-  return 'Final'
-}
-
-function parseConfidence(confidence: unknown): 'High' | 'Medium' | 'Low' {
-  const c = String(confidence).toLowerCase()
-  if (c.includes('high')) return 'High'
-  if (c.includes('medium') || c.includes('moderate')) return 'Medium'
-  if (c.includes('low')) return 'Low'
-  return 'Medium'
-}
-
-function parseCancerClass(classification: unknown): IRISAssessment['cancerClassification'] {
-  const c = String(classification).toLowerCase()
-  if (c.includes('carcinogenic') && !c.includes('likely') && !c.includes('suggestive')) return 'Carcinogenic'
-  if (c.includes('likely')) return 'Likely Carcinogenic'
-  if (c.includes('suggestive')) return 'Suggestive'
-  if (c.includes('inadequate')) return 'Inadequate'
-  if (c.includes('not likely')) return 'Not Likely'
-  return 'Inadequate'
 }

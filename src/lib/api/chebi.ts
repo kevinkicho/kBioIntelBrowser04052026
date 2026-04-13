@@ -1,4 +1,5 @@
 import type { ChebiAnnotation } from '../types'
+import { stripHtml } from '../utils'
 
 const OLS_SEARCH_BASE = 'https://www.ebi.ac.uk/ols4/api/search'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -37,10 +38,7 @@ export async function getChebiAnnotationByName(name: string): Promise<ChebiAnnot
     const roles: string[] = doc.annotation?.has_role ?? []
 
     const definition = doc.description?.[0] ?? ''
-    const cleanDefinition = definition
-      .replace(/<[^>]+>/g, ' ')
-      .replace(/\s+/g, ' ')
-      .trim()
+    const cleanDefinition = stripHtml(definition)
 
     return {
       chebiId,

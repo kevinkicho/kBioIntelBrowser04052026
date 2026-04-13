@@ -1,30 +1,41 @@
 import type { SMPDBPathway } from '../types'
 import { LIMITS } from '../api-limits'
+import { stripHtml } from '../utils'
 
-const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
+const REACTOME_URL = 'https://reactome.org/ContentService/search/query'
+const REACTOME_DETAIL_URL = 'https://reactome.org/ContentService/data/query'
+const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-/**
- * Search SMPDB for small molecule pathways
- */
-export async function searchSMPDB(query: string, limit: number = LIMITS.SMPDB.initial): Promise<SMPDBPathway[]> {
+async function searchReactome(query: string, limit: number): Promise<SMPDBPathway[]> {
   try {
-    // SMPDB API endpoint
-    const searchUrl = `https://smpdb.ca/search/json?query=${encodeURIComponent(query)}&limit=${limit}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
+    const url = `${REACTOME_URL}?query=${encodeURIComponent(query)}&types=Pathway&species=Homo+sapiens&cluster=true`
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      ...fetchOptions,
+    })
+    if (!res.ok) return []
 
-    const searchData = await searchRes.json()
-    const pathways = Array.isArray(searchData) ? searchData : searchData?.pathways || []
+    const data = await res.json()
+    const pathwayGroup = (data.results ?? []).find(
+      (g: { typeName?: string }) => g.typeName === 'Pathway',
+    )
+    if (!pathwayGroup) return []
 
-    return pathways.slice(0, limit).map((pathway: Record<string, unknown>) => ({
-      smpdbId: String(pathway.smpdb_id || pathway.id || ''),
-      name: String(pathway.name || pathway.title || ''),
-      description: String(pathway.description || pathway.summary || ''),
-      pathwayType: String(pathway.pathway_type || pathway.category || ''),
-      organism: String(pathway.organism || 'Homo sapiens'),
-      metabolites: Array.isArray(pathway.metabolites) ? pathway.metabolites.map((m: unknown) => String(m)) : [],
-      enzymes: Array.isArray(pathway.enzymes) ? pathway.enzymes.map((e: unknown) => String(e)) : [],
-      url: `https://smpdb.ca/view/${pathway.smpdb_id || pathway.id}`,
+    const entries = (pathwayGroup.entries ?? []).slice(0, limit)
+    return entries.map((entry: {
+      stId?: string
+      name?: string
+      species?: string
+      summation?: string
+    }) => ({
+      smpdbId: entry.stId || '',
+      name: entry.name || '',
+      description: stripHtml(entry.summation || ''),
+      pathwayType: 'Metabolic',
+      organism: entry.species || 'Homo sapiens',
+      metabolites: [],
+      enzymes: [],
+      url: `https://reactome.org/content/detail/${entry.stId || ''}`,
     }))
   } catch (error) {
     console.error('SMPDB search error:', error)
@@ -32,26 +43,31 @@ export async function searchSMPDB(query: string, limit: number = LIMITS.SMPDB.in
   }
 }
 
-/**
- * Get SMPDB pathway details by ID
- */
+export async function searchSMPDB(query: string, limit: number = LIMITS.SMPDB.initial): Promise<SMPDBPathway[]> {
+  return searchReactome(query, limit)
+}
+
 export async function getSMPDBPathway(smpdbId: string): Promise<SMPDBPathway | null> {
   try {
-    const pathwayUrl = `https://smpdb.ca/pathways/${smpdbId}.json`
-    const pathwayRes = await fetch(pathwayUrl, fetchOptions)
-    if (!pathwayRes.ok) return null
+    const url = `${REACTOME_DETAIL_URL}/${encodeURIComponent(smpdbId)}`
+    const res = await fetch(url, {
+      headers: { Accept: 'application/json' },
+      ...fetchOptions,
+    })
+    if (!res.ok) return null
 
-    const pathway = await pathwayRes.json()
+    const data = await res.json()
+    const pathway = Array.isArray(data) ? data[0] : data
 
     return {
-      smpdbId: pathway.smpdb_id || smpdbId,
+      smpdbId: pathway.stId || smpdbId,
       name: pathway.name || '',
-      description: pathway.description || pathway.summary || '',
-      pathwayType: pathway.pathway_type || pathway.category || '',
-      organism: pathway.organism || 'Homo sapiens',
-      metabolites: Array.isArray(pathway.metabolites) ? pathway.metabolites.map((m: unknown) => String(m)) : [],
-      enzymes: Array.isArray(pathway.enzymes) ? pathway.enzymes.map((e: unknown) => String(e)) : [],
-      url: `https://smpdb.ca/view/${smpdbId}`,
+      description: stripHtml(pathway.summation || ''),
+      pathwayType: pathway.compartment?.[0]?.name || 'Metabolic',
+      organism: pathway.species?.displayName || 'Homo sapiens',
+      metabolites: [],
+      enzymes: (pathway.compartment ?? []).map((c: { name?: string }) => c.name || ''),
+      url: `https://reactome.org/content/detail/${smpdbId}`,
     }
   } catch (error) {
     console.error('SMPDB pathway fetch error:', error)
@@ -59,30 +75,6 @@ export async function getSMPDBPathway(smpdbId: string): Promise<SMPDBPathway | n
   }
 }
 
-/**
- * Search SMPDB by metabolite name
- */
 export async function searchSMPDBByMetabolite(metabolite: string, limit: number = LIMITS.SMPDB.initial): Promise<SMPDBPathway[]> {
-  try {
-    const searchUrl = `https://smpdb.ca/search/json?metabolite=${encodeURIComponent(metabolite)}&limit=${limit}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
-
-    const searchData = await searchRes.json()
-    const pathways = Array.isArray(searchData) ? searchData : searchData?.pathways || []
-
-    return pathways.slice(0, limit).map((pathway: Record<string, unknown>) => ({
-      smpdbId: String(pathway.smpdb_id || pathway.id || ''),
-      name: String(pathway.name || ''),
-      description: String(pathway.description || ''),
-      pathwayType: String(pathway.pathway_type || ''),
-      organism: String(pathway.organism || 'Homo sapiens'),
-      metabolites: Array.isArray(pathway.metabolites) ? pathway.metabolites.map((m: unknown) => String(m)) : [],
-      enzymes: Array.isArray(pathway.enzymes) ? pathway.enzymes.map((e: unknown) => String(e)) : [],
-      url: `https://smpdb.ca/view/${pathway.smpdb_id || pathway.id}`,
-    }))
-  } catch (error) {
-    console.error('SMPDB metabolite search error:', error)
-    return []
-  }
+  return searchReactome(metabolite, limit)
 }

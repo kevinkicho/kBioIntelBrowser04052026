@@ -22,10 +22,10 @@ export interface ClinVarSearchResponse {
   total: number
 }
 
-export async function getClinVarVariantsByName(name: string): Promise<ClinVarVariant[]> {
+export async function getClinVarVariantsByName(name: string, limit: number = LIMITS.CLINVAR.initial): Promise<ClinVarVariant[]> {
   try {
     const searchRes = await fetch(
-      withNCBICreds(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=${encodeURIComponent(name)}&retmode=json&retmax=${LIMITS.CLINVAR.initial}`),
+      withNCBICreds(`https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=clinvar&term=${encodeURIComponent(name)}&retmode=json&retmax=${limit}`),
       fetchOptions,
     )
     if (!searchRes.ok) return []

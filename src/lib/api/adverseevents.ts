@@ -8,7 +8,7 @@ function buildUrl(name: string, limit: number): string {
   const apiKey = process.env.OPENFDA_API_KEY
   const keyParam = apiKey ? `&api_key=${apiKey}` : ''
   const encoded = encodeURIComponent(name)
-  return `${BASE_URL}?search=patient.drug.openfda.generic_name:"${encoded}"&count=patient.reaction.reactionmeddrapt.exact&limit=${limit}${keyParam}`
+  return `${BASE_URL}?search=patient.drug.openfda.generic_name:"${encoded}"+OR+patient.drug.openfda.brand_name:"${encoded}"&count=patient.reaction.reactionmeddrapt.exact&limit=${limit}${keyParam}`
 }
 
 export async function getAdverseEventsByName(name: string, limit: number = LIMITS.ADVERSE_EVENTS.initial): Promise<AdverseEvent[]> {

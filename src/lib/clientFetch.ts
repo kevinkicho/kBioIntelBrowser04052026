@@ -84,7 +84,7 @@ export async function clientFetch(
     const sizeStr = size ? ` ${Math.round(parseInt(size) / 1024)}KB` : ''
 
     const source = url.includes('/category/')
-      ? 'category:' + url.split('/category/')[1]?.split('/')[0]?.split('?')[0]
+      ? null
       : url.includes('/panel/')
         ? 'panel:' + url.split('/panel/')[1]?.split('/')[0]?.split('?')[0]
         : url.includes('/search')
@@ -93,13 +93,15 @@ export async function clientFetch(
             ? 'similar'
             : url
 
-    enqueueMetric({
-      source,
-      endpoint: url,
-      status: response.status,
-      duration_ms: duration,
-      has_data: response.ok,
-    })
+    if (source) {
+      enqueueMetric({
+        source,
+        endpoint: url,
+        status: response.status,
+        duration_ms: duration,
+        has_data: response.ok,
+      })
+    }
 
     if (response.ok) {
       console.log(
@@ -118,7 +120,7 @@ export async function clientFetch(
     const duration = Math.round(performance.now() - start)
 
     const source = url.includes('/category/')
-      ? 'category:' + url.split('/category/')[1]?.split('/')[0]?.split('?')[0]
+      ? null
       : url.includes('/panel/')
         ? 'panel:' + url.split('/panel/')[1]?.split('/')[0]?.split('?')[0]
         : url.includes('/search')
@@ -127,14 +129,16 @@ export async function clientFetch(
             ? 'similar'
             : url
 
-    enqueueMetric({
-      source,
-      endpoint: url,
-      status: 0,
-      duration_ms: duration,
-      error: error instanceof Error ? error.message : String(error),
-      has_data: false,
-    })
+    if (source) {
+      enqueueMetric({
+        source,
+        endpoint: url,
+        status: 0,
+        duration_ms: duration,
+        error: error instanceof Error ? error.message : String(error),
+        has_data: false,
+      })
+    }
 
     console.error(
       `%c✗ Network error %c${ms(duration)}`,

@@ -1,8 +1,4 @@
-// GTEx Portal API Client
-// https://gtexportal.org/
-// Normal tissue gene expression baselines across 54 tissues
-
-const BASE_URL = 'https://gtexportal.org/api/v2'
+const BASE_URL = 'https://gtexportal.org/rest/v1'
 
 const fetchOptions: RequestInit = {
   next: { revalidate: 86400 },
@@ -103,9 +99,24 @@ const tissueMap: Record<string, string> = {
   'Whole Blood': 'Whole_Blood',
 }
 
-/**
- * Get all GTEx tissues
- */
+async function resolveGeneSymbol(symbol: string): Promise<string | null> {
+  try {
+    const url = `${BASE_URL}/reference/gene?geneSymbol=${encodeURIComponent(symbol)}`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return null
+    const data = await res.json()
+    const genes = data?.data ?? data
+    if (Array.isArray(genes) && genes.length > 0) {
+      return String(genes[0]?.gencodeId ?? genes[0]?.geneId ?? '')
+    }
+    if (genes?.gencodeId) return String(genes.gencodeId)
+    if (genes?.geneId) return String(genes.geneId)
+    return null
+  } catch {
+    return null
+  }
+}
+
 export async function getGTExTissues(): Promise<GTExTissue[]> {
   return Object.entries(tissueMap).map(([name, code]) => ({
     tissueId: code,
@@ -114,34 +125,40 @@ export async function getGTExTissues(): Promise<GTExTissue[]> {
   }))
 }
 
-/**
- * Get gene expression across all tissues
- */
 export async function getGTExGeneExpression(geneId: string): Promise<GTExGeneExpression | null> {
   try {
-    const params = new URLSearchParams({
-      gencodeId: geneId,
-    })
-    const url = `${BASE_URL}/expression/gene?${params}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) throw new Error('GTEx expression request failed')
-    const data = await res.json()
+    let gencodeId = geneId
+    if (!geneId.startsWith('ENSG')) {
+      const resolved = await resolveGeneSymbol(geneId)
+      if (!resolved) return null
+      gencodeId = resolved
+    }
 
-    const expressionData = data.data?.geneExpression ?? []
-    const geneInfo = data.data?.geneInfo ?? {}
+    const v2Url = `https://gtexportal.org/api/v2/expression/gene?gencodeId=${encodeURIComponent(gencodeId)}`
+    let res = await fetch(v2Url, fetchOptions)
+    
+    if (!res.ok) {
+      const v1Url = `${BASE_URL}/expression/geneExpression?gencodeId=${encodeURIComponent(gencodeId)}`
+      res = await fetch(v1Url, fetchOptions)
+      if (!res.ok) return null
+    }
+
+    const data = await res.json()
+    const expressionData = data?.data?.geneExpression ?? data?.geneExpression ?? []
+    const geneInfo = data?.data?.geneInfo ?? data?.geneInfo ?? {}
 
     return {
-      geneId: geneInfo.gencodeId ?? geneId,
-      geneSymbol: geneInfo.symbol ?? '',
+      geneId: gencodeId,
+      geneSymbol: geneInfo.symbol ?? geneInfo.geneSymbol ?? '',
       biotype: geneInfo.biotype ?? '',
       descriptions: geneInfo.description ?? '',
       expressions: expressionData.map((exp: Record<string, unknown>) => ({
-        geneId,
-        geneSymbol: geneInfo.symbol ?? '',
-        tissueName: exp.tissueName ?? '',
-        tissueCode: exp.tissueSiteDetailId ?? '',
+        geneId: gencodeId,
+        geneSymbol: geneInfo.symbol ?? geneInfo.geneSymbol ?? '',
+        tissueName: exp.tissueName ?? exp.tissueSiteDetail ?? '',
+        tissueCode: exp.tissueSiteDetailId ?? exp.tissueSiteDetail ?? '',
         tpm: exp.tpm ?? 0,
-        tpmSd: exp.tpmSd ?? 0,
+        tpmSd: exp.tpmSd ?? exp.tpmSd ?? 0,
         nSamples: exp.nSamples ?? 0,
         rank: exp.rank ?? 0,
         percentile: exp.percentile ?? 0,
@@ -152,28 +169,32 @@ export async function getGTExGeneExpression(geneId: string): Promise<GTExGeneExp
   }
 }
 
-/**
- * Get eQTL data for a gene in a specific tissue
- */
 export async function getGTExEQTL(
   geneId: string,
   tissueName: string,
 ): Promise<GTExEQTL[]> {
   try {
+    let gencodeId = geneId
+    if (!geneId.startsWith('ENSG')) {
+      const resolved = await resolveGeneSymbol(geneId)
+      if (!resolved) return []
+      gencodeId = resolved
+    }
+
     const params = new URLSearchParams({
-      geneId,
-      tissueName,
+      gencodeId,
+      tissueSiteDetailId: tissueName,
     })
-    const url = `${BASE_URL}/expression/eQTL?${params}`
+    const url = `${BASE_URL}/association/eQTL?${params}`
     const res = await fetch(url, fetchOptions)
-    if (!res.ok) throw new Error('GTEx eQTL request failed')
+    if (!res.ok) return []
     const data = await res.json()
 
-    return (data.data?.eqtlList ?? []).map((eqtl: Record<string, unknown>) => ({
+    return (data?.data?.eqtlList ?? data?.eqtlList ?? []).map((eqtl: Record<string, unknown>) => ({
       variantId: eqtl.variantId ?? '',
-      geneId: eqtl.geneId ?? '',
+      geneId: gencodeId,
       geneSymbol: eqtl.geneSymbol ?? '',
-      tissueName: eqtl.tissueName ?? '',
+      tissueName: eqtl.tissueName ?? tissueName,
       slope: eqtl.slope ?? 0,
       tStat: eqtl.tStat ?? 0,
       pValue: eqtl.pValue ?? 0,
@@ -185,9 +206,6 @@ export async function getGTExEQTL(
   }
 }
 
-/**
- * Get tissue-specific expression for a gene
- */
 export async function getGTExTissueExpression(
   geneId: string,
   tissueName: string,
@@ -205,9 +223,6 @@ export async function getGTExTissueExpression(
   }
 }
 
-/**
- * Get top expressed tissues for a gene
- */
 export async function getGTExTopTissues(geneId: string, limit = 5): Promise<GTExExpression[]> {
   try {
     const result = await getGTExGeneExpression(geneId)

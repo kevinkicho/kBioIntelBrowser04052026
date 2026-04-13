@@ -15,7 +15,7 @@ export async function getOrangeBookByName(name: string): Promise<OrangeBookEntry
     const keyParam = apiKey ? `&api_key=${apiKey}` : ''
     const encoded = encodeURIComponent(name)
     const dateFilter = `+AND+submissions.submission_date:[${twoYearsAgoCompact()}+TO+${new Date().toISOString().slice(0, 10).replace(/-/g, '')}]`
-    const url = `${BASE_URL}?search=openfda.generic_name:"${encoded}"${dateFilter}&limit=10${keyParam}`
+    const url = `${BASE_URL}?search=openfda.generic_name:"${encoded}"+AND+openfda.brand_name:"${encoded}"${dateFilter}&limit=10${keyParam}`
 
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []

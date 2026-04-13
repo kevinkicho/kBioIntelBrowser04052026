@@ -3,18 +3,16 @@ import type { MetaboliteData, MetabolomicsStudy } from '../types'
 const BASE_URL = 'https://www.metabolomicsworkbench.org/rest'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-/**
- * Search metabolites by name or synonym
- */
 export async function searchMetabolitesByName(name: string): Promise<MetaboliteData[]> {
   try {
-    // Use RefMet search which supports name/synonym matching
     const url = `${BASE_URL}/refmet/name/${encodeURIComponent(name)}/all/json`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()
 
-    return (data.data ?? []).map((item: Record<string, string>) => ({
+    const items: Record<string, string>[] = Array.isArray(data) ? data : (data.data ?? [])
+
+    return items.map((item: Record<string, string>) => ({
       refmetName: item.REFMET_NAME,
       formula: item.FORMULA,
       exactMass: parseFloat(item.EXACT_MASS) || 0,
@@ -32,9 +30,6 @@ export async function searchMetabolitesByName(name: string): Promise<MetaboliteD
   }
 }
 
-/**
- * Search metabolites by mass (with tolerance)
- */
 export async function searchMetabolitesByMass(
   mass: number,
   tolerance: number = 0.01
@@ -45,7 +40,9 @@ export async function searchMetabolitesByMass(
     if (!res.ok) return []
     const data = await res.json()
 
-    return (data.data ?? []).map((item: Record<string, string>) => ({
+    const items: Record<string, string>[] = Array.isArray(data) ? data : (data.data ?? [])
+
+    return items.map((item: Record<string, string>) => ({
       refmetName: item.REFMET_NAME,
       formula: item.FORMULA,
       exactMass: parseFloat(item.EXACT_MASS) || 0,
@@ -63,9 +60,6 @@ export async function searchMetabolitesByMass(
   }
 }
 
-/**
- * Get study summary by study ID
- */
 export async function getStudySummary(studyId: string): Promise<MetabolomicsStudy | null> {
   try {
     const url = `${BASE_URL}/study/study_id/${studyId}/summary/json`
@@ -73,23 +67,22 @@ export async function getStudySummary(studyId: string): Promise<MetabolomicsStud
     if (!res.ok) return null
     const data = await res.json()
 
+    const study = (Array.isArray(data) ? data[0] : data) ?? data
+
     return {
-      studyId: data.STUDY_ID,
-      title: data.STUDY_TITLE,
-      description: data.STUDY_DESCRIPTION,
-      metabolites: parseInt(data.NUM_METABOLITES) || 0,
-      samples: parseInt(data.NUM_SAMPLES) || 0,
-      organisms: data.ORGANISMS ? data.ORGANISMS.split(',') : [],
-      doi: data.STUDY_DOI,
+      studyId: study.STUDY_ID,
+      title: study.STUDY_TITLE,
+      description: study.STUDY_DESCRIPTION,
+      metabolites: parseInt(study.NUM_METABOLITES) || 0,
+      samples: parseInt(study.NUM_SAMPLES) || 0,
+      organisms: study.ORGANISMS ? study.ORGANISMS.split(',') : [],
+      doi: study.STUDY_DOI,
     }
   } catch {
     return null
   }
 }
 
-/**
- * Search studies by metabolite name
- */
 export async function searchStudiesByMetabolite(metaboliteName: string): Promise<MetabolomicsStudy[]> {
   try {
     const url = `${BASE_URL}/study/metabolite/${encodeURIComponent(metaboliteName)}/all/json`
@@ -97,7 +90,9 @@ export async function searchStudiesByMetabolite(metaboliteName: string): Promise
     if (!res.ok) return []
     const data = await res.json()
 
-    return (data.data ?? []).map((item: Record<string, string>) => ({
+    const items: Record<string, string>[] = Array.isArray(data) ? data : (data.data ?? [])
+
+    return items.map((item: Record<string, string>) => ({
       studyId: item.STUDY_ID,
       title: item.STUDY_TITLE,
       description: item.STUDY_DESCRIPTION,
@@ -111,16 +106,15 @@ export async function searchStudiesByMetabolite(metaboliteName: string): Promise
   }
 }
 
-/**
- * Get metabolite details by RefMet name
- */
 export async function getMetaboliteDetails(refmetName: string): Promise<MetaboliteData | null> {
   try {
     const url = `${BASE_URL}/refmet/name/${encodeURIComponent(refmetName)}/all/json`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return null
     const data = await res.json()
-    const item = data.data?.[0]
+
+    const items: Record<string, string>[] = Array.isArray(data) ? data : (data.data ?? [])
+    const item = items[0]
 
     if (!item) return null
 
@@ -142,9 +136,6 @@ export async function getMetaboliteDetails(refmetName: string): Promise<Metaboli
   }
 }
 
-/**
- * Main export: Get comprehensive metabolomics data
- */
 export async function getMetabolomicsData(moleculeName: string, molecularWeight?: number): Promise<{
   metabolites: MetaboliteData[]
   studies: MetabolomicsStudy[]
@@ -154,7 +145,6 @@ export async function getMetabolomicsData(moleculeName: string, molecularWeight?
     searchStudiesByMetabolite(moleculeName)
   ])
 
-  // If no direct matches and molecular weight provided, try mass search
   let massBasedMetabolites: MetaboliteData[] = []
   if (metabolites.length === 0 && molecularWeight) {
     massBasedMetabolites = await searchMetabolitesByMass(molecularWeight, 0.5)
@@ -169,7 +159,7 @@ export async function getMetabolomicsData(moleculeName: string, molecularWeight?
   }
 
   return {
-    metabolites: allMetabolites.slice(0, 20), // Limit results
+    metabolites: allMetabolites.slice(0, 20),
     studies: studies.slice(0, 10)
   }
 }

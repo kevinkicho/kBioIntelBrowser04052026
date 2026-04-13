@@ -5,12 +5,22 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getRxcuiByName(name: string): Promise<string | null> {
   try {
-    const url = `${BASE_URL}/rxcui.json?name=${encodeURIComponent(name)}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
-    const data = await res.json()
-    const ids = data.idGroup?.rxnormId
-    return Array.isArray(ids) && ids.length > 0 ? ids[0] : null
+    let url = `${BASE_URL}/rxcui.json?name=${encodeURIComponent(name)}`
+    let res = await fetch(url, fetchOptions)
+    if (res.ok) {
+      const data = await res.json()
+      const ids = data.idGroup?.rxnormId
+      if (Array.isArray(ids) && ids.length > 0) return ids[0]
+    }
+
+    url = `${BASE_URL}/approximateTerm.json?term=${encodeURIComponent(name)}&maxEntries=1`
+    res = await fetch(url, fetchOptions)
+    if (res.ok) {
+      const data = await res.json()
+      const match = data.approximateGroup?.candidate?.[0]
+      if (match?.rxcui) return match.rxcui
+    }
+    return null
   } catch {
     return null
   }

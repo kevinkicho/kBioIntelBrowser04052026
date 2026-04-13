@@ -1,4 +1,5 @@
 import type { ReactomePathway } from '../types'
+import { stripHtml } from '../utils'
 
 const BASE_URL = 'https://reactome.org/ContentService/search/query'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -27,7 +28,7 @@ export async function getReactomePathwaysByName(name: string): Promise<ReactomeP
       stId: entry.stId ?? '',
       name: entry.name ?? '',
       species: entry.species ?? 'Homo sapiens',
-      summation: entry.summation ?? '',
+      summation: stripHtml(entry.summation ?? ''),
       url: `https://reactome.org/content/detail/${entry.stId ?? ''}`,
     }))
   } catch {

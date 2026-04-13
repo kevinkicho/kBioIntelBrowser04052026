@@ -1,5 +1,6 @@
 import type { Molecule, SearchResult } from '../types'
 import { classifyMolecule, buildStructureImageUrl } from '../utils'
+import type { SearchType } from '../apiIdentifiers'
 
 const BASE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 const AUTOCOMPLETE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound'
@@ -130,6 +131,57 @@ export async function getMoleculeCidByName(name: string): Promise<number | null>
 /**
  * Get molecule with additional checks for large molecules
  */
+export async function resolveIdentifier(query: string, type: SearchType): Promise<number | null> {
+  try {
+    let url: string
+    switch (type) {
+      case 'cid':
+        return parseInt(query, 10) || null
+      case 'cas':
+        url = `${BASE_URL}/compound/name/${encodeURIComponent(query)}/cids/JSON`
+        break
+      case 'smiles':
+        url = `${BASE_URL}/compound/smiles/${encodeURIComponent(query)}/cids/JSON`
+        break
+      case 'inchikey':
+        url = `${BASE_URL}/compound/inchikey/${encodeURIComponent(query)}/cids/JSON`
+        break
+      case 'inchi':
+        url = `${BASE_URL}/compound/inchi/${encodeURIComponent(query)}/cids/JSON`
+        break
+      case 'formula':
+        url = `${BASE_URL}/compound/formula/${encodeURIComponent(query)}/cids/JSON?MaxRecords=1`
+        break
+      case 'name':
+      default:
+        url = `${BASE_URL}/compound/name/${encodeURIComponent(query)}/cids/JSON`
+        break
+    }
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return null
+    const data = await res.json()
+    const cidList = data.IdentifierList?.CID ?? data.PC_URIs?.[0]?.CID
+    if (Array.isArray(cidList)) return cidList[0] ?? null
+    if (typeof cidList === 'number') return cidList
+    return null
+  } catch {
+    return null
+  }
+}
+
+export async function searchByType(query: string, type: SearchType): Promise<string[]> {
+  try {
+    if (type === 'name') {
+      return searchMolecules(query)
+    }
+    const cid = await resolveIdentifier(query, type)
+    if (!cid) return []
+    return [`CID ${cid}`]
+  } catch {
+    return []
+  }
+}
+
 export async function getMoleculeByIdSafe(cid: number): Promise<Molecule | { error: string; cid: number }> {
   const molecule = await getMoleculeById(cid)
   if (!molecule) {

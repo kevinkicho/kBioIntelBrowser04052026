@@ -3,7 +3,11 @@ import { getMoleculeById } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
 import { safe } from '@/lib/utils'
 import { trackedSafe, flushApiMetrics } from '@/lib/api-tracker'
+import { API_SOURCE_TIMEOUTS } from '@/lib/utils'
 import { recordMetric } from '@/lib/analytics/db'
+
+import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
+import { getMoleculeIdentifiers, resolveApiQuery, getApiParamNumber } from '@/lib/resolveApiQuery'
 
 // Pharmaceutical
 import { getDrugsByIngredient } from '@/lib/api/openfda'
@@ -173,20 +177,21 @@ async function fetchSynthesisRoutes(moleculeName: string): Promise<SynthesisRout
   return [...keggRoutes, ...(rheaRoutes as SynthesisRoute[])]
 }
 
-async function fetchPharmaceutical(name: string, synonyms: string[]) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const searchTerms = [name, ...synonyms.slice(0, 1)]
   const [companiesNested, ndcProducts, orangeBookEntries, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
     trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
-    trackedSafe('fda-ndc', getNdcProductsByName(name), []),
-    trackedSafe('orangebook', getOrangeBookByName(name), []),
+    trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
+    trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
     trackedSafe('nadac', getDrugPricesByName(name), []),
-    trackedSafe('rxnorm', getDrugInteractionsByName(name), []),
+    trackedSafe('rxnorm', getDrugInteractionsByName(queryFor('drug-interactions')), []),
     trackedSafe('dailymed', getDrugLabelsByName(name), []),
-    trackedSafe('atc', getAtcClassificationsByName(name), []),
-    trackedSafe('drugcentral', getDrugCentralEnhanced(name), { drug: null, targets: [], indications: [], pharmacologicActions: [], atcCodes: [], manufacturers: [], products: [] }),
+    trackedSafe('atc', getAtcClassificationsByName(queryFor('atc')), []),
+    trackedSafe('drugcentral', getDrugCentralEnhanced(queryFor('drugcentral')), { drug: null, targets: [], indications: [], pharmacologicActions: [], atcCodes: [], manufacturers: [], products: [] }),
     trackedSafe('gsrs', searchGSRS(name), []),
-    trackedSafe('pharmgkb', getPharmGKBData(name), { drugs: [], genes: [], guidelines: [] }),
-    trackedSafe('cpic', getCPICData(name), []),
+    trackedSafe('pharmgkb', getPharmGKBData(queryFor('pharmgkb')), { drugs: [], genes: [], guidelines: [] }),
+    trackedSafe('cpic', getCPICData(queryFor('cpic')), []),
   ])
   const seen = new Set<string>()
   const companies = companiesNested.flat().filter(p => {
@@ -209,18 +214,19 @@ async function fetchPharmaceutical(name: string, synonyms: string[]) {
   }
 }
 
-async function fetchClinicalSafety(name: string) {
+async function fetchClinicalSafety(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
+  const clinicalTrialsLimit = getApiParamNumber(apiParams, 'clinical-trials', 'maxResults', 10)
   const [clinicalTrials, isrctnTrials, adverseEvents, drugRecalls, chemblIndications, clinVarVariants, gwasAssociations, toxcastData, siderData, irisAssessments, drugShortagesData] = await Promise.all([
-    trackedSafe('clinicaltrials', getClinicalTrialsByName(name), []),
+    trackedSafe('clinicaltrials', getClinicalTrialsByName(queryFor('clinical-trials'), clinicalTrialsLimit), []),
     trackedSafe('isrctn', searchISRCTN(name), []),
-    trackedSafe('adverseevents', getAdverseEventsByName(name), []),
-    trackedSafe('recalls', getDrugRecallsByName(name), []),
+    trackedSafe('adverseevents', getAdverseEventsByName(queryFor('adverse-events')), []),
+    trackedSafe('recalls', getDrugRecallsByName(queryFor('recalls')), []),
     trackedSafe('chembl-indications', getChemblIndicationsByName(name), []),
-    trackedSafe('clinvar', getClinVarVariantsByName(name), []),
-    trackedSafe('gwas-catalog', getGwasAssociationsByName(name), []),
-    trackedSafe('toxcast', getToxCastData(name), { casrn: '', dtxsid: '', chemicalName: '', assays: [], summary: { totalAssays: 0, activeAssays: 0, inactiveAssays: 0, inconclusiveAssays: 0, topHitSubcategory: '' } }),
-    trackedSafe('sider', getSIDERData(name), { sideEffects: [] }),
-    trackedSafe('iris', searchIRIS(name), []),
+    trackedSafe('clinvar', getClinVarVariantsByName(queryFor('clinvar'), getApiParamNumber(apiParams, 'clinvar', 'maxResults', 20)), []),
+    trackedSafe('gwas-catalog', getGwasAssociationsByName(queryFor('gwas-catalog')), []),
+    trackedSafe('toxcast', getToxCastData(queryFor('toxcast')), null),
+    trackedSafe('sider', getSIDERData(queryFor('sider')), { sideEffects: [] }),
+    trackedSafe('iris', searchIRIS(queryFor('iris')), []),
     trackedSafe('fda-drug-shortages', searchDrugShortages(name), { shortages: [], total: 0 }),
   ])
   return {
@@ -238,21 +244,22 @@ async function fetchClinicalSafety(name: string) {
   }
 }
 
-async function fetchMolecularChemical(name: string, cid: number, molecularWeight: number) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function fetchMolecularChemical(name: string, cid: number, molecularWeight: number, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [computedProperties, ghsHazards, chebiAnnotation, compToxData, routes, metabolomicsData, myChemData, hmdbData, massBankSpectra, chemSpiderCompounds, metabolightsData, gnpsData, lipidMapsResult, unichemResult, foodbCompounds] = await Promise.all([
     trackedSafe('pubchem-properties', getComputedPropertiesByCid(cid), null),
     trackedSafe('pubchem-hazards', getGhsHazardsByCid(cid), { signalWord: '', hazardStatements: [], precautionaryStatements: [] }),
-    trackedSafe('chebi', getChebiAnnotationByName(name), null),
-    trackedSafe('comptox', getCompToxByName(name), null),
+    trackedSafe('chebi', getChebiAnnotationByName(queryFor('chebi')), null),
+    trackedSafe('comptox', getCompToxByName(queryFor('comptox')), null),
     trackedSafe('synthesis-routes', fetchSynthesisRoutes(name), []),
     trackedSafe('metabolomics', getMetabolomicsData(name, molecularWeight), { metabolites: [], studies: [] }),
-    trackedSafe('mychem', getMyChemData(name), { chemicals: [] }),
-    trackedSafe('hmdb', getHMDBData(name), { metabolites: [] }),
-    trackedSafe('massbank', searchMassBank(name), []),
-    trackedSafe('chemspider', searchChemSpider(name), []),
+    trackedSafe('mychem', getMyChemData(queryFor('mychem')), { chemicals: [] }),
+    trackedSafe('hmdb', getHMDBData(queryFor('hmdb')), { metabolites: [] }),
+    trackedSafe('massbank', searchMassBank(queryFor('massbank')), [], API_SOURCE_TIMEOUTS['massbank']),
+    trackedSafe('chemspider', searchChemSpider(queryFor('chemspider')), []),
     trackedSafe('metabolights', searchMetaboLights(name), []),
     trackedSafe('gnps-library', Promise.all([searchGNPSLibrary(name), searchGNPSNetworks(name)]).then(([spectra, clusters]) => ({ spectra, clusters })), { spectra: [], clusters: [] }),
-    trackedSafe('lipidmaps', searchLipidMaps(name), { lipids: [], total: 0 }),
+    trackedSafe('lipidmaps', searchLipidMaps(queryFor('lipidmaps')), { lipids: [], total: 0 }),
     trackedSafe('unichem', getAllCompoundIds('pubchem', String(cid)), { inchiKey: null, mappings: {} }),
     trackedSafe('foodb', searchFooDB(name), []),
   ])
@@ -280,20 +287,21 @@ async function fetchMolecularChemical(name: string, cid: number, molecularWeight
   }
 }
 
-async function fetchBioactivityTargets(name: string) {
+async function fetchBioactivityTargets(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
+  const chemblLimit = getApiParamNumber(apiParams, 'chembl', 'maxResults', 20)
   const [chemblActivities, bioAssays, chemblMechanisms, pharmacologyTargets, bindingAffinities, pharosTargets, drugGeneInteractions, diseaseAssociations, ctdData, iedbData, lincsSignatures, ttdData] = await Promise.all([
-    trackedSafe('chembl', getChemblActivitiesByName(name), []),
-    trackedSafe('bioassay', getBioAssaysByName(name), []),
-    trackedSafe('chembl-mechanisms', getChemblMechanismsByName(name), []),
-    trackedSafe('iuphar', getPharmacologyTargetsByName(name), []),
-    trackedSafe('bindingdb', getBindingAffinitiesByName(name), []),
-    trackedSafe('pharos', getPharosTargetsByName(name), []),
-    trackedSafe('dgidb', getDrugGeneInteractionsByName(name), []),
-    trackedSafe('opentargets', getDiseaseAssociationsByName(name), []),
-    trackedSafe('ctd', getCTDData(name, false), { interactions: [], diseaseAssociations: [] }),
-    trackedSafe('iedb', getIEDBData(name), { epitopes: [] }),
-    trackedSafe('lincs', getLINCSSignaturesByName(name), []),
-    trackedSafe('ttd', getTTDData(name), { targets: [], drugs: [] }),
+    trackedSafe('chembl', getChemblActivitiesByName(queryFor('chembl'), chemblLimit), [], API_SOURCE_TIMEOUTS['chembl']),
+    trackedSafe('bioassay', getBioAssaysByName(queryFor('bioassay')), []),
+    trackedSafe('chembl-mechanisms', getChemblMechanismsByName(queryFor('chembl-mechanisms'), getApiParamNumber(apiParams, 'chembl-mechanisms', 'maxResults', 20)), [], API_SOURCE_TIMEOUTS['chembl-mechanisms']),
+    trackedSafe('iuphar', getPharmacologyTargetsByName(queryFor('iuphar')), []),
+    trackedSafe('bindingdb', getBindingAffinitiesByName(queryFor('bindingdb')), []),
+    trackedSafe('pharos', getPharosTargetsByName(queryFor('pharos')), []),
+    trackedSafe('dgidb', getDrugGeneInteractionsByName(queryFor('dgidb')), []),
+    trackedSafe('opentargets', getDiseaseAssociationsByName(queryFor('opentargets')), [], API_SOURCE_TIMEOUTS['opentargets']),
+    trackedSafe('ctd', getCTDData(queryFor('ctd'), false), { interactions: [], diseaseAssociations: [] }),
+    trackedSafe('iedb', getIEDBData(queryFor('iedb')), { epitopes: [] }),
+    trackedSafe('lincs', getLINCSSignaturesByName(queryFor('lincs')), [], API_SOURCE_TIMEOUTS['lincs']),
+    trackedSafe('ttd', getTTDData(queryFor('ttd')), { targets: [], drugs: [] }),
   ])
   return {
     chemblActivities,
@@ -313,10 +321,11 @@ async function fetchBioactivityTargets(name: string) {
   }
 }
 
-async function fetchProteinStructure(name: string) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function fetchProteinStructure(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [uniprotEntries, pdbStructures, pdbeLigands, prideProjects, cathDomains, sabdabEntries] = await Promise.all([
-    safe(getUniprotEntriesByName(name), []),
-    safe(getPdbStructuresByName(name), []),
+    safe(getUniprotEntriesByName(queryFor('uniprot')), []),
+    safe(getPdbStructuresByName(queryFor('pdb')), []),
     safe(getPdbeLigandsByName(name), []),
     safe(searchPRIDE(name), []),
     safe(searchCATHDomains(name), []),
@@ -359,21 +368,22 @@ async function fetchProteinStructure(name: string) {
   }
 }
 
-async function fetchGenomicsDisease(name: string) {
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+async function fetchGenomicsDisease(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [uniprotEntries, geneInfo, monarchDiseases, nciConcepts, meshTerms, disgenetData, orphanetData, myGeneData, omimData, geoDatasets, dbSnpVariants, clinGenData, medGenConcepts] = await Promise.all([
-    trackedSafe('uniprot', getUniprotEntriesByName(name), []),
-    trackedSafe('ncbi-gene', getGeneInfoByName(name), []),
-    trackedSafe('monarch', getMonarchDiseasesByName(name), []),
-    trackedSafe('nci-thesaurus', getNciConceptsByName(name), []),
-    trackedSafe('mesh', getMeshTermsByName(name), []),
-    trackedSafe('disgenet', getDisGeNetData(name), { associations: [] }),
-    trackedSafe('orphanet', getOrphanetData(name), { diseases: [] }),
-    trackedSafe('mygene', getMyGeneData(name), { genes: [] }),
-    trackedSafe('omim', getOMIMData(name), { entries: [] }),
+    trackedSafe('uniprot', getUniprotEntriesByName(queryFor('uniprot')), []),
+    trackedSafe('ncbi-gene', getGeneInfoByName(queryFor('gene-info')), []),
+    trackedSafe('monarch', getMonarchDiseasesByName(queryFor('monarch')), []),
+    trackedSafe('nci-thesaurus', getNciConceptsByName(queryFor('nci-thesaurus')), []),
+    trackedSafe('mesh', getMeshTermsByName(queryFor('mesh')), []),
+    trackedSafe('disgenet', getDisGeNetData(queryFor('disgenet')), { associations: [] }),
+    trackedSafe('orphanet', getOrphanetData(queryFor('orphanet')), { diseases: [] }),
+    trackedSafe('mygene', getMyGeneData(queryFor('mygene')), { genes: [] }),
+    trackedSafe('omim', getOMIMData(queryFor('omim')), { entries: [] }),
     trackedSafe('geo', searchGEO(name), []),
-    trackedSafe('dbsnp', getDbSNPVariants(name), []),
-    trackedSafe('clingen', getClinGenData(name), { geneDiseases: [], variants: [] }),
-    trackedSafe('medgen', getMedGenConcepts(name), []),
+    trackedSafe('dbsnp', getDbSNPVariants(queryFor('dbsnp')), []),
+    trackedSafe('clingen', getClinGenData(queryFor('clingen')), { geneDiseases: [], variants: [] }),
+    trackedSafe('medgen', getMedGenConcepts(queryFor('medgen')), []),
   ])
   const geneSymbols = (uniprotEntries as Array<{geneName: string}>).map(e => e.geneName).filter(Boolean)
   const [ensemblGenes, geneExpressions, bgeeData, gtexExpressions, goTerms, hpoTerms, olsTerms, bioModelsResult, bioSamplesResult, massiveResult] = await Promise.all([
@@ -381,7 +391,7 @@ async function fetchGenomicsDisease(name: string) {
     trackedSafe('expression-atlas', getGeneExpressionBySymbols(geneSymbols), []),
     trackedSafe('bgee', getBgeeData(name), { expressions: [] }),
     trackedSafe('gtex', Promise.all(geneSymbols.slice(0, 5).map(g => getGTExTopTissues(g, 10).catch(() => []))).then(r => r.flat()), []),
-    trackedSafe('gene-ontology', Promise.all(geneSymbols.slice(0, 5).map(g => searchGOTerms(g).catch(() => []))).then(r => r.flat()), []),
+    trackedSafe('gene-ontology', Promise.all(geneSymbols.slice(0, 5).map(g => searchGOTerms(g).then(r => r.terms).catch(() => []))).then(r => r.flat()), []),
     trackedSafe('hpo', searchHPOTerms(name), { terms: [], total: 0 }),
     trackedSafe('ols', searchOLS(name), { terms: [], total: 0 }),
     trackedSafe('biomodels', searchBioModels(name), { models: [], total: 0 }),
@@ -414,45 +424,45 @@ async function fetchGenomicsDisease(name: string) {
   }
 }
 
-async function fetchInteractionsPathways(name: string) {
+async function fetchInteractionsPathways(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [proteinInteractions, chemicalProteinInteractions, molecularInteractions, reactomePathways, wikiPathways, pathwayCommonsResults, bioCycPathways, smpdbPathways, keggData] = await Promise.all([
-    trackedSafe('string-db', getProteinInteractionsByName(name), []),
-    trackedSafe('stitch', getChemicalInteractionsByName(name), []),
-    trackedSafe('intact', getMolecularInteractionsByName(name), []),
-    trackedSafe('reactome', getReactomePathwaysByName(name), []),
-    trackedSafe('wikipathways', getWikiPathwaysByName(name), []),
-    trackedSafe('pathway-commons', getPathwayCommonsByName(name), []),
-    trackedSafe('biocyc', searchBioCyc(name), []),
-    trackedSafe('smpdb', searchSMPDB(name), []),
-    trackedSafe('kegg', getKEGGData(name), { pathways: [], compounds: [], drugs: [] }),
+    trackedSafe('string-db', getProteinInteractionsByName(queryFor('string'), getApiParamNumber(apiParams, 'string', 'maxResults', 10), Number(apiParams['string']?.minScore ?? 0)), []),
+    trackedSafe('stitch', getChemicalInteractionsByName(queryFor('stitch')), []),
+    trackedSafe('intact', getMolecularInteractionsByName(queryFor('intact')), []),
+    trackedSafe('reactome', getReactomePathwaysByName(queryFor('reactome')), []),
+    trackedSafe('wikipathways', getWikiPathwaysByName(queryFor('wikipathways')), []),
+    trackedSafe('pathway-commons', getPathwayCommonsByName(queryFor('pathway-commons')), []),
+    trackedSafe('biocyc', searchBioCyc(queryFor('biocyc')), []),
+    trackedSafe('smpdb', searchSMPDB(queryFor('smpdb')), []),
+    trackedSafe('kegg', getKEGGData(queryFor('kegg')), { pathways: [], compounds: [], drugs: [] }),
   ])
   return { proteinInteractions, chemicalProteinInteractions, molecularInteractions, reactomePathways, wikiPathways, pathwayCommonsResults, bioCycPathways, smpdbPathways, keggData }
 }
 
-async function fetchResearchLiterature(name: string) {
+async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [literature, nihGrants, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
-    trackedSafe('europepmc', getLiteratureByName(name), []),
-    trackedSafe('nihreporter', getNihGrantsByName(name), []),
-    trackedSafe('patents', getPatentsByMoleculeName(name), []),
-    trackedSafe('secedgar', getSecFilingsByName(name), []),
-    trackedSafe('semantic-scholar', getSemanticPapersByName(name), []),
-    trackedSafe('openalex', getOpenAlexWorksByName(name), []),
-    trackedSafe('pubmed', searchPubMed(name, 20), []),
-    trackedSafe('crossref', searchCrossRef(name), []),
-    trackedSafe('arxiv', searchArXiv(name), []),
+    trackedSafe('europepmc', getLiteratureByName(queryFor('literature')), []),
+    trackedSafe('nihreporter', getNihGrantsByName(queryFor('nih-reporter')), []),
+    trackedSafe('patents', getPatentsByMoleculeName(queryFor('patents')), []),
+    trackedSafe('secedgar', getSecFilingsByName(queryFor('sec')), []),
+    trackedSafe('semantic-scholar', getSemanticPapersByName(queryFor('semantic-scholar')), []),
+    trackedSafe('openalex', getOpenAlexWorksByName(queryFor('open-alex')), []),
+    trackedSafe('pubmed', searchPubMed(queryFor('pubmed'), getApiParamNumber(apiParams, 'pubmed', 'maxResults', 20)), []),
+    trackedSafe('crossref', searchCrossRef(queryFor('crossref')), []),
+    trackedSafe('arxiv', searchArXiv(queryFor('arxiv')), []),
   ])
   const dois = (literature as Array<{doi?: string}>).map(l => l.doi).filter(Boolean) as string[]
   const citationMetrics = await trackedSafe('opencitations', getCitationMetrics(dois), [])
   return { literature, nihGrants, patents, secFilings, semanticPapers, openAlexWorks, citationMetrics, pubmedArticles, crossRefWorks, arxivPapers }
 }
 
-async function fetchNihHighImpact(name: string) {
+async function fetchNihHighImpact(name: string, queryFor: (s: string) => string) {
   const [translatorData, cadsrData, anvilData, immPortData, neuroMMSigData] = await Promise.all([
-    safe(fetchTranslatorData(name), null),
-    safe(fetchCadsrData(name), null),
-    safe(fetchAnvilData(name), null),
-    safe(fetchImmPortData(name), null),
-    safe(fetchNeuroMMSigData(name), null),
+    trackedSafe('ncats-translator', fetchTranslatorData(queryFor('ncats-translator')), null),
+    trackedSafe('nci-cadsr', fetchCadsrData(queryFor('nci-cadsr')), null),
+    trackedSafe('nhgri-anvil', fetchAnvilData(queryFor('nhgri-anvil')), null),
+    trackedSafe('niaid-immport', fetchImmPortData(queryFor('niaid-immport')), null),
+    trackedSafe('ninds-neurommsig', fetchNeuroMMSigData(queryFor('ninds-neurommsig')), null),
   ])
   return { translatorData, cadsrData, anvilData, immPortData, neuroMMSigData }
 }
@@ -481,7 +491,7 @@ function normalizeGoTerms(raw: unknown): unknown[] {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string; categoryId: string } }
 ) {
   const cid = parseInt(params.id, 10)
@@ -503,82 +513,67 @@ export async function GET(
   const synonyms = molecule.synonyms || []
   const molecularWeight = molecule.molecularWeight || 0
 
-  const cacheKey = `category:${cid}:${categoryId}`
+  let overrides: Record<string, ApiIdentifierType> = {}
+  let apiParams: Record<string, ApiParamValue> = {}
+  try {
+    const overridesStr = request.nextUrl.searchParams.get('overrides')
+    if (overridesStr) overrides = JSON.parse(overridesStr)
+  } catch {}
+  try {
+    const paramsStr = request.nextUrl.searchParams.get('params')
+    if (paramsStr) apiParams = JSON.parse(paramsStr)
+  } catch {}
+
+  const hasOverrides = Object.keys(overrides).length > 0
+  const identifiers = hasOverrides ? await getMoleculeIdentifiers(cid) : null
+  const queryFor = (source: string): string => {
+    if (identifiers) return resolveApiQuery(identifiers, source, overrides)
+    return name
+  }
+
+  const cacheKey = `category:${cid}:${categoryId}${Object.keys(overrides).length > 0 ? `:${request.nextUrl.searchParams.get('overrides')}` : ''}`
   const cached = getCached<Record<string, unknown>>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
   }
 
   let data: Record<string, unknown>
-  const startTime = Date.now()
+  void Date.now()
   try {
     switch (categoryId) {
       case 'pharmaceutical':
-        data = await fetchPharmaceutical(name, synonyms)
+        data = await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
         break
       case 'clinical-safety':
-        data = await fetchClinicalSafety(name)
+        data = await fetchClinicalSafety(name, queryFor, apiParams)
         break
       case 'molecular-chemical':
-        data = await fetchMolecularChemical(name, cid, molecularWeight)
+        data = await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
         break
       case 'bioactivity-targets':
-        data = await fetchBioactivityTargets(name)
+        data = await fetchBioactivityTargets(name, queryFor, apiParams)
         break
       case 'protein-structure':
-        data = await fetchProteinStructure(name)
+        data = await fetchProteinStructure(name, queryFor, apiParams)
         break
       case 'genomics-disease':
-        data = await fetchGenomicsDisease(name)
+        data = await fetchGenomicsDisease(name, queryFor, apiParams)
         break
       case 'interactions-pathways':
-        data = await fetchInteractionsPathways(name)
+        data = await fetchInteractionsPathways(name, queryFor, apiParams)
         break
       case 'research-literature':
-        data = await fetchResearchLiterature(name)
+        data = await fetchResearchLiterature(name, queryFor, apiParams)
         break
       case 'nih-high-impact':
-        data = await fetchNihHighImpact(name)
+        data = await fetchNihHighImpact(name, queryFor)
         break
       default:
         return NextResponse.json({ error: 'Unknown category' }, { status: 400 })
     }
 
-    const duration = Date.now() - startTime
-    const panelKeys = Object.keys(data)
-    let totalItems = 0
-    let hasAnyData = false
-    for (const key of panelKeys) {
-      const val = data[key]
-      if (val && typeof val === 'object' && 'data' in (val as object)) {
-        const inner = (val as Record<string, unknown>).data
-        if (Array.isArray(inner)) {
-          totalItems += inner.length
-          if (inner.length > 0) hasAnyData = true
-        } else if (inner && typeof inner === 'object') {
-          const arrVals = Object.values(inner as Record<string, unknown>)
-          const foundArr = arrVals.find(Array.isArray)
-          if (foundArr && Array.isArray(foundArr)) {
-            totalItems += foundArr.length
-            if (foundArr.length > 0) hasAnyData = true
-          } else if (arrVals.length > 0) {
-            hasAnyData = true
-          }
-        }
-      } else if (Array.isArray(val)) {
-        totalItems += val.length
-        if (val.length > 0) hasAnyData = true
-      }
-    }
+    // duration computed but no longer tracked at category level
 
-    recordMetric({
-      source: `category:${categoryId}`,
-      endpoint: `/api/molecule/${cid}/category/${categoryId}`,
-      status: 200,
-      duration_ms: duration,
-      has_data: hasAnyData,
-      items_count: totalItems,
-    })
     for (const m of flushApiMetrics()) {
       recordMetric({
         source: m.source,
@@ -590,15 +585,6 @@ export async function GET(
       })
     }
   } catch (err) {
-    const duration = Date.now() - startTime
-    recordMetric({
-      source: `category:${categoryId}`,
-      endpoint: `/api/molecule/${cid}/category/${categoryId}`,
-      status: 500,
-      duration_ms: duration,
-      error: err instanceof Error ? err.message : String(err),
-      has_data: false,
-    })
     for (const m of flushApiMetrics()) {
       recordMetric({
         source: m.source,

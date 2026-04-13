@@ -3,12 +3,33 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientFetch } from '@/lib/clientFetch'
+import { type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
 
 interface SearchBarProps {
   onNavigating?: (navigating: boolean) => void
+  searchType?: SearchType
+  apiOverrides?: Record<string, ApiIdentifierType>
+  apiParams?: Record<string, ApiParamValue>
 }
 
-export function SearchBar({ onNavigating }: SearchBarProps) {
+function buildSearchParams(searchType: SearchType, apiOverrides?: Record<string, ApiIdentifierType>, apiParams?: Record<string, ApiParamValue>): string {
+  const params = new URLSearchParams()
+  if (searchType !== 'name') params.set('searchType', searchType)
+  if (apiOverrides && Object.keys(apiOverrides).length > 0) {
+    params.set('overrides', JSON.stringify(apiOverrides))
+  }
+  if (apiParams && Object.keys(apiParams).filter(k => Object.keys(apiParams[k]).length > 0).length > 0) {
+    const filtered: Record<string, ApiParamValue> = {}
+    for (const [k, v] of Object.entries(apiParams)) {
+      if (Object.keys(v).length > 0) filtered[k] = v
+    }
+    if (Object.keys(filtered).length > 0) params.set('params', JSON.stringify(filtered))
+  }
+  const s = params.toString()
+  return s ? `?${s}` : ''
+}
+
+export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, apiParams }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
@@ -33,7 +54,7 @@ export function SearchBar({ onNavigating }: SearchBarProps) {
     debounceRef.current = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const res = await clientFetch(`/api/search?q=${encodeURIComponent(query)}`)
+        const res = await clientFetch(`/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(searchType)}`)
         if (res.ok) {
           const data = await res.json()
           setSuggestions(data.suggestions ?? [])
@@ -45,7 +66,7 @@ export function SearchBar({ onNavigating }: SearchBarProps) {
     }, 300)
 
     return () => clearTimeout(debounceRef.current)
-  }, [query])
+  }, [query, searchType])
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
@@ -70,28 +91,63 @@ export function SearchBar({ onNavigating }: SearchBarProps) {
     setIsOpen(false)
     setSuggestions([])
     setQuery(name)
+
+    if (searchType === 'cid' && /^\d+$/.test(name.replace('CID ', ''))) {
+      const cid = parseInt(name.replace('CID ', ''), 10)
+      if (cid > 0) {
+        router.push(`/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+        return
+      }
+    }
+
     try {
-      const res = await clientFetch(`/api/search/resolve?name=${encodeURIComponent(name)}`)
+      const res = await clientFetch(`/api/search/resolve?name=${encodeURIComponent(name)}&type=${encodeURIComponent(searchType)}`)
       if (res.ok) {
         const data = await res.json()
         if (data.cid) {
-          router.push(`/molecule/${data.cid}`)
+          router.push(`/molecule/${data.cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
           return
         }
       }
     } catch {}
-    router.push(`/molecule/name/${encodeURIComponent(name)}`)
+
+    if (searchType === 'cid') {
+      const cid = parseInt(query, 10)
+      if (cid > 0) {
+        router.push(`/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+        return
+      }
+    }
+
+    router.push(`/molecule/name/${encodeURIComponent(name)}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent) {
+    if (e.key === 'Enter' && query.trim().length >= 2) {
+      handleSelect(query.trim())
+    }
+  }
+
+  const placeholders: Record<SearchType, string> = {
+    name: 'Search a molecule, drug, enzyme, or gene...',
+    cid: 'Enter a PubChem CID number...',
+    cas: 'Enter a CAS Registry Number (e.g. 50-78-2)...',
+    smiles: 'Enter a SMILES string...',
+    inchikey: 'Enter an InChIKey (e.g. RYXSWKPIZGBOPP-UHFFFAOYSA-N)...',
+    inchi: 'Enter an InChI string...',
+    formula: 'Enter a molecular formula (e.g. C9H8O4)...',
   }
 
   return (
-    <div className="relative w-full max-w-2xl" ref={containerRef}>
+    <div className="relative w-full" ref={containerRef}>
       <div className="relative">
         <input
           type="text"
           value={query}
           onChange={e => { if (!isNavigating) setQuery(e.target.value) }}
+          onKeyDown={handleKeyDown}
           onFocus={() => { if (suggestions.length > 0 && !isNavigating) setIsOpen(true) }}
-          placeholder="Search a molecule, drug, enzyme, or gene..."
+          placeholder={placeholders[searchType]}
           disabled={isNavigating}
           className="w-full bg-slate-800 border border-slate-600 rounded-xl px-5 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
         />

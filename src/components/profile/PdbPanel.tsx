@@ -7,9 +7,11 @@ import { StructureViewer } from '@/components/charts/StructureViewer'
 import type { PdbStructure } from '@/lib/types'
 
 const methodColors: Record<string, string> = {
+  'X-ray': 'bg-sky-900/40 text-sky-300 border-sky-700/30',
   'X-RAY DIFFRACTION': 'bg-sky-900/40 text-sky-300 border-sky-700/30',
   'ELECTRON MICROSCOPY': 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30',
   'SOLUTION NMR': 'bg-amber-900/40 text-amber-300 border-amber-700/30',
+  'NMR': 'bg-amber-900/40 text-amber-300 border-amber-700/30',
 }
 
 export const PdbPanel = memo(function PdbPanel({ structures, panelId, lastFetched }: { structures: PdbStructure[], panelId?: string, lastFetched?: Date }) {
@@ -54,7 +56,7 @@ export const PdbPanel = memo(function PdbPanel({ structures, panelId, lastFetche
               </div>
               <p className="text-xs text-slate-400 mt-1 line-clamp-2">{structure.title}</p>
               <div className="flex items-center gap-3 mt-1">
-                {structure.resolution !== null && (
+                {structure.resolution > 0 && (
                   <span className="text-xs text-slate-500">{structure.resolution.toFixed(1)} Å</span>
                 )}
                 {structure.depositionDate && (

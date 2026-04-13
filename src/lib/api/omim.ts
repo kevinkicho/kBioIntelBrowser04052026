@@ -1,4 +1,5 @@
 import type { OMIMEntry } from '../types'
+import { stripHtml } from '../utils'
 
 const BASE_URL = 'https://api.omim.org/api'
 // OMIM requires API key - users can set via environment variable
@@ -81,7 +82,7 @@ export async function getOMIMEntry(mimNumber: number): Promise<OMIMEntry | null>
       name: entry.titles?.split(';;')?.[0] ?? '',
       prefix: entry.prefix as string ?? '',
       status: entry.status as string ?? '',
-      description: (entry.text?.textSectionList?.[0]?.textSection?.content ?? '').substring(0, 500),
+      description: stripHtml((entry.text?.textSectionList?.[0]?.textSection?.content ?? '').substring(0, 500)),
       geneSymbols,
       phenotypes,
       references,

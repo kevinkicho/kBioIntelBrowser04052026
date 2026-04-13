@@ -1,4 +1,5 @@
 import type { HMDBMetabolite } from '../types'
+import { stripHtml } from '../utils'
 
 const BASE_URL = 'https://hmdb.ca'
 const fetchOptions: RequestInit = { next: { revalidate: 604800 } } // 7 days
@@ -47,6 +48,7 @@ export async function getMetaboliteById(hmdbId: string): Promise<HMDBMetabolite 
     const inchiMatch = text.match(/<inchi>([^<]*)<\/inchi>/)
     const inchiKeyMatch = text.match(/<inchikey>([^<]*)<\/inchikey>/)
     const descriptionMatch = text.match(/<description>([^<]*)<\/description>/)
+    const description = stripHtml(descriptionMatch?.[1] ?? '')
 
     // Extract biospecimen locations
     const biospecimenMatches = text.match(/<biospecimen>([^<]+)<\/biospecien>/g) ?? []
@@ -71,7 +73,7 @@ export async function getMetaboliteById(hmdbId: string): Promise<HMDBMetabolite 
       smiles: smilesMatch?.[1] ?? '',
       inchi: inchiMatch?.[1] ?? '',
       inchiKey: inchiKeyMatch?.[1] ?? '',
-      description: descriptionMatch?.[1] ?? '',
+      description,
       biospecimens: biospecimens.slice(0, 10),
       tissues: tissues.slice(0, 10),
       pathways: pathways.slice(0, 10),

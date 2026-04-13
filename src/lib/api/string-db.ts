@@ -3,9 +3,10 @@ import { LIMITS } from '../api-limits'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-export async function getProteinInteractionsByName(name: string, limit: number = LIMITS.STRING.initial): Promise<StringInteraction[]> {
+export async function getProteinInteractionsByName(name: string, limit: number = LIMITS.STRING.initial, requiredScore: number = 0): Promise<StringInteraction[]> {
   try {
-    const url = `https://string-db.org/api/json/interaction_partners?identifiers=${encodeURIComponent(name)}&species=9606&limit=${limit}`
+    let url = `https://string-db.org/api/json/interaction_partners?identifiers=${encodeURIComponent(name)}&species=9606&limit=${limit}`
+    if (requiredScore > 0) url += `&required_score=${requiredScore}`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()

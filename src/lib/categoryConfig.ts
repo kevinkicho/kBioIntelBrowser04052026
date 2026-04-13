@@ -210,20 +210,14 @@ export const CATEGORIES: CategoryDef[] = [
 ]
 
 function hasRealData(value: unknown): boolean {
-  if (value === null || value === undefined) return false
+  if (value === null || value === undefined || value === '' || value === 0) return false
   if (Array.isArray(value)) return value.length > 0
   if (typeof value === 'object') {
     const obj = value as Record<string, unknown>
     if ('data' in obj && typeof obj.data === 'object' && obj.data !== null) {
       return hasRealData(obj.data)
     }
-    const entries = Object.entries(obj)
-    return entries.some(([, v]) =>
-      v !== null && v !== undefined &&
-      !(Array.isArray(v) && v.length === 0) &&
-      v !== '' &&
-      !(typeof v === 'object' && v !== null && !Array.isArray(v) && !hasRealData(v))
-    )
+    return Object.values(obj).some(v => hasRealData(v))
   }
   return true
 }

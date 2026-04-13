@@ -1,14 +1,14 @@
 # BioIntel Explorer
 
-A public open-science web portal that aggregates molecular, pharmaceutical, clinical, regulatory, and structural biology data from **85+ free public APIs** into a unified molecule profile page with **75+ data panels** across **9 categories**.
+A public open-science web portal that aggregates molecular, pharmaceutical, clinical, regulatory, and structural biology data from **110+ free public APIs** into a unified molecule profile page with **100+ data panels** across **9 categories**.
 
-Search any molecule by name, browse by category, compare side-by-side, or explore relationships through an interactive network graph.
+Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI — with per-API identifier overrides and parameter controls — then browse by category, compare side-by-side, or explore relationships through an interactive network graph.
 
 ## Built With Claude Code
 
-This project was designed and engineered almost entirely by [Claude Code](https://claude.ai/claude-code) (Anthropic's AI coding agent), working in collaboration with a bioengineering domain expert who provided the scientific vision, feature direction, and quality review. Claude Code authored the architecture, all API integrations, UI components, test suite, and documentation — from initial scaffold through 89+ data source integrations across multiple iterative development cycles.
+This project was designed and engineered almost entirely by [Claude Code](https://claude.ai/claude-code) (Anthropic's AI coding agent), working in collaboration with a bioengineering domain expert who provided the scientific vision, feature direction, and quality review. Claude Code authored the architecture, all API integrations, UI components, test suite, and documentation — from initial scaffold through 110+ data source integrations across multiple iterative development cycles.
 
-## Data Sources (85+ Free Public APIs)
+## Data Sources (110+ Free Public APIs)
 
 ### NIH High-Impact (5 APIs)
 | Source | What It Provides |
@@ -19,7 +19,7 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | NIAID ImmPort | Immunology data, clinical studies, and reagents |
 | NINDS NeuroMMSig | Neurological disease mechanisms and signatures |
 
-### Pharmaceutical (9 APIs)
+### Pharmaceutical (11 APIs)
 | Source | What It Provides |
 |--------|-----------------|
 | openFDA Drugs | Manufacturer/brand data, product types, administration routes |
@@ -29,13 +29,12 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | WHO ATC | Anatomical Therapeutic Chemical classification |
 | FDA NDC Directory | National Drug Code packaging, dosage forms, marketing status |
 | CMS NADAC | National Average Drug Acquisition Cost — pharmacy pricing |
-| DrugCentral | Drug indications, FAERS adverse events |
+| DrugCentral | Drug indications, targets, FAERS adverse events, ATC codes |
 | PharmGKB | Pharmacogenomics data and drug-gene associations |
 | CPIC | Clinical pharmacogenetics implementation guidelines |
 | GSRS (UNII) | Unique ingredient identifiers |
-| ChemSpider | Chemical structure database |
 
-### Clinical & Safety (10 APIs)
+### Clinical & Safety (11 APIs)
 | Source | What It Provides |
 |--------|-----------------|
 | ClinicalTrials.gov | Active clinical trials, phases, sponsors, conditions |
@@ -44,10 +43,11 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | FDA Drug Recalls | Safety recalls with severity classification |
 | ChEMBL Indications | Approved and investigational therapeutic indications |
 | ClinVar | Clinically significant genetic variants |
-| GWAS Catalog | Genome-wide association study results |
+| GWAS Catalog | Genome-wide association study results with p-values |
 | EPA ToxCast | High-throughput toxicity assay results |
 | SIDER | Side effect frequency data |
 | EPA IRIS | Toxicological assessments |
+| FDA Drug Shortages | Current and resolved drug shortage reports |
 
 ### Molecular & Chemical (15 APIs)
 | Source | What It Provides |
@@ -64,11 +64,11 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | MassBank | Mass spectrometry data (MassBank3 API) |
 | MetaboLights | Metabolomics repository |
 | GNPS | Mass spectrometry networking |
-| BioCyc | Metabolic pathway database |
-| SMPDB | Small molecule pathway database |
+| LIPID MAPS | Comprehensive lipid classification |
+| UniChem | Cross-references between chemical databases |
 | FooDB | Food compound database |
 
-### Bioactivity & Targets (10 APIs)
+### Bioactivity & Targets (12 APIs)
 | Source | What It Provides |
 |--------|-----------------|
 | ChEMBL | Bioactivity data (IC50, Ki, assay results) |
@@ -77,19 +77,21 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | IUPHAR/GtoP | Ligand-target interactions with affinity |
 | BindingDB | Quantitative binding affinity measurements |
 | Pharos (TCRD) | Target development level classification |
-| DGIdb | Drug-gene interactions |
+| DGIdb v5 | Drug-gene interactions (GraphQL API) |
 | Open Targets | Disease associations |
 | CTD | Chemical-gene-disease interactions |
 | IEDB | Immune epitope database |
+| LINCS L1000 | Perturbation signatures from Connectivity Map |
+| TTD | Therapeutic target database |
 
-### Protein & Structure (12 APIs)
+### Protein & Structure (15 APIs)
 | Source | What It Provides |
 |--------|-----------------|
 | UniProt | Protein targets with functional descriptions |
 | InterPro | Protein domain and family annotations |
-| EBI Proteins | Protein features — active sites, binding sites |
+| EBI Proteins API | Protein features — variants, active sites, binding sites |
 | Human Protein Atlas | Tissue and subcellular localization |
-| QuickGO | Gene Ontology annotations |
+| QuickGO | Gene Ontology annotations (EBI) |
 | RCSB PDB | 3D crystal structures |
 | PDBe Ligands | Small molecule ligand properties |
 | AlphaFold DB | AI-predicted protein structures |
@@ -98,12 +100,13 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | CATH/Gene3D | Protein domain classification |
 | SAbDab | Antibody structure database |
 
-### Genomics & Disease (15 APIs)
+### Genomics & Disease (19 APIs)
 | Source | What It Provides |
 |--------|-----------------|
 | NCBI Gene | Gene summaries, genomic location |
 | Ensembl | Genomic coordinates, biotype classification |
 | Expression Atlas | Gene expression across tissues |
+| GTEx | Tissue-specific gene expression |
 | GEO | Gene Expression Omnibus datasets |
 | dbSNP | Genetic variant database |
 | ClinGen | Clinical genomics resource |
@@ -116,6 +119,9 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | MyGene.info | Gene annotation aggregator |
 | Bgee | Gene expression patterns |
 | OMIM | Genetic disorder database |
+| HPO | Human Phenotype Ontology |
+| OLS | Ontology Lookup Service |
+| CTD Diseases | Disease associations from CTD |
 
 ### Interactions & Pathways (10 APIs)
 | Source | What It Provides |
@@ -126,10 +132,11 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 | Reactome | Biological pathway participation |
 | WikiPathways | Community-curated pathways |
 | Pathway Commons | Aggregated pathway data |
-| CTD Disease | Disease associations from CTD |
-| KEGG Pathways | Metabolic and signaling pathways |
+| BioCyc | Metabolic pathway database |
+| SMPDB | Small molecule pathway database |
+| KEGG | Metabolic and signaling pathways, compounds, drugs |
 
-### Research & Literature (9 APIs)
+### Research & Literature (10 APIs)
 | Source | What It Provides |
 |--------|-----------------|
 | NIH RePORTER | Active NIH-funded research grants |
@@ -145,37 +152,46 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 
 ## Features
 
+### Advanced Search System
+- **7 Identifier Types** — Search by Name, CID, CAS, SMILES, InChIKey, InChI, or Formula
+- **Per-API Identifier Overrides** — Each of the 80+ APIs can be configured to use a different identifier type (e.g., search ChEMBL by SMILES, UniProt by gene symbol, PDB by InChIKey)
+- **Per-API Parameters** — Configure maxResults, filters (clinical trial status, assay type, p-value thresholds, confidence scores), and toggles per API
+- **API Health Checks** — Click any API name to see description, data fields, organization, docs link, endpoint URL, and live health check with latency
+- **Dense Table Layout** — All 80+ APIs visible at once with no-wrap rows, category filter pills, and text filter
+- **Navigation Guard** — Page dims and blocks all clicks during navigation to prevent double-submits
+
 ### Core
-- **Molecule Profile Page** — 75+ panel dashboard aggregating data from 85+ APIs
-- **Collapsible Sidebar Navigation** — 9 category tabs with data availability indicators
+- **Molecule Profile Page** — 100+ panel dashboard aggregating data from 85+ APIs
+- **Horizontal Category Tab Bar** — Sticky top navigation with data availability indicators
+- **Full-Width Content** — No sidebar; content uses the entire viewport width
 - **Lazy Category Loading** — Categories load on-demand (pharmaceutical first, others pre-fetch in background)
 - **Virtual Scrolling** — Large datasets (>20 items) use virtual scrolling for smooth performance
 - **AI Research Summarizer** — Plain-English intelligence briefs from 60+ data points
-- **Shareable URLs** — Active tab and view mode synced to URL for deep linking
+- **Shareable URLs** — Active tab, view mode, and per-API overrides synced to URL for deep linking
 - **Error Boundaries** — Individual panel isolation prevents cascading failures
 - **Request Deduplication** — In-flight API requests are shared across components
-- **Browser Console Logging** — Styled request/response/error logging for easier debugging
+
+### Source Transparency
+- **Panel Source Footer** — Every data card shows the source organization, API name, documentation link, endpoint URL, and "Fetch JSON" button
+- **API Metadata Registry** — 80+ APIs cataloged with organization, description, docs URL, and endpoint
 
 ### Visualization
 - **Interactive Network Graph** — D3.js force-directed graph showing molecule relationships
 - **3D Protein Structure Viewer** — 3Dmol.js viewer with multiple render modes
 - **Interactive Charts** — Clinical trials, adverse events, bioactivity, publications
-- **Pathway Diagrams** — Inline pathway previews from Reactome and WikiPathways
 
 ### Tools
 - **Drug-Drug Interaction Checker** — Cross-reference 2-8 drugs with severity color-coding
 - **Batch Molecule Lookup** — Compare 3-10 molecules side by side
 - **Molecule Comparison** — Two-molecule deep comparison across 20+ dimensions
-- **Similar Molecules** — PubChem structural similarity suggestions
 
 ### Data
 - **PDF Export** — Executive summary with structure, metrics, AI brief
 - **Favorites** — Bookmark system with favorites bar
 - **Data Freshness Indicators** — Time since last fetch for each panel
 - **Server-Side Caching** — LRU cache (200 entries, 24hr TTL)
-- **Consistent Empty States** — All panels show "No data found" instead of vanishing
-- **Hide Empty Panels** — Toggle defaults to hiding panels with no data; auto-loads idle categories when toggled on
-- **API Analytics Dashboard** — `/analytics` page with per-source success rate, latency trends, error tracking, and empty-data detection (SQLite-backed, zero-cost)
+- **Hide Empty Panels** — Toggle defaults to hiding panels with no data
+- **API Analytics Dashboard** — `/analytics` page with per-source success rate, latency trends, error tracking, and empty-data detection
 
 ## Tech Stack
 
@@ -202,12 +218,8 @@ App runs on **http://localhost:52167** by default (configurable via `PORT` env v
 ```env
 OPENFDA_API_KEY=your_key_here          # Increases openFDA rate limits
 NCBI_EMAIL=your_email_here             # NCBI Entrez (required)
+NCBI_API_KEY=your_key_here             # NCBI API key (increases rate limits)
 OMIM_API_KEY=your_key_here             # OMIM genetic disorder data
-NCI_CADSR_API_KEY=your_key_here        # NCI Cancer Data Standards Registry (caDSR)
-NCATS_TRANSLATOR_API_KEY=your_key_here # NCATS Biomedical Translator
-NHGRI_ANVIL_API_KEY=your_key_here      # NHGRI AnVIL
-NIAID_IMMPORT_API_KEY=your_key_here     # NIAID ImmPort
-NINDS_NEUROMMSIG_API_KEY=your_key_here  # NINDS NeuroMMSig
 ```
 
 ## Project Structure
@@ -215,37 +227,54 @@ NINDS_NEUROMMSIG_API_KEY=your_key_here  # NINDS NeuroMMSig
 ```
 src/
   app/
-    page.tsx                     # Home page with search
+    page.tsx                     # Home page with advanced search
     browse/                      # Category browsing
     compare/                     # Side-by-side comparison
     batch/                       # Batch lookup (3-10 molecules)
     interactions/                # Drug interaction checker
     molecule/[id]/               # Profile page (server + client)
-    api/                         # 85+ API routes
+    api/                         # API routes
   lib/
-    api/                         # 85 API client modules
+    api/                         # 85+ API client modules
+    apiIdentifiers.ts            # Per-API identifier configs & parameter definitions
+    resolveApiQuery.ts           # Identifier resolution (name/CID/CAS/SMILES/InChIKey/InChI/formula)
+    panelSources.ts              # Panel→source metadata mapping
     clientFetch.ts               # Browser fetch wrapper with logging & dedup
-    lazyPanels.tsx               # Dynamic imports for 75+ panels
+    fetchCategory.ts             # Category data fetcher with override forwarding
+    lazyPanels.tsx               # Dynamic imports for 100+ panels
     types.ts                     # TypeScript interfaces
     categoryConfig.ts            # Panel/category configuration
+    analytics/api-meta.ts        # API metadata registry (org, docs, endpoint)
   components/
-    profile/                     # 75+ data panel components
+    search/                      # AdvancedSearchPanel, SearchBar
+    profile/                     # 100+ data panel components
     charts/                      # Recharts visualizations
     graph/                       # D3.js network graph
-    ui/                          # Shared primitives (Panel, Card, Table, etc.)
+    ui/                          # Shared primitives (Panel with source footer, Card, Table)
   __tests__/                     # Test suites
 ```
 
 ## Recent Changes
 
+### v0.3.0 (2026-04-13)
+
+- **Advanced Search System:** 7 identifier types (Name, CID, CAS, SMILES, InChIKey, InChI, Formula) with per-API overrides and parameter controls for 80+ APIs
+- **Per-API Settings Pipeline:** Full end-to-end wiring — overrides/params flow from homepage URL params through ProfilePageClient → fetchCategoryData → category route → individual API functions
+- **Dense API Settings Table:** Replaced collapsible category tree with flat no-wrap table showing all 80+ APIs at once; category filter pills and text filter for quick navigation
+- **API Detail Drawer:** Click any API name for description, data fields, organization, docs link, endpoint URL, and live health check with latency
+- **Navigation Guard:** Page dims and blocks all clicks during navigation to prevent double-submits across all interactive elements
+- **Source Footer on Panels:** Every data card shows source organization, API name, docs link, and endpoint URL
+- **Horizontal Category Tab Bar:** Replaced sidebar with sticky top navigation
+- **Identifier Resolution:** `resolveApiQuery.ts` utility resolves correct identifier per API from molecule data (CID, name, CAS, SMILES, InChIKey, InChI, formula)
+- **API Fixes:** LINCS (single signature query), MassBank (timeout/size limits), ChEMBL (timeout override), ATC (response parsing), ToxCast/IRIS/CompTox (search fallback), IUPHAR (fuzzy search), BindingDB (URL), DGIdb (v5 GraphQL), ChemSpider (PubChem rewrite), MeSH (UI URLs), Gene Ontology (EBI QuickGO), PDB (parallel fetch, number resolution), GWAS Catalog (trait→EFO→associations with p-values)
+- **HTML Stripping:** Shared `stripHtml()` utility applied to Reactome, SMPDB, OMIM, MeSH, HMDB, ChEBI, IUPHAR
+- **Per-API Params:** `getChemblMechanismsByName`, `getClinVarVariantsByName`, `searchPubMed`, `getProteinInteractionsByName` (STRING) now accept limit/score parameters
+
 ### v0.2.0 (2026-04-11)
 
-- **Bug Fix:** NIH High-Impact category panels (NCI caDSR, NCATS Translator, NHGRI AnVIL, NIAID ImmPort, NINDS NeuroMMSig) incorrectly showed "5/5" data count even when all panels had no data. The API clients returned wrapper objects (e.g., `{ data: { concepts: [] }, source: '...', timestamp: '' }`) on failure, which the category data counter treated as non-null objects with data. Fixed by:
-  - Changing `safe()` fallbacks in `fetchNihHighImpact()` from wrapper objects to `null`
-  - Updating panel renderers to safely unwrap `null` and wrapper-object responses
-  - Rewriting `getCategoryDataCounts()` with a recursive `hasRealData()` helper that looks inside `{ data: ... }` wrappers to check for actually populated arrays/objects
-- **Dev server:** Fixed `rimraf` dependency error and switched to Node built-in `fs.rmSync`; changed default port to `0` (OS-assigned)
-- **Dev server:** Fixed `serverExternalPackages` config warning (moved to `experimental.serverComponentsExternalPackages` for Next.js 14)
+- **Bug Fix:** NIH High-Impact category panels incorrectly showed "5/5" data count when all panels had no data. Fixed by returning `null` on failure and rewriting `hasRealData()` with recursive check.
+- **Dev server:** Fixed `rimraf` dependency error and switched to Node built-in `fs.rmSync`
+- **Dev server:** Fixed `serverExternalPackages` config warning
 
 ## License
 

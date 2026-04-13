@@ -1,4 +1,5 @@
 import type { MeshTerm } from '../types'
+import { stripHtml } from '../utils'
 import { LIMITS } from '../api-limits'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -24,15 +25,16 @@ export async function getMeshTermsByName(name: string): Promise<MeshTerm[]> {
       .map(uid => {
         const entry = result[uid] as Record<string, unknown>
         const meshTerms = (entry.ds_meshterms as string[]) ?? []
+        const meshUi = String(entry.ds_meshui ?? uid)
         return {
-          meshId: uid,
+          meshId: meshUi,
           termName: meshTerms[0] ?? uid,
           name: meshTerms[0] ?? uid,
-          definition: (entry.ds_scopenote as string) ?? '',
-          scopeNote: (entry.ds_scopenote as string) ?? '',
-          treeNumbers: [] as string[],
-          relatedTerms: [] as string[],
-          url: `https://meshb.nlm.nih.gov/record/ui?ui=${uid}`,
+          definition: stripHtml((entry.ds_scopenote as string) ?? ''),
+          scopeNote: stripHtml((entry.ds_scopenote as string) ?? ''),
+          treeNumbers: ((entry.ds_idxlinks as Array<Record<string, unknown>>) ?? []).map((l: Record<string, unknown>) => String(l.treenum ?? '')).filter(Boolean),
+          relatedTerms: (entry.ds_seerelated as string[]) ?? [],
+          url: `https://meshb.nlm.nih.gov/record/ui?ui=${meshUi}`,
         }
       })
   } catch {

@@ -1,11 +1,11 @@
 import type { PdbStructure } from '../types'
 
 const SEARCH_URL = 'https://search.rcsb.org/rcsbsearch/v2/query'
+const ENTRY_URL = 'https://data.rcsb.org/rest/v1/core/entry'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getPdbStructuresByName(name: string): Promise<PdbStructure[]> {
   try {
-    // Step 1: Search for PDB entries containing the molecule
     const searchBody = JSON.stringify({
       query: {
         type: 'terminal',
@@ -33,63 +33,44 @@ export async function getPdbStructuresByName(name: string): Promise<PdbStructure
       .filter(Boolean)
     if (pdbIds.length === 0) return []
 
-    // Step 2: Fetch summary data for all PDB IDs
-    const idsParam = pdbIds.join(',')
-    const summaryRes = await fetch(
-      `https://data.rcsb.org/rest/v1/core/entry/${idsParam}`,
-      fetchOptions,
+    const results = await Promise.all(
+      pdbIds.map(async (id) => {
+        try {
+          const res = await fetch(`${ENTRY_URL}/${id}`, fetchOptions)
+          if (!res.ok) return null
+          const entry = await res.json()
+
+          const rawResolution = entry?.rcsb_entry_info?.resolution_combined
+          const resolution = Array.isArray(rawResolution)
+            ? Number(rawResolution[0]) || 0
+            : typeof rawResolution === 'number'
+              ? rawResolution
+              : 0
+
+          const rawMethod = entry?.rcsb_entry_info?.experimental_method ?? ''
+          const method = Array.isArray(rawMethod) ? rawMethod.join(', ') : String(rawMethod)
+
+          return {
+            pdbId: id,
+            title: entry?.struct?.title ?? '',
+            resolution: resolution,
+            method,
+            depositionDate: entry?.rcsb_accession_info?.deposit_date
+              ? String(entry.rcsb_accession_info.deposit_date).split('T')[0]
+              : '',
+            releaseDate: '',
+            organisms: [],
+            chains: [],
+            url: `https://www.rcsb.org/structure/${id}`,
+          } as PdbStructure
+        } catch {
+          return null
+        }
+      })
     )
 
-    // If batch endpoint fails, build from search results only
-    if (!summaryRes.ok) {
-      return pdbIds.map(id => ({
-        pdbId: id,
-        title: '',
-        resolution: 0,
-        method: '',
-        depositionDate: '',
-        releaseDate: '',
-        organisms: [],
-        chains: [],
-        url: `https://www.rcsb.org/structure/${id}`,
-      }))
-    }
+    const structures = results.filter((s): s is PdbStructure => s !== null)
 
-    const summaryData = await summaryRes.json()
-
-    // summaryData may be a single object (1 ID) or keyed object (multiple IDs)
-    const entries: Record<string, {
-      struct?: { title?: string }
-      rcsb_entry_info?: {
-        resolution_combined?: number[]
-        experimental_method?: string
-      }
-      rcsb_accession_info?: { deposit_date?: string }
-    }> = pdbIds.length === 1
-      ? { [pdbIds[0]]: summaryData }
-      : summaryData
-
-    const structures = pdbIds
-      .map(id => {
-        const entry = entries[id]
-        if (!entry) return null
-        const resolution = entry.rcsb_entry_info?.resolution_combined?.[0]
-        const result: PdbStructure = {
-          pdbId: id,
-          title: entry.struct?.title ?? '',
-          resolution: resolution != null ? Number(resolution) : 0,
-          method: entry.rcsb_entry_info?.experimental_method ?? '',
-          releaseDate: '',
-          organisms: [],
-          chains: [],
-          depositionDate: entry.rcsb_accession_info?.deposit_date ?? '',
-          url: `https://www.rcsb.org/structure/${id}`,
-        }
-        return result
-      })
-      .filter((s): s is PdbStructure => s !== null)
-
-    // Sort by resolution (best/lowest first), 0 values last
     structures.sort((a, b) => {
       if (a.resolution === 0 && b.resolution === 0) return 0
       if (a.resolution === 0) return 1

@@ -4,7 +4,7 @@ const SEARCH_URL = 'https://www.ebi.ac.uk/chembl/api/data/molecule/search.json'
 const MECHANISM_URL = 'https://www.ebi.ac.uk/chembl/api/data/mechanism.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-export async function getChemblMechanismsByName(name: string): Promise<ChemblMechanism[]> {
+export async function getChemblMechanismsByName(name: string, limit: number = 10): Promise<ChemblMechanism[]> {
   try {
     const searchRes = await fetch(
       `${SEARCH_URL}?q=${encodeURIComponent(name)}&limit=1`,
@@ -17,7 +17,7 @@ export async function getChemblMechanismsByName(name: string): Promise<ChemblMec
     const chemblId = molecules[0].molecule_chembl_id
 
     const mechRes = await fetch(
-      `${MECHANISM_URL}?molecule_chembl_id=${chemblId}&limit=10`,
+      `${MECHANISM_URL}?molecule_chembl_id=${chemblId}&limit=${limit}`,
       fetchOptions
     )
     if (!mechRes.ok) return []

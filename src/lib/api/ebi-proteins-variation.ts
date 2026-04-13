@@ -73,36 +73,40 @@ export async function getProteinVariations(accession: string): Promise<ProteinVa
     if (!data || data.length === 0) return null
 
     const item = data[0]
+    const variations = (item.variations ?? []).map((v: Record<string, unknown>) => {
+      const location = v.featureLocation as Record<string, unknown> | undefined
+      const seqVar = v.sequenceVariation as Record<string, unknown> | undefined
+      const freq = v.frequency as Record<string, unknown> | undefined
+      const locationStart = location?.start as Record<string, unknown> | undefined
+      const locationEnd = location?.end as Record<string, unknown> | undefined
+      return {
+        type: (v.type as string) ?? '',
+        location: {
+          start: (locationStart?.position as number) ?? 0,
+          end: (locationEnd?.position as number) ?? 0,
+        },
+        sequenceVariation: seqVar ? {
+          type: (seqVar.type as string) ?? '',
+          sequence: (seqVar.sequence as string) ?? '',
+        } : undefined,
+        clinicalSignificance: (v.clinicalSignificance as string) ?? undefined,
+        source: (v.source as string) ?? '',
+        sourceId: (v.sourceId as string) ?? '',
+        frequency: freq ? {
+          value: (freq.value as number) ?? 0,
+          population: (freq.population as string) ?? undefined,
+        } : undefined,
+        description: (v.description as string) ?? undefined,
+      }
+    })
+
+    if (variations.length === 0) return null
+
     return {
       accession: item.accession ?? '',
       entryName: item.entryName ?? '',
       geneName: item.geneName?.[0]?.value ?? '',
-      variations: (item.variations ?? []).map((v: Record<string, unknown>) => {
-        const location = v.featureLocation as Record<string, unknown> | undefined
-        const seqVar = v.sequenceVariation as Record<string, unknown> | undefined
-        const freq = v.frequency as Record<string, unknown> | undefined
-        const locationStart = location?.start as Record<string, unknown> | undefined
-        const locationEnd = location?.end as Record<string, unknown> | undefined
-        return {
-          type: (v.type as string) ?? '',
-          location: {
-            start: (locationStart?.position as number) ?? 0,
-            end: (locationEnd?.position as number) ?? 0,
-          },
-          sequenceVariation: seqVar ? {
-            type: (seqVar.type as string) ?? '',
-            sequence: (seqVar.sequence as string) ?? '',
-          } : undefined,
-          clinicalSignificance: (v.clinicalSignificance as string) ?? undefined,
-          source: (v.source as string) ?? '',
-          sourceId: (v.sourceId as string) ?? '',
-          frequency: freq ? {
-            value: (freq.value as number) ?? 0,
-            population: (freq.population as string) ?? undefined,
-          } : undefined,
-          description: (v.description as string) ?? undefined,
-        }
-      }),
+      variations,
     }
   } catch {
     return null
@@ -122,16 +126,20 @@ export async function getProteomicsMappings(accession: string): Promise<Proteomi
     if (!data || data.length === 0) return null
 
     const item = data[0]
+    const proteomicsData = (item.proteomics ?? []).map((p: Record<string, unknown>) => ({
+      proteinId: (p.proteinId as string) ?? '',
+      peptideCount: (p.peptideCount as number) ?? 0,
+      uniquePeptideCount: (p.uniquePeptideCount as number) ?? 0,
+      coverage: (p.coverage as number) ?? 0,
+      experiments: ((p.experiments as string[]) ?? []).map(e => e),
+    }))
+
+    if (proteomicsData.length === 0) return null
+
     return {
       accession: item.accession ?? '',
       entryName: item.entryName ?? '',
-      proteomicsData: (item.proteomics ?? []).map((p: Record<string, unknown>) => ({
-        proteinId: (p.proteinId as string) ?? '',
-        peptideCount: (p.peptideCount as number) ?? 0,
-        uniquePeptideCount: (p.uniquePeptideCount as number) ?? 0,
-        coverage: (p.coverage as number) ?? 0,
-        experiments: ((p.experiments as string[]) ?? []).map(e => e),
-      })),
+      proteomicsData,
     }
   } catch {
     return null
@@ -151,17 +159,21 @@ export async function getProteinCrossReferences(accession: string): Promise<Cros
     if (!data || data.length === 0) return null
 
     const item = data[0]
+    const crossReferences = (item.crossReferences ?? []).map((xr: Record<string, unknown>) => {
+      const db = xr.database as Record<string, unknown> | undefined
+      return {
+        database: (db?.name as string) ?? '',
+        id: (xr.id as string) ?? '',
+        url: (xr.url as string) ?? undefined,
+      }
+    })
+
+    if (crossReferences.length === 0) return null
+
     return {
       accession: item.accession ?? '',
       entryName: item.entryName ?? '',
-      crossReferences: (item.crossReferences ?? []).map((xr: Record<string, unknown>) => {
-        const db = xr.database as Record<string, unknown> | undefined
-        return {
-          database: (db?.name as string) ?? '',
-          id: (xr.id as string) ?? '',
-          url: (xr.url as string) ?? undefined,
-        }
-      }),
+      crossReferences,
     }
   } catch {
     return null

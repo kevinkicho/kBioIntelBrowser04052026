@@ -1,54 +1,72 @@
 import type { PharmacologyTarget } from '../types'
+import { stripHtml } from '../utils'
 
-const SEARCH_BASE = 'https://www.guidetopharmacology.org/services/search'
-const LIGANDS_BASE = 'https://www.guidetopharmacology.org/services/ligands'
+const LIGANDS_URL = 'https://www.guidetopharmacology.org/services/ligands'
+const INTERACTIONS_URL = 'https://www.guidetopharmacology.org/services/interactions'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 const jsonHeaders = { Accept: 'application/json' }
 
+interface LigandResult {
+  ligandId: number
+  name: string
+  type: string
+  approved: boolean
+}
+
+interface InteractionResult {
+  targetId: number
+  targetName: string
+  targetSpecies: string
+  ligandId: number
+  ligandName: string
+  type: string | null
+  action: string | null
+  selectivity: string | null
+  affinity: string | null
+  affinityParameter: string | null
+  primaryTarget: boolean
+  refIds: number[]
+}
+
 export async function getPharmacologyTargetsByName(name: string): Promise<PharmacologyTarget[]> {
   try {
-    const searchUrl = `${SEARCH_BASE}?query=${encodeURIComponent(name)}&type=ligand`
+    const searchUrl = `${LIGANDS_URL}?search=${encodeURIComponent(name)}`
     const searchRes = await fetch(searchUrl, { ...fetchOptions, headers: jsonHeaders })
     if (!searchRes.ok) return []
-    const searchData: { ligandId?: number; name?: string }[] = await searchRes.json()
+
+    const contentLength = searchRes.headers.get('content-length')
+    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) return []
+
+    const searchData: LigandResult[] = await searchRes.json()
     if (!searchData.length) return []
 
-    const ligandId = searchData[0].ligandId
+    const ligand = searchData[0]
+    const ligandId = ligand.ligandId
     if (!ligandId) return []
 
-    const interactionsUrl = `${LIGANDS_BASE}/${ligandId}/interactions`
+    const interactionsUrl = `${INTERACTIONS_URL}?ligandId=${ligandId}`
     const interactionsRes = await fetch(interactionsUrl, { ...fetchOptions, headers: jsonHeaders })
     if (!interactionsRes.ok) return []
-    const interactions: {
-      targetName?: string
-      type?: string | null
-      action?: string | null
-      affinity_median?: number | null
-      affinity_units?: string | null
-      species?: string
-      primaryTarget?: boolean
-    }[] = await interactionsRes.json()
+
+    const interactionContentLength = interactionsRes.headers.get('content-length')
+    if (interactionContentLength && parseInt(interactionContentLength) > 2 * 1024 * 1024) return []
+
+    const interactions: InteractionResult[] = await interactionsRes.json()
 
     const ligandUrl = `https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=${ligandId}`
 
-    return interactions.slice(0, 10).map(interaction => {
-      const affinityType = interaction.type ?? interaction.action ?? ''
-      const affinityNum = interaction.affinity_median
-      const affinityUnits = interaction.affinity_units
-
-      return {
-        targetId: '',
-        targetName: interaction.targetName ?? '',
-        ligandName: searchData[0]?.name ?? '',
-        actionType: affinityType,
-        type: affinityType,
-        affinity: affinityNum ?? undefined,
-        affinityUnit: affinityUnits ?? undefined,
-        species: interaction.species ?? '',
-        primaryTarget: interaction.primaryTarget ?? false,
-        url: ligandUrl,
-      }
-    })
+    return interactions.slice(0, 10).map((interaction) => ({
+      targetId: String(interaction.targetId),
+      targetName: stripHtml(interaction.targetName || ''),
+      ligandName: interaction.ligandName || ligand.name || '',
+      actionType: interaction.type || interaction.action || '',
+      type: interaction.type || '',
+      affinity: interaction.affinity ? parseFloat(interaction.affinity.split('-')[0].trim()) : undefined,
+      affinityUnit: interaction.affinityParameter || undefined,
+      url: ligandUrl,
+      primaryTarget: interaction.primaryTarget ?? false,
+      species: interaction.targetSpecies || '',
+    }))
   } catch {
     return []
   }

@@ -5,8 +5,12 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getGeneInfoByName(name: string): Promise<GeneInfo[]> {
   try {
+    const NCBI_EMAIL = process.env.NCBI_EMAIL ?? ''
+    const NCBI_API_KEY = process.env.NCBI_API_KEY ?? ''
+    const credsSuffix = (NCBI_API_KEY ? `&api_key=${NCBI_API_KEY}` : '') + (NCBI_EMAIL ? `&email=${encodeURIComponent(NCBI_EMAIL)}` : '')
+    const term = `${encodeURIComponent(name)}+AND+Homo+sapiens[Organism]`
     const searchRes = await fetch(
-      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gene&term=${encodeURIComponent(name)}+AND+Homo+sapiens[Organism]&retmode=json&retmax=${LIMITS.NCBI_GENE.initial}`,
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gene&term=${term}&retmode=json&retmax=${LIMITS.NCBI_GENE.initial}${credsSuffix}`,
       fetchOptions,
     )
     if (!searchRes.ok) return []
@@ -15,7 +19,7 @@ export async function getGeneInfoByName(name: string): Promise<GeneInfo[]> {
     if (ids.length === 0) return []
 
     const summaryRes = await fetch(
-      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=gene&id=${ids.join(',')}&retmode=json`,
+      `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=gene&id=${ids.join(',')}&retmode=json${credsSuffix}`,
       fetchOptions,
     )
     if (!summaryRes.ok) return []

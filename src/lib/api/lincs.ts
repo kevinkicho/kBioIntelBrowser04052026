@@ -24,48 +24,61 @@ const LINCS_BASE_URL = 'https://lincsportal.ccs.miami.edu/api/v2'
 
 export async function getLINCSSignaturesByName(name: string, limit: number = 20): Promise<LINCSSignature[]> {
   try {
-    // Search for perturbations by name
-    const searchUrl = `${LINCS_BASE_URL}/perturbations/?search=${encodeURIComponent(name)}&limit=${limit}`
-    const res = await fetch(searchUrl, { next: { revalidate: 86400 } })
-    if (!res.ok) return []
-    const data = await res.json()
-
-    if (!data.results?.length) return []
-
-    const signatures: LINCSSignature[] = []
-
-    for (const perturbation of data.results.slice(0, 10)) {
-      const detailsUrl = `${LINCS_BASE_URL}/perturbations/${perturbation.id}/`
-      const detailsRes = await fetch(detailsUrl, { next: { revalidate: 86400 } })
-      if (!detailsRes.ok) continue
-      const details = await detailsRes.json()
-
-      // Get signature data
-      const signatureUrl = `${LINCS_BASE_URL}/signatures/?perturbation=${perturbation.id}&limit=5`
-      const sigRes = await fetch(signatureUrl, { next: { revalidate: 86400 } })
-      if (!sigRes.ok) continue
-      const sigData = await sigRes.json()
-
-      for (const sig of sigData.results || []) {
-        signatures.push({
-          perturbationId: perturbation.id || '',
-          perturbationName: details.name || perturbation.name || '',
-          perturbationType: details.type || 'small molecule',
-          concentration: Number(details.concentration) || 0,
-          concentrationUnit: details.concentration_unit || 'uM',
-          timePoint: sig.time_point || '24h',
-          cellLine: sig.cell_line || '',
-          cellLineName: sig.cell_line_name || '',
-          tissue: sig.tissue || '',
-          upregulatedGenes: sig.up_genes || [],
-          downregulatedGenes: sig.down_genes || [],
-          zScore: Number(sig.zscore) || 0,
-          pValue: Number(sig.pvalue) || 0,
-        })
+    const sigUrl = `${LINCS_BASE_URL}/signatures/?search=${encodeURIComponent(name)}&limit=${limit}`
+    const res = await fetch(sigUrl, { next: { revalidate: 86400 } })
+    if (!res.ok) {
+      const fallbackUrl = `${LINCS_BASE_URL}/perturbations/?search=${encodeURIComponent(name)}&limit=${Math.min(limit, 5)}`
+      const fallbackRes = await fetch(fallbackUrl, { next: { revalidate: 86400 } })
+      if (!fallbackRes.ok) return []
+      const fallbackData = await fallbackRes.json()
+      if (!fallbackData.results?.length) return []
+      const perturbationIds = fallbackData.results.slice(0, 5).map((p: { id?: string }) => p.id).filter(Boolean)
+      const sigPromises = perturbationIds.map((id: string) =>
+        fetch(`${LINCS_BASE_URL}/signatures/?perturbation=${id}&limit=3`, { next: { revalidate: 86400 } })
+          .then(r => r.ok ? r.json() : null)
+          .catch(() => null)
+      )
+      const sigResults = await Promise.all(sigPromises)
+      const signatures: LINCSSignature[] = []
+      for (const sigData of sigResults) {
+        if (!sigData?.results) continue
+        for (const sig of sigData.results) {
+          signatures.push({
+            perturbationId: sig.perturbation_id || '',
+            perturbationName: sig.perturbation_name || name,
+            perturbationType: sig.perturbation_type || 'small molecule',
+            concentration: Number(sig.concentration) || 0,
+            concentrationUnit: sig.concentration_unit || 'uM',
+            timePoint: sig.time_point || '24h',
+            cellLine: sig.cell_line || '',
+            cellLineName: sig.cell_line_name || '',
+            tissue: sig.tissue || '',
+            upregulatedGenes: sig.up_genes || [],
+            downregulatedGenes: sig.down_genes || [],
+            zScore: Number(sig.zscore) || 0,
+            pValue: Number(sig.pvalue) || 0,
+          })
+        }
       }
+      return signatures
     }
-
-    return signatures
+    const data = await res.json()
+    if (!data.results?.length) return []
+    return data.results.slice(0, limit).map((sig: Record<string, unknown>) => ({
+      perturbationId: (sig.perturbation_id as string) ?? '',
+      perturbationName: (sig.perturbation_name as string) ?? name,
+      perturbationType: (sig.perturbation_type as string) ?? 'small molecule',
+      concentration: Number(sig.concentration) || 0,
+      concentrationUnit: (sig.concentration_unit as string) ?? 'uM',
+      timePoint: (sig.time_point as string) ?? '24h',
+      cellLine: (sig.cell_line as string) ?? '',
+      cellLineName: (sig.cell_line_name as string) ?? '',
+      tissue: (sig.tissue as string) ?? '',
+      upregulatedGenes: (sig.up_genes as string[]) ?? [],
+      downregulatedGenes: (sig.down_genes as string[]) ?? [],
+      zScore: Number(sig.zscore) || 0,
+      pValue: Number(sig.pvalue) || 0,
+    }))
   } catch {
     return []
   }

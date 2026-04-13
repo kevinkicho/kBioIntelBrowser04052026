@@ -23,7 +23,7 @@ export async function getDrugRecallsByName(name: string): Promise<DrugRecall[]> 
     const encoded = encodeURIComponent(name)
     const today = new Date().toISOString().slice(0, 10).replace(/-/g, '')
     const dateFilter = `+AND+report_date:[${twoYearsAgoCompact()}+TO+${today}]`
-    const url = `${BASE_URL}?search=openfda.generic_name:"${encoded}"${dateFilter}&limit=10&sort=report_date:desc${keyParam}`
+    const url = `${BASE_URL}?search=openfda.generic_name:"${encoded}"+OR+openfda.brand_name:"${encoded}"${dateFilter}&limit=10&sort=report_date:desc${keyParam}`
 
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []

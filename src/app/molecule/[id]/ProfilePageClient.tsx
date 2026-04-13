@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import Link from 'next/link'
 import { ViewToggle } from '@/components/profile/ViewToggle'
-import { CategorySidebar } from '@/components/profile/CategorySidebar'
+import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { CategorySection } from '@/components/profile/CategorySection'
 import { PanelSearch } from '@/components/profile/PanelSearch'
@@ -24,11 +25,14 @@ import { ResearchBrief } from '@/components/profile/ResearchBrief'
 import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetection'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
+import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 
 interface Props {
   cid: number
   moleculeName: string
   molecularWeight: number
+  inchiKey: string
+  iupacName: string
 }
 
 type PanelRenderer = (panelId: string, lastFetched?: Date) => React.ReactNode
@@ -44,20 +48,34 @@ function initStatus(): CategoriesStatus {
   return s
 }
 
-export function ProfilePageClient({ cid, moleculeName, molecularWeight }: Props) {
+export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName }: Props) {
   return (
     <Suspense fallback={<div className="animate-pulse h-96 bg-slate-800/50 rounded-xl" />}>
-      <ProfilePageClientInner cid={cid} moleculeName={moleculeName} molecularWeight={molecularWeight} />
+      <ProfilePageClientInner cid={cid} moleculeName={moleculeName} molecularWeight={molecularWeight} inchiKey={inchiKey} iupacName={iupacName} />
     </Suspense>
   )
 }
 
-function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
+function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, iupacName }: Props) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialTab = searchParams.get('tab')
   const initialView = searchParams.get('view')
   const pendingRef = useRef<Set<CategoryId>>(new Set())
+
+  const apiOverrides = useMemo<Record<string, ApiIdentifierType>>(() => {
+    try {
+      const raw = searchParams.get('overrides')
+      return raw ? JSON.parse(raw) : {}
+    } catch { return {} }
+  }, [searchParams])
+
+  const apiParams = useMemo<Record<string, ApiParamValue>>(() => {
+    try {
+      const raw = searchParams.get('params')
+      return raw ? JSON.parse(raw) : {}
+    } catch { return {} }
+  }, [searchParams])
 
   const [view, setView] = useState<'panels' | 'graph'>(
     initialView === 'graph' ? 'graph' : 'panels'
@@ -115,7 +133,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
     pendingRef.current.add(catId)
     setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
     try {
-      const data = await fetchCategoryData(cid, catId)
+      const data = await fetchCategoryData(cid, catId, apiOverrides, apiParams)
       setCategoryData(prev => ({ ...prev, [catId]: data }))
       setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
       setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
@@ -124,7 +142,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
     } finally {
       pendingRef.current.delete(catId)
     }
-  }, [cid, categoryStatus])
+  }, [cid, categoryStatus, apiOverrides, apiParams])
 
   // Scroll to category section
   const scrollToCategory = useCallback((catId: CategoryId | 'all') => {
@@ -494,58 +512,56 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
   }
 
   return (
-    <div className="flex gap-4 md:gap-6 relative">
+    <div className="relative">
       {showLoadingOverlay && (
         <LoadingOverlay categoryStatus={categoryStatus} dataCounts={dataCounts} />
       )}
-      {/* Main content - takes full width, sidebar pushes it from right */}
-      <div className="flex-1 min-w-0">
-        <div className="mb-4 flex items-center justify-between">
-          <ViewToggle active={view} onChange={setView} disabled={isBusy} />
-          <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
+
+      <div className="sticky top-0 z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4">
+        <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-mono text-slate-500">
+          <Link href="/" className="text-slate-500 hover:text-slate-300 shrink-0">Home</Link>
+          <span className="text-slate-700">/</span>
+          <span className="text-indigo-300/80">CID:{cid}</span>
+          {inchiKey && <><span className="text-slate-700">|</span><span className="text-emerald-300/60" title="InChIKey">{inchiKey}</span></>}
+          {iupacName && <><span className="text-slate-700">|</span><span className="text-slate-400 truncate max-w-[200px]" title={iupacName}>{iupacName}</span></>}
+          <div className="ml-auto flex items-center gap-2">
+            <ViewToggle active={view} onChange={setView} disabled={isBusy} />
+            <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
+          </div>
         </div>
+        <CategoryTabBar
+          active={activeCategory}
+          counts={dataCounts}
+          onChange={scrollToCategory}
+          freshness={freshnessMap}
+          disabled={isBusy}
+        />
+      </div>
 
-        {/* Mobile category selector */}
-        <div className="md:hidden mb-4">
-          <select
-            value={activeCategory}
-            onChange={(e) => scrollToCategory(e.target.value as CategoryId)}
-            disabled={isBusy}
-            className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-slate-200 text-sm disabled:opacity-50"
-          >
-            <option value="all">All Categories</option>
-            {CATEGORIES.map(cat => (
-              <option key={cat.id} value={cat.id}>
-                {cat.icon} {cat.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <div className="mb-4">
+        <MoleculeSummary
+          data={summaryData}
+          onCategoryClick={isBusy ? () => {} : (id) => {
+            setView('panels')
+            scrollToCategory(id as CategoryId)
+          }}
+          onMetricClick={isBusy ? () => {} : (categoryId, panelId) => {
+            const catId = categoryId as CategoryId
+            setQuickViewPanel({ categoryId: catId, panelId })
+            if (categoryStatus[catId] === 'idle') {
+              loadCategory(catId)
+            }
+          }}
+        />
+      </div>
 
-        <div className="mb-6">
-          <MoleculeSummary
-            data={summaryData}
-            onCategoryClick={isBusy ? () => {} : (id) => {
-              setView('panels')
-              scrollToCategory(id as CategoryId)
-            }}
-            onMetricClick={isBusy ? () => {} : (categoryId, panelId) => {
-              const catId = categoryId as CategoryId
-              setQuickViewPanel({ categoryId: catId, panelId })
-              if (categoryStatus[catId] === 'idle') {
-                loadCategory(catId)
-              }
-            }}
-          />
-        </div>
+      <ChangeAlerts changes={detectedChanges} cid={cid} />
 
-        <ChangeAlerts changes={detectedChanges} cid={cid} />
+      <ResearchBrief data={mergedData} moleculeName={moleculeName} />
 
-        <ResearchBrief data={mergedData} moleculeName={moleculeName} />
+      <SimilarMolecules cid={cid} />
 
-        <SimilarMolecules cid={cid} />
-
-        <InsightsSection data={mergedData} />
+      <InsightsSection data={mergedData} />
 
         {view === 'panels' ? (
           <div>
@@ -654,18 +670,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight }: Props) {
             </Modal>
           )
         })()}
-      </div>
-
-      {/* Sidebar on the right */}
-      <aside className="hidden md:block shrink-0" style={{ height: 'fit-content', position: 'sticky', top: '4.5rem' }}>
-        <CategorySidebar
-          active={activeCategory}
-          counts={dataCounts}
-          onChange={scrollToCategory}
-          freshness={freshnessMap}
-          disabled={isBusy}
-        />
-      </aside>
     </div>
   )
 }

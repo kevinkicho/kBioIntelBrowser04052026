@@ -1,6 +1,36 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import { API_METADATA } from '@/lib/analytics/api-meta'
+import type { ApiMeta } from '@/lib/analytics/api-meta'
+
+function ApiMetaInfo({ meta }: { meta: ApiMeta }) {
+  return (
+    <div className="bg-slate-800/40 rounded px-3 py-2 text-xs">
+      <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">Source info</div>
+      <div className="space-y-0.5">
+        <div className="flex items-start gap-2">
+          <span className="text-slate-500 shrink-0 w-14">Org</span>
+          <span className="text-slate-200">{meta.organization}</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-slate-500 shrink-0 w-14">What</span>
+          <span className="text-slate-400">{meta.description}</span>
+        </div>
+        <div className="flex items-start gap-2">
+          <span className="text-slate-500 shrink-0 w-14">Endpoint</span>
+          <a href={meta.apiEndpoint} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 break-all font-mono text-[10px]">{meta.apiEndpoint}</a>
+        </div>
+        {meta.apiDocs && (
+          <div className="flex items-start gap-2">
+            <span className="text-slate-500 shrink-0 w-14">Docs</span>
+            <a href={meta.apiDocs} target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 break-all font-mono text-[10px]">{meta.apiDocs}</a>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
 
 interface ApiSummary {
   source: string
@@ -81,7 +111,8 @@ interface ApiDetail {
   recent_calls: ApiMetricRow[]
 }
 
-type ViewMode = 'summary' | 'trend' | 'errors'
+type ViewMode = 'summary' | 'table' | 'trend' | 'errors'
+type LayoutMode = 'grouped' | 'flat'
 
 function healthDot(rate: number) {
   if (rate >= 95) return '\uD83D\uDFE2'
@@ -243,8 +274,11 @@ function MiniBar({ pct, color }: { pct: number; color: string }) {
 
 export default function AnalyticsPage() {
   const [view, setView] = useState<ViewMode>('summary')
+  const [layout, setLayout] = useState<LayoutMode>('grouped')
   const [since, setSince] = useState('7d')
+  const [filter, setFilter] = useState('')
   const [categories, setCategories] = useState<CategoryGroup[]>([])
+  const [flatApis, setFlatApis] = useState<ApiSummary[]>([])
   const [trend, setTrend] = useState<DailySnapshot[]>([])
   const [errors, setErrors] = useState<ApiMetricRow[]>([])
   const [loading, setLoading] = useState(true)
@@ -261,15 +295,18 @@ export default function AnalyticsPage() {
         ? new Date(Date.now() - 90 * 86400000).toISOString()
         : undefined
 
-  useEffect(() => {
+  const fetchData = useCallback(() => {
     setLoading(true)
-    const params = new URLSearchParams({ since: sinceParam || '' })
+    const sp = sinceParam
+    const params = new URLSearchParams({ since: sp || '' })
     if (view === 'summary') {
-      params.set('view', 'categorized')
-      fetch(`/api/analytics/summary?${params}`)
+      const catParams = new URLSearchParams(params)
+      catParams.set('view', 'categorized')
+      fetch(`/api/analytics/summary?${catParams}`)
         .then(r => r.json())
         .then((data: CategoryGroup[]) => {
           setCategories(data)
+          setFlatApis(data.flatMap(c => c.apis).sort((a, b) => apiName(a.source).localeCompare(apiName(b.source))))
           const newExpanded = new Set<string>(data.map(c => c.id))
           setExpanded(newExpanded)
         })
@@ -291,6 +328,10 @@ export default function AnalyticsPage() {
         .finally(() => setLoading(false))
     }
   }, [view, since]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    fetchData()
+  }, [fetchData]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const openDetail = useCallback((source: string) => {
     setDetailSource(source)
@@ -327,6 +368,22 @@ export default function AnalyticsPage() {
             <p className="text-slate-400 mt-1">Monitor API health, response times, and data availability</p>
           </div>
           <div className="flex items-center gap-3">
+            {view === 'summary' && (
+              <div className="flex items-center bg-slate-800 rounded-lg border border-slate-700">
+                <button
+                  onClick={() => setLayout('grouped')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-l-lg ${layout === 'grouped' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Grouped
+                </button>
+                <button
+                  onClick={() => setLayout('flat')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-r-lg ${layout === 'flat' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  Table
+                </button>
+              </div>
+            )}
             <select
               value={since}
               onChange={e => setSince(e.target.value)}
@@ -337,6 +394,15 @@ export default function AnalyticsPage() {
               <option value="90d">Last 90 days</option>
               <option value="all">All time</option>
             </select>
+            <button
+              onClick={fetchData}
+              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+              title="Refresh"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+              </svg>
+            </button>
             <a href="/" className="text-indigo-400 hover:text-indigo-300 text-sm">Back to app</a>
           </div>
         </div>
@@ -347,18 +413,81 @@ export default function AnalyticsPage() {
               key={v}
               onClick={() => setView(v)}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                view === v
+                (v === 'summary' && view === 'summary') || (v === 'table' && view === 'table')
                   ? 'bg-indigo-600 text-white'
-                  : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                  : view === v
+                    ? 'bg-indigo-600 text-white'
+                    : 'bg-slate-800 text-slate-400 hover:text-slate-200'
               }`}
             >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
+              {v === 'summary' ? 'Overview' : v.charAt(0).toUpperCase() + v.slice(1)}
             </button>
           ))}
         </div>
 
         {loading ? (
           <div className="text-center py-12 text-slate-500 animate-pulse">Loading analytics...</div>
+        ) : view === 'summary' && layout === 'flat' ? (
+          <div>
+            <div className="mb-4">
+              <input
+                type="text"
+                placeholder="Filter APIs by name..."
+                value={filter}
+                onChange={e => setFilter(e.target.value)}
+                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-slate-500 border-b border-slate-700">
+                    <th className="text-left py-2 px-3 font-medium">API</th>
+                    <th className="text-left py-2 px-3 font-medium">Category</th>
+                    <th className="text-center py-2 px-3 font-medium">Health</th>
+                    <th className="text-right py-2 px-3 font-medium">Reqs</th>
+                    <th className="text-right py-2 px-3 font-medium">OK</th>
+                    <th className="text-right py-2 px-3 font-medium">Errors</th>
+                    <th className="text-right py-2 px-3 font-medium">Empty</th>
+                    <th className="text-right py-2 px-3 font-medium">Avg Time</th>
+                    <th className="text-right py-2 px-3 font-medium">Last OK</th>
+                    <th className="text-right py-2 px-3 font-medium">Last Error</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {flatApis
+                    .filter(api => !filter || apiName(api.source).toLowerCase().includes(filter.toLowerCase()) || api.categoryLabel.toLowerCase().includes(filter.toLowerCase()))
+                    .map(api => (
+                    <tr
+                      key={api.source}
+                      onClick={() => openDetail(api.source)}
+                      className="border-b border-slate-800/30 hover:bg-slate-800/20 cursor-pointer group"
+                    >
+                      <td className="py-2 px-3 font-medium text-slate-200 group-hover:text-indigo-300 transition-colors">
+                        {apiName(api.source)}
+                      </td>
+                      <td className="py-2 px-3 text-xs text-slate-400">{api.categoryIcon} {api.categoryLabel}</td>
+                      <td className="py-2 px-3 text-center">{healthDot(api.success_rate)} {api.success_rate}%</td>
+                      <td className="py-2 px-3 text-right text-slate-400">{api.total_requests}</td>
+                      <td className="py-2 px-3 text-right text-emerald-400">{api.success_count}</td>
+                      <td className="py-2 px-3 text-right text-red-400">{api.error_count}</td>
+                      <td className="py-2 px-3 text-right text-yellow-400/70">{api.empty_count}</td>
+                      <td className="py-2 px-3 text-right text-slate-300">{api.avg_duration_ms}ms</td>
+                      <td className="py-2 px-3 text-right text-slate-400 text-xs">{timeAgo(api.last_success_at)}</td>
+                      <td className="py-2 px-3 text-right text-slate-400 text-xs">
+                        {api.last_error ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 40)}` : '\u2014'}
+                      </td>
+                    </tr>
+                  ))}
+                  {flatApis.filter(api => !filter || apiName(api.source).toLowerCase().includes(filter.toLowerCase()) || api.categoryLabel.toLowerCase().includes(filter.toLowerCase())).length === 0 && (
+                    <tr>
+                      <td colSpan={10} className="py-8 text-center text-slate-500">No APIs match your filter.</td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         ) : view === 'summary' ? (
           <div>
             {categories.length === 0 && (
@@ -522,119 +651,102 @@ export default function AnalyticsPage() {
         <div className="fixed inset-0 z-50 flex justify-end">
           <div className="absolute inset-0 bg-black/60" onClick={closeDetail} />
           <div className="relative w-full max-w-2xl bg-slate-900 border-l border-slate-700 overflow-y-auto">
-            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 px-6 py-4 flex items-center justify-between z-10">
-              <div>
-                <h2 className="text-xl font-bold text-white">{apiName(detailSource)}</h2>
-                <p className="text-xs text-slate-400 font-mono mt-0.5">source: {detailSource}</p>
+            <div className="sticky top-0 bg-slate-900/95 backdrop-blur-sm border-b border-slate-700/50 px-4 py-2 z-10">
+              <div className="flex items-center gap-4">
+                <div className="shrink-0">
+                  <h2 className="text-base font-bold text-white leading-tight">{apiName(detailSource)}</h2>
+                  <p className="text-[9px] text-slate-500 font-mono">{detailSource}</p>
+                </div>
+                {!detailLoading && detail && (
+                  <div className="flex items-center gap-3 ml-auto">
+                    {[
+                      { label: 'Min', value: detail.min_ms, hl: false },
+                      { label: 'P50', value: detail.p50_ms, hl: false },
+                      { label: 'Avg', value: detail.avg_duration_ms, hl: false },
+                      { label: 'P95', value: detail.p95_ms, hl: true },
+                      { label: 'P99', value: detail.p99_ms, hl: true },
+                    ].map(t => (
+                      <div key={t.label} className="text-center">
+                        <div className="text-[9px] text-slate-500">{t.label}</div>
+                        <div className={`text-xs font-semibold ${t.hl ? 'text-orange-400' : 'text-slate-300'}`}>{fmtMs(t.value)}</div>
+                      </div>
+                    ))}
+                    <div className="text-center pl-2 border-l border-slate-700/40">
+                      <div className="text-[9px] text-slate-500">Rate</div>
+                      <div className={`text-xs font-bold ${detail.success_rate >= 95 ? 'text-emerald-400' : detail.success_rate >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>{detail.success_rate}%</div>
+                    </div>
+                  </div>
+                )}
+                <button onClick={closeDetail} className="p-1.5 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors shrink-0">
+                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
               </div>
-              <button onClick={closeDetail} className="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition-colors">
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
             </div>
 
             {detailLoading ? (
-              <div className="p-12 text-center text-slate-500 animate-pulse">Loading details...</div>
+              <div className="p-8 text-center text-slate-500 animate-pulse">Loading...</div>
             ) : detail ? (
-              <div className="p-6 space-y-6">
+              <div className="px-4 py-3 space-y-3">
 
-                <div className="grid grid-cols-4 gap-3">
-                  {[
-                    { label: 'Total', value: detail.total_requests, color: 'text-white' },
-                    { label: 'Success', value: detail.success_count, color: 'text-emerald-400' },
-                    { label: 'Errors', value: detail.error_count, color: 'text-red-400' },
-                    { label: 'Empty', value: detail.empty_count, color: 'text-yellow-400' },
-                  ].map(s => (
-                    <div key={s.label} className="bg-slate-800/50 rounded-lg p-3">
-                      <div className="text-xs text-slate-400 mb-1">{s.label}</div>
-                      <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
-                    </div>
-                  ))}
+                <div className="flex items-center gap-3 text-xs">
+                  <span className="text-white font-semibold">{detail.total_requests}<span className="text-slate-500 font-normal ml-0.5">reqs</span></span>
+                  <span className={`${detail.success_rate >= 95 ? 'text-emerald-400' : detail.success_rate >= 70 ? 'text-yellow-400' : 'text-red-400'} font-bold`}>{detail.success_rate}%</span>
+                  <span className="text-emerald-400">{detail.success_count}<span className="text-slate-500 ml-0.5">ok</span></span>
+                  <span className="text-red-400">{detail.error_count}<span className="text-slate-500 ml-0.5">err</span></span>
+                  <span className="text-yellow-400/70">{detail.empty_count}<span className="text-slate-500 ml-0.5">empty</span></span>
+                  <span className="inline-flex items-center gap-1 text-slate-400">
+                    {detail.consecutive_successes > 0 && <span className="bg-emerald-500/20 text-emerald-400 px-1.5 py-px rounded text-[10px] font-medium">{detail.consecutive_successes}ok</span>}
+                    {detail.consecutive_errors > 0 && <span className="bg-red-500/20 text-red-400 px-1.5 py-px rounded text-[10px] font-medium">{detail.consecutive_errors}err</span>}
+                  </span>
                 </div>
 
-                <div className="bg-slate-800/50 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-slate-300 mb-3">Success Rate</h3>
-                  <div className="flex items-center gap-4">
-                    <span className={`text-3xl font-bold ${detail.success_rate >= 95 ? 'text-emerald-400' : detail.success_rate >= 70 ? 'text-yellow-400' : 'text-red-400'}`}>
-                      {detail.success_rate}%
-                    </span>
-                    <div className="flex-1">
-                      <MiniBar pct={detail.success_rate} color={detail.success_rate >= 95 ? 'bg-emerald-500' : detail.success_rate >= 70 ? 'bg-yellow-500' : 'bg-red-500'} />
-                    </div>
-                  </div>
-                  <div className="flex gap-4 mt-3 text-xs text-slate-400">
-                    <span>Consecutive OK: <span className="text-emerald-400">{detail.consecutive_successes}</span></span>
-                    <span>Consecutive errors: <span className="text-red-400">{detail.consecutive_errors}</span></span>
-                  </div>
-                </div>
-
-                <div className="bg-slate-800/50 rounded-lg p-4">
-                  <h3 className="text-sm font-semibold text-slate-300 mb-3">Response Time Distribution</h3>
-                  <div className="grid grid-cols-5 gap-3">
-                    {[
-                      { label: 'Min', value: detail.min_ms },
-                      { label: 'P50', value: detail.p50_ms },
-                      { label: 'Avg', value: detail.avg_duration_ms },
-                      { label: 'P95', value: detail.p95_ms },
-                      { label: 'P99', value: detail.p99_ms },
-                    ].map(t => (
-                      <div key={t.label} className="text-center">
-                        <div className="text-xs text-slate-400 mb-1">{t.label}</div>
-                        <div className={`text-lg font-semibold ${t.label === 'P95' || t.label === 'P99' ? 'text-orange-400' : 'text-slate-200'}`}>
-                          {fmtMs(t.value)}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  {detail.max_ms > detail.p95_ms * 2 && (
-                    <div className="mt-2 text-xs text-orange-400/70">
-                      Max: {fmtMs(detail.max_ms)} {'\u2014'} significant tail latency
-                    </div>
-                  )}
-                </div>
+                {detail.max_ms > detail.p95_ms * 2 && (
+                  <div className="text-[10px] text-orange-400/60 px-1">Max: {fmtMs(detail.max_ms)} — significant tail latency</div>
+                )}
 
                 {detail.status_codes.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Status Code Distribution</h3>
-                    <div className="space-y-2">
-                      {detail.status_codes.map(sc => (
-                        <div key={sc.status} className="flex items-center gap-3">
-                          <span className={`font-mono text-sm w-12 ${sc.status >= 200 && sc.status < 300 ? 'text-emerald-400' : sc.status >= 400 ? 'text-red-400' : 'text-yellow-400'}`}>
-                            {sc.status}
-                          </span>
-                          <div className="flex-1">
-                            <MiniBar pct={(sc.count / detail.total_requests) * 100} color={sc.status >= 200 && sc.status < 300 ? 'bg-emerald-500' : sc.status >= 400 ? 'bg-red-500' : 'bg-yellow-500'} />
-                          </div>
-                          <span className="text-xs text-slate-400 w-16 text-right">{sc.count} ({Math.round((sc.count / detail.total_requests) * 100)}%)</span>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="bg-slate-800/40 rounded px-3 py-2 space-y-1">
+                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">Status codes</div>
+                    {detail.status_codes.map(sc => (
+                      <div key={sc.status} className="flex items-center gap-2 text-xs">
+                        <span className={`font-mono w-8 ${sc.status >= 200 && sc.status < 300 ? 'text-emerald-400' : sc.status >= 400 ? 'text-red-400' : 'text-yellow-400'}`}>{sc.status}</span>
+                        <div className="flex-1"><MiniBar pct={(sc.count / detail.total_requests) * 100} color={sc.status >= 200 && sc.status < 300 ? 'bg-emerald-500' : sc.status >= 400 ? 'bg-red-500' : 'bg-yellow-500'} /></div>
+                        <span className="text-slate-500 w-14 text-right">{sc.count} <span className="opacity-60">({Math.round((sc.count / detail.total_requests) * 100)}%)</span></span>
+                      </div>
+                    ))}
                   </div>
                 )}
 
                 {detail.top_errors.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Top Errors</h3>
-                    <div className="space-y-2">
-                      {detail.top_errors.map((e, i) => (
-                        <div key={i} className="bg-red-950/20 border border-red-900/30 rounded-lg p-3">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-red-300 text-xs font-medium">{e.count}x</span>
-                            <span className="text-slate-500 text-xs">{timeAgo(e.last_at)}</span>
-                          </div>
-                          <code className="text-xs text-red-400/80 break-all">{e.message}</code>
+                  <div className="space-y-1">
+                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider">Top errors</div>
+                    {detail.top_errors.map((e, i) => (
+                      <div key={i} className="bg-red-950/20 border border-red-900/30 rounded px-2 py-1.5 text-xs">
+                        <div className="flex items-center justify-between">
+                          <span className="text-red-300 font-medium">{e.count}x</span>
+                          <span className="text-slate-500">{timeAgo(e.last_at)}</span>
                         </div>
-                      ))}
-                    </div>
+                        <code className="text-red-400/70 break-all text-[10px] leading-tight">{e.message}</code>
+                      </div>
+                    ))}
                   </div>
                 )}
 
+                {API_METADATA[detailSource] && <ApiMetaInfo meta={API_METADATA[detailSource]} />}
+
+                <div className="text-[10px] text-slate-600 px-1 flex items-center gap-3">
+                  <span>First: {detail.first_seen ? new Date(detail.first_seen).toLocaleString() : '\u2014'}</span>
+                  <span>Last: {detail.last_seen ? new Date(detail.last_seen).toLocaleString() : '\u2014'}</span>
+                  {detail.category && <span>Cat: {detail.category.icon} {detail.category.label}</span>}
+                </div>
+
                 {detail.hourly_distribution.length > 1 && (
-                  <div className="bg-slate-800/50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Request Volume (hourly)</h3>
+                  <div className="pt-1">
+                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">Hourly volume</div>
                     <Sparkline data={detail.hourly_distribution.map(h => h.total)} key_="total" />
-                    <div className="flex justify-between text-xs text-slate-500 mt-1">
+                    <div className="flex justify-between text-[9px] text-slate-600 mt-0.5">
                       <span>{detail.hourly_distribution[0]?.hour.slice(11)}</span>
                       <span>{detail.hourly_distribution[detail.hourly_distribution.length - 1]?.hour.slice(11)}</span>
                     </div>
@@ -642,40 +754,31 @@ export default function AnalyticsPage() {
                 )}
 
                 {detail.daily_trend.length > 1 && (
-                  <div className="bg-slate-800/50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Daily Trend</h3>
-                    <div className="grid grid-cols-3 gap-2 mb-3">
-                      <div>
-                        <div className="text-xs text-slate-400 mb-1">Volume</div>
-                        <Sparkline data={detail.daily_trend.map(d => d.total_requests)} key_="total" />
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-400 mb-1">Avg Latency</div>
-                        <Sparkline data={detail.daily_trend.map(d => d.avg_duration_ms)} key_="avg_ms" />
-                      </div>
-                      <div>
-                        <div className="text-xs text-slate-400 mb-1">Errors</div>
-                        <Sparkline data={detail.daily_trend.map(d => d.error_count)} key_="errors" />
-                      </div>
+                  <div className="pt-1">
+                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">Daily trend</div>
+                    <div className="grid grid-cols-3 gap-1 mb-1.5">
+                      <div><div className="text-[9px] text-slate-500">Vol</div><Sparkline data={detail.daily_trend.map(d => d.total_requests)} key_="total" /></div>
+                      <div><div className="text-[9px] text-slate-500">Lat</div><Sparkline data={detail.daily_trend.map(d => d.avg_duration_ms)} key_="avg_ms" /></div>
+                      <div><div className="text-[9px] text-slate-500">Err</div><Sparkline data={detail.daily_trend.map(d => d.error_count)} key_="errors" /></div>
                     </div>
-                    <table className="w-full text-xs">
+                    <table className="w-full text-[10px]">
                       <thead>
-                        <tr className="text-slate-500 border-b border-slate-700/50">
-                          <th className="text-left py-1.5 px-2">Date</th>
-                          <th className="text-right py-1.5 px-2">Reqs</th>
-                          <th className="text-right py-1.5 px-2">OK</th>
-                          <th className="text-right py-1.5 px-2">Errors</th>
-                          <th className="text-right py-1.5 px-2">Avg ms</th>
+                        <tr className="text-slate-600">
+                          <th className="text-left py-0.5 px-1 font-medium">Date</th>
+                          <th className="text-right py-0.5 px-1 font-medium">Reqs</th>
+                          <th className="text-right py-0.5 px-1 font-medium">OK</th>
+                          <th className="text-right py-0.5 px-1 font-medium">Err</th>
+                          <th className="text-right py-0.5 px-1 font-medium">ms</th>
                         </tr>
                       </thead>
                       <tbody>
                         {detail.daily_trend.map((d, i) => (
-                          <tr key={i} className="border-b border-slate-800/30">
-                            <td className="py-1.5 px-2 text-slate-300">{d.date}</td>
-                            <td className="py-1.5 px-2 text-right text-slate-400">{d.total_requests}</td>
-                            <td className="py-1.5 px-2 text-right text-emerald-400">{d.success_count}</td>
-                            <td className="py-1.5 px-2 text-right text-red-400">{d.error_count}</td>
-                            <td className="py-1.5 px-2 text-right text-slate-300">{Math.round(d.avg_duration_ms)}</td>
+                          <tr key={i} className="border-t border-slate-800/30">
+                            <td className="py-0.5 px-1 text-slate-400">{d.date}</td>
+                            <td className="py-0.5 px-1 text-right text-slate-400">{d.total_requests}</td>
+                            <td className="py-0.5 px-1 text-right text-emerald-400">{d.success_count}</td>
+                            <td className="py-0.5 px-1 text-right text-red-400">{d.error_count}</td>
+                            <td className="py-0.5 px-1 text-right text-slate-300">{Math.round(d.avg_duration_ms)}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -684,42 +787,29 @@ export default function AnalyticsPage() {
                 )}
 
                 {detail.recent_calls.length > 0 && (
-                  <div className="bg-slate-800/50 rounded-lg p-4">
-                    <h3 className="text-sm font-semibold text-slate-300 mb-3">Recent Calls (last {detail.recent_calls.length})</h3>
-                    <div className="space-y-1.5">
+                  <div className="pt-1">
+                    <div className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mb-1">Recent calls ({detail.recent_calls.length})</div>
+                    <div className="space-y-0.5">
                       {detail.recent_calls.map(call => (
-                        <div key={call.id} className={`rounded-lg px-3 py-2 text-xs ${call.status >= 400 || call.status === 0 ? 'bg-red-950/20 border border-red-900/20' : 'bg-slate-800/40'}`}>
+                        <div key={call.id} className={`rounded px-2 py-1 text-[10px] ${call.status >= 400 || call.status === 0 ? 'bg-red-950/20 border border-red-900/20' : 'bg-slate-800/30'}`}>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1.5">
                               <span className={`font-mono ${call.status >= 400 ? 'text-red-400' : 'text-emerald-400'}`}>{call.status}</span>
                               <span className="text-slate-300">{fmtMs(call.duration_ms)}</span>
-                              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${call.has_data ? 'bg-emerald-900/40 text-emerald-400' : 'bg-yellow-900/40 text-yellow-400'}`}>
+                              <span className={`px-1 py-px rounded text-[9px] font-medium ${call.has_data ? 'bg-emerald-900/40 text-emerald-400' : 'bg-yellow-900/40 text-yellow-400'}`}>
                                 {call.has_data ? 'data' : 'empty'}
                               </span>
                             </div>
-                            <span className="text-slate-500">{timeAgo(call.timestamp)}</span>
+                            <span className="text-slate-600">{timeAgo(call.timestamp)}</span>
                           </div>
                           {call.error && (
-                            <div className="mt-1 text-red-400/80 break-all">{call.error.slice(0, 120)}</div>
+                            <div className="text-red-400/60 break-all leading-tight mt-0.5">{call.error.slice(0, 120)}</div>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
                 )}
-
-                <div className="bg-slate-800/50 rounded-lg p-4 text-xs text-slate-500">
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>First seen: {detail.first_seen ? new Date(detail.first_seen).toLocaleString() : '\u2014'}</div>
-                    <div>Last seen: {detail.last_seen ? new Date(detail.last_seen).toLocaleString() : '\u2014'}</div>
-                    {detail.category && (
-                      <>
-                        <div>Category: {detail.category.icon} {detail.category.label}</div>
-                        <div>Category ID: {detail.category.id}</div>
-                      </>
-                    )}
-                  </div>
-                </div>
 
               </div>
             ) : (

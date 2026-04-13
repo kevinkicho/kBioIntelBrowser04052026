@@ -2,6 +2,8 @@
 
 import { useState, useCallback } from 'react'
 import { SearchBar } from '@/components/search/SearchBar'
+import { AdvancedSearchPanel } from '@/components/search/AdvancedSearchPanel'
+import { API_IDENTIFIER_CONFIGS, API_PARAMETERS, type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
 import { FavoritesBar } from '@/components/home/FavoritesBar'
 
 const EXAMPLE_SEARCHES = [
@@ -45,10 +47,46 @@ function ChipLink({ href, label, disabled }: { href: string; label: string; disa
 
 export default function HomePage() {
   const [isNavigating, setIsNavigating] = useState(false)
+  const [searchType, setSearchType] = useState<SearchType>('name')
+  const [apiOverrides, setApiOverrides] = useState<Record<string, ApiIdentifierType>>({})
+  const [apiParams, setApiParams] = useState<Record<string, ApiParamValue>>({})
   const handleNavigating = useCallback((navigating: boolean) => setIsNavigating(navigating), [])
 
+  function handleApiOverride(panelId: string, idType: ApiIdentifierType) {
+    setApiOverrides(prev => {
+      const next = { ...prev }
+      const config = API_IDENTIFIER_CONFIGS.find(c => c.panelId === panelId)
+      if (idType === config?.defaultType) {
+        delete next[panelId]
+      } else {
+        next[panelId] = idType
+      }
+      return next
+    })
+  }
+
+  function handleApiParamChange(panelId: string, param: string, value: string | number | boolean) {
+    setApiParams(prev => {
+      const next = { ...prev }
+      const paramDef = API_PARAMETERS[panelId]?.find(p => p.key === param)
+      if (!next[panelId]) next[panelId] = {}
+      if (value === paramDef?.default) {
+        delete next[panelId][param]
+        if (Object.keys(next[panelId]).length === 0) delete next[panelId]
+      } else {
+        next[panelId][param] = value
+      }
+      return next
+    })
+  }
+
+  function handleReset() {
+    setApiOverrides({})
+    setApiParams({})
+  }
+
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center px-4 py-16">
+    <main className={`min-h-screen flex flex-col items-center justify-center px-4 py-16 transition-opacity ${isNavigating ? 'opacity-60 pointer-events-none' : ''}`}>
       <div className="text-center mb-12 max-w-3xl">
         <h1 className="text-5xl font-bold text-slate-100 mb-4 tracking-tight">
           BioIntel Explorer
@@ -61,7 +99,19 @@ export default function HomePage() {
         </p>
       </div>
 
-      <SearchBar onNavigating={handleNavigating} />
+      <div className="flex flex-col items-center w-full max-w-2xl">
+        <SearchBar onNavigating={handleNavigating} searchType={searchType} apiOverrides={apiOverrides} apiParams={apiParams} />
+        <AdvancedSearchPanel
+          searchType={searchType}
+          onSearchTypeChange={setSearchType}
+          apiOverrides={apiOverrides}
+          onApiOverrideChange={handleApiOverride}
+          onResetOverrides={handleReset}
+          onResetParams={() => setApiParams({})}
+          apiParams={apiParams}
+          onApiParamChange={handleApiParamChange}
+        />
+      </div>
 
       <FavoritesBar />
 
@@ -91,7 +141,7 @@ export default function HomePage() {
         ))}
       </div>
 
-      <footer className="absolute bottom-6 text-xs text-slate-600 text-center px-4">
+      <footer className="mt-16 pb-6 text-xs text-slate-600 text-center px-4">
         Data sourced from PubChem, openFDA, KEGG, Rhea, USPTO, ClinicalTrials.gov, NIH Reporter, SEC EDGAR, ChEMBL, UniProt, Open Targets, and other free public databases.
         Built for open science. Not for clinical use.
       </footer>

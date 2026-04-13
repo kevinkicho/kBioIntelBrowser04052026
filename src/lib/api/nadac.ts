@@ -11,7 +11,7 @@ function twoYearsAgo(): string {
 export async function getDrugPricesByName(name: string): Promise<DrugPrice[]> {
   try {
     const cutoff = twoYearsAgo()
-    const where = `upper(ndc_description) like upper('%25${name}%25') AND effective_date > '${cutoff}'`
+    const where = `upper(ndc_description) like upper('%${name}%') AND effective_date > '${cutoff}'`
     const url = `https://data.medicaid.gov/resource/a4y5-998d.json?$where=${encodeURIComponent(where)}&$limit=10&$order=effective_date DESC`
 
     const res = await fetch(url, fetchOptions)

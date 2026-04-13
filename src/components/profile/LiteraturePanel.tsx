@@ -26,16 +26,28 @@ function LiteratureItem({ paper }: { paper: LiteratureResult }) {
           </span>
         )}
       </div>
-      {paper.doi && (
-        <a
-          href={`https://doi.org/${paper.doi}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={paper.doi}
-          className="text-xs text-blue-400 hover:text-blue-300 mt-1 block doi-display"
-          data-doi={paper.doi}
-        />
-      )}
+      <div className="flex items-center gap-3 mt-1">
+        {paper.doi && (
+          <a
+            href={`https://doi.org/${paper.doi}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-blue-400 hover:text-blue-300"
+          >
+            DOI:{paper.doi}
+          </a>
+        )}
+        {paper.pmid && (
+          <a
+            href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-xs text-emerald-400 hover:text-emerald-300"
+          >
+            PubMed:{paper.pmid}
+          </a>
+        )}
+      </div>
     </div>
   )
 }

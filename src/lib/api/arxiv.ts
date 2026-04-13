@@ -1,7 +1,7 @@
 import type { ArXivPaper } from '../types'
 import { LIMITS } from '../api-limits'
 
-const BASE_URL = 'http://export.arxiv.org/api/query'
+const BASE_URL = 'https://export.arxiv.org/api/query'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
 
 /**
@@ -10,8 +10,8 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
 export async function searchArXiv(query: string, limit: number = LIMITS.ARXIV.initial): Promise<ArXivPaper[]> {
   try {
     // Add biology/bioinformatics categories by default
-    const searchQuery = `${query} AND (cat:q-bio.BM OR cat:q-bio.GN OR cat:q-bio.CB OR cat:q-bio.TO OR cat:q-bio.NC OR cat:q-bio.PE)`
-    const searchUrl = `${BASE_URL}?search_query=all:${encodeURIComponent(searchQuery)}&max_results=${limit}`
+    const searchQuery = `all:${query} AND (cat:q-bio.BM OR cat:q-bio.GN OR cat:q-bio.CB OR cat:q-bio.TO OR cat:q-bio.NC OR cat:q-bio.PE)`
+    const searchUrl = `${BASE_URL}?search_query=${encodeURIComponent(searchQuery)}&max_results=${limit}`
 
     const searchRes = await fetch(searchUrl, fetchOptions)
     if (!searchRes.ok) return []

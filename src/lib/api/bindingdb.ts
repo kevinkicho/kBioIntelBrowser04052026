@@ -1,6 +1,6 @@
 import type { BindingAffinity } from '../types'
 
-const BASE_URL = 'https://bindingdb.org/rwd/bind/chemsearch/marvin/MolsFromName.json'
+const BASE_URL = 'https://bindingdb.org/bind/chemsearch/marvin/MolsFromName.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 type AffinityKey = 'Ki' | 'Kd' | 'IC50' | 'EC50'

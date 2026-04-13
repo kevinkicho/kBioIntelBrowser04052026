@@ -9,17 +9,20 @@ export async function getAtcClassificationsByName(name: string): Promise<AtcClas
     const rxcui = await getRxcuiByName(name)
     if (!rxcui) return []
 
-    const url = `${BASE_URL}?rxcui=${rxcui}&relaSource=ATC`
+    const url = `${BASE_URL}?rxcui=${rxcui}&classType=ATC`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()
 
-    const concepts = data.rxclassMinConceptList?.rxclassMinConcept ?? []
-    return concepts.map((c: { classId?: string; className?: string; classType?: string }) => ({
-      code: c.classId ?? '',
-      name: c.className ?? '',
-      classType: c.classType ?? '',
-    }))
+    const drugInfoList = data.rxclassDrugInfoList?.rxclassDrugInfo ?? data.rxclassMinConceptList?.rxclassMinConcept ?? []
+    return drugInfoList.map((item: Record<string, unknown>) => {
+      const concept = (item.rxclassMinConceptItem ?? item) as Record<string, unknown>
+      return {
+        code: String(concept.classId ?? ''),
+        name: String(concept.className ?? ''),
+        classType: String(concept.classType ?? ''),
+      }
+    })
   } catch {
     return []
   }

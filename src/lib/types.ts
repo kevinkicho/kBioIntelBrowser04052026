@@ -387,7 +387,7 @@ export interface ReactomePathway {
 export interface LiteratureResult {
   id: string
   title: string
-  authors: string[]
+  authors: string
   journal: string
   publicationDate: string
   year: number
