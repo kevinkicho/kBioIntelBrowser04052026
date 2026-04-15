@@ -5,6 +5,8 @@ import { SearchBar } from '@/components/search/SearchBar'
 import { AdvancedSearchPanel } from '@/components/search/AdvancedSearchPanel'
 import { API_IDENTIFIER_CONFIGS, API_PARAMETERS, type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
 import { FavoritesBar } from '@/components/home/FavoritesBar'
+import { AIBanner } from '@/components/ai/AIBanner'
+import { AIStatusIndicator } from '@/components/ai/AIStatusIndicator'
 
 const EXAMPLE_SEARCHES = [
   'insulin', 'aspirin', 'metformin', 'caffeine', 'penicillin', 'amylase', 'doxorubicin', 'glucose'
@@ -46,6 +48,10 @@ function ChipLink({ href, label, disabled }: { href: string; label: string; disa
 }
 
 export default function HomePage() {
+  return <HomePageContent />
+}
+
+function HomePageContent() {
   const [isNavigating, setIsNavigating] = useState(false)
   const [searchType, setSearchType] = useState<SearchType>('name')
   const [apiOverrides, setApiOverrides] = useState<Record<string, ApiIdentifierType>>({})
@@ -88,8 +94,9 @@ export default function HomePage() {
   return (
     <main className={`min-h-screen flex flex-col items-center justify-center px-4 py-16 transition-opacity ${isNavigating ? 'opacity-60 pointer-events-none' : ''}`}>
       <div className="text-center mb-12 max-w-3xl">
-        <h1 className="text-5xl font-bold text-slate-100 mb-4 tracking-tight">
+        <h1 className="text-5xl font-bold text-slate-100 mb-4 tracking-tight flex items-center justify-center gap-3">
           BioIntel Explorer
+          <AIStatusIndicator />
         </h1>
         <p className="text-xl text-slate-400 mb-2">
           The commercial and scientific landscape of biological molecules.
@@ -98,6 +105,8 @@ export default function HomePage() {
           Search any molecule, drug, enzyme, or gene — see who makes it, how it&apos;s synthesized, and what products it&apos;s in.
         </p>
       </div>
+
+      <AIBanner />
 
       <div className="flex flex-col items-center w-full max-w-2xl">
         <SearchBar onNavigating={handleNavigating} searchType={searchType} apiOverrides={apiOverrides} apiParams={apiParams} />

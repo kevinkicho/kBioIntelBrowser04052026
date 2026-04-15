@@ -25,6 +25,7 @@ import { ResearchBrief } from '@/components/profile/ResearchBrief'
 import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetection'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
+import { AICopilot } from '@/components/ai/AICopilot'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 
 interface Props {
@@ -670,6 +671,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             </Modal>
           )
         })()}
+        <AICopilot
+          categoryData={categoryData}
+          categoryStatus={categoryStatus}
+          fetchedAt={fetchedAt}
+          identity={{ name: moleculeName, cid, molecularWeight, inchiKey, iupacName }}
+        />
     </div>
   )
 }

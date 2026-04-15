@@ -1,0 +1,230 @@
+'use client'
+
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useAI } from '@/lib/ai/useAI'
+import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
+import { buildMoleculeContext, contextToPromptBlock } from '@/lib/ai/contextBuilder'
+import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, type PromptMode } from '@/lib/ai/promptTemplates'
+import type { CategoryId } from '@/lib/categoryConfig'
+import type { CategoryLoadState } from '@/lib/fetchCategory'
+
+export interface CopilotMessage {
+  id: string
+  role: 'user' | 'assistant' | 'system'
+  content: string
+  mode: PromptMode
+  timestamp: number
+}
+
+export interface CopilotState {
+  messages: CopilotMessage[]
+  isStreaming: boolean
+  activeTab: 'monitor' | 'insights' | 'ask' | 'settings'
+  autoInsightGenerated: boolean
+}
+
+export function useAICopilot(
+  categoryData: Partial<Record<CategoryId, Record<string, unknown>>>,
+  categoryStatus: Record<CategoryId, CategoryLoadState>,
+  fetchedAt: Partial<Record<CategoryId, Date>>,
+  identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string },
+) {
+  const ai = useAI()
+  const [messages, setMessages] = useState<CopilotMessage[]>([])
+  const [isStreaming, setIsStreaming] = useState(false)
+  const [activeTab, setActiveTab] = useState<CopilotState['activeTab']>('monitor')
+  const [autoInsightGenerated, setAutoInsightGenerated] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+  const prevLoadedCountRef = useRef(0)
+  const messageIdRef = useRef(0)
+  const isStreamingRef = useRef(false)
+  const messagesRef = useRef<CopilotMessage[]>([])
+  messagesRef.current = messages
+
+  const generateInsightRef = useRef<((mode: PromptMode) => Promise<void>) | null>(null)
+
+  const snapshot = useMemo(
+    () => buildRetrievalSnapshot(categoryData, categoryStatus, fetchedAt),
+    [categoryData, categoryStatus, fetchedAt]
+  )
+
+  const allData = useMemo(() => {
+    const merged: Record<string, unknown> = {}
+    for (const catId of Object.keys(categoryData) as CategoryId[]) {
+      const catData = categoryData[catId]
+      if (catData) Object.assign(merged, catData)
+    }
+    return merged
+  }, [categoryData])
+
+  const context = useMemo(
+    () => buildMoleculeContext(categoryData, identity, allData, snapshot),
+    [categoryData, identity, allData, snapshot]
+  )
+
+  const contextBlock = useMemo(
+    () => contextToPromptBlock(context),
+    [context]
+  )
+
+  const aiAvailable = ai.enabled && ai.status === 'available'
+
+  const addMessage = useCallback((role: CopilotMessage['role'], content: string, mode: PromptMode): CopilotMessage => {
+    const msg: CopilotMessage = {
+      id: `msg-${Date.now()}-${messageIdRef.current++}`,
+      role,
+      content,
+      mode,
+      timestamp: Date.now(),
+    }
+    setMessages(prev => [...prev, msg])
+    return msg
+  }, [])
+
+  const generateInsight = useCallback(async (mode: PromptMode) => {
+    if (!aiAvailable) {
+      addMessage('system', 'AI is not available. Connect Ollama to enable AI insights.', mode)
+      return
+    }
+    if (isStreamingRef.current) return
+    isStreamingRef.current = true
+    setIsStreaming(true)
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    let prompts: { system: string; user: string }
+
+    switch (mode) {
+      case 'auto_insight':
+        prompts = buildAutoInsightPrompt(context, snapshot)
+        break
+      case 'executive_brief':
+        prompts = buildExecutiveBriefPrompt(context, snapshot)
+        break
+      case 'gap_analysis':
+        prompts = buildGapAnalysisPrompt(context, snapshot)
+        break
+      case 'safety_deep_dive':
+        prompts = buildSafetyDeepDivePrompt(context)
+        break
+      default:
+        prompts = buildAutoInsightPrompt(context, snapshot)
+    }
+
+    addMessage('system', `Generating ${mode.replace('_', ' ')}...`, mode)
+    const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
+    setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode, timestamp: Date.now() }])
+
+    let fullContent = ''
+    try {
+      const chatMessages = [
+        { role: 'system' as const, content: prompts.system },
+        { role: 'user' as const, content: prompts.user },
+      ]
+
+      for await (const token of ai.askAI(chatMessages)) {
+        if (controller.signal.aborted) break
+        fullContent += token
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+      }
+    } catch (err) {
+      fullContent += `\n[Error: ${err instanceof Error ? err.message : String(err)}]`
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+    }
+
+    isStreamingRef.current = false
+    setIsStreaming(false)
+  }, [ai, aiAvailable, context, snapshot, addMessage])
+
+  const askQuestion = useCallback(async (question: string) => {
+    if (!aiAvailable) {
+      addMessage('user', question, 'free_qa')
+      addMessage('system', 'AI is not available. Connect Ollama to enable Q&A.', 'free_qa')
+      return
+    }
+    if (isStreamingRef.current) return
+    isStreamingRef.current = true
+    setIsStreaming(true)
+    abortRef.current?.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+
+    addMessage('user', question, 'free_qa')
+
+    const recentHistory = messagesRef.current.slice(-6).map(m => ({
+      role: m.role as 'system' | 'user' | 'assistant',
+      content: m.content,
+    }))
+
+    const chatMessages = buildFollowUpPrompt(recentHistory, context, question)
+
+    const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
+    setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode: 'followup', timestamp: Date.now() }])
+
+    let fullContent = ''
+    try {
+      for await (const token of ai.askAI(chatMessages)) {
+        if (controller.signal.aborted) break
+        fullContent += token
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+      }
+    } catch (err) {
+      fullContent += `\n[Error: ${err instanceof Error ? err.message : String(err)}]`
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+    }
+
+    isStreamingRef.current = false
+    setIsStreaming(false)
+  }, [ai, aiAvailable, context, addMessage])
+
+  const stopStreaming = useCallback(() => {
+    abortRef.current?.abort()
+    isStreamingRef.current = false
+    setIsStreaming(false)
+  }, [])
+
+  const clearChat = useCallback(() => {
+    setMessages([])
+    setAutoInsightGenerated(false)
+  }, [])
+
+  useEffect(() => {
+    generateInsightRef.current = generateInsight
+  }, [generateInsight])
+
+  useEffect(() => {
+    const loadedCount = Object.values(categoryStatus).filter(s => s === 'loaded').length
+    if (loadedCount >= 3 && !autoInsightGenerated && aiAvailable) {
+      const timer = setTimeout(() => {
+        setAutoInsightGenerated(true)
+        generateInsightRef.current?.('auto_insight')
+      }, 100)
+      return () => clearTimeout(timer)
+    }
+  }, [categoryStatus, autoInsightGenerated, aiAvailable])
+
+  useEffect(() => {
+    const loadedCount = Object.values(categoryStatus).filter(s => s === 'loaded').length
+    if (loadedCount > prevLoadedCountRef.current + 1 && loadedCount <= 7) {
+      prevLoadedCountRef.current = loadedCount
+    }
+  }, [categoryStatus])
+
+  return {
+    snapshot,
+    context,
+    contextBlock,
+    messages,
+    isStreaming,
+    activeTab,
+    aiAvailable,
+    autoInsightGenerated,
+    setActiveTab,
+    generateInsight,
+    askQuestion,
+    stopStreaming,
+    clearChat,
+    formatRetrievalSummary: () => formatRetrievalSummary(snapshot),
+  }
+}

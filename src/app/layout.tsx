@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
+import { AIProvider } from '@/lib/ai/useAI'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -23,7 +24,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en" className="dark scroll-smooth">
       <body className={`${inter.className} bg-[#0f1117] text-slate-200 min-h-screen`}>
-        {children}
+        <AIProvider>
+          {children}
+        </AIProvider>
         <script
           dangerouslySetInnerHTML={{
             __html: `

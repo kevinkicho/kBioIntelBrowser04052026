@@ -167,6 +167,7 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 - **Lazy Category Loading** — Categories load on-demand (pharmaceutical first, others pre-fetch in background)
 - **Virtual Scrolling** — Large datasets (>20 items) use virtual scrolling for smooth performance
 - **AI Research Summarizer** — Plain-English intelligence briefs from 60+ data points
+- **BioIntel Copilot** — AI sidebar with data retrieval monitor, auto insights, gap analysis, and free-form Q&A (100% local via Ollama)
 - **Shareable URLs** — Active tab, view mode, and per-API overrides synced to URL for deep linking
 - **Error Boundaries** — Individual panel isolation prevents cascading failures
 - **Request Deduplication** — In-flight API requests are shared across components
@@ -198,7 +199,7 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript (strict mode)
 - **Styling:** Tailwind CSS (dark-mode-first)
-- **AI Engine:** Ollama (qwen3.5) for summarization
+- **AI Engine:** Ollama (local LLM) for summarization and copilot
 - **Charts:** Recharts
 - **Visualization:** D3.js, 3Dmol.js
 - **Virtualization:** @tanstack/react-virtual
@@ -255,6 +256,15 @@ src/
 ```
 
 ## Recent Changes
+
+### v0.4.0 (2026-04-14)
+
+- **BioIntel Copilot:** AI-powered sidebar with real-time data retrieval monitoring, auto-generated insights (executive brief, safety deep dive, gap analysis), and free-form Q&A — all processed locally via Ollama
+- **Unified AI Provider:** Single persistent `AIProvider` at root layout survives page navigations; connection state, model selection, and config persist across the entire app
+- **AI Connection Resilience:** Config restore/save race condition fixed — localStorage no longer overwritten with defaults before restore; auto-reconnect with exponential backoff (up to 20 retries)
+- **API Proxy Improvements:** `/api/ai/show` returns `{ available: false }` (HTTP 200) instead of forwarding Ollama error status codes, eliminating spurious 404 console errors
+- **Cleaner Console Logging:** Model info logs suppressed when all fields are null; no redundant noise on models that don't support `/api/show`
+- **Dev Server Fix:** Eliminated Node DEP0190 deprecation warning for `shell: true` with args in `scripts/dev.js`
 
 ### v0.3.0 (2026-04-13)
 
