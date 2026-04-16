@@ -3,20 +3,21 @@
 import { memo, useState } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { CTDInteraction, CTDDiseaseAssociation } from '@/lib/types'
 
 interface CTDPanelProps {
-  data: MoleculeData
+  interactions?: CTDInteraction[]
+  diseaseAssociations?: CTDDiseaseAssociation[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const CTDPanel = memo(function CTDPanel({ data, panelId, lastFetched }: CTDPanelProps) {
+export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociations, panelId, lastFetched }: CTDPanelProps) {
   const [activeTab, setActiveTab] = useState<'interactions' | 'diseases'>('interactions')
-  const interactions = data.ctdInteractions ?? []
-  const diseaseAssociations = data.ctdDiseaseAssociations ?? []
+  const items = interactions ?? []
+  const diseases = diseaseAssociations ?? []
 
-  if (interactions.length === 0 && diseaseAssociations.length === 0) {
+  if (items.length === 0 && diseases.length === 0) {
     return (
       <Panel title="CTD" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No CTD interactions found for this molecule.</p>
@@ -36,7 +37,7 @@ export const CTDPanel = memo(function CTDPanel({ data, panelId, lastFetched }: C
               : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
           }`}
         >
-          Gene Interactions ({interactions.length})
+          Gene Interactions ({items.length})
         </button>
         <button
           onClick={() => setActiveTab('diseases')}
@@ -46,14 +47,14 @@ export const CTDPanel = memo(function CTDPanel({ data, panelId, lastFetched }: C
               : 'bg-slate-700 text-slate-400 hover:bg-slate-600'
           }`}
         >
-          Disease Associations ({diseaseAssociations.length})
+          Disease Associations ({diseases.length})
         </button>
       </div>
 
       {/* Content */}
       {activeTab === 'interactions' && (
         <PaginatedList className="space-y-1">
-          {interactions.map((interaction, idx) => (
+          {items.map((interaction, idx) => (
             <div key={idx} className="py-1.5 border-b border-slate-700/50 last:border-0">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-slate-200">{interaction.geneSymbol}</span>
@@ -73,7 +74,7 @@ export const CTDPanel = memo(function CTDPanel({ data, panelId, lastFetched }: C
 
       {activeTab === 'diseases' && (
         <PaginatedList className="space-y-1">
-          {diseaseAssociations.map((disease, idx) => (
+          {diseases.map((disease, idx) => (
             <div key={idx} className="py-1.5 border-b border-slate-700/50 last:border-0">
               <div className="flex items-center justify-between">
                 <a

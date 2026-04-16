@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeCidByName, resolveIdentifier } from '@/lib/api/pubchem'
 import type { SearchType } from '@/lib/apiIdentifiers'
 
+const VALID_SEARCH_TYPES = new Set(['name', 'cid', 'cas', 'smiles', 'inchikey', 'inchi', 'formula'])
+
 const GENE_SYMBOL_PATTERN = /^[A-Z][A-Z0-9-]*$/
 const PUBCHEM_PUG = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 const PC_FETCH_OPTS: RequestInit = { next: { revalidate: 86400 } }
@@ -83,26 +85,35 @@ async function getExtendedIdentifiers(cid: number) {
 
 export async function GET(request: NextRequest) {
   const name = request.nextUrl.searchParams.get('name')
-  const type = (request.nextUrl.searchParams.get('type') ?? 'name') as SearchType
+  const typeParam = request.nextUrl.searchParams.get('type') ?? 'name'
   const extended = request.nextUrl.searchParams.get('extended') === 'true'
 
   if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 
+  if (!VALID_SEARCH_TYPES.has(typeParam)) {
+    return NextResponse.json({ error: `Invalid search type: ${typeParam}. Valid types: name, cid, cas, smiles, inchikey, inchi, formula` }, { status: 400 })
+  }
+
   let cid: number | null = null
 
-  if (type === 'name') {
-    cid = await getMoleculeCidByName(name)
+  try {
+    if (typeParam === 'name') {
+      cid = await getMoleculeCidByName(name)
 
-    if (!cid) {
-      if (GENE_SYMBOL_PATTERN.test(name)) {
-        cid = await resolveGeneToCid(name)
-      }
       if (!cid) {
-        cid = await resolveProteinToCid(name)
+        if (GENE_SYMBOL_PATTERN.test(name)) {
+          cid = await resolveGeneToCid(name)
+        }
+        if (!cid) {
+          cid = await resolveProteinToCid(name)
+        }
       }
+    } else {
+      cid = await resolveIdentifier(name, typeParam as SearchType)
     }
-  } else {
-    cid = await resolveIdentifier(name, type)
+  } catch (error) {
+    console.error('[api/search/resolve] Error:', error)
+    return NextResponse.json({ error: 'Resolve failed', message: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
   }
 
   if (!cid) return NextResponse.json({ cid: null })

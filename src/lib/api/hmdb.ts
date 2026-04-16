@@ -51,7 +51,7 @@ export async function getMetaboliteById(hmdbId: string): Promise<HMDBMetabolite 
     const description = stripHtml(descriptionMatch?.[1] ?? '')
 
     // Extract biospecimen locations
-    const biospecimenMatches = text.match(/<biospecimen>([^<]+)<\/biospecien>/g) ?? []
+    const biospecimenMatches = text.match(/<biospecimen>([^<]+)<\/biospecimen>/g) ?? []
     const biospecimens = biospecimenMatches.map(m => m.replace(/<\/?biospecimen>/g, ''))
 
     // Extract tissue locations

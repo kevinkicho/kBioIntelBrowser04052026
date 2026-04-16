@@ -1,77 +1,56 @@
-// Unit tests for NINDS NeuroMMSig API utility.
+import { fetchNeuroMMSigData } from '@/lib/api/ninds-neurommsig'
 
-import { fetchNeuroMMSigData } from '../ninds-neurommsig'
-import { standardizeResponse } from '../utils'
-
-// Mock fetch
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({
-      signatures: [
-        {
-          signatureId: '12345',
-          name: 'Test Signature',
-          disease: 'Test Disease',
-          mechanism: 'Test Mechanism',
-          genes: ['Gene1', 'Gene2'],
-          drugs: ['Drug1'],
-          evidence: 'Test evidence',
-          publications: ['Pub1'],
-        },
-      ],
-    }),
-  })
-) as jest.Mock
+global.fetch = jest.fn()
 
 describe('NINDS NeuroMMSig API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    process.env.NINDS_NEUROMMSIG_API_KEY = 'test-key'
   })
 
-  it('should fetch and parse NINDS NeuroMMSig data', async () => {
+  it('should fetch and parse NINDS NeuroGenetics data', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        results: [
+          {
+            id: '12345',
+            gene_symbol: 'PTGS2',
+            disease: 'Migraine',
+            mechanism: 'Inflammation',
+            evidence: 'Strong',
+          },
+        ],
+      }),
+    })
+
     const result = await fetchNeuroMMSigData('test')
-    
+
     expect(fetch).toHaveBeenCalledWith(
-      'https://neurommsig.scai.fraunhofer.de/api/signatures?search=test&api_key=test-key'
+      expect.stringContaining('stemcells.nindsgenetics.org'),
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) })
     )
-    expect(result).toEqual(
-      standardizeResponse(
-        {
-          signatures: [
-            {
-              signatureId: '12345',
-              name: 'Test Signature',
-              disease: 'Test Disease',
-              mechanism: 'Test Mechanism',
-              genes: ['Gene1', 'Gene2'],
-              drugs: ['Drug1'],
-              evidence: 'Test evidence',
-              publications: ['Pub1'],
-            },
-          ],
-        },
-        'NINDS NeuroMMSig'
-      )
-    )
+    expect(result.source).toBe('NINDS NeuroGenetics')
+    expect(result.data.signatures).toHaveLength(1)
+    expect(result.timestamp).toBeTruthy()
   })
 
-  it('should handle missing API key gracefully', async () => {
-    delete process.env.NINDS_NEUROMMSIG_API_KEY
-    const result = await fetchNeuroMMSigData('test')
-    
-    expect(result).toEqual(
-      standardizeResponse({ signatures: [] }, 'NINDS NeuroMMSig')
-    )
+  it('should handle empty results gracefully', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    })
+
+    const result = await fetchNeuroMMSigData('nonexistent')
+
+    expect(result.source).toBe('NINDS NeuroGenetics')
+    expect(result.data.signatures).toEqual([])
   })
 
   it('should handle API errors gracefully', async () => {
     global.fetch = jest.fn(() => Promise.reject(new Error('API error'))) as jest.Mock
     const result = await fetchNeuroMMSigData('test')
-    
-    expect(result).toEqual(
-      standardizeResponse({ signatures: [] }, 'NINDS NeuroMMSig')
-    )
+
+    expect(result.source).toBe('NINDS NeuroGenetics')
+    expect(result.data.signatures).toEqual([])
   })
 })

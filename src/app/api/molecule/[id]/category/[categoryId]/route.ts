@@ -1,149 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeById } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
-import { safe } from '@/lib/utils'
-import { trackedSafe, flushApiMetrics } from '@/lib/api-tracker'
-import { API_SOURCE_TIMEOUTS } from '@/lib/utils'
+import { getCategoryTimeout, withTimeout } from '@/lib/utils'
+import { flushApiMetrics } from '@/lib/api-tracker'
 import { recordMetric } from '@/lib/analytics/db'
 
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
-import { getMoleculeIdentifiers, resolveApiQuery, getApiParamNumber } from '@/lib/resolveApiQuery'
+import { getMoleculeIdentifiers, resolveApiQuery } from '@/lib/resolveApiQuery'
 
-// Pharmaceutical
-import { getDrugsByIngredient } from '@/lib/api/openfda'
-import { getNdcProductsByName } from '@/lib/api/fda-ndc'
-import { getOrangeBookByName } from '@/lib/api/orangebook'
-import { getDrugPricesByName } from '@/lib/api/nadac'
-import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
-import { getDrugLabelsByName } from '@/lib/api/dailymed'
-import { getAtcClassificationsByName } from '@/lib/api/atc'
-
-import { getDrugCentralEnhanced } from '@/lib/api/drugcentral'
-import { searchGSRS } from '@/lib/api/gsrs'
-
-import { getPharmGKBData } from '@/lib/api/pharmgkb'
-import { getCPICData } from '@/lib/api/cpic'
-
-// Clinical & Safety
-import { getClinicalTrialsByName } from '@/lib/api/clinicaltrials'
-import { searchISRCTN } from '@/lib/api/isrctn'
-import { getAdverseEventsByName } from '@/lib/api/adverseevents'
-import { getDrugRecallsByName } from '@/lib/api/recalls'
-import { getChemblIndicationsByName } from '@/lib/api/chembl-indications'
-import { getClinVarVariantsByName } from '@/lib/api/clinvar'
-import { getGwasAssociationsByName } from '@/lib/api/gwas-catalog'
-import { getToxCastData } from '@/lib/api/toxcast'
-import { getSIDERData } from '@/lib/api/sider'
-import { searchIRIS } from '@/lib/api/iris'
-
-// Molecular & Chemical
-import { getComputedPropertiesByCid } from '@/lib/api/pubchem-properties'
-import { getGhsHazardsByCid } from '@/lib/api/pubchem-hazards'
-import { getChebiAnnotationByName } from '@/lib/api/chebi'
-import { getCompToxByName } from '@/lib/api/comptox'
-import { getKeggCompoundId, getKeggReactions, getKeggReactionDetail, getKEGGData } from '@/lib/api/kegg'
-import { getRheaSynthesisRoutes } from '@/lib/api/rhea'
-import { getMetabolomicsData } from '@/lib/api/metabolomics'
-import { getMyChemData } from '@/lib/api/mychem'
-import { getHMDBData } from '@/lib/api/hmdb'
-import { searchMassBank } from '@/lib/api/massbank'
-import { searchChemSpider } from '@/lib/api/chemspider'
-import { searchMetaboLights } from '@/lib/api/metabolights'
-import { searchGNPSLibrary, searchGNPSNetworks } from '@/lib/api/gnps'
-import { searchFooDB } from '@/lib/api/foodb'
-
-// Bioactivity & Targets
-import { getChemblActivitiesByName } from '@/lib/api/chembl'
-import { getBioAssaysByName } from '@/lib/api/bioassay'
-import { getChemblMechanismsByName } from '@/lib/api/chembl-mechanisms'
-import { getPharmacologyTargetsByName } from '@/lib/api/iuphar'
-import { getBindingAffinitiesByName } from '@/lib/api/bindingdb'
-import { getPharosTargetsByName } from '@/lib/api/pharos'
-import { getDrugGeneInteractionsByName } from '@/lib/api/dgidb'
-import { getDiseaseAssociationsByName } from '@/lib/api/opentargets'
-import { getCTDData } from '@/lib/api/ctd'
-import { getIEDBData } from '@/lib/api/iedb'
-
-// Protein & Structure (chained: UniProt first)
-import { getUniprotEntriesByName } from '@/lib/api/uniprot'
-import { getAlphaFoldPredictions } from '@/lib/api/alphafold'
-import { getProteinDomains } from '@/lib/api/interpro'
-import { getProteinFeaturesByAccessions } from '@/lib/api/ebi-proteins'
-import { getProteinAtlasBySymbols } from '@/lib/api/protein-atlas'
-import { getGoAnnotationsByAccessions } from '@/lib/api/quickgo'
-import { getPdbStructuresByName } from '@/lib/api/pdb'
-import { getPdbeLigandsByName } from '@/lib/api/pdbe-ligands'
-import { getPeptideAtlasData } from '@/lib/api/peptideatlas'
-import { searchPRIDE } from '@/lib/api/pride'
-import { searchCATHDomains, searchGene3D } from '@/lib/api/cath'
-
-import { searchSAbDab } from '@/lib/api/sabdab'
-
-// Genomics & Disease (chained: needs gene symbols from UniProt)
-import { getGeneInfoByName } from '@/lib/api/ncbi-gene'
-import { searchGEO } from '@/lib/api/geo'
-import { getDbSNPVariants } from '@/lib/api/dbsnp'
-import { getClinGenData } from '@/lib/api/clingen'
-import { getMedGenConcepts } from '@/lib/api/medgen'
-import { getEnsemblGenesBySymbols } from '@/lib/api/ensembl'
-import { getGeneExpressionBySymbols } from '@/lib/api/expression-atlas'
-import { getMonarchDiseasesByName } from '@/lib/api/monarch'
-import { getNciConceptsByName } from '@/lib/api/nci-thesaurus'
-import { getMeshTermsByName } from '@/lib/api/mesh'
-import { getDisGeNetData } from '@/lib/api/disgenet'
-import { getOrphanetData } from '@/lib/api/orphanet'
-import { getMyGeneData } from '@/lib/api/mygene'
-import { getBgeeData } from '@/lib/api/bgee'
-import { getOMIMData } from '@/lib/api/omim'
-
-// Interactions & Pathways
-import { getProteinInteractionsByName } from '@/lib/api/string-db'
-import { getChemicalInteractionsByName } from '@/lib/api/stitch'
-import { getMolecularInteractionsByName } from '@/lib/api/intact'
-import { getReactomePathwaysByName } from '@/lib/api/reactome'
-import { getWikiPathwaysByName } from '@/lib/api/wikipathways'
-import { getPathwayCommonsByName } from '@/lib/api/pathway-commons'
-import { searchBioCyc } from '@/lib/api/biocyc'
-import { searchSMPDB } from '@/lib/api/smpdb'
-
-// Research & Literature (chained: Literature first for DOIs)
-import { getNihGrantsByName } from '@/lib/api/nihreporter'
-import { getPatentsByMoleculeName } from '@/lib/api/patents'
-import { getSecFilingsByName } from '@/lib/api/secedgar'
-import { getLiteratureByName } from '@/lib/api/europepmc'
-import { getSemanticPapersByName } from '@/lib/api/semantic-scholar'
-import { getOpenAlexWorksByName } from '@/lib/api/openalex'
-import { getCitationMetrics } from '@/lib/api/opencitations'
-import { searchPubMed } from '@/lib/api/pubmed'
-import { searchCrossRef } from '@/lib/api/crossref'
-import { searchArXiv } from '@/lib/api/arxiv'
-
-
-// New APIs (2026-04-09)
-import { getUniProtProtein } from '@/lib/api/uniprot'
-import { searchGOTerms } from '@/lib/api/gene-ontology'
-import { searchHPOTerms } from '@/lib/api/hpo'
-import { getGTExTopTissues } from '@/lib/api/gtex'
-import { searchDrugShortages } from '@/lib/api/fda-drug-shortages'
-import { searchLipidMaps } from '@/lib/api/lipidmaps'
-import { searchBioModels } from '@/lib/api/biomodels'
-import { searchOLS } from '@/lib/api/ols'
-import { getProteinVariations, getProteomicsMappings, getProteinCrossReferences } from '@/lib/api/ebi-proteins-variation'
-import { getAllCompoundIds } from '@/lib/api/unichem'
-import { searchBioSamples } from '@/lib/api/biosamples'
-import { searchMassive } from '@/lib/api/massive'
-import { getLINCSSignaturesByName } from '@/lib/api/lincs'
-import { getProteinAtlasData } from '@/lib/api/human-protein-atlas'
-import { getTTDData } from '@/lib/api/ttd'
-
-// NIH High-Impact
-import { fetchTranslatorData } from '@/lib/api/ncats-translator'
-import { fetchCadsrData } from '@/lib/api/nci-cadsr'
-import { fetchAnvilData } from '@/lib/api/nhgri-anvil'
-import { fetchImmPortData } from '@/lib/api/niaid-immport'
-import { fetchNeuroMMSigData } from '@/lib/api/ninds-neurommsig'
-
-import type { SynthesisRoute } from '@/lib/types'
+import {
+  fetchPharmaceutical,
+  fetchClinicalSafety,
+  fetchMolecularChemical,
+  fetchBioactivityTargets,
+  fetchProteinStructure,
+  fetchGenomicsDisease,
+  fetchInteractionsPathways,
+  fetchResearchLiterature,
+  fetchNihHighImpact,
+} from '@/lib/categoryFetchers'
 
 const VALID_CATEGORIES = [
   'pharmaceutical', 'clinical-safety', 'molecular-chemical',
@@ -153,349 +28,12 @@ const VALID_CATEGORIES = [
 
 const VALID_CATEGORY_IDS = new Set(VALID_CATEGORIES)
 
-async function fetchSynthesisRoutes(moleculeName: string): Promise<SynthesisRoute[]> {
-  const [keggId, rheaRoutes] = await Promise.all([
-    safe(getKeggCompoundId(moleculeName), null),
-    safe(getRheaSynthesisRoutes(moleculeName), []),
-  ])
-  const keggRoutes: SynthesisRoute[] = []
-  if (keggId) {
-    const reactionIds = await safe(getKeggReactions(keggId), [])
-    const details = await Promise.all((reactionIds as string[]).slice(0, 5).map(id => safe(getKeggReactionDetail(id), null)))
-    for (const detail of details) {
-      if (!detail) continue
-      keggRoutes.push({
-        method: detail.name,
-        description: detail.equation,
-        keggReactionIds: [detail.id],
-        enzymesInvolved: detail.enzymes,
-        precursors: [],
-        source: 'kegg',
-      })
-    }
-  }
-  return [...keggRoutes, ...(rheaRoutes as SynthesisRoute[])]
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const searchTerms = [name, ...synonyms.slice(0, 1)]
-  const [companiesNested, ndcProducts, orangeBookEntries, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
-    trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
-    trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
-    trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
-    trackedSafe('nadac', getDrugPricesByName(name), []),
-    trackedSafe('rxnorm', getDrugInteractionsByName(queryFor('drug-interactions')), []),
-    trackedSafe('dailymed', getDrugLabelsByName(name), []),
-    trackedSafe('atc', getAtcClassificationsByName(queryFor('atc')), []),
-    trackedSafe('drugcentral', getDrugCentralEnhanced(queryFor('drugcentral')), { drug: null, targets: [], indications: [], pharmacologicActions: [], atcCodes: [], manufacturers: [], products: [] }),
-    trackedSafe('gsrs', searchGSRS(name), []),
-    trackedSafe('pharmgkb', getPharmGKBData(queryFor('pharmgkb')), { drugs: [], genes: [], guidelines: [] }),
-    trackedSafe('cpic', getCPICData(queryFor('cpic')), []),
-  ])
-  const seen = new Set<string>()
-  const companies = companiesNested.flat().filter(p => {
-    if (seen.has(p.brandName)) return false
-    seen.add(p.brandName)
-    return true
-  })
-  return {
-    companies,
-    ndcProducts,
-    orangeBookEntries,
-    drugPrices,
-    drugInteractions,
-    drugLabels,
-    atcClassifications,
-    drugCentralEnhanced: drugCentralData,
-    gsrsSubstances,
-    pharmgkbDrugs: pharmgkbData.drugs,
-    cpicGuidelines,
-  }
-}
-
-async function fetchClinicalSafety(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const clinicalTrialsLimit = getApiParamNumber(apiParams, 'clinical-trials', 'maxResults', 10)
-  const [clinicalTrials, isrctnTrials, adverseEvents, drugRecalls, chemblIndications, clinVarVariants, gwasAssociations, toxcastData, siderData, irisAssessments, drugShortagesData] = await Promise.all([
-    trackedSafe('clinicaltrials', getClinicalTrialsByName(queryFor('clinical-trials'), clinicalTrialsLimit), []),
-    trackedSafe('isrctn', searchISRCTN(name), []),
-    trackedSafe('adverseevents', getAdverseEventsByName(queryFor('adverse-events')), []),
-    trackedSafe('recalls', getDrugRecallsByName(queryFor('recalls')), []),
-    trackedSafe('chembl-indications', getChemblIndicationsByName(name), []),
-    trackedSafe('clinvar', getClinVarVariantsByName(queryFor('clinvar'), getApiParamNumber(apiParams, 'clinvar', 'maxResults', 20)), []),
-    trackedSafe('gwas-catalog', getGwasAssociationsByName(queryFor('gwas-catalog')), []),
-    trackedSafe('toxcast', getToxCastData(queryFor('toxcast')), null),
-    trackedSafe('sider', getSIDERData(queryFor('sider')), { sideEffects: [] }),
-    trackedSafe('iris', searchIRIS(queryFor('iris')), []),
-    trackedSafe('fda-drug-shortages', searchDrugShortages(name), { shortages: [], total: 0 }),
-  ])
-  return {
-    clinicalTrials,
-    isrctnTrials,
-    adverseEvents,
-    drugRecalls,
-    chemblIndications,
-    clinVarVariants,
-    gwasAssociations,
-    toxcastData,
-    siderSideEffects: siderData.sideEffects,
-    irisAssessments,
-    drugShortages: drugShortagesData.shortages,
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function fetchMolecularChemical(name: string, cid: number, molecularWeight: number, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [computedProperties, ghsHazards, chebiAnnotation, compToxData, routes, metabolomicsData, myChemData, hmdbData, massBankSpectra, chemSpiderCompounds, metabolightsData, gnpsData, lipidMapsResult, unichemResult, foodbCompounds] = await Promise.all([
-    trackedSafe('pubchem-properties', getComputedPropertiesByCid(cid), null),
-    trackedSafe('pubchem-hazards', getGhsHazardsByCid(cid), { signalWord: '', hazardStatements: [], precautionaryStatements: [] }),
-    trackedSafe('chebi', getChebiAnnotationByName(queryFor('chebi')), null),
-    trackedSafe('comptox', getCompToxByName(queryFor('comptox')), null),
-    trackedSafe('synthesis-routes', fetchSynthesisRoutes(name), []),
-    trackedSafe('metabolomics', getMetabolomicsData(name, molecularWeight), { metabolites: [], studies: [] }),
-    trackedSafe('mychem', getMyChemData(queryFor('mychem')), { chemicals: [] }),
-    trackedSafe('hmdb', getHMDBData(queryFor('hmdb')), { metabolites: [] }),
-    trackedSafe('massbank', searchMassBank(queryFor('massbank')), [], API_SOURCE_TIMEOUTS['massbank']),
-    trackedSafe('chemspider', searchChemSpider(queryFor('chemspider')), []),
-    trackedSafe('metabolights', searchMetaboLights(name), []),
-    trackedSafe('gnps-library', Promise.all([searchGNPSLibrary(name), searchGNPSNetworks(name)]).then(([spectra, clusters]) => ({ spectra, clusters })), { spectra: [], clusters: [] }),
-    trackedSafe('lipidmaps', searchLipidMaps(queryFor('lipidmaps')), { lipids: [], total: 0 }),
-    trackedSafe('unichem', getAllCompoundIds('pubchem', String(cid)), { inchiKey: null, mappings: {} }),
-    trackedSafe('foodb', searchFooDB(name), []),
-  ])
-  return {
-    computedProperties,
-    ghsHazards,
-    chebiAnnotation,
-    compToxData,
-    routes,
-    metabolomicsData,
-    myChemAnnotations: myChemData.chemicals,
-    hmdbMetabolites: hmdbData.metabolites,
-    massBankSpectra,
-    chemSpiderCompounds,
-    metabolightsData: { studies: metabolightsData, metabolites: [] },
-    gnpsData,
-    lipidMapsLipids: lipidMapsResult.lipids,
-    unichemMappings: Object.entries(unichemResult.mappings).map(([source, id]) => ({
-      sourceId: source.toLowerCase(),
-      sourceName: source,
-      externalId: id,
-      url: `https://www.ebi.ac.uk/unichem/#/search/${source.toLowerCase()}/${encodeURIComponent(id)}`,
-    })),
-    foodbCompounds,
-  }
-}
-
-async function fetchBioactivityTargets(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const chemblLimit = getApiParamNumber(apiParams, 'chembl', 'maxResults', 20)
-  const [chemblActivities, bioAssays, chemblMechanisms, pharmacologyTargets, bindingAffinities, pharosTargets, drugGeneInteractions, diseaseAssociations, ctdData, iedbData, lincsSignatures, ttdData] = await Promise.all([
-    trackedSafe('chembl', getChemblActivitiesByName(queryFor('chembl'), chemblLimit), [], API_SOURCE_TIMEOUTS['chembl']),
-    trackedSafe('bioassay', getBioAssaysByName(queryFor('bioassay')), []),
-    trackedSafe('chembl-mechanisms', getChemblMechanismsByName(queryFor('chembl-mechanisms'), getApiParamNumber(apiParams, 'chembl-mechanisms', 'maxResults', 20)), [], API_SOURCE_TIMEOUTS['chembl-mechanisms']),
-    trackedSafe('iuphar', getPharmacologyTargetsByName(queryFor('iuphar')), []),
-    trackedSafe('bindingdb', getBindingAffinitiesByName(queryFor('bindingdb')), []),
-    trackedSafe('pharos', getPharosTargetsByName(queryFor('pharos')), []),
-    trackedSafe('dgidb', getDrugGeneInteractionsByName(queryFor('dgidb')), []),
-    trackedSafe('opentargets', getDiseaseAssociationsByName(queryFor('opentargets')), [], API_SOURCE_TIMEOUTS['opentargets']),
-    trackedSafe('ctd', getCTDData(queryFor('ctd'), false), { interactions: [], diseaseAssociations: [] }),
-    trackedSafe('iedb', getIEDBData(queryFor('iedb')), { epitopes: [] }),
-    trackedSafe('lincs', getLINCSSignaturesByName(queryFor('lincs')), [], API_SOURCE_TIMEOUTS['lincs']),
-    trackedSafe('ttd', getTTDData(queryFor('ttd')), { targets: [], drugs: [] }),
-  ])
-  return {
-    chemblActivities,
-    bioAssays,
-    chemblMechanisms,
-    pharmacologyTargets,
-    bindingAffinities,
-    pharosTargets,
-    drugGeneInteractions,
-    diseaseAssociations,
-    ctdInteractions: ctdData.interactions,
-    ctdDiseaseAssociations: ctdData.diseaseAssociations,
-    iedbEpitopes: iedbData.epitopes,
-    lincsSignatures,
-    ttdTargets: ttdData.targets,
-    ttdDrugs: ttdData.drugs,
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function fetchProteinStructure(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [uniprotEntries, pdbStructures, pdbeLigands, prideProjects, cathDomains, sabdabEntries] = await Promise.all([
-    safe(getUniprotEntriesByName(queryFor('uniprot')), []),
-    safe(getPdbStructuresByName(queryFor('pdb')), []),
-    safe(getPdbeLigandsByName(name), []),
-    safe(searchPRIDE(name), []),
-    safe(searchCATHDomains(name), []),
-    safe(searchSAbDab(name), []),
-  ])
-  const accessions = (uniprotEntries as Array<{accession: string}>).map(e => e.accession).filter(Boolean)
-  const geneSymbols = (uniprotEntries as Array<{geneName: string}>).map(e => e.geneName).filter(Boolean)
-  const [alphaFoldPredictions, proteinDomains, proteinFeatures, proteinAtlasEntries, goAnnotations, peptideAtlasData, gene3dEntries, uniprotProteins, ebiVariations, ebiProteomics, ebiCrossRefs, humanProteinAtlas] = await Promise.all([
-    safe(getAlphaFoldPredictions(accessions), []),
-    safe(getProteinDomains(accessions), []),
-    safe(getProteinFeaturesByAccessions(accessions), []),
-    safe(getProteinAtlasBySymbols(geneSymbols), []),
-    safe(getGoAnnotationsByAccessions(accessions), []),
-    safe(getPeptideAtlasData(name), { peptides: [] }),
-    safe(Promise.all(geneSymbols.slice(0, 5).map(s => searchGene3D(s).catch(() => []))).then(r => r.flat()), []),
-    safe(Promise.all(geneSymbols.slice(0, 5).map(g => getUniProtProtein(g).catch(() => null))).then(results => results.filter((p): p is NonNullable<typeof p> => p !== null)), []),
-    safe(Promise.all(accessions.slice(0, 3).map(a => getProteinVariations(a).catch(() => null))).then(r => r.find(x => x) || null), null),
-    safe(Promise.all(accessions.slice(0, 3).map(a => getProteomicsMappings(a).catch(() => null))).then(r => r.find(x => x) || null), null),
-    safe(Promise.all(accessions.slice(0, 3).map(a => getProteinCrossReferences(a).catch(() => null))).then(r => r.find(x => x) || null), null),
-    safe(geneSymbols.length > 0 ? getProteinAtlasData(geneSymbols[0]) : Promise.resolve(null), null),
-  ])
-  return {
-    uniprotEntries,
-    pdbStructures,
-    pdbeLigands,
-    alphaFoldPredictions,
-    proteinDomains,
-    proteinFeatures,
-    proteinAtlasEntries,
-    goAnnotations,
-    peptideAtlasEntries: peptideAtlasData.peptides,
-    prideProjects,
-    cathData: { domains: cathDomains, gene3dEntries },
-    sabdabEntries,
-    uniprotProteins,
-    ebiProteinVariations: ebiVariations,
-    ebiProteomicsData: ebiProteomics,
-    ebiCrossReferences: ebiCrossRefs,
-    humanProteinAtlas,
-  }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-async function fetchGenomicsDisease(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [uniprotEntries, geneInfo, monarchDiseases, nciConcepts, meshTerms, disgenetData, orphanetData, myGeneData, omimData, geoDatasets, dbSnpVariants, clinGenData, medGenConcepts] = await Promise.all([
-    trackedSafe('uniprot', getUniprotEntriesByName(queryFor('uniprot')), []),
-    trackedSafe('ncbi-gene', getGeneInfoByName(queryFor('gene-info')), []),
-    trackedSafe('monarch', getMonarchDiseasesByName(queryFor('monarch')), []),
-    trackedSafe('nci-thesaurus', getNciConceptsByName(queryFor('nci-thesaurus')), []),
-    trackedSafe('mesh', getMeshTermsByName(queryFor('mesh')), []),
-    trackedSafe('disgenet', getDisGeNetData(queryFor('disgenet')), { associations: [] }),
-    trackedSafe('orphanet', getOrphanetData(queryFor('orphanet')), { diseases: [] }),
-    trackedSafe('mygene', getMyGeneData(queryFor('mygene')), { genes: [] }),
-    trackedSafe('omim', getOMIMData(queryFor('omim')), { entries: [] }),
-    trackedSafe('geo', searchGEO(name), []),
-    trackedSafe('dbsnp', getDbSNPVariants(queryFor('dbsnp')), []),
-    trackedSafe('clingen', getClinGenData(queryFor('clingen')), { geneDiseases: [], variants: [] }),
-    trackedSafe('medgen', getMedGenConcepts(queryFor('medgen')), []),
-  ])
-  const geneSymbols = (uniprotEntries as Array<{geneName: string}>).map(e => e.geneName).filter(Boolean)
-  const [ensemblGenes, geneExpressions, bgeeData, gtexExpressions, goTerms, hpoTerms, olsTerms, bioModelsResult, bioSamplesResult, massiveResult] = await Promise.all([
-    trackedSafe('ensembl', getEnsemblGenesBySymbols(geneSymbols), []),
-    trackedSafe('expression-atlas', getGeneExpressionBySymbols(geneSymbols), []),
-    trackedSafe('bgee', getBgeeData(name), { expressions: [] }),
-    trackedSafe('gtex', Promise.all(geneSymbols.slice(0, 5).map(g => getGTExTopTissues(g, 10).catch(() => []))).then(r => r.flat()), []),
-    trackedSafe('gene-ontology', Promise.all(geneSymbols.slice(0, 5).map(g => searchGOTerms(g).then(r => r.terms).catch(() => []))).then(r => r.flat()), []),
-    trackedSafe('hpo', searchHPOTerms(name), { terms: [], total: 0 }),
-    trackedSafe('ols', searchOLS(name), { terms: [], total: 0 }),
-    trackedSafe('biomodels', searchBioModels(name), { models: [], total: 0 }),
-    trackedSafe('biosamples', searchBioSamples(name, 0, 10), { samples: [], total: 0, page: 0, size: 10 }),
-    trackedSafe('massive', searchMassive(name, 10), { datasets: [], total: 0 }),
-  ])
-  return {
-    geneInfo,
-    ensemblGenes,
-    geneExpressions,
-    geoDatasets,
-    dbSnpVariants,
-    clinGenData,
-    medGenConcepts,
-    monarchDiseases,
-    nciConcepts,
-    meshTerms,
-    disgenetAssociations: disgenetData.associations,
-    orphanetDiseases: orphanetData.diseases,
-    myGeneAnnotations: myGeneData.genes,
-    bgeeExpressions: bgeeData.expressions,
-    omimEntries: omimData.entries,
-    gtexExpressions,
-    goTerms: normalizeGoTerms(goTerms),
-    hpoTerms: (hpoTerms as unknown as { terms?: unknown[] })?.terms ?? hpoTerms,
-    olsTerms: olsTerms.terms,
-    bioModelsModels: bioModelsResult.models,
-    bioSamples: bioSamplesResult.samples,
-    massiveDatasets: massiveResult.datasets,
-  }
-}
-
-async function fetchInteractionsPathways(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [proteinInteractions, chemicalProteinInteractions, molecularInteractions, reactomePathways, wikiPathways, pathwayCommonsResults, bioCycPathways, smpdbPathways, keggData] = await Promise.all([
-    trackedSafe('string-db', getProteinInteractionsByName(queryFor('string'), getApiParamNumber(apiParams, 'string', 'maxResults', 10), Number(apiParams['string']?.minScore ?? 0)), []),
-    trackedSafe('stitch', getChemicalInteractionsByName(queryFor('stitch')), []),
-    trackedSafe('intact', getMolecularInteractionsByName(queryFor('intact')), []),
-    trackedSafe('reactome', getReactomePathwaysByName(queryFor('reactome')), []),
-    trackedSafe('wikipathways', getWikiPathwaysByName(queryFor('wikipathways')), []),
-    trackedSafe('pathway-commons', getPathwayCommonsByName(queryFor('pathway-commons')), []),
-    trackedSafe('biocyc', searchBioCyc(queryFor('biocyc')), []),
-    trackedSafe('smpdb', searchSMPDB(queryFor('smpdb')), []),
-    trackedSafe('kegg', getKEGGData(queryFor('kegg')), { pathways: [], compounds: [], drugs: [] }),
-  ])
-  return { proteinInteractions, chemicalProteinInteractions, molecularInteractions, reactomePathways, wikiPathways, pathwayCommonsResults, bioCycPathways, smpdbPathways, keggData }
-}
-
-async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [literature, nihGrants, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
-    trackedSafe('europepmc', getLiteratureByName(queryFor('literature')), []),
-    trackedSafe('nihreporter', getNihGrantsByName(queryFor('nih-reporter')), []),
-    trackedSafe('patents', getPatentsByMoleculeName(queryFor('patents')), []),
-    trackedSafe('secedgar', getSecFilingsByName(queryFor('sec')), []),
-    trackedSafe('semantic-scholar', getSemanticPapersByName(queryFor('semantic-scholar')), []),
-    trackedSafe('openalex', getOpenAlexWorksByName(queryFor('open-alex')), []),
-    trackedSafe('pubmed', searchPubMed(queryFor('pubmed'), getApiParamNumber(apiParams, 'pubmed', 'maxResults', 20)), []),
-    trackedSafe('crossref', searchCrossRef(queryFor('crossref')), []),
-    trackedSafe('arxiv', searchArXiv(queryFor('arxiv')), []),
-  ])
-  const dois = (literature as Array<{doi?: string}>).map(l => l.doi).filter(Boolean) as string[]
-  const citationMetrics = await trackedSafe('opencitations', getCitationMetrics(dois), [])
-  return { literature, nihGrants, patents, secFilings, semanticPapers, openAlexWorks, citationMetrics, pubmedArticles, crossRefWorks, arxivPapers }
-}
-
-async function fetchNihHighImpact(name: string, queryFor: (s: string) => string) {
-  const [translatorData, cadsrData, anvilData, immPortData, neuroMMSigData] = await Promise.all([
-    trackedSafe('ncats-translator', fetchTranslatorData(queryFor('ncats-translator')), null),
-    trackedSafe('nci-cadsr', fetchCadsrData(queryFor('nci-cadsr')), null),
-    trackedSafe('nhgri-anvil', fetchAnvilData(queryFor('nhgri-anvil')), null),
-    trackedSafe('niaid-immport', fetchImmPortData(queryFor('niaid-immport')), null),
-    trackedSafe('ninds-neurommsig', fetchNeuroMMSigData(queryFor('ninds-neurommsig')), null),
-  ])
-  return { translatorData, cadsrData, anvilData, immPortData, neuroMMSigData }
-}
-
-function normalizeGoTerms(raw: unknown): unknown[] {
-  let items: unknown[]
-  if (Array.isArray(raw)) {
-    items = raw
-  } else if (raw && typeof raw === 'object') {
-    const obj = raw as Record<string, unknown>
-    items = Array.isArray(obj.terms) ? obj.terms : []
-  } else {
-    items = []
-  }
-  return items.map((raw: unknown) => {
-    const item = raw as Record<string, unknown>
-    return {
-      goId: item.goId || item.id || '',
-      goName: item.goName || item.label || item.name || '',
-      goAspect: item.goAspect || item.aspect || '',
-      evidence: item.evidence || item.goEvidence || '',
-      qualifier: item.qualifier || '',
-      url: item.url || `https://amigo.geneontology.org/amigo/term/${item.goId || item.id || ''}`,
-    }
-  })
-}
-
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; categoryId: string } }
 ) {
   const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
+  if (isNaN(cid) || cid < 1) {
     return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
   }
 
@@ -504,7 +42,13 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
   }
 
-  const molecule = await getMoleculeById(cid)
+  let molecule
+  try {
+    molecule = await getMoleculeById(cid)
+  } catch (error) {
+    console.error(`[api/category] Error fetching molecule ${cid}:`, error)
+    return NextResponse.json({ error: 'Failed to fetch molecule data' }, { status: 500 })
+  }
   if (!molecule) {
     return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
   }
@@ -524,6 +68,12 @@ export async function GET(
     if (paramsStr) apiParams = JSON.parse(paramsStr)
   } catch {}
 
+  const MAX_OVERRIDES = 200
+  const MAX_PARAMS = 200
+  if (Object.keys(overrides).length > MAX_OVERRIDES || Object.keys(apiParams).length > MAX_PARAMS) {
+    return NextResponse.json({ error: 'Too many overrides/params' }, { status: 400 })
+  }
+
   const hasOverrides = Object.keys(overrides).length > 0
   const identifiers = hasOverrides ? await getMoleculeIdentifiers(cid) : null
   const queryFor = (source: string): string => {
@@ -531,48 +81,42 @@ export async function GET(
     return name
   }
 
-  const cacheKey = `category:${cid}:${categoryId}${Object.keys(overrides).length > 0 ? `:${request.nextUrl.searchParams.get('overrides')}` : ''}`
+  const cacheKey = `category:${cid}:${categoryId}${Object.keys(overrides).length > 0 ? `:${request.nextUrl.searchParams.get('overrides')}` : ''}${Object.keys(apiParams).length > 0 ? `:${request.nextUrl.searchParams.get('params')}` : ''}`
   const cached = getCached<Record<string, unknown>>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
   }
 
-  let data: Record<string, unknown>
-  void Date.now()
-  try {
-    switch (categoryId) {
-      case 'pharmaceutical':
-        data = await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
-        break
-      case 'clinical-safety':
-        data = await fetchClinicalSafety(name, queryFor, apiParams)
-        break
-      case 'molecular-chemical':
-        data = await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
-        break
-      case 'bioactivity-targets':
-        data = await fetchBioactivityTargets(name, queryFor, apiParams)
-        break
-      case 'protein-structure':
-        data = await fetchProteinStructure(name, queryFor, apiParams)
-        break
-      case 'genomics-disease':
-        data = await fetchGenomicsDisease(name, queryFor, apiParams)
-        break
-      case 'interactions-pathways':
-        data = await fetchInteractionsPathways(name, queryFor, apiParams)
-        break
-      case 'research-literature':
-        data = await fetchResearchLiterature(name, queryFor, apiParams)
-        break
-      case 'nih-high-impact':
-        data = await fetchNihHighImpact(name, queryFor)
-        break
-      default:
-        return NextResponse.json({ error: 'Unknown category' }, { status: 400 })
-    }
+  const categoryTimeout = getCategoryTimeout(categoryId)
 
-    // duration computed but no longer tracked at category level
+  let data: Record<string, unknown>
+  try {
+    const fetchPromise = (async () => {
+      switch (categoryId) {
+        case 'pharmaceutical':
+          return await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
+        case 'clinical-safety':
+          return await fetchClinicalSafety(name, queryFor, apiParams)
+        case 'molecular-chemical':
+          return await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
+        case 'bioactivity-targets':
+          return await fetchBioactivityTargets(name, queryFor, apiParams)
+        case 'protein-structure':
+          return await fetchProteinStructure(name, queryFor, apiParams)
+        case 'genomics-disease':
+          return await fetchGenomicsDisease(name, queryFor, apiParams)
+        case 'interactions-pathways':
+          return await fetchInteractionsPathways(name, queryFor, apiParams)
+        case 'research-literature':
+          return await fetchResearchLiterature(name, queryFor, apiParams)
+        case 'nih-high-impact':
+          return await fetchNihHighImpact(name, queryFor)
+        default:
+          return null
+      }
+    })()
+
+    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 5000)
 
     for (const m of flushApiMetrics()) {
       recordMetric({
@@ -595,7 +139,12 @@ export async function GET(
         has_data: m.has_data,
       })
     }
-    throw err
+    console.error(`[api/category] Error fetching ${categoryId} for molecule ${cid}:`, err)
+    return NextResponse.json({
+      error: 'Failed to fetch category data',
+      category: categoryId,
+      message: err instanceof Error ? err.message : 'Unknown error',
+    }, { status: 500 })
   }
 
   setCache(cacheKey, data)

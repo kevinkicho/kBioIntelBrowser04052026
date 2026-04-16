@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getMoleculeById } from '@/lib/api/pubchem'
 import { getOMIMData } from '@/lib/api/omim'
 
 export async function GET(
@@ -6,10 +7,17 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const moleculeId = params.id
+    const cid = parseInt(params.id, 10)
+    if (isNaN(cid)) {
+      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
+    }
 
-    // Fetch genetic disorder data from OMIM
-    const data = await getOMIMData(moleculeId)
+    const molecule = await getMoleculeById(cid)
+    if (!molecule) {
+      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
+    }
+
+    const data = await getOMIMData(molecule.name)
 
     return NextResponse.json({
       entries: data.entries

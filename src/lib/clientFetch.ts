@@ -1,3 +1,5 @@
+const IS_DEV = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
+
 const LOG_STYLE = 'color: #60a5fa; font-weight: bold'
 const OK_STYLE = 'color: #34d399'
 const ERR_STYLE = 'color: #f87171'
@@ -9,7 +11,9 @@ function ms(duration: number): string {
   return `${(duration / 1000).toFixed(1)}s`
 }
 
-const inFlight = new Map<string, Promise<Response>>()
+const inFlight = new Map<string, { promise: Promise<Response>; addedAt: number }>()
+const INFLIGHT_MAX_AGE_MS = 60_000
+const INFLIGHT_MAX_SIZE = 500
 
 function getKey(input: RequestInfo | URL, init?: RequestInit): string {
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
@@ -26,7 +30,7 @@ function flushAnalytics() {
   fetch('/api/analytics', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(batch[0]),
+    body: JSON.stringify(batch),
   }).catch(() => {})
 }
 
@@ -52,14 +56,14 @@ export async function clientFetch(
   if (isDedupable) {
     const existing = inFlight.get(key)
     if (existing) {
-      console.log(`%c↑ dedupe %c${method} %c${url}`, DIM_STYLE, LOG_STYLE, DIM_STYLE)
-      const res = await existing
+      if (IS_DEV) console.log(`%c↑ dedupe %c${method} %c${url}`, DIM_STYLE, LOG_STYLE, DIM_STYLE)
+      const res = await existing.promise
       return res.clone()
     }
   }
 
   const start = performance.now()
-  console.group(`%c→ ${method} %c${url}`, LOG_STYLE, DIM_STYLE)
+  if (IS_DEV) console.group(`%c→ ${method} %c${url}`, LOG_STYLE, DIM_STYLE)
 
   const promise = fetch(input, init).then(response => {
     if (isDedupable) {
@@ -74,7 +78,13 @@ export async function clientFetch(
   })
 
   if (isDedupable) {
-    inFlight.set(key, promise)
+    if (inFlight.size > INFLIGHT_MAX_SIZE) {
+      const now = Date.now()
+      inFlight.forEach((v, k) => {
+        if (now - v.addedAt > INFLIGHT_MAX_AGE_MS) inFlight.delete(k)
+      })
+    }
+    inFlight.set(key, { promise, addedAt: Date.now() })
   }
 
   try {
@@ -104,17 +114,17 @@ export async function clientFetch(
     }
 
     if (response.ok) {
-      console.log(
+      if (IS_DEV) console.log(
         `%c← ${response.status} %c${ms(duration)}%c${sizeStr}`,
         OK_STYLE, TIME_STYLE, DIM_STYLE,
       )
     } else {
-      console.warn(
+      if (IS_DEV) console.warn(
         `%c← ${response.status} ${response.statusText} %c${ms(duration)}`,
         ERR_STYLE, TIME_STYLE,
       )
     }
-    console.groupEnd()
+    if (IS_DEV) console.groupEnd()
     return response
   } catch (error) {
     const duration = Math.round(performance.now() - start)
@@ -140,12 +150,12 @@ export async function clientFetch(
       })
     }
 
-    console.error(
+    if (IS_DEV) console.error(
       `%c✗ Network error %c${ms(duration)}`,
       ERR_STYLE, TIME_STYLE,
       error,
     )
-    console.groupEnd()
+    if (IS_DEV) console.groupEnd()
     throw error
   }
 }

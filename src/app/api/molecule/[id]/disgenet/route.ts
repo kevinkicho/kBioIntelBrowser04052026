@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getMoleculeById } from '@/lib/api/pubchem'
 import { getDisGeNetData } from '@/lib/api/disgenet'
 
 export async function GET(
@@ -6,10 +7,17 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const moleculeId = params.id
+    const cid = parseInt(params.id, 10)
+    if (isNaN(cid)) {
+      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
+    }
 
-    // Fetch gene-disease associations from DisGeNET
-    const data = await getDisGeNetData(moleculeId)
+    const molecule = await getMoleculeById(cid)
+    if (!molecule) {
+      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
+    }
+
+    const data = await getDisGeNetData(molecule.name)
 
     return NextResponse.json({
       associations: data.associations

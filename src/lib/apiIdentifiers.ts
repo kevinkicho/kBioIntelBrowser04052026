@@ -72,7 +72,6 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
   { panelId: 'wikipathways', label: 'WikiPathways', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'kegg', label: 'KEGG', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'biocyc', label: 'BioCyc', defaultType: 'name', supportedTypes: ['name'] },
-  { panelId: 'smpdb', label: 'SMPDB', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'pubmed', label: 'PubMed', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'literature', label: 'Europe PMC', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'semantic-scholar', label: 'Semantic Scholar', defaultType: 'name', supportedTypes: ['name'] },

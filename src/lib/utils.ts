@@ -45,7 +45,7 @@ export function buildStructureImageUrl(cid: number): string {
 }
 
 export function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
-  return promise.catch(() => fallback)
+  return withTimeout(promise, DEFAULT_API_TIMEOUT).catch(() => fallback)
 }
 
 const API_TIMEOUTS: Record<string, number> = {

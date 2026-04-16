@@ -1,12 +1,13 @@
 import type { GeneInfo } from '../types'
 import { LIMITS } from '../api-limits'
+import { getApiKey } from './utils'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getGeneInfoByName(name: string): Promise<GeneInfo[]> {
   try {
     const NCBI_EMAIL = process.env.NCBI_EMAIL ?? ''
-    const NCBI_API_KEY = process.env.NCBI_API_KEY ?? ''
+    const NCBI_API_KEY = getApiKey('NCBI_API_KEY') ?? ''
     const credsSuffix = (NCBI_API_KEY ? `&api_key=${NCBI_API_KEY}` : '') + (NCBI_EMAIL ? `&email=${encodeURIComponent(NCBI_EMAIL)}` : '')
     const term = `${encodeURIComponent(name)}+AND+Homo+sapiens[Organism]`
     const searchRes = await fetch(

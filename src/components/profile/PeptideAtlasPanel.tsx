@@ -1,17 +1,15 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import type { MoleculeData } from '@/lib/types'
+import type { PeptideAtlasEntry } from '@/lib/types'
 
 interface PeptideAtlasPanelProps {
-  data: MoleculeData
+  peptides?: PeptideAtlasEntry[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const PeptideAtlasPanel = memo(function PeptideAtlasPanel({ data, panelId, lastFetched }: PeptideAtlasPanelProps) {
-  const peptides = data.peptideAtlasEntries ?? []
-
-  if (peptides.length === 0) {
+export const PeptideAtlasPanel = memo(function PeptideAtlasPanel({ peptides, panelId, lastFetched }: PeptideAtlasPanelProps) {
+  if (!peptides || peptides.length === 0) {
     return (
       <Panel title="PeptideAtlas" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No peptide data found for this molecule.</p>
@@ -25,7 +23,7 @@ export const PeptideAtlasPanel = memo(function PeptideAtlasPanel({ data, panelId
     if (!acc[protein]) acc[protein] = []
     acc[protein].push(peptide)
     return acc
-  }, {} as Record<string, typeof peptides>)
+  }, {} as Record<string, PeptideAtlasEntry[]>)
 
   const proteins = Object.entries(groupedByProtein)
 

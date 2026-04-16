@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkOllamaHealth } from '@/lib/ai/ollama'
+import { validateOllamaUrl } from '@/lib/ai/config'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
@@ -13,25 +14,35 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  console.log(`[ai/health] Checking ${ollamaUrl}/api/tags`)
-  const health = await checkOllamaHealth(ollamaUrl)
-
-  if (!health.available) {
-    console.warn(`[ai/health] Ollama at ${ollamaUrl} unavailable — ${health.error}`)
+  const validation = validateOllamaUrl(ollamaUrl)
+  if (!validation.valid) {
     return NextResponse.json({
       available: false,
       models: [],
-      ollamaUrl,
+      error: validation.error,
+    })
+  }
+  const validatedUrl = validation.normalized!
+
+  console.log(`[ai/health] Checking ${validatedUrl}/api/tags`)
+  const health = await checkOllamaHealth(validatedUrl)
+
+  if (!health.available) {
+    console.warn(`[ai/health] Ollama at ${validatedUrl} unavailable — ${health.error}`)
+    return NextResponse.json({
+      available: false,
+      models: [],
+      ollamaUrl: validatedUrl,
       error: health.error,
     })
   }
 
-  console.log(`[ai/health] Ollama at ${ollamaUrl} available | models: [${health.models.join(', ')}]`)
+  console.log(`[ai/health] Ollama at ${validatedUrl} available | models: [${health.models.join(', ')}]`)
 
   return NextResponse.json({
     available: true,
     models: health.models,
-    ollamaUrl,
+    ollamaUrl: validatedUrl,
     error: undefined,
   })
 }

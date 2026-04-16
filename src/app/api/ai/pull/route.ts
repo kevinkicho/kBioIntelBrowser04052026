@@ -1,5 +1,6 @@
 import { NextRequest } from 'next/server'
 import { pullModel } from '@/lib/ai/ollama'
+import { validateOllamaUrl } from '@/lib/ai/config'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
@@ -12,18 +13,26 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  const validation = validateOllamaUrl(ollamaUrl)
+  if (!validation.valid) {
+    return new Response(JSON.stringify({ status: 'error', error: validation.error }) + '\n', {
+      headers: { 'Content-Type': 'text/plain; charset=utf-8' },
+    })
+  }
+  const validatedUrl = validation.normalized!
+
   if (!modelName) {
     return new Response(JSON.stringify({ status: 'error', error: 'No model specified' }) + '\n', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },
     })
   }
 
-  console.log('[ai/pull] Starting model pull:', modelName, 'at', ollamaUrl)
+  console.log('[ai/pull] Starting model pull:', modelName, 'at', validatedUrl)
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
-      const result = await pullModel(ollamaUrl, modelName, (status, progress) => {
+      const result = await pullModel(validatedUrl, modelName, (status, progress) => {
         try {
           controller.enqueue(encoder.encode(JSON.stringify({ status, progress }) + '\n'))
         } catch {}

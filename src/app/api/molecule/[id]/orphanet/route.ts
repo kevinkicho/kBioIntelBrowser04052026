@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getMoleculeById } from '@/lib/api/pubchem'
 import { getOrphanetData } from '@/lib/api/orphanet'
 
 export async function GET(
@@ -6,10 +7,17 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
-    const moleculeId = params.id
+    const cid = parseInt(params.id, 10)
+    if (isNaN(cid)) {
+      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
+    }
 
-    // Fetch rare disease data from Orphanet
-    const data = await getOrphanetData(moleculeId)
+    const molecule = await getMoleculeById(cid)
+    if (!molecule) {
+      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
+    }
+
+    const data = await getOrphanetData(molecule.name)
 
     return NextResponse.json({
       diseases: data.diseases

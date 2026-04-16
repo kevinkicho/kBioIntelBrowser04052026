@@ -41,7 +41,7 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'drug-interactions', title: 'DrugInteractions', propKey: 'drugInteractions', isNullable: false },
       { id: 'dailymed', title: 'DailyMed', propKey: 'drugLabels', isNullable: false },
       { id: 'atc', title: 'ATC', propKey: 'atcClassifications', isNullable: false },
-      { id: 'drugcentral', title: 'DrugCentral', propKey: 'drugCentralData', isNullable: true },
+      { id: 'drugcentral', title: 'DrugCentral', propKey: 'drugCentralEnhanced', isNullable: true },
       { id: 'gsrs', title: 'GSRS (UNII)', propKey: 'gsrsSubstances', isNullable: true },
 
       { id: 'pharmgkb', title: 'PharmGKB', propKey: 'pharmgkbDrugs', isNullable: true },
@@ -62,7 +62,7 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'clinvar', title: 'ClinVar', propKey: 'clinVarVariants', isNullable: false },
       { id: 'drug-shortages', title: 'DrugShortages', propKey: 'drugShortages', isNullable: true },
       { id: 'gwas', title: 'GwasCatalog', propKey: 'gwasAssociations', isNullable: false },
-      { id: 'toxcast', title: 'ToxCast', propKey: 'toxcastData', isNullable: true },
+      { id: 'toxcast', title: 'ToxCast', propKey: 'toxcast', isNullable: true },
       { id: 'sider', title: 'SIDER', propKey: 'siderSideEffects', isNullable: true },
       { id: 'iris', title: 'IRIS', propKey: 'irisAssessments', isNullable: true },
     ],

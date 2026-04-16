@@ -1,8 +1,5 @@
 /** @type {import('next').NextConfig } */
 const nextConfig = {
-  experimental: {
-    serverComponentsExternalPackages: ['better-sqlite3'],
-  },
   env: {
     OLLAMA_HOST: process.env.OLLAMA_HOST,
   },
@@ -29,8 +26,31 @@ const nextConfig = {
       },
       {
         protocol: 'https',
-        hostname: 'pubchem.ncbi.nlm.nih.gov',
-        pathname: '/image/**',
+        hostname: 'alphafold.ebi.ac.uk',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.ebi.ac.uk',
+      },
+      {
+        protocol: 'https',
+        hostname: 'string-db.org',
+      },
+      {
+        protocol: 'https',
+        hostname: 'stitch.embl.de',
+      },
+      {
+        protocol: 'https',
+        hostname: 'www.ncbi.nlm.nih.gov',
+      },
+      {
+        protocol: 'https',
+        hostname: 'cdn.jsdelivr.net',
+      },
+      {
+        protocol: 'https',
+        hostname: 'files.rcsb.org',
       },
     ],
   },

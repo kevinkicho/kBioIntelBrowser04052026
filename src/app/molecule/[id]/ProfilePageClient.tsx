@@ -15,7 +15,7 @@ import { computeMoleculeSummary } from '@/lib/moleculeSummary'
 import { fetchCategoryData, type CategoryLoadState } from '@/lib/fetchCategory'
 import type { FreshnessMap } from '@/lib/dataFreshness'
 import { buildGraphData } from '@/lib/buildGraphData'
-import type { CompanyProduct, SynthesisRoute, Patent, UniprotEntry, MoleculeData, CadsrConcept, TranslatorAssociation, AnvilDataset, ImmPortStudy, NeuroMMSigSignature } from '@/lib/types'
+import type { CompanyProduct, SynthesisRoute, Patent, UniprotEntry, CadsrConcept, TranslatorAssociation, AnvilDataset, ImmPortStudy, NeuroMMSigSignature } from '@/lib/types'
 import * as LazyPanels from '@/lib/lazyPanels'
 import { NetworkGraph } from '@/components/graph/NetworkGraph'
 import { InsightsSection } from '@/components/profile/InsightsSection'
@@ -26,6 +26,7 @@ import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetect
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
 import { AICopilot } from '@/components/ai/AICopilot'
+import { sessionHistory } from '@/lib/sessionHistory'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 
 interface Props {
@@ -90,6 +91,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryData, setCategoryData] = useState<CategoriesData>({})
   const [categoryStatus, setCategoryStatus] = useState<CategoriesStatus>(initStatus)
+  const categoryStatusRef = useRef(categoryStatus)
+  categoryStatusRef.current = categoryStatus
   const [quickViewPanel, setQuickViewPanel] = useState<{ categoryId: CategoryId, panelId: string } | null>(null)
   const [fetchedAt, setFetchedAt] = useState<Partial<Record<CategoryId, Date>>>({})
   const [hideEmpty, setHideEmpty] = useState(true)
@@ -130,7 +133,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
   const loadCategory = useCallback(async (catId: CategoryId) => {
     if (pendingRef.current.has(catId)) return
-    if (categoryStatus[catId] === 'loaded' || categoryStatus[catId] === 'loading') return
+    if (categoryStatusRef.current[catId] === 'loaded' || categoryStatusRef.current[catId] === 'loading') return
     pendingRef.current.add(catId)
     setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
     try {
@@ -143,7 +146,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     } finally {
       pendingRef.current.delete(catId)
     }
-  }, [cid, categoryStatus, apiOverrides, apiParams])
+  }, [cid, apiOverrides, apiParams])
 
   // Scroll to category section
   const scrollToCategory = useCallback((catId: CategoryId | 'all') => {
@@ -152,21 +155,20 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       return
     }
     setActiveCategory(catId)
-    if (categoryStatus[catId] === 'idle') loadCategory(catId)
-    // Scroll to the section after a short delay to allow rendering
+    if (categoryStatusRef.current[catId] === 'idle') loadCategory(catId)
     requestAnimationFrame(() => {
       const el = document.getElementById(catId)
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
-  }, [categoryStatus, loadCategory])
+  }, [loadCategory])
 
   // Auto-load the active category when it changes
   useEffect(() => {
     if (activeCategory === 'all') return
-    if (categoryStatus[activeCategory] === 'idle') {
+    if (categoryStatusRef.current[activeCategory] === 'idle') {
       loadCategory(activeCategory)
     }
-  }, [activeCategory, categoryStatus, loadCategory])
+  }, [activeCategory, loadCategory])
 
   // Auto-load default category on mount
   useEffect(() => {
@@ -177,15 +179,27 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   useEffect(() => {
     if (!hideEmpty) return
     for (const id of ALL_CATEGORY_IDS) {
-      if (categoryStatus[id] === 'idle') loadCategory(id)
+      if (categoryStatusRef.current[id] === 'idle') loadCategory(id)
     }
-  }, [hideEmpty])
+  }, [hideEmpty, loadCategory])
 
   // Background pre-fetch: once pharmaceutical loads, silently load remaining categories
-  useEffect(() => {
-    if (categoryStatus['pharmaceutical'] !== 'loaded') return
+  const pharmaceuticalLoaded = categoryStatus['pharmaceutical'] === 'loaded'
 
-    // Priority order: most valuable categories first
+  useEffect(() => {
+    if (pharmaceuticalLoaded) {
+      const merged: Record<string, unknown> = {}
+      for (const catId of Object.keys(categoryData) as CategoryId[]) {
+        const catData = categoryData[catId]
+        if (catData) Object.assign(merged, catData)
+      }
+      sessionHistory.addMolecule(moleculeName, merged)
+    }
+  }, [pharmaceuticalLoaded, categoryData, moleculeName])
+
+  useEffect(() => {
+    if (!pharmaceuticalLoaded) return
+
     const prefetchOrder: CategoryId[] = [
       'clinical-safety',
       'research-literature',
@@ -200,22 +214,17 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     async function prefetchSequentially() {
       for (const catId of prefetchOrder) {
         if (cancelled) break
-        // Skip if already loaded, loading, or errored
-        if (categoryStatus[catId] !== 'idle') continue
-        // Small delay between fetches to avoid hammering APIs
+        if (categoryStatusRef.current[catId] !== 'idle') continue
         await new Promise(r => setTimeout(r, 300))
         if (cancelled) break
         loadCategory(catId)
-        // Wait for this one to finish before starting next
         await new Promise(r => setTimeout(r, 1500))
       }
     }
 
     const timer = setTimeout(prefetchSequentially, 500)
     return () => { cancelled = true; clearTimeout(timer) }
-    // Only trigger once when pharmaceutical first loads
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [categoryStatus['pharmaceutical']])
+  }, [pharmaceuticalLoaded, loadCategory])
 
   // Merge all loaded data into a single props-like object for summary/export/counts
   const mergedData = useMemo(() => {
@@ -303,21 +312,21 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'semantic-scholar': (panelId, lastFetched) => <LazyPanels.LazySemanticScholarPanel papers={d('semanticPapers')} panelId={panelId} lastFetched={lastFetched} />,
       'open-alex': (panelId, lastFetched) => <LazyPanels.LazyOpenAlexPanel works={d('openAlexWorks')} panelId={panelId} lastFetched={lastFetched} />,
       'open-citations': (panelId, lastFetched) => <LazyPanels.LazyOpenCitationsPanel metrics={d('citationMetrics')} panelId={panelId} lastFetched={lastFetched} />,
-      'drugcentral': (panelId, lastFetched) => <LazyPanels.LazyDrugCentralPanel data={d('drugCentralData')} panelId={panelId} lastFetched={lastFetched} />,
+      'drugcentral': (panelId, lastFetched) => <LazyPanels.LazyDrugCentralPanel data={d('drugCentralEnhanced')} panelId={panelId} lastFetched={lastFetched} />,
       'metabolomics': (panelId, lastFetched) => <LazyPanels.LazyMetabolomicsPanel data={d('metabolomicsData')} panelId={panelId} lastFetched={lastFetched} />,
-      'toxcast': (panelId, lastFetched) => <LazyPanels.LazyToxCastPanel data={d('toxcastData')} panelId={panelId} lastFetched={lastFetched} />,
-      'disgenet': (panelId, lastFetched) => <LazyPanels.LazyDisGeNETPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'orphanet': (panelId, lastFetched) => <LazyPanels.LazyOrphanetPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'mychem': (panelId, lastFetched) => <LazyPanels.LazyMyChemPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'mygene': (panelId, lastFetched) => <LazyPanels.LazyMyGenePanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'bgee': (panelId, lastFetched) => <LazyPanels.LazyBgeePanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'ctd': (panelId, lastFetched) => <LazyPanels.LazyCTDPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'ctd-diseases': (panelId, lastFetched) => <LazyPanels.LazyCTDPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'hmdb': (panelId, lastFetched) => <LazyPanels.LazyHMDBPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'sider': (panelId, lastFetched) => <LazyPanels.LazySIDERPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'omim': (panelId, lastFetched) => <LazyPanels.LazyOMIMPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'iedb': (panelId, lastFetched) => <LazyPanels.LazyIEDBPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
-      'peptideatlas': (panelId, lastFetched) => <LazyPanels.LazyPeptideAtlasPanel data={mergedData as unknown as MoleculeData} panelId={panelId} lastFetched={lastFetched} />,
+      'toxcast': (panelId, lastFetched) => <LazyPanels.LazyToxCastPanel data={d('toxcast')} panelId={panelId} lastFetched={lastFetched} />,
+      'disgenet': (panelId, lastFetched) => <LazyPanels.LazyDisGeNETPanel associations={d('disgenetAssociations')} panelId={panelId} lastFetched={lastFetched} />,
+      'orphanet': (panelId, lastFetched) => <LazyPanels.LazyOrphanetPanel diseases={d('orphanetDiseases')} panelId={panelId} lastFetched={lastFetched} />,
+      'mychem': (panelId, lastFetched) => <LazyPanels.LazyMyChemPanel chemicals={d('myChemAnnotations')} panelId={panelId} lastFetched={lastFetched} />,
+      'mygene': (panelId, lastFetched) => <LazyPanels.LazyMyGenePanel genes={d('myGeneAnnotations')} panelId={panelId} lastFetched={lastFetched} />,
+      'bgee': (panelId, lastFetched) => <LazyPanels.LazyBgeePanel expressions={d('bgeeExpressions')} panelId={panelId} lastFetched={lastFetched} />,
+      'ctd': (panelId, lastFetched) => <LazyPanels.LazyCTDPanel interactions={d('ctdInteractions')} diseaseAssociations={d('ctdDiseaseAssociations')} panelId={panelId} lastFetched={lastFetched} />,
+      'ctd-diseases': (panelId, lastFetched) => <LazyPanels.LazyCTDPanel interactions={d('ctdInteractions')} diseaseAssociations={d('ctdDiseaseAssociations')} panelId={panelId} lastFetched={lastFetched} />,
+      'hmdb': (panelId, lastFetched) => <LazyPanels.LazyHMDBPanel metabolites={d('hmdbMetabolites')} panelId={panelId} lastFetched={lastFetched} />,
+      'sider': (panelId, lastFetched) => <LazyPanels.LazySIDERPanel sideEffects={d('siderSideEffects')} panelId={panelId} lastFetched={lastFetched} />,
+      'omim': (panelId, lastFetched) => <LazyPanels.LazyOMIMPanel entries={d('omimEntries')} panelId={panelId} lastFetched={lastFetched} />,
+      'iedb': (panelId, lastFetched) => <LazyPanels.LazyIEDBPanel epitopes={d('iedbEpitopes')} panelId={panelId} lastFetched={lastFetched} />,
+      'peptideatlas': (panelId, lastFetched) => <LazyPanels.LazyPeptideAtlasPanel peptides={d('peptideAtlasEntries')} panelId={panelId} lastFetched={lastFetched} />,
       // New API panels
       'geo': (panelId, lastFetched) => <LazyPanels.LazyGEOPanel datasets={d('geoDatasets')} panelId={panelId} lastFetched={lastFetched} />,
       'dbsnp': (panelId, lastFetched) => <LazyPanels.LazyDbSNPPanel variants={d('dbSnpVariants')} panelId={panelId} lastFetched={lastFetched} />,
@@ -355,7 +364,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'ttd': (panelId, lastFetched) => <LazyPanels.LazyTTDPanel targets={d('ttdTargets')} drugs={d('ttdDrugs')} panelId={panelId} lastFetched={lastFetched} />,
       'uniprot-extended': (panelId, lastFetched) => <LazyPanels.LazyUniProtExtendedPanel proteins={d('uniprotProteins')} panelId={panelId} lastFetched={lastFetched} />,
       'ebi-proteomics': (panelId, lastFetched) => <LazyPanels.LazyEbiProteinsPanel variations={d('ebiProteinVariations')} proteomics={d('ebiProteomicsData')} crossReferences={d('ebiCrossReferences')} panelId={panelId} lastFetched={lastFetched} />,
-      'ebi-crossrefs': (panelId, lastFetched) => <LazyPanels.LazyEbiProteinsPanel variations={d('ebiProteinVariations')} proteomics={d('ebiProteomicsData')} crossReferences={d('ebiCrossReferences')} panelId={panelId} lastFetched={lastFetched} />,
       'human-protein-atlas': (panelId, lastFetched) => <LazyPanels.LazyHumanProteinAtlasPanel data={d('humanProteinAtlas')} panelId={panelId} lastFetched={lastFetched} />,
       'gtex': (panelId, lastFetched) => <LazyPanels.LazyGTExPanel expressions={d('gtexExpressions')} panelId={panelId} lastFetched={lastFetched} />,
       'go': (panelId, lastFetched) => <LazyPanels.LazyGeneOntologyPanel terms={d('goTerms')} panelId={panelId} lastFetched={lastFetched} />,
@@ -368,34 +376,34 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'nci-cadsr': (panelId, lastFetched) => {
         const raw = d('cadsrData')
         const concepts = (raw?.data?.concepts ?? (Array.isArray(raw) ? raw : [])) as CadsrConcept[]
-        return <LazyPanels.LazyNciCadsrPanel data={concepts} isLoading={categoryStatus['nih-high-impact'] === 'loading'} />
+        return <LazyPanels.LazyNciCadsrPanel data={concepts} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'ncats-translator': (panelId, lastFetched) => {
         const raw = d('translatorData')
         const associations = (raw?.data?.associations ?? (Array.isArray(raw) ? raw : [])) as TranslatorAssociation[]
-        return <LazyPanels.LazyNcatsTranslatorPanel data={associations} isLoading={categoryStatus['nih-high-impact'] === 'loading'} />
+        return <LazyPanels.LazyNcatsTranslatorPanel data={associations} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'nhgri-anvil': (panelId, lastFetched) => {
         const raw = d('anvilData')
         const datasets = (raw?.data?.datasets ?? (Array.isArray(raw) ? raw : [])) as AnvilDataset[]
-        return <LazyPanels.LazyNhgriAnvilPanel data={datasets} isLoading={categoryStatus['nih-high-impact'] === 'loading'} />
+        return <LazyPanels.LazyNhgriAnvilPanel data={datasets} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'niaid-immport': (panelId, lastFetched) => {
         const raw = d('immPortData')
         const studies = (raw?.data?.studies ?? (Array.isArray(raw) ? raw : [])) as ImmPortStudy[]
-        return <LazyPanels.LazyNiaidImmportPanel data={studies} isLoading={categoryStatus['nih-high-impact'] === 'loading'} />
+        return <LazyPanels.LazyNiaidImmportPanel data={studies} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
       },
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'ninds-neurommsig': (panelId, lastFetched) => {
         const raw = d('neuroMMSigData')
         const signatures = (raw?.data?.signatures ?? (Array.isArray(raw) ? raw : [])) as NeuroMMSigSignature[]
-        return <LazyPanels.LazyNindsNeurommsigPanel data={signatures} isLoading={categoryStatus['nih-high-impact'] === 'loading'} />
+        return <LazyPanels.LazyNindsNeurommsigPanel data={signatures} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
       },
     } as Record<string, PanelRenderer>
-  }, [d, mergedData, molecularWeight, moleculeName])
+  }, [d, molecularWeight, moleculeName])
 
   const allLoaded = ALL_CATEGORY_IDS.every(id => categoryStatus[id] === 'loaded')
 
@@ -540,6 +548,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       </div>
 
       <div className="mb-4">
+        <ErrorBoundary>
         <MoleculeSummary
           data={summaryData}
           onCategoryClick={isBusy ? () => {} : (id) => {
@@ -554,15 +563,16 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             }
           }}
         />
+        </ErrorBoundary>
       </div>
 
-      <ChangeAlerts changes={detectedChanges} cid={cid} />
+      <ErrorBoundary><ChangeAlerts changes={detectedChanges} cid={cid} /></ErrorBoundary>
 
-      <ResearchBrief data={mergedData} moleculeName={moleculeName} />
+      <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
 
-      <SimilarMolecules cid={cid} />
+      <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
 
-      <InsightsSection data={mergedData} />
+      <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
 
         {view === 'panels' ? (
           <div>

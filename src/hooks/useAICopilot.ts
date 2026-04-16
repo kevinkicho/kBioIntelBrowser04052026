@@ -3,8 +3,9 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
-import { buildMoleculeContext, contextToPromptBlock } from '@/lib/ai/contextBuilder'
-import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, type PromptMode } from '@/lib/ai/promptTemplates'
+import { buildMoleculeContext, contextToPromptBlock, extractRichData } from '@/lib/ai/contextBuilder'
+import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
+import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 
@@ -36,6 +37,7 @@ export function useAICopilot(
   const [autoInsightGenerated, setAutoInsightGenerated] = useState(false)
   const abortRef = useRef<AbortController | null>(null)
   const prevLoadedCountRef = useRef(0)
+  const prevCidRef = useRef(identity.cid)
   const messageIdRef = useRef(0)
   const isStreamingRef = useRef(false)
   const messagesRef = useRef<CopilotMessage[]>([])
@@ -108,6 +110,35 @@ export function useAICopilot(
       case 'safety_deep_dive':
         prompts = buildSafetyDeepDivePrompt(context)
         break
+      case 'mechanism_analysis':
+        prompts = buildMechanismAnalysisPrompt(context)
+        break
+      case 'therapeutic_hypothesis':
+        prompts = buildTherapeuticHypothesisPrompt(context)
+        break
+      case 'competitive_position':
+        prompts = buildCompetitivePositionPrompt(context)
+        break
+      case 'repurposing_scan':
+        prompts = buildRepurposingScanPrompt(context)
+        break
+      case 'cross_molecule_compare': {
+        const others = sessionHistory.getRecentMolecules(5)
+          .filter(m => m.name !== identity.name)
+          .map((m): SessionMoleculeSummary => {
+            const rd = extractRichData(m.drugData)
+            return {
+              name: m.name,
+              searchedAt: m.searchedAt,
+              topTargets: rd.topTargetActivities.slice(0, 5).map(t => t.targetName),
+              topAEs: rd.topAdverseEvents.slice(0, 5).map(ae => ae.reactionName),
+              mechanisms: rd.mechanismDetails.slice(0, 3).map(mech => `${mech.mechanismOfAction} -> ${mech.targetName}`),
+              indications: rd.indicationDetails.slice(0, 5).map(i => i.condition),
+            }
+          })
+        prompts = buildCrossMoleculeComparePrompt(context, others)
+        break
+      }
       default:
         prompts = buildAutoInsightPrompt(context, snapshot)
     }
@@ -152,12 +183,24 @@ export function useAICopilot(
 
     addMessage('user', question, 'free_qa')
 
-    const recentHistory = messagesRef.current.slice(-6).map(m => ({
-      role: m.role as 'system' | 'user' | 'assistant',
-      content: m.content,
-    }))
+    const hasQaHistory = messagesRef.current.some(m => (m.mode === 'free_qa' || m.mode === 'followup') && m.role === 'assistant' && m.content)
+    let chatMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]
 
-    const chatMessages = buildFollowUpPrompt(recentHistory, context, question)
+    if (hasQaHistory) {
+      const recentHistory = messagesRef.current
+        .filter(m => m.mode === 'free_qa' || m.mode === 'followup')
+        .slice(-6).map(m => ({
+          role: m.role as 'system' | 'user' | 'assistant',
+          content: m.content,
+        }))
+      chatMessages = buildFollowUpPrompt(recentHistory, context, question)
+    } else {
+      const { system, user } = buildFreeQAPrompt(context, question)
+      chatMessages = [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ]
+    }
 
     const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
     setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode: 'followup', timestamp: Date.now() }])
@@ -192,6 +235,18 @@ export function useAICopilot(
   useEffect(() => {
     generateInsightRef.current = generateInsight
   }, [generateInsight])
+
+  useEffect(() => {
+    if (identity.cid !== prevCidRef.current) {
+      prevCidRef.current = identity.cid
+      abortRef.current?.abort()
+      isStreamingRef.current = false
+      setIsStreaming(false)
+      setMessages([])
+      setAutoInsightGenerated(false)
+      prevLoadedCountRef.current = 0
+    }
+  }, [identity.cid])
 
   useEffect(() => {
     const loadedCount = Object.values(categoryStatus).filter(s => s === 'loaded').length

@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { validateOllamaUrl } from '@/lib/ai/config'
 
 export async function POST(request: NextRequest) {
   try {
@@ -11,6 +12,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing prompt' }, { status: 400 })
     }
 
+    if (prompt.length > 50000) {
+      return NextResponse.json({ error: 'Prompt too long (max 50,000 characters)' }, { status: 400 })
+    }
+
     if (!model) {
       return NextResponse.json({ error: 'No model specified' }, { status: 400 })
     }
@@ -19,11 +24,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No Ollama URL provided' }, { status: 400 })
     }
 
+    const validation = validateOllamaUrl(ollamaUrl)
+    if (!validation.valid) {
+      return NextResponse.json({ error: validation.error }, { status: 400 })
+    }
+    const validatedUrl = validation.normalized!
+
     try {
       const controller = new AbortController()
       const timeout = setTimeout(() => controller.abort(), 30000)
 
-      const res = await fetch(`${ollamaUrl}/api/generate`, {
+      const res = await fetch(`${validatedUrl}/api/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -36,6 +47,7 @@ export async function POST(request: NextRequest) {
           },
         }),
         signal: controller.signal,
+        redirect: 'error',
       })
 
       clearTimeout(timeout)

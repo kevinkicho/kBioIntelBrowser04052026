@@ -1,18 +1,16 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { OMIMEntry } from '@/lib/types'
 
 interface OMIMPanelProps {
-  data: MoleculeData
+  entries?: OMIMEntry[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const OMIMPanel = memo(function OMIMPanel({ data, panelId, lastFetched }: OMIMPanelProps) {
-  const entries = data.omimEntries ?? []
-
-  if (entries.length === 0) {
+export const OMIMPanel = memo(function OMIMPanel({ entries, panelId, lastFetched }: OMIMPanelProps) {
+  if (!entries || entries.length === 0) {
     return (
       <Panel title="OMIM" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No OMIM entries found for this molecule.</p>

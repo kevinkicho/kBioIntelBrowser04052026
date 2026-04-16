@@ -259,6 +259,18 @@ let _rows: MetricRow[] = []
 let _nextId = 1
 let _writeTimer: ReturnType<typeof setTimeout> | null = null
 
+const MAX_ROWS = 50000
+const PURGE_AGE_DAYS = 30
+
+function maybePurge(): void {
+  if (_rows.length <= MAX_ROWS) return
+  const cutoff = new Date(Date.now() - PURGE_AGE_DAYS * 86400000).toISOString()
+  _rows = _rows.filter(r => r.timestamp >= cutoff)
+  if (_rows.length > MAX_ROWS) {
+    _rows = _rows.slice(-MAX_ROWS)
+  }
+}
+
 function load(): MetricRow[] {
   if (_rows.length > 0) return _rows
   try {
@@ -311,6 +323,7 @@ export function recordMetric(metric: {
     items_count: metric.items_count ?? null,
     timestamp: new Date().toISOString(),
   })
+  maybePurge()
   scheduleWrite()
 }
 

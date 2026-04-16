@@ -1,17 +1,15 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import type { MoleculeData } from '@/lib/types'
+import type { BgeeExpression } from '@/lib/types'
 
 interface BgeePanelProps {
-  data: MoleculeData
+  expressions?: BgeeExpression[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const BgeePanel = memo(function BgeePanel({ data, panelId, lastFetched }: BgeePanelProps) {
-  const expressions = data.bgeeExpressions ?? []
-
-  if (expressions.length === 0) {
+export const BgeePanel = memo(function BgeePanel({ expressions, panelId, lastFetched }: BgeePanelProps) {
+  if (!expressions || expressions.length === 0) {
     return (
       <Panel title="Bgee" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No gene expression data found for this molecule.</p>
@@ -25,7 +23,7 @@ export const BgeePanel = memo(function BgeePanel({ data, panelId, lastFetched }:
     if (!acc[tissue]) acc[tissue] = []
     acc[tissue].push(expr)
     return acc
-  }, {} as Record<string, typeof expressions>)
+  }, {} as Record<string, BgeeExpression[]>)
 
   const tissues = Object.entries(groupedByTissue)
 

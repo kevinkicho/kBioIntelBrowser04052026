@@ -3,6 +3,8 @@
 import React, { useState, useRef, useEffect } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { useAICopilot, type CopilotMessage } from '@/hooks/useAICopilot'
+import { renderSimpleMarkdown } from '@/lib/sanitize'
+import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
@@ -27,14 +29,17 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
   const [inputValue, setInputValue] = useState('')
   const [urlInput, setUrlInput] = useState(ai.ollamaUrl || 'localhost:11434')
   const [connecting, setConnecting] = useState(false)
+  const [compareCount, setCompareCount] = useState(sessionHistory.getCount())
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+    setCompareCount(sessionHistory.getCount())
   }, [copilot.messages])
 
   useEffect(() => {
     setUrlInput(ai.ollamaUrl || 'localhost:11434')
+    setCompareCount(sessionHistory.getCount())
   }, [ai.ollamaUrl])
 
   const handleConnect = async () => {
@@ -119,6 +124,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
                 isStreaming={copilot.isStreaming}
                 onGenerate={copilot.generateInsight}
                 aiAvailable={copilot.aiAvailable}
+                hasComparisons={compareCount > 1}
               />
             )}
 
@@ -128,6 +134,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
                 isStreaming={copilot.isStreaming}
                 aiAvailable={copilot.aiAvailable}
                 onAsk={(q) => { copilot.askQuestion(q); setInputValue('') }}
+                previousMolecules={sessionHistory.getRecentMolecules(5).filter(m => m.name !== identity.name).map(m => m.name)}
               />
             )}
 
@@ -274,11 +281,13 @@ function InsightsTab({
   isStreaming,
   onGenerate,
   aiAvailable,
+  hasComparisons,
 }: {
   messages: CopilotMessage[]
   isStreaming: boolean
-  onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive') => void
+  onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare') => void
   aiAvailable: boolean
+  hasComparisons: boolean
 }) {
   return (
     <div className="space-y-3">
@@ -286,8 +295,15 @@ function InsightsTab({
       <div className="grid grid-cols-2 gap-2">
         <InsightButton label="Executive Brief" onClick={() => onGenerate('executive_brief')} disabled={isStreaming || !aiAvailable} icon="brief" />
         <InsightButton label="Safety Deep Dive" onClick={() => onGenerate('safety_deep_dive')} disabled={isStreaming || !aiAvailable} icon="safety" />
+        <InsightButton label="Mechanism Analysis" onClick={() => onGenerate('mechanism_analysis')} disabled={isStreaming || !aiAvailable} icon="mechanism" />
+        <InsightButton label="Repurposing Scan" onClick={() => onGenerate('repurposing_scan')} disabled={isStreaming || !aiAvailable} icon="repurpose" />
+        <InsightButton label="Therapeutic Hypotheses" onClick={() => onGenerate('therapeutic_hypothesis')} disabled={isStreaming || !aiAvailable} icon="hypothesis" />
+        <InsightButton label="Competitive Position" onClick={() => onGenerate('competitive_position')} disabled={isStreaming || !aiAvailable} icon="competitive" />
         <InsightButton label="Gap Analysis" onClick={() => onGenerate('gap_analysis')} disabled={isStreaming || !aiAvailable} icon="gap" />
         <InsightButton label="Auto Insights" onClick={() => onGenerate('auto_insight')} disabled={isStreaming || !aiAvailable} icon="auto" />
+        {hasComparisons && (
+          <InsightButton label="Compare Molecules" onClick={() => onGenerate('cross_molecule_compare')} disabled={isStreaming || !aiAvailable} icon="compare" />
+        )}
       </div>
 
       {/* Message list */}
@@ -314,18 +330,25 @@ function AskTab({
   isStreaming,
   aiAvailable,
   onAsk,
+  previousMolecules,
 }: {
   messages: CopilotMessage[]
   isStreaming: boolean
   aiAvailable: boolean
   onAsk: (question: string) => void
+  previousMolecules: string[]
 }) {
   const suggestions = [
-    'What are the main therapeutic uses?',
-    'How does this compare to similar drugs?',
-    'What are the key safety concerns?',
-    'What research gaps should I investigate?',
+    'What is the primary mechanism of action?',
+    'Could this drug be repurposed for other diseases?',
+    'Which adverse events are mechanism-related vs off-target?',
+    'What genes and pathways connect this drug to its indications?',
+    'What experiments should a researcher run next?',
   ]
+
+  if (previousMolecules.length > 0) {
+    suggestions.push(`How does this compare to ${previousMolecules[0]}?`)
+  }
 
   return (
     <div className="space-y-3">
@@ -414,26 +437,34 @@ function renderMarkdown(text: string) {
   const lines = text.split('\n')
   let inList = false
   let listKey = 0
+  let listType: 'ul' | 'ol' | null = null
 
   for (let i = 0; i < lines.length; i++) {
-    const line = lines[i]
-    const boldLine = line.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-    const italicLine = boldLine.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>')
-
-    if (/^[-*]\s/.test(italicLine)) {
-      if (!inList) { parts.push(<ul key={`list-${listKey++}`} className="list-disc list-inside space-y-0.5 ml-1" />); inList = true }
-      const content = italicLine.replace(/^[-*]\s/, '')
+    const raw = lines[i]
+    if (/^[-*]\s/.test(raw)) {
+      if (!inList || listType !== 'ul') {
+        listType = 'ul'
+        parts.push(<ul key={`list-${listKey++}`} className="list-disc list-inside space-y-0.5 ml-1" />)
+        inList = true
+      }
+      const content = renderSimpleMarkdown(raw.replace(/^[-*]\s/, ''))
       parts.push(<li key={`li-${i}`} className="ml-2" dangerouslySetInnerHTML={{ __html: content }} />)
-    } else if (/^\d+\.\s/.test(italicLine)) {
-      if (!inList) { parts.push(<ol key={`list-${listKey++}`} className="list-decimal list-inside space-y-0.5 ml-1" />); inList = true }
-      const content = italicLine.replace(/^\d+\.\s/, '')
+    } else if (/^\d+\.\s/.test(raw)) {
+      if (!inList || listType !== 'ol') {
+        listType = 'ol'
+        parts.push(<ol key={`list-${listKey++}`} className="list-decimal list-inside space-y-0.5 ml-1" />)
+        inList = true
+      }
+      const content = renderSimpleMarkdown(raw.replace(/^\d+\.\s/, ''))
       parts.push(<li key={`li-${i}`} className="ml-2" dangerouslySetInnerHTML={{ __html: content }} />)
     } else {
       inList = false
-      if (italicLine.trim() === '') {
+      listType = null
+      if (raw.trim() === '') {
         parts.push(<br key={`br-${i}`} />)
       } else {
-        parts.push(<span key={`line-${i}`} className="block" dangerouslySetInnerHTML={{ __html: italicLine }} />)
+        const content = renderSimpleMarkdown(raw)
+        parts.push(<span key={`line-${i}`} className="block" dangerouslySetInnerHTML={{ __html: content }} />)
       }
     }
   }
@@ -442,7 +473,7 @@ function renderMarkdown(text: string) {
 }
 
 function InsightButton({ label, onClick, disabled, icon }: { label: string; onClick: () => void; disabled: boolean; icon: string }) {
-  const icons: Record<string, string> = { brief: '📋', safety: '🛡️', gap: '🔍', auto: '✨' }
+  const icons: Record<string, string> = { brief: '📋', safety: '🛡️', gap: '🔍', auto: '✨', mechanism: '🎯', hypothesis: '💡', competitive: '📊', repurpose: '🔄', compare: '⚗️' }
   return (
     <button
       onClick={onClick}

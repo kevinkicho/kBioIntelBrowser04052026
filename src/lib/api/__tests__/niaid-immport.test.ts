@@ -1,79 +1,61 @@
-// Unit tests for NIAID ImmPort API utility.
+import { fetchImmPortData } from '@/lib/api/niaid-immport'
 
-import { fetchImmPortData } from '../niaid-immport'
-import { standardizeResponse } from '../utils'
-
-// Mock fetch
-global.fetch = jest.fn(() =>
-  Promise.resolve({
-    ok: true,
-    json: () => Promise.resolve({
-      studies: [
-        {
-          studyId: '12345',
-          title: 'Test Study',
-          description: 'Test description',
-          studyType: 'Clinical Trial',
-          conditionStudied: 'Test Condition',
-          intervention: 'Test Intervention',
-          participantCount: 50,
-          arms: ['Arm A', 'Arm B'],
-          reagents: ['Reagent 1'],
-        },
-      ],
-    }),
-  })
-) as jest.Mock
+global.fetch = jest.fn()
 
 describe('NIAID ImmPort API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    process.env.NIAID_IMMPORT_API_KEY = 'test-key'
   })
 
   it('should fetch and parse NIAID ImmPort data', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        studies: [
+          {
+            study_id: '12345',
+            title: 'Test Study',
+            description: 'Test description',
+            study_type: 'Clinical Trial',
+            condition_studied: 'Test Condition',
+            intervention: 'Test Intervention',
+            participant_count: 50,
+            arms: ['Arm A', 'Arm B'],
+            reagents: ['Reagent 1'],
+          },
+        ],
+      }),
+    })
+
     const result = await fetchImmPortData('test')
-    
+
     expect(fetch).toHaveBeenCalledWith(
-      'https://immport.org/data/query/study?search=test&api_key=test-key'
+      expect.stringContaining('immport.org'),
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) })
     )
-    expect(result).toEqual(
-      standardizeResponse(
-        {
-          studies: [
-            {
-              studyId: '12345',
-              title: 'Test Study',
-              description: 'Test description',
-              studyType: 'Clinical Trial',
-              conditionStudied: 'Test Condition',
-              intervention: 'Test Intervention',
-              participantCount: 50,
-              arms: ['Arm A', 'Arm B'],
-              reagents: ['Reagent 1'],
-            },
-          ],
-        },
-        'NIAID ImmPort'
-      )
-    )
+    expect(result.source).toBe('NIAID ImmPort')
+    expect(result.data.studies).toHaveLength(1)
+    expect(result.data.studies[0].studyId).toBe('12345')
+    expect(result.timestamp).toBeTruthy()
   })
 
-  it('should handle missing API key gracefully', async () => {
-    delete process.env.NIAID_IMMPORT_API_KEY
-    const result = await fetchImmPortData('test')
-    
-    expect(result).toEqual(
-      standardizeResponse({ studies: [] }, 'NIAID ImmPort')
-    )
+  it('should handle empty results gracefully', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({}),
+    })
+
+    const result = await fetchImmPortData('nonexistent')
+
+    expect(result.source).toBe('NIAID ImmPort')
+    expect(result.data.studies).toEqual([])
   })
 
   it('should handle API errors gracefully', async () => {
     global.fetch = jest.fn(() => Promise.reject(new Error('API error'))) as jest.Mock
     const result = await fetchImmPortData('test')
-    
-    expect(result).toEqual(
-      standardizeResponse({ studies: [] }, 'NIAID ImmPort')
-    )
+
+    expect(result.source).toBe('NIAID ImmPort')
+    expect(result.data.studies).toEqual([])
   })
 })

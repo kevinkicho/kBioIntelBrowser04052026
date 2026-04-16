@@ -14,7 +14,6 @@
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.23",
     "@types/d3": "^7.4.3",
-    "better-sqlite3": "^12.8.0",
     "d3": "^7.9.0",
     "next": "14.2.35",
     "react": "^18",
@@ -28,7 +27,6 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
-    "@types/better-sqlite3": "^7.6.13",
     "@types/jest": "^30.0.0",
     "@types/node": "^20",
     "@types/react": "^18",

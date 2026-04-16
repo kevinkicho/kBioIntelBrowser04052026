@@ -1,18 +1,16 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { MyGeneAnnotation } from '@/lib/types'
 
 interface MyGenePanelProps {
-  data: MoleculeData
+  genes?: MyGeneAnnotation[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const MyGenePanel = memo(function MyGenePanel({ data, panelId, lastFetched }: MyGenePanelProps) {
-  const genes = data.myGeneAnnotations ?? []
-
-  if (genes.length === 0) {
+export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetched }: MyGenePanelProps) {
+  if (!genes || genes.length === 0) {
     return (
       <Panel title="MyGene" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No gene annotations found for this molecule.</p>

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateChat } from '@/lib/ai/ollama'
+import { validateOllamaUrl } from '@/lib/ai/config'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
@@ -10,6 +11,12 @@ export async function POST(request: NextRequest) {
   if (!ollamaUrl) {
     return NextResponse.json({ error: 'No Ollama URL provided' }, { status: 400 })
   }
+
+  const validation = validateOllamaUrl(ollamaUrl)
+  if (!validation.valid) {
+    return NextResponse.json({ error: validation.error }, { status: 400 })
+  }
+  const validatedUrl = validation.normalized!
 
   if (!model) {
     return NextResponse.json({ error: 'No model specified' }, { status: 400 })
@@ -25,7 +32,7 @@ export async function POST(request: NextRequest) {
   const stream = new ReadableStream({
     async start(controller) {
       const result = await generateChat(
-        ollamaUrl,
+        validatedUrl,
         model,
         messages,
         (token) => {

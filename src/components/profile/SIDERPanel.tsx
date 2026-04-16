@@ -1,17 +1,15 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import type { MoleculeData } from '@/lib/types'
+import type { SIDERSideEffect } from '@/lib/types'
 
 interface SIDERPanelProps {
-  data: MoleculeData
+  sideEffects?: SIDERSideEffect[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const SIDERPanel = memo(function SIDERPanel({ data, panelId, lastFetched }: SIDERPanelProps) {
-  const sideEffects = data.siderSideEffects ?? []
-
-  if (sideEffects.length === 0) {
+export const SIDERPanel = memo(function SIDERPanel({ sideEffects, panelId, lastFetched }: SIDERPanelProps) {
+  if (!sideEffects || sideEffects.length === 0) {
     return (
       <Panel title="SIDER" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No side effect data found for this molecule.</p>
@@ -25,7 +23,7 @@ export const SIDERPanel = memo(function SIDERPanel({ data, panelId, lastFetched 
     if (!acc[freq]) acc[freq] = []
     acc[freq].push(effect)
     return acc
-  }, {} as Record<string, typeof sideEffects>)
+  }, {} as Record<string, SIDERSideEffect[]>)
 
   const frequencyOrder = ['Very frequent', 'Frequent', 'Occasional', 'Rare', 'Very rare', 'Unknown']
 

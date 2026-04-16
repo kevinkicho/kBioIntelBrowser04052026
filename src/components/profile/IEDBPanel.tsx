@@ -3,19 +3,18 @@
 import { memo, useState } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { IEDBEpitope } from '@/lib/types'
 
 interface IEDBPanelProps {
-  data: MoleculeData
+  epitopes?: IEDBEpitope[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const IEDBPanel = memo(function IEDBPanel({ data, panelId, lastFetched }: IEDBPanelProps) {
+export const IEDBPanel = memo(function IEDBPanel({ epitopes, panelId, lastFetched }: IEDBPanelProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'bcell' | 'tcell'>('all')
-  const epitopes = data.iedbEpitopes ?? []
 
-  if (epitopes.length === 0) {
+  if (!epitopes || epitopes.length === 0) {
     return (
       <Panel title="IEDB" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No epitope data found for this molecule.</p>

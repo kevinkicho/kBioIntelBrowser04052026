@@ -54,15 +54,15 @@ export interface RetrievalAnomaly {
 }
 
 const KNOWN_PANEL_KEYS: Record<string, string[]> = {
-  pharmaceutical: ['companies', 'ndcProducts', 'orangeBookEntries', 'drugLabels', 'drugInteractions', 'nadacPrices', 'atcClasses', 'drugCentral', 'gsrsSubstances', 'pharmgkb', 'cpicGuidelines'],
-  'clinical-safety': ['clinicalTrials', 'isrctnTrials', 'adverseEvents', 'drugRecalls', 'chemblIndications', 'clinVarVariants', 'gwasAssociations', 'toxCastAssays', 'siderEffects', 'irisAssessments', 'drugShortages'],
-  'molecular-chemical': ['computedProperties', 'ghsHazards', 'chebiAnnotations', 'compToxData', 'synthesisRoutes', 'metabolomicsWorkbench', 'myChemAnnotations', 'hmdbMetabolites', 'massBankSpectra', 'chemSpiderCompounds', 'metaboLightsStudies', 'gnpsSpectra', 'lipidMapsLipids', 'uniChemMappings', 'foodbCompounds'],
-  'bioactivity-targets': ['chemblActivities', 'bioAssays', 'chemblMechanisms', 'iupharLigands', 'bindingDbAssays', 'pharosTargets', 'dgiDbInteractions', 'openTargetsAssociations', 'ctdInteractions', 'iedbEpitopes', 'lincsSignatures', 'ttdTargets'],
-  'protein-structure': ['uniprotEntries', 'uniprotExtended', 'interProDomains', 'ebiProteins', 'proteinAtlas', 'humanProteinAtlas', 'quickGoTerms', 'pdbStructures', 'pdbeLigands', 'alphaFoldPredictions', 'peptideAtlasEntries', 'prideProjects', 'cathDomains', 'gene3DEntries', 'sabdabEntries'],
-  'genomics-disease': ['geneInfo', 'ensemblGenes', 'expressionAtlas', 'gtexExpression', 'geoDatasets', 'dbSnpVariants', 'clinGenAssociations', 'medGenConcepts', 'monarchDiseases', 'nciThesaurus', 'meshTerms', 'goTerms', 'hpoTerms', 'olsTerms', 'disgenetAssociations', 'orphanetDiseases', 'myGeneAnnotations', 'bgeeExpression', 'omimEntries', 'bioModelsModels', 'bioSamples', 'massiveDatasets'],
-  'interactions-pathways': ['stringInteractions', 'stitchInteractions', 'intactInteractions', 'reactomePathways', 'wikiPathways', 'pathwayCommons', 'bioCycPathways', 'smpdbPathways', 'ctdDiseases', 'keggPathways'],
-  'nih-high-impact': ['cadsrConcepts', 'translatorAssociations', 'anvilDatasets', 'immportStudies', 'neurommsigSignatures'],
-  'research-literature': ['nihGrants', 'patents', 'secFilings', 'literature', 'pubMedArticles', 'semanticPapers', 'openAlexWorks', 'openCitations', 'crossRefWorks', 'arxivPapers'],
+  pharmaceutical: ['companies', 'ndcProducts', 'orangeBookEntries', 'drugPrices', 'drugInteractions', 'drugLabels', 'atcClassifications', 'drugCentralEnhanced', 'gsrsSubstances', 'pharmgkbDrugs', 'cpicGuidelines'],
+  'clinical-safety': ['clinicalTrials', 'isrctnTrials', 'adverseEvents', 'drugRecalls', 'chemblIndications', 'clinVarVariants', 'drugShortages', 'gwasAssociations', 'toxcast', 'siderSideEffects', 'irisAssessments'],
+  'molecular-chemical': ['computedProperties', 'ghsHazards', 'chebiAnnotation', 'compToxData', 'routes', 'metabolomicsData', 'myChemAnnotations', 'hmdbMetabolites', 'massBankSpectra', 'chemSpiderCompounds', 'metabolightsData', 'gnpsData', 'lipidMapsLipids', 'unichemMappings', 'foodbCompounds'],
+  'bioactivity-targets': ['chemblActivities', 'bioAssays', 'chemblMechanisms', 'pharmacologyTargets', 'bindingAffinities', 'pharosTargets', 'drugGeneInteractions', 'diseaseAssociations', 'ctdInteractions', 'iedbEpitopes', 'lincsSignatures', 'ttdTargets'],
+  'protein-structure': ['uniprotEntries', 'uniprotProteins', 'proteinDomains', 'ebiProteinVariations', 'ebiProteomicsData', 'ebiCrossReferences', 'proteinAtlasEntries', 'humanProteinAtlas', 'goAnnotations', 'pdbStructures', 'pdbeLigands', 'alphaFoldPredictions', 'peptideAtlasEntries', 'prideProjects', 'cathData', 'sabdabEntries'],
+  'genomics-disease': ['geneInfo', 'ensemblGenes', 'geneExpressions', 'gtexExpressions', 'geoDatasets', 'dbSnpVariants', 'clinGenData', 'medGenConcepts', 'monarchDiseases', 'nciConcepts', 'meshTerms', 'goTerms', 'hpoTerms', 'olsTerms', 'disgenetAssociations', 'orphanetDiseases', 'myGeneAnnotations', 'bgeeExpressions', 'omimEntries', 'bioModelsModels', 'bioSamples', 'massiveDatasets'],
+  'interactions-pathways': ['proteinInteractions', 'chemicalProteinInteractions', 'molecularInteractions', 'reactomePathways', 'wikiPathways', 'pathwayCommonsResults', 'bioCycPathways', 'smpdbPathways', 'ctdDiseaseAssociations', 'keggData'],
+  'nih-high-impact': ['cadsrData', 'translatorData', 'anvilData', 'immPortData', 'neuroMMSigData'],
+  'research-literature': ['nihGrants', 'patents', 'secFilings', 'literature', 'pubmedArticles', 'semanticPapers', 'openAlexWorks', 'citationMetrics', 'crossRefWorks', 'arxivPapers'],
 }
 
 function countItems(val: unknown): number {

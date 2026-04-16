@@ -6,7 +6,7 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 export async function getChemicalInteractionsByName(name: string, limit: number = LIMITS.STITCH.initial): Promise<ChemicalProteinInteraction[]> {
   try {
     const identifiers = encodeURIComponent(name)
-    const url = `https://stitch.embl.de/api/json/interactionPartners?identifiers=${identifiers}&species=9606&limit=${limit}`
+    const url = `https://stitch.embl.de/api/json/interactionPartners?identifiers=${identifiers}&species=9606&limit=${limit}&caller_identity=kNIHexplorer`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()

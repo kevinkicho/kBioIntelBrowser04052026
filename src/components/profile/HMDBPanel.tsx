@@ -1,18 +1,16 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { HMDBMetabolite } from '@/lib/types'
 
 interface HMDBPanelProps {
-  data: MoleculeData
+  metabolites?: HMDBMetabolite[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const HMDBPanel = memo(function HMDBPanel({ data, panelId, lastFetched }: HMDBPanelProps) {
-  const metabolites = data.hmdbMetabolites ?? []
-
-  if (metabolites.length === 0) {
+export const HMDBPanel = memo(function HMDBPanel({ metabolites, panelId, lastFetched }: HMDBPanelProps) {
+  if (!metabolites || metabolites.length === 0) {
     return (
       <Panel title="HMDB" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No metabolite data found for this molecule.</p>

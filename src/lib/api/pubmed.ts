@@ -1,12 +1,13 @@
 import type { PubMedArticle } from '../types'
 import { LIMITS } from '../api-limits'
+import { getApiKey } from './utils'
 
 const BASE_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
 
 // NCBI credentials from environment
 const NCBI_EMAIL = process.env.NCBI_EMAIL ?? ''
-const NCBI_API_KEY = process.env.NCBI_API_KEY ?? ''
+const NCBI_API_KEY = getApiKey('NCBI_API_KEY') ?? ''
 
 // Helper to add NCBI credentials to URL
 const withNCBICredentials = (url: string): string => {

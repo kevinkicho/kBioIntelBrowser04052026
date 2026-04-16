@@ -3,6 +3,7 @@
 import { useState, useMemo } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
 import { buildStructuredBrief, buildOllamaPrompt, type StructuredBrief } from '@/lib/aiSummarizer'
+import { useAI } from '@/lib/ai/useAI'
 
 interface Props {
   data: Record<string, unknown>
@@ -17,6 +18,7 @@ const sentimentColors: Record<string, string> = {
 }
 
 export function ResearchBrief({ data, moleculeName }: Props) {
+  const ai = useAI()
   const [expanded, setExpanded] = useState(false)
   const [aiSummary, setAiSummary] = useState<string | null>(null)
   const [aiLoading, setAiLoading] = useState(false)
@@ -27,10 +29,13 @@ export function ResearchBrief({ data, moleculeName }: Props) {
     [data, moleculeName]
   )
 
-  // Don't render if we have no meaningful data
   if (brief.sections.length === 0) return null
 
   async function handleAiBrief() {
+    if (!ai.ollamaUrl || !ai.model) {
+      setAiError('Connect to Ollama and select a model in Settings first.')
+      return
+    }
     setAiLoading(true)
     setAiError(null)
     try {
@@ -38,10 +43,12 @@ export function ResearchBrief({ data, moleculeName }: Props) {
       const res = await clientFetch('/api/ai-brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt }),
+        body: JSON.stringify({ prompt, model: ai.model, ollamaUrl: ai.ollamaUrl }),
       })
       const result = await res.json()
-      if (result.fallback) {
+      if (result.error) {
+        setAiError(result.error)
+      } else if (result.fallback) {
         setAiError(result.message)
       } else {
         setAiSummary(result.summary)
@@ -94,7 +101,7 @@ export function ResearchBrief({ data, moleculeName }: Props) {
             <div className="flex items-center gap-3">
               <button
                 onClick={handleAiBrief}
-                disabled={aiLoading}
+                disabled={aiLoading || !ai.ollamaUrl || !ai.model}
                 className="text-xs bg-indigo-600/80 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5"
               >
                 {aiLoading ? (

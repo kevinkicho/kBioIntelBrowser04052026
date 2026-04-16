@@ -257,6 +257,30 @@ src/
 
 ## Recent Changes
 
+### v0.5.0 (2026-04-15)
+
+**Security**
+- **SSRF Protection:** All AI routes (`/api/ai/chat`, `/api/ai/health`, `/api/ai/pull`, `/api/ai/show`) now validate `ollamaUrl` — blocks private IPs (10.x, 172.16-31.x, 192.168.x, 169.254.x, 100.64-127.x), restricts to `http:`/`https:` protocols, and rejects invalid URLs
+- **XSS Protection:** AI copilot markdown rendering and ChEBI panel HTML now use a DOMParser-based sanitizer (`src/lib/sanitize.ts`) instead of raw `dangerouslySetInnerHTML`, preventing script injection from AI model responses or third-party API data
+- **Analytics Rate Limiting:** `POST /api/analytics` now enforces 120 req/min per-IP rate limiting, input string truncation (source 100 chars, endpoint 500, error 500), and numeric caps on duration/items_count
+
+**Architecture**
+- **Category Route Refactor:** Split the 603-line god handler (`api/molecule/[id]/category/[categoryId]/route.ts`) into 9 per-category modules under `src/lib/categoryFetchers/`. Route file reduced from 603 to ~100 lines; each category fetcher is independently testable and maintainable
+- **Request Timeouts:** `safe()` utility now wraps all promises with a 15-second timeout (previously no timeout). Category route has a top-level timeout guard. Input size limits added for overrides/params (max 200 each)
+- **ErrorBoundary Fix:** "Try again" button now increments a `resetKey` to force React to remount child components, preventing stale error state
+
+**Performance**
+- **Production Console Gating:** All `console.log/warn/error/group/groupEnd` in `clientFetch.ts` now gated behind `NODE_ENV === 'development'`, eliminating production console noise
+- **clientFetch Dedup Limits:** In-flight request deduplication map now caps at 500 entries and auto-evicts entries older than 60 seconds, preventing unbounded memory growth on interrupted fetches
+- **Analytics DB Cap:** Auto-purges metrics older than 30 days and caps at 50,000 rows on every write, preventing unbounded `analytics.json` growth
+
+**Code Quality**
+- **Centralized API Keys:** `getApiKey()` in `src/lib/api/utils.ts` now includes `NCBI_API_KEY` and `CHEMSPIDER_API_KEY`. 6 API modules (clinvar, ncbi-gene, pubmed, ncbi-eutils, medgen, dbsnp) updated to use it instead of inline `process.env`
+- **Jest Config Simplified:** Removed conflicting `ts-jest` projects; single `next/jest` config with consistent `setupFiles` and `setupFilesAfterEnv`
+- **Removed unused `better-sqlite3`:** Not referenced anywhere in source code; removed from `package.json` dependencies and `next.config.mjs` external packages
+- **Duplicate panel fix:** Removed duplicate `ebi-crossrefs` panel renderer that rendered identical content to `ebi-proteomics`
+- **Duplicate config fix:** Removed duplicate `pubchem.ncbi.nlm.nih.gov` remote pattern entry in `next.config.mjs`
+
 ### v0.4.0 (2026-04-14)
 
 - **BioIntel Copilot:** AI-powered sidebar with real-time data retrieval monitoring, auto-generated insights (executive brief, safety deep dive, gap analysis), and free-form Q&A — all processed locally via Ollama

@@ -1,3 +1,5 @@
+import { getApiKey } from './utils'
+
 // NCBI E-Utilities API Client
 // Provides access to 38+ NCBI databases via 9 endpoints
 // https://eutils.ncbi.nlm.nih.gov/
@@ -10,7 +12,7 @@ const fetchOptions: RequestInit = {
 
 // NCBI credentials from environment
 const NCBI_EMAIL = process.env.NCBI_EMAIL ?? ''
-const NCBI_API_KEY = process.env.NCBI_API_KEY ?? ''
+const NCBI_API_KEY = getApiKey('NCBI_API_KEY') ?? ''
 
 // Add email and tool for NCBI tracking
 const getParams = (params: Record<string, string>) => {

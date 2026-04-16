@@ -1,18 +1,16 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { DisGeNetAssociation } from '@/lib/types'
 
 interface DisGeNETPanelProps {
-  data: MoleculeData
+  associations?: DisGeNetAssociation[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const DisGeNETPanel = memo(function DisGeNETPanel({ data, panelId, lastFetched }: DisGeNETPanelProps) {
-  const associations = data.disgenetAssociations ?? []
-
-  if (associations.length === 0) {
+export const DisGeNETPanel = memo(function DisGeNETPanel({ associations, panelId, lastFetched }: DisGeNETPanelProps) {
+  if (!associations || associations.length === 0) {
     return (
       <Panel title="DisGeNET" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No disease-gene associations found for this molecule.</p>

@@ -1,6 +1,12 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { sanitizeHtml } from '@/lib/sanitize'
 import type { ChebiAnnotation } from '@/lib/types'
+
+function safeHtml(dirty: string): string {
+  if (typeof window === 'undefined') return dirty.replace(/<[^>]*>/g, '')
+  return sanitizeHtml(dirty)
+}
 
 export const ChebiPanel = memo(function ChebiPanel({ annotation, panelId, lastFetched }: { annotation: ChebiAnnotation | null, panelId?: string, lastFetched?: Date }) {
   if (!annotation) {
@@ -23,7 +29,7 @@ export const ChebiPanel = memo(function ChebiPanel({ annotation, panelId, lastFe
 
         {annotation.definition && (
           <p className="text-sm text-slate-300 leading-relaxed"
-             dangerouslySetInnerHTML={{ __html: annotation.definition }}
+             dangerouslySetInnerHTML={{ __html: safeHtml(annotation.definition) }}
           />
         )}
 

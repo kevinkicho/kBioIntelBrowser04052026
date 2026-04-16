@@ -1,18 +1,16 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { OrphanetDisease } from '@/lib/types'
 
 interface OrphanetPanelProps {
-  data: MoleculeData
+  diseases?: OrphanetDisease[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const OrphanetPanel = memo(function OrphanetPanel({ data, panelId, lastFetched }: OrphanetPanelProps) {
-  const diseases = data.orphanetDiseases ?? []
-
-  if (diseases.length === 0) {
+export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, lastFetched }: OrphanetPanelProps) {
+  if (!diseases || diseases.length === 0) {
     return (
       <Panel title="Orphanet" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No rare disease data found for this molecule.</p>

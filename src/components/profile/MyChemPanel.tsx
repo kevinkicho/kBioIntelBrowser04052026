@@ -1,18 +1,16 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MoleculeData } from '@/lib/types'
+import type { MyChemAnnotation } from '@/lib/types'
 
 interface MyChemPanelProps {
-  data: MoleculeData
+  chemicals?: MyChemAnnotation[]
   panelId?: string
   lastFetched?: Date
 }
 
-export const MyChemPanel = memo(function MyChemPanel({ data, panelId, lastFetched }: MyChemPanelProps) {
-  const chemicals = data.myChemAnnotations ?? []
-
-  if (chemicals.length === 0) {
+export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastFetched }: MyChemPanelProps) {
+  if (!chemicals || chemicals.length === 0) {
     return (
       <Panel title="MyChem" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No chemical annotations found for this molecule.</p>
@@ -20,7 +18,7 @@ export const MyChemPanel = memo(function MyChemPanel({ data, panelId, lastFetche
     )
   }
 
-  function displayName(chem: typeof chemicals[0]): string {
+  function displayName(chem: MyChemAnnotation): string {
     if (chem.name) return chem.name
     if (chem.chebi?.name) return chem.chebi.name
     const firstId = chem.chemblId || chem.chebiId || chem.drugbankId || chem.pubchemCid
