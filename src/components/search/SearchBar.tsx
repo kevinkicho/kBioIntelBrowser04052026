@@ -32,6 +32,7 @@ function buildSearchParams(searchType: SearchType, apiOverrides?: Record<string,
 export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, apiParams }: SearchBarProps) {
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
+  const [suggestionsAreDiseases, setSuggestionsAreDiseases] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
@@ -46,6 +47,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
   useEffect(() => {
     if (query.length < 2) {
       setSuggestions([])
+      setSuggestionsAreDiseases(false)
       setIsOpen(false)
       return
     }
@@ -58,6 +60,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
         if (res.ok) {
           const data = await res.json()
           setSuggestions(data.suggestions ?? [])
+          setSuggestionsAreDiseases(data.searchType === 'disease')
           setIsOpen(true)
         }
       } finally {
@@ -91,6 +94,11 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     setIsOpen(false)
     setSuggestions([])
     setQuery(name)
+
+    if (searchType === 'disease') {
+      router.push(`/disease?q=${encodeURIComponent(name)}`)
+      return
+    }
 
     if (searchType === 'cid' && /^\d+$/.test(name.replace('CID ', ''))) {
       const cid = parseInt(name.replace('CID ', ''), 10)
@@ -136,6 +144,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     inchikey: 'Enter an InChIKey (e.g. RYXSWKPIZGBOPP-UHFFFAOYSA-N)...',
     inchi: 'Enter an InChI string...',
     formula: 'Enter a molecular formula (e.g. C9H8O4)...',
+    disease: 'Search a disease or condition (e.g. diabetes)...',
   }
 
   return (
@@ -165,9 +174,12 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
               <button
                 onClick={() => handleSelect(s)}
                 disabled={isNavigating}
-                className="w-full text-left px-5 py-3 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full text-left px-5 py-3 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                {s}
+                {suggestionsAreDiseases && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-900/60 text-rose-300 border border-rose-700/50 shrink-0">DISEASE</span>
+                )}
+                <span>{s}</span>
               </button>
             </li>
           ))}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeCidByName, resolveIdentifier } from '@/lib/api/pubchem'
 import type { SearchType } from '@/lib/apiIdentifiers'
 
-const VALID_SEARCH_TYPES = new Set(['name', 'cid', 'cas', 'smiles', 'inchikey', 'inchi', 'formula'])
+const VALID_SEARCH_TYPES = new Set(['name', 'cid', 'cas', 'smiles', 'inchikey', 'inchi', 'formula', 'disease'])
 
 const GENE_SYMBOL_PATTERN = /^[A-Z][A-Z0-9-]*$/
 const PUBCHEM_PUG = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
@@ -91,7 +91,11 @@ export async function GET(request: NextRequest) {
   if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 
   if (!VALID_SEARCH_TYPES.has(typeParam)) {
-    return NextResponse.json({ error: `Invalid search type: ${typeParam}. Valid types: name, cid, cas, smiles, inchikey, inchi, formula` }, { status: 400 })
+    return NextResponse.json({ error: `Invalid search type: ${typeParam}. Valid types: name, cid, cas, smiles, inchikey, inchi, formula, disease` }, { status: 400 })
+  }
+
+  if (typeParam === 'disease') {
+    return NextResponse.json({ disease: true, name })
   }
 
   let cid: number | null = null

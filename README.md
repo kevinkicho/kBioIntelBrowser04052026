@@ -231,6 +231,7 @@ src/
     page.tsx                     # Home page with advanced search
     browse/                      # Category browsing
     compare/                     # Side-by-side comparison
+    disease/                     # Disease explorer
     batch/                       # Batch lookup (3-10 molecules)
     interactions/                # Drug interaction checker
     molecule/[id]/               # Profile page (server + client)
@@ -256,6 +257,34 @@ src/
 ```
 
 ## Recent Changes
+
+### v0.6.0 (2026-04-16)
+
+**Disease Search**
+- **Disease Explorer Page** (`/disease`) — Search diseases by name and view associated molecules, genes, and clinical data via Open Targets and other APIs
+- **Disease Search API** (`/api/search/disease`) — Server-side disease search endpoint with result aggregation
+
+**Type System & Test Suite Overhaul**
+- **Fixed 32 TypeScript errors** — Eliminated all `tsc --noEmit` failures caused by type definitions drifting from their source implementations
+- **Type definitions corrected** — `OrangeBookEntry` (`ingredient` → `activeIngredient`), `DrugLabel` (`id` → `setId`), `NdcProduct` (`productTypeName` → `productType`), `ChemblMechanism` (added missing `targetChemblId`), `LiteratureResult` (`authors: string[]` → `string`), `ClinVarVariant` (added `conditionName`, `geneSymbol`), `PharmacologyTarget` (added `actionType`)
+- **Test suite expanded from 15 → 29 suites, 164 → 243 tests** — Previously hidden test files now discovered and passing
+- **Jest environment fixed** — Added explicit `testEnvironment: 'jsdom'` (was defaulting to `node`, silently breaking component tests), excluded mock files from test discovery
+- **GWAS Catalog tests rewritten** — Aligned with refactored multi-step API flow (searchTraits → fetchAssociationsByEfo → fetchStudiesByDiseaseTrait)
+- **printReport tests rewritten** — Replaced `global.window` override with `jest.spyOn(window, 'open')` for jsdom compatibility
+- **ProfilePageClient tests updated** — Mocked `useAI` provider, migrated from deprecated combobox selectors to tab button interactions, updated `fetchCategoryData` call signatures
+- **IntersectionObserver mock fixed** — Added missing `root`, `rootMargin`, `thresholds` properties
+- **jsdom stubs** — Added `scrollIntoView` stub in jest.setup.ts
+
+**AI Copilot Enhancements**
+- **Richer context builder** — Expanded AI context generation with additional data dimensions
+- **New prompt templates** — 10 prompt modes for copilot interactions
+- **Session history tracking** — Copilot maintains conversation context across interactions
+
+**Other Fixes**
+- **Badge component** — Split into `ClassificationBadge` (molecule classification) and generic `Badge` (variant-based)
+- **Search improvements** — Updated search bar and advanced search panel
+- **Export button** — Updated for new type signatures
+- **Sanitize** — Minor fix to HTML sanitizer
 
 ### v0.5.0 (2026-04-15)
 

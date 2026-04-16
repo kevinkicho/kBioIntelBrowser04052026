@@ -21,7 +21,7 @@ const mockResults: LiteratureResult[] = [
   {
     id: 'PMID11111111',
     title: 'Paper A',
-    authors: ['Author A'],
+    authors: 'Author A',
     journal: 'Journal A',
     publicationDate: '2020-01-15',
     year: 2020,
@@ -33,7 +33,7 @@ const mockResults: LiteratureResult[] = [
   {
     id: 'PMID22222222',
     title: 'Paper B',
-    authors: ['Author B'],
+    authors: 'Author B',
     journal: 'Journal B',
     publicationDate: '2021-03-20',
     year: 2021,
@@ -45,7 +45,7 @@ const mockResults: LiteratureResult[] = [
   {
     id: 'PMID33333333',
     title: 'Paper C',
-    authors: ['Author C'],
+    authors: 'Author C',
     journal: 'Journal C',
     publicationDate: '2021-06-10',
     year: 2021,

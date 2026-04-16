@@ -7,6 +7,7 @@ const mockMechanisms: ChemblMechanism[] = [
     mechanismId: 'MEC001',
     moleculeName: 'Aspirin',
     targetName: 'Cyclooxygenase-2',
+    targetChemblId: 'CHEMBL2094253',
     actionType: 'INHIBITOR',
     mechanismOfAction: 'Cyclooxygenase inhibitor',
     directInteraction: true,

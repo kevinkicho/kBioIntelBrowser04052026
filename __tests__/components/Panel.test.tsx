@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import { Panel } from '@/components/ui/Panel'
-import { Badge } from '@/components/ui/Badge'
+import { ClassificationBadge } from '@/components/ui/Badge'
 
 describe('Panel', () => {
   test('renders title and children', () => {
@@ -12,12 +12,12 @@ describe('Panel', () => {
 
 describe('Badge', () => {
   test('renders classification label', () => {
-    render(<Badge classification="therapeutic" />)
+    render(<ClassificationBadge classification="therapeutic" />)
     expect(screen.getByText('Therapeutic')).toBeInTheDocument()
   })
 
   test('renders enzyme classification', () => {
-    render(<Badge classification="enzyme" />)
+    render(<ClassificationBadge classification="enzyme" />)
     expect(screen.getByText('Enzyme')).toBeInTheDocument()
   })
 })

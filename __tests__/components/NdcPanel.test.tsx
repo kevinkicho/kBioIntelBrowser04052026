@@ -7,7 +7,7 @@ const mockProducts: NdcProduct[] = [
     productNdc: '0002-3227',
     substanceName: 'FLUOXETINE HYDROCHLORIDE',
     substanceUnii: '01K63TZC7V',
-    productTypeName: 'HUMAN PRESCRIPTION DRUG',
+    productType: 'HUMAN PRESCRIPTION DRUG',
     finallisted: true,
     marketingCategory: 'NDA',
     brandName: 'PROZAC',

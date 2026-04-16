@@ -198,14 +198,14 @@ export interface Patent {
 
 export interface NdcProduct {
   productNdc: string
-  substanceName: string
-  substanceUnii: string
-  productTypeName: string
-  finallisted: boolean
+  substanceName?: string
+  substanceUnii?: string
+  productType: string
+  finallisted?: boolean
   marketingCategory: string
   brandName: string
   genericName: string
-  manufacturer: string
+  manufacturer?: string
   labelerName: string
   dosageForm?: string
   route?: string
@@ -214,27 +214,27 @@ export interface NdcProduct {
 }
 
 export interface OrangeBookEntry {
-  ingredient: string
-  applicantFullName: string
+  activeIngredient: string
+  applicantFullName?: string
   sponsorName: string
-  tradeName: string
-  dosageType: string
+  tradeName?: string
+  dosageType?: string
   dosageForm: string
   applicationNumber: string
   approvalDate: string
-  patentNumber: string
-  patentExpirationDate: string
+  patentNumber?: string
+  patentExpirationDate?: string
   teCode?: string
   patents?: Array<{ patentNumber: string; expiryDate: string }>
   exclusivities?: Array<{ code: string; expiryDate: string }>
 }
 
 export interface DrugLabel {
-  id: string
   title: string
-  version: string
-  date: string
-  url: string
+  setId: string
+  version?: string
+  date?: string
+  url?: string
   dailyMedUrl: string
   labelerName?: string
   dosageForm?: string
@@ -325,13 +325,14 @@ export interface ChemblActivity {
 }
 
 export interface ChemblMechanism {
-  mechanismId: string
-  moleculeName: string
-  targetName: string
+  mechanismId?: string
+  moleculeName?: string
+  targetName?: string
+  targetChemblId: string
   actionType: string
   mechanismOfAction: string
   directInteraction: boolean
-  diseaseEfficacy: boolean
+  diseaseEfficacy?: boolean
   url: string
   maxPhase: number
 }
@@ -562,6 +563,7 @@ export interface CompToxData {
 export interface DiseaseAssociation {
   diseaseId: string
   diseaseName: string
+  description?: string
   score: number
   evidenceCount: number
   sources: string[]

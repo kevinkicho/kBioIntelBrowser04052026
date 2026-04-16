@@ -53,16 +53,16 @@ export function ExportButton({ data, moleculeName, cid }: ExportButtonProps) {
           </button>
           <div className="border-t border-slate-700" />
           <button
-            onClick={() => { printReport(data, moleculeName, cid); setOpen(false) }}
+            onClick={() => { if (!printReport(data, moleculeName, cid)) { alert('Please allow popups to print the report.') } setOpen(false) }}
             className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700"
           >
-            🖨️ Full PDF Report
+            🖨️ Print Full Report
           </button>
           <button
-            onClick={() => { printSummaryReport(data, moleculeName, cid); setOpen(false) }}
+            onClick={() => { if (!printSummaryReport(data, moleculeName, cid)) { alert('Please allow popups to print the summary.') } setOpen(false) }}
             className="w-full text-left px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 rounded-b-lg"
           >
-            📊 Executive Summary
+            🖨️ Print Executive Summary
           </button>
         </div>
       )}

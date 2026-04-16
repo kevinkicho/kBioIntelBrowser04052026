@@ -6,7 +6,7 @@ const mockResults: LiteratureResult[] = [
   {
     id: 'PMID33456789',
     title: 'Metformin and cancer risk reduction',
-    authors: ['Smith J', 'Doe A', 'Johnson B'],
+    authors: 'Smith J, Doe A, Johnson B',
     journal: 'Nature Reviews Drug Discovery',
     publicationDate: '2021-01-15',
     year: 2021,

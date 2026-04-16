@@ -8,7 +8,7 @@ const ALLOWED_ATTRS: Record<string, Set<string>> = {
 
 const SCHEME_RE = /^(https?|mailto):/i
 
-function escapeHtml(text: string): string {
+export function escapeHtml(text: string): string {
   return text
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')

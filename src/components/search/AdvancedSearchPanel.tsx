@@ -24,6 +24,7 @@ const SEARCH_TYPES: { value: SearchType; label: string; placeholder: string; des
   { value: 'inchikey', label: 'InChIKey', placeholder: 'e.g. RYXSWKPIZGBOPP-UHFFFAOYSA-N', description: 'IUPAC International Chemical Identifier Key' },
   { value: 'inchi', label: 'InChI', placeholder: 'e.g. InChI=1S/C9H8O4/c1-6...', description: 'IUPAC International Chemical Identifier' },
   { value: 'formula', label: 'Formula', placeholder: 'e.g. C9H8O4', description: 'Molecular formula' },
+  { value: 'disease', label: 'Disease', placeholder: 'e.g. diabetes, hypertension, melanoma', description: 'Disease or condition name' },
 ]
 
 const PANEL_FIELDS: Record<string, string[]> = {

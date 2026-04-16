@@ -4,11 +4,12 @@ import nextJest from 'next/jest.js'
 const createJestConfig = nextJest({ dir: './' })
 
 const config: Config = {
+  testEnvironment: 'jsdom',
   coverageProvider: 'v8',
   moduleNameMapper: {
     '^@/(.*)$': '<rootDir>/src/$1',
   },
-  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/'],
+  testPathIgnorePatterns: ['<rootDir>/.next/', '<rootDir>/node_modules/', '<rootDir>/__tests__/mocks/'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.ts'],
   setupFiles: ['<rootDir>/jest.setup.js'],
   transformIgnorePatterns: [

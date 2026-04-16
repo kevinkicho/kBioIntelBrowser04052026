@@ -1,6 +1,10 @@
 import type { DiseaseAssociation } from '../types'
 import { getChemblIdByName } from './chembl'
 
+function escapeGraphQLString(str: string): string {
+  return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
+}
+
 const API_URL = 'https://api.platform.opentargets.org/api/v4/graphql'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -30,7 +34,7 @@ export async function getDiseaseAssociationsByName(name: string): Promise<Diseas
 async function queryDrugDiseases(chemblId: string): Promise<DiseaseAssociation[]> {
   const query = `
     query {
-      drug(chemblId: "${chemblId}") {
+      drug(chemblId: "${escapeGraphQLString(chemblId)}") {
         name
         linkedDiseases {
           count
@@ -79,11 +83,11 @@ async function queryDrugDiseases(chemblId: string): Promise<DiseaseAssociation[]
   }))
 }
 
-async function searchDiseases(queryString: string): Promise<DiseaseAssociation[]> {
+export async function searchDiseases(queryString: string): Promise<DiseaseAssociation[]> {
   const query = `
     query {
       search(
-        queryString: "${queryString.replace(/"/g, '\\"')}"
+        queryString: "${escapeGraphQLString(queryString)}"
         entityNames: ["disease"]
         page: { index: 0, size: 10 }
       ) {
@@ -123,10 +127,45 @@ async function searchDiseases(queryString: string): Promise<DiseaseAssociation[]
   return results.map((result: {
     id: string
     name: string
+    description?: string
     therapeuticAreas?: { id: string; name: string }[]
   }) => ({
     diseaseId: result.id ?? '',
     diseaseName: result.name ?? '',
+    description: result.description ?? undefined,
     therapeuticAreas: (result.therapeuticAreas ?? []).map(ta => ta.name),
   }))
+}
+
+export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
+  try {
+    const query = `
+      query {
+        disease(efoId: "${escapeGraphQLString(diseaseId)}") {
+          id
+          name
+          linkedTargets {
+            count
+            rows {
+              id
+              target { id name }
+            }
+          }
+        }
+      }
+    `
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      ...fetchOptions,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    if (data.errors) return []
+    const targets: { target: { name: string } }[] = data.data?.disease?.linkedTargets?.rows ?? []
+    return targets.map((t: { target: { name: string } }) => t.target.name).filter(Boolean).slice(0, 10)
+  } catch {
+    return []
+  }
 }

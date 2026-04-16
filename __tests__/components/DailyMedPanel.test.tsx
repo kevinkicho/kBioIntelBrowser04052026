@@ -3,7 +3,7 @@ import { DailyMedPanel } from '@/components/profile/DailyMedPanel'
 import type { DrugLabel } from '@/lib/types'
 
 const mockLabels: DrugLabel[] = [{
-  id: 'abc-123',
+  setId: 'abc-123',
   title: 'METFORMIN HYDROCHLORIDE tablet',
   version: '1',
   date: '2024-01-15',

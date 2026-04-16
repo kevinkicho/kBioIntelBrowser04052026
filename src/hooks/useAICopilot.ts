@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
-import { buildMoleculeContext, contextToPromptBlock, extractRichData } from '@/lib/ai/contextBuilder'
-import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
+import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock } from '@/lib/ai/contextBuilder'
+import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
@@ -59,14 +59,25 @@ export function useAICopilot(
     return merged
   }, [categoryData])
 
+  const isDiseaseContext = identity.cid === 0 && Array.isArray(allData.diseaseResults)
+
   const context = useMemo(
     () => buildMoleculeContext(categoryData, identity, allData, snapshot),
     [categoryData, identity, allData, snapshot]
   )
 
+  const diseaseCtx = useMemo(
+    () => isDiseaseContext
+      ? buildDiseaseContext(identity.name, (allData.diseaseResults as { id: string; name: string; description?: string; therapeuticAreas?: string[]; source: string; molecules?: { name: string; cid: number | null }[] }[]) ?? [])
+      : null,
+    [identity.name, allData, isDiseaseContext]
+  )
+
   const contextBlock = useMemo(
-    () => contextToPromptBlock(context),
-    [context]
+    () => isDiseaseContext && diseaseCtx
+      ? diseaseContextToPromptBlock(diseaseCtx)
+      : contextToPromptBlock(context),
+    [isDiseaseContext, diseaseCtx, context]
   )
 
   const aiAvailable = ai.enabled && ai.status === 'available'
@@ -97,50 +108,68 @@ export function useAICopilot(
 
     let prompts: { system: string; user: string }
 
-    switch (mode) {
-      case 'auto_insight':
-        prompts = buildAutoInsightPrompt(context, snapshot)
-        break
-      case 'executive_brief':
-        prompts = buildExecutiveBriefPrompt(context, snapshot)
-        break
-      case 'gap_analysis':
-        prompts = buildGapAnalysisPrompt(context, snapshot)
-        break
-      case 'safety_deep_dive':
-        prompts = buildSafetyDeepDivePrompt(context)
-        break
-      case 'mechanism_analysis':
-        prompts = buildMechanismAnalysisPrompt(context)
-        break
-      case 'therapeutic_hypothesis':
-        prompts = buildTherapeuticHypothesisPrompt(context)
-        break
-      case 'competitive_position':
-        prompts = buildCompetitivePositionPrompt(context)
-        break
-      case 'repurposing_scan':
-        prompts = buildRepurposingScanPrompt(context)
-        break
-      case 'cross_molecule_compare': {
-        const others = sessionHistory.getRecentMolecules(5)
-          .filter(m => m.name !== identity.name)
-          .map((m): SessionMoleculeSummary => {
-            const rd = extractRichData(m.drugData)
-            return {
-              name: m.name,
-              searchedAt: m.searchedAt,
-              topTargets: rd.topTargetActivities.slice(0, 5).map(t => t.targetName),
-              topAEs: rd.topAdverseEvents.slice(0, 5).map(ae => ae.reactionName),
-              mechanisms: rd.mechanismDetails.slice(0, 3).map(mech => `${mech.mechanismOfAction} -> ${mech.targetName}`),
-              indications: rd.indicationDetails.slice(0, 5).map(i => i.condition),
-            }
-          })
-        prompts = buildCrossMoleculeComparePrompt(context, others)
-        break
+    if (isDiseaseContext && diseaseCtx) {
+      const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
+      switch (mode) {
+        case 'auto_insight':
+        case 'executive_brief':
+        case 'gap_analysis':
+        case 'safety_deep_dive':
+        case 'mechanism_analysis':
+        case 'therapeutic_hypothesis':
+        case 'competitive_position':
+        case 'repurposing_scan':
+          prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
+          break
+        default:
+          prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
       }
-      default:
-        prompts = buildAutoInsightPrompt(context, snapshot)
+    } else {
+      switch (mode) {
+        case 'auto_insight':
+          prompts = buildAutoInsightPrompt(context, snapshot)
+          break
+        case 'executive_brief':
+          prompts = buildExecutiveBriefPrompt(context, snapshot)
+          break
+        case 'gap_analysis':
+          prompts = buildGapAnalysisPrompt(context, snapshot)
+          break
+        case 'safety_deep_dive':
+          prompts = buildSafetyDeepDivePrompt(context)
+          break
+        case 'mechanism_analysis':
+          prompts = buildMechanismAnalysisPrompt(context)
+          break
+        case 'therapeutic_hypothesis':
+          prompts = buildTherapeuticHypothesisPrompt(context)
+          break
+        case 'competitive_position':
+          prompts = buildCompetitivePositionPrompt(context)
+          break
+        case 'repurposing_scan':
+          prompts = buildRepurposingScanPrompt(context)
+          break
+        case 'cross_molecule_compare': {
+          const others = sessionHistory.getRecentMolecules(5)
+            .filter(m => m.name !== identity.name)
+            .map((m): SessionMoleculeSummary => {
+              const rd = extractRichData(m.drugData)
+              return {
+                name: m.name,
+                searchedAt: m.searchedAt,
+                topTargets: rd.topTargetActivities.slice(0, 5).map(t => t.targetName),
+                topAEs: rd.topAdverseEvents.slice(0, 5).map(ae => ae.reactionName),
+                mechanisms: rd.mechanismDetails.slice(0, 3).map(mech => `${mech.mechanismOfAction} -> ${mech.targetName}`),
+                indications: rd.indicationDetails.slice(0, 5).map(i => i.condition),
+              }
+            })
+          prompts = buildCrossMoleculeComparePrompt(context, others)
+          break
+        }
+        default:
+          prompts = buildAutoInsightPrompt(context, snapshot)
+      }
     }
 
     addMessage('system', `Generating ${mode.replace('_', ' ')}...`, mode)
@@ -166,7 +195,7 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, snapshot, addMessage])
+  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, isDiseaseContext, diseaseCtx])
 
   const askQuestion = useCallback(async (question: string) => {
     if (!aiAvailable) {
@@ -186,7 +215,14 @@ export function useAICopilot(
     const hasQaHistory = messagesRef.current.some(m => (m.mode === 'free_qa' || m.mode === 'followup') && m.role === 'assistant' && m.content)
     let chatMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]
 
-    if (hasQaHistory) {
+    if (isDiseaseContext && diseaseCtx) {
+      const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
+      const { system, user } = buildDiseaseQAPrompt(diseaseBlock, question)
+      chatMessages = [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ]
+    } else if (hasQaHistory) {
       const recentHistory = messagesRef.current
         .filter(m => m.mode === 'free_qa' || m.mode === 'followup')
         .slice(-6).map(m => ({
@@ -219,7 +255,7 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, addMessage])
+  }, [ai, aiAvailable, context, addMessage, isDiseaseContext, diseaseCtx])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()

@@ -1,4 +1,4 @@
-import { printReport } from '@/lib/printReport'
+import { printReport, printSummaryReport } from '@/lib/printReport'
 
 jest.mock('@/lib/exportData', () => ({
   buildExportSections: () => [
@@ -13,78 +13,117 @@ jest.mock('@/lib/exportData', () => ({
   ],
 }))
 
+jest.mock('@/lib/aiSummarizer', () => ({
+  buildStructuredBrief: () => ({
+    headline: 'Test headline',
+    sections: [
+      { title: 'Key Findings', sentiment: 'positive', emoji: '✅', bullets: ['Drug works well', '<script>alert(1)</script>'] },
+    ],
+  }),
+}))
+
 describe('printReport', () => {
   let mockPrint: jest.Mock
-  let mockWindow: { location: { href: string }; onload: (() => void) | null; print: jest.Mock }
-  let capturedBlob: Blob | null
+  let mockClose: jest.Mock
+  let mockWrite: jest.Mock
+  let writtenHtml: string
 
   beforeEach(() => {
     mockPrint = jest.fn()
-    mockWindow = { location: { href: '' }, onload: null, print: mockPrint }
-    capturedBlob = null
+    mockClose = jest.fn()
+    mockWrite = jest.fn((html: string) => { writtenHtml = html })
+    writtenHtml = ''
 
-    // Provide window global in node environment
-    ;(global as Record<string, unknown>).window = {
-      open: jest.fn(() => mockWindow),
-    }
+    const mockDoc = { open: jest.fn(), write: mockWrite, close: mockClose }
 
-    // Mock Blob
-    ;(global as Record<string, unknown>).Blob = class MockBlob {
-      private parts: string[]
-      public type: string
-      constructor(parts: string[], options?: { type?: string }) {
-        this.parts = parts
-        this.type = options?.type ?? ''
-        capturedBlob = this as unknown as Blob
-      }
-      getContent() { return this.parts.join('') }
-    }
-
-    // Mock URL
-    ;(global as Record<string, unknown>).URL = {
-      createObjectURL: jest.fn(() => 'blob:mock-url'),
-      revokeObjectURL: jest.fn(),
-    } as unknown as typeof URL
+    jest.spyOn(window, 'open').mockReturnValue({
+      document: mockDoc,
+      print: mockPrint,
+    } as unknown as Window)
   })
 
   afterEach(() => {
-    delete (global as Record<string, unknown>).window
-    delete (global as Record<string, unknown>).Blob
-    delete (global as Record<string, unknown>).URL
+    jest.restoreAllMocks()
   })
 
-  it('opens a new window targeting a blob URL', () => {
+  it('opens a new window and writes HTML via document.write', () => {
     printReport({ companies: [] }, 'Aspirin')
-
-    expect((global as Record<string, unknown>).window).toBeDefined()
-    expect(mockWindow.location.href).toBe('blob:mock-url')
-    expect(((global as Record<string, unknown>).URL as { createObjectURL: jest.Mock }).createObjectURL).toHaveBeenCalled()
+    expect(window.open).toHaveBeenCalled()
+    expect(mockWrite).toHaveBeenCalled()
+    expect(mockClose).toHaveBeenCalled()
   })
 
-  it('registers an onload handler that prints and revokes the blob URL', () => {
+  it('writes HTML containing the molecule name and report title', () => {
     printReport({ companies: [] }, 'Aspirin')
+    expect(writtenHtml).toContain('Aspirin')
+    expect(writtenHtml).toContain('BioIntel Explorer')
+    expect(writtenHtml).toContain('Pharmaceutical')
+    expect(writtenHtml).toContain('Companies')
+  })
 
-    expect(typeof mockWindow.onload).toBe('function')
-    mockWindow.onload!()
+  it('escapes HTML in table cells', () => {
+    printReport({ companies: [] }, 'Aspirin')
+    expect(writtenHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+  })
+
+  it('calls print() directly after document.close()', () => {
+    printReport({ companies: [] }, 'Aspirin')
     expect(mockPrint).toHaveBeenCalled()
-    expect(((global as Record<string, unknown>).URL as { revokeObjectURL: jest.Mock }).revokeObjectURL).toHaveBeenCalledWith('blob:mock-url')
   })
 
-  it('builds a blob containing the molecule name and report title', () => {
-    printReport({ companies: [] }, 'Aspirin')
+  it('returns true when popup opens successfully', () => {
+    const result = printReport({ companies: [] }, 'Aspirin')
+    expect(result).toBe(true)
+  })
 
-    expect(capturedBlob).not.toBeNull()
-    const content = (capturedBlob as unknown as { getContent: () => string }).getContent()
-    expect(content).toContain('Aspirin')
-    expect(content).toContain('BioIntel Explorer Report')
-    expect(content).toContain('Pharmaceutical')
-    expect(content).toContain('Companies')
+  it('escapes HTML in molecule name', () => {
+    printReport({ companies: [] }, 'Test<em>Drug</em>')
+    expect(writtenHtml).toContain('Test&lt;em&gt;Drug&lt;/em&gt;')
+    expect(writtenHtml).not.toContain('<em>Drug</em>')
   })
 
   it('handles blocked popup gracefully', () => {
-    ;(global as Record<string, unknown>).window = {
-      open: jest.fn(() => null),
+    jest.spyOn(window, 'open').mockReturnValue(null)
+    const result = printReport({}, 'Test')
+    expect(result).toBe(false)
+  })
+})
+
+describe('printSummaryReport', () => {
+  let writtenHtml: string
+
+  beforeEach(() => {
+    writtenHtml = ''
+    const mockDoc = {
+      open: jest.fn(),
+      write: jest.fn((html: string) => { writtenHtml = html }),
+      close: jest.fn(),
     }
-    expect(() => printReport({}, 'Test')).not.toThrow()
+
+    jest.spyOn(window, 'open').mockReturnValue({
+      document: mockDoc,
+      print: jest.fn(),
+    } as unknown as Window)
+  })
+
+  afterEach(() => {
+    jest.restoreAllMocks()
+  })
+
+  it('writes HTML containing the molecule name and executive summary title', () => {
+    printSummaryReport({ companies: [] }, 'Aspirin')
+    expect(writtenHtml).toContain('Aspirin')
+    expect(writtenHtml).toContain('Executive Summary')
+  })
+
+  it('escapes HTML in bullet text', () => {
+    printSummaryReport({ companies: [] }, 'Aspirin')
+    expect(writtenHtml).toContain('&lt;script&gt;alert(1)&lt;/script&gt;')
+  })
+
+  it('returns false when popup is blocked', () => {
+    jest.spyOn(window, 'open').mockReturnValue(null)
+    const result = printSummaryReport({}, 'Test')
+    expect(result).toBe(false)
   })
 })

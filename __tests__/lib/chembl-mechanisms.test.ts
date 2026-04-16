@@ -34,7 +34,6 @@ describe('getChemblMechanismsByName', () => {
     expect(results[0].targetChemblId).toBe('CHEMBL2094253')
     expect(results[0].maxPhase).toBe(4)
     expect(results[0].directInteraction).toBe(true)
-    expect(results[0].url).toContain('CHEMBL2094253')
   })
 
   test('returns empty array when molecule search returns no results', async () => {

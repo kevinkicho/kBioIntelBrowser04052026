@@ -505,3 +505,33 @@ function findAEMechanismLink(ctx: MoleculeContext): string | null {
 
   return null
 }
+
+export function buildDiseaseAutoInsightPrompt(diseaseContext: string): { system: string; user: string } {
+  const user = `Analyze the disease search results below. Do NOT just list what was found — instead, identify 3-4 genuinely surprising scientific findings that connect diseases, molecules, and therapeutic areas.
+
+For each finding:
+- State the SPECIFIC observation with exact disease names, molecule targets, and therapeutic areas
+- Explain the clinical or therapeutic SIGNIFICANCE — why does this matter?
+- Connect it to at least ONE other result (e.g., shared molecules across diseases, overlapping therapeutic areas suggesting repurposing opportunities)
+
+BAD EXAMPLE: "Found 3 diseases: Diabetes, Type 2 diabetes, and Diabetic neuropathy. They have some molecules."
+GOOD EXAMPLE: "Type 2 diabetes and hypertension share therapeutic area overlap in metabolic disease — and both list Metformin as a candidate molecule, suggesting a common mechanism (AMPK activation) that could be leveraged for patients with comorbid metabolic syndrome."
+
+${diseaseContext}
+
+IMPORTANT: Your insights should teach a researcher something they wouldn't get from just reading the list. Synthesize across the disease results to find non-obvious connections.`
+
+  return { system: SYSTEM_PROMPT, user }
+}
+
+export function buildDiseaseQAPrompt(diseaseContext: string, question: string): { system: string; user: string } {
+  const user = `The user asks: "${question}"
+
+IMPORTANT: Answer as a drug discovery researcher, not a data reporter. If you just list data points without interpretation, you have failed. Every statement should answer "so what?" — what does this data mean for the disease, the therapeutic landscape, or the next experiment?
+
+${diseaseContext}
+
+Answer the question using the available disease data. Be specific — cite disease names, molecule targets, and sources from the context. If the data is insufficient to answer fully, explain what's missing and suggest specific searches or experiments that would fill the gap. Do NOT just repeat what's in the data — explain the science and therapeutic implications.`
+
+  return { system: SYSTEM_PROMPT, user }
+}

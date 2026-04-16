@@ -6,7 +6,9 @@ const mockVariants: ClinVarVariant[] = [
   {
     variantId: '12345',
     clinicalSignificance: 'Pathogenic',
+    conditionName: 'Androgen insensitivity syndrome',
     condition: 'Androgen insensitivity syndrome',
+    geneSymbol: 'AR',
     gene: 'AR',
     title: 'NM_000044.6(AR):c.2596G>A (p.Val866Met)',
     variantType: 'single nucleotide variant',
@@ -18,7 +20,9 @@ const mockVariants: ClinVarVariant[] = [
   {
     variantId: '67890',
     clinicalSignificance: 'Drug response',
+    conditionName: 'Cystic fibrosis',
     condition: 'Cystic fibrosis',
+    geneSymbol: 'CFTR',
     gene: 'CFTR',
     title: 'NM_000492.4(CFTR):c.1521_1523del (p.Phe508del)',
     variantType: 'deletion',

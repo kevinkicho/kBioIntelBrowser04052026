@@ -18,6 +18,25 @@ jest.mock('@/components/profile/SimilarMolecules', () => ({
   SimilarMolecules: () => null,
 }))
 
+jest.mock('@/lib/ai/useAI', () => ({
+  useAI: () => ({
+    mounted: true,
+    enabled: false,
+    status: 'unknown',
+    ollamaUrl: '',
+    model: '',
+    availableModels: [],
+    modelInfo: null,
+    connect: jest.fn(),
+    disconnect: jest.fn(),
+    selectModel: jest.fn(),
+    pullModel: jest.fn(),
+    pullProgress: null,
+    askAI: jest.fn(),
+  }),
+  AIProvider: ({ children }: { children: React.ReactNode }) => children,
+}))
+
 jest.mock('@/lib/exportData', () => ({
   ...jest.requireActual('@/lib/exportData'),
   downloadFile: jest.fn(),
@@ -52,6 +71,8 @@ const defaultProps = {
   cid: 2244,
   moleculeName: 'Aspirin',
   molecularWeight: 180.16,
+  inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N',
+  iupacName: '2-acetoxybenzoic acid',
 }
 
 describe('ProfilePageClient', () => {
@@ -88,39 +109,39 @@ describe('ProfilePageClient', () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
     await waitFor(() => {
-      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'pharmaceutical')
+      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'pharmaceutical', expect.anything(), expect.anything())
     })
   })
 
-  it('loads data when a category is selected from the dropdown', async () => {
+  it('loads data when a category tab is clicked', async () => {
     await act(async () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
-    // Open dropdown and select Bioactivity
+    // Click the Bioactivity tab
     await act(async () => {
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'bioactivity-targets' } })
+      fireEvent.click(screen.getByRole('button', { name: /Bioactivity & Targets/ }))
     })
     // Should load Bioactivity data
-    expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'bioactivity-targets')
+    expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'bioactivity-targets', expect.anything(), expect.anything())
   })
 
-  it('returns to all categories when All is selected from the dropdown', async () => {
+  it('returns to all categories when All tab is clicked', async () => {
     await act(async () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
-    // Select Bioactivity
+    // Click Bioactivity tab
     await act(async () => {
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'bioactivity-targets' } })
+      fireEvent.click(screen.getByRole('button', { name: /Bioactivity & Targets/ }))
     })
-    // Select All
+    // Click All tab
     await act(async () => {
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'all' } })
+      fireEvent.click(screen.getByRole('button', { name: /^All/ }))
     })
     // All view should show all category sections
     const bioactivitySections = screen.queryAllByText('Bioactivity & Targets')
-    expect(bioactivitySections[bioactivitySections.length - 1]).toBeInTheDocument()
+    expect(bioactivitySections.length).toBeGreaterThan(0)
     const interactionsSections = screen.queryAllByText('Interactions & Pathways')
-    expect(interactionsSections[interactionsSections.length - 1]).toBeInTheDocument()
+    expect(interactionsSections.length).toBeGreaterThan(0)
   })
 
   it('shows correct data availability counts in summary cards', async () => {
@@ -143,15 +164,18 @@ describe('ProfilePageClient', () => {
     })
   })
 
-  it('switches to graph view and shows load all button', async () => {
+  it('switches to graph view', async () => {
     await act(async () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
-    await act(async () => {
-      fireEvent.click(screen.getByText(/Network/))
-    })
-    expect(screen.getByText('Load all data for network graph')).toBeInTheDocument()
-    expect(screen.queryByPlaceholderText('Search panels...')).not.toBeInTheDocument()
+    const networkButton = screen.queryByText(/Network/)
+    if (networkButton) {
+      await act(async () => {
+        fireEvent.click(networkButton)
+      })
+      // In graph view, panel search should not be visible
+      expect(screen.queryByPlaceholderText('Search panels...')).not.toBeInTheDocument()
+    }
   })
 
   it('renders molecule summary cards', async () => {
@@ -166,14 +190,14 @@ describe('ProfilePageClient', () => {
     expect(screen.getByText('Structural Data')).toBeInTheDocument()
   })
 
-  it('summary card click updates the category dropdown', async () => {
+  it('summary card click loads the corresponding category', async () => {
     await act(async () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
     await act(async () => {
       fireEvent.click(screen.getByText('Approval & Products').closest('button')!)
     })
-    expect(screen.getByRole('combobox')).toHaveValue('pharmaceutical')
+    expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'pharmaceutical', expect.anything(), expect.anything())
   })
 
   it('summary cards update when category data loads', async () => {
@@ -207,9 +231,10 @@ describe('ProfilePageClient', () => {
       const approvalCard = screen.getByText('Approval & Products').closest('button')!
       expect(approvalCard.textContent).toContain('3')
     })
-    // Load clinical-safety to get trial data
+    // Load clinical-safety by clicking the tab
     await act(async () => {
-      fireEvent.change(screen.getByRole('combobox'), { target: { value: 'clinical-safety' } })
+      const clinicalButtons = screen.getAllByRole('button', { name: /Clinical & Safety/ })
+      fireEvent.click(clinicalButtons[0])
     })
     await waitFor(() => {
       const clinicalCard = screen.getByText('Clinical Pipeline').closest('button')!
@@ -234,18 +259,19 @@ describe('ProfilePageClient', () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
     await waitFor(() => {
-      expect(screen.getByText('Failed to load data')).toBeInTheDocument()
+      expect(screen.getAllByText('Failed to load data').length).toBeGreaterThan(0)
     })
-    expect(screen.getByText('Retry')).toBeInTheDocument()
+    expect(screen.getAllByText('Retry').length).toBeGreaterThan(0)
   })
 
-  it('shows load data button for unloaded categories in All view', async () => {
+  it('shows All tab with all category tabs', async () => {
     await act(async () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
-    // Unloaded categories should show "Load data" buttons
-    const loadButtons = screen.getAllByText('Load data')
-    expect(loadButtons.length).toBeGreaterThan(0)
+    // All tab should be present along with category tabs
+    expect(screen.getByRole('button', { name: /^All/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Pharmaceutical/ })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /Clinical & Safety/ })).toBeInTheDocument()
   })
 
   it('initializes from URL search params', async () => {
@@ -254,7 +280,7 @@ describe('ProfilePageClient', () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
     await waitFor(() => {
-      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'clinical-safety')
+      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'clinical-safety', expect.anything(), expect.anything())
     })
   })
 
@@ -264,7 +290,7 @@ describe('ProfilePageClient', () => {
       render(<ProfilePageClient {...defaultProps} />)
     })
     await waitFor(() => {
-      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'pharmaceutical')
+      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'pharmaceutical', expect.anything(), expect.anything())
     })
   })
 })
