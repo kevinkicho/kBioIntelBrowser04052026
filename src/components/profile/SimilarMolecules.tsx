@@ -104,23 +104,26 @@ export function SimilarMolecules({ cid }: { cid: number }) {
           </div>
           <div className="space-y-2">
             {targetRelated.map(mol => (
-              <Link
+              <div
                 key={mol.name}
-                href={`/molecule/name/${encodeURIComponent(mol.name)}`}
                 className="flex items-center justify-between gap-3 py-2 px-3 rounded-lg hover:bg-slate-700/40 transition-colors"
               >
                 <div className="min-w-0">
-                  <p className="text-xs font-semibold text-indigo-300 truncate">{mol.name}</p>
+                  <Link
+                    href={`/molecule/name/${encodeURIComponent(mol.name)}`}
+                    className="text-xs font-semibold text-indigo-300 hover:text-indigo-200 truncate block"
+                  >
+                    {mol.name}
+                  </Link>
                   <div className="flex flex-wrap gap-1 mt-1">
                     {mol.sharedTargets.slice(0, 5).map(gene => (
-                      <Link
+                      <a
                         key={gene}
                         href={`/gene?q=${encodeURIComponent(gene)}`}
-                        onClick={e => e.stopPropagation()}
                         className="text-[9px] px-1.5 py-0.5 rounded bg-cyan-900/30 text-cyan-400 border border-cyan-800/30 hover:bg-cyan-800/40 transition-colors"
                       >
                         {gene}
-                      </Link>
+                      </a>
                     ))}
                     {mol.sharedTargets.length > 5 && (
                       <span className="text-[9px] text-slate-500">+{mol.sharedTargets.length - 5}</span>
@@ -135,7 +138,7 @@ export function SimilarMolecules({ cid }: { cid: number }) {
                     {mol.sharedTargets.length} shared
                   </span>
                 </div>
-              </Link>
+              </div>
             ))}
           </div>
         </div>

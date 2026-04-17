@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSimilarMolecules } from '@/lib/api/pubchem-similar'
 import { getTargetRelatedMolecules } from '@/lib/api/dgidb'
-import { getDrugGeneInteractionsByName } from '@/lib/api/dgidb'
 import { getCached, setCache } from '@/lib/cache'
 
 export async function GET(
@@ -17,32 +16,35 @@ export async function GET(
   const cached = getCached<unknown>(cacheKey)
   if (cached) return NextResponse.json(cached)
 
-  const [structural, geneInteractions] = await Promise.all([
+  const [moleculeName, structural] = await Promise.all([
+    resolveMoleculeName(cid),
     getSimilarMolecules(cid),
-    getDrugGeneInteractionsByCID(cid),
   ])
 
-  const geneSymbols = geneInteractions.map(i => i.geneSymbol).filter(Boolean)
-  const drugName = geneInteractions[0]?.drugName ?? ''
-  const targetRelated = geneSymbols.length > 0
-    ? await getTargetRelatedMolecules(geneSymbols, drugName)
-    : []
+  let targetRelated: Awaited<ReturnType<typeof getTargetRelatedMolecules>> = []
+
+  if (moleculeName) {
+    const { getDrugGeneInteractionsByName } = await import('@/lib/api/dgidb')
+    const geneInteractions = await getDrugGeneInteractionsByName(moleculeName)
+    const geneSymbols = geneInteractions.map(i => i.geneSymbol).filter(Boolean)
+    if (geneSymbols.length > 0) {
+      targetRelated = await getTargetRelatedMolecules(geneSymbols, moleculeName)
+    }
+  }
 
   const result = { structural, targetRelated }
   setCache(cacheKey, result)
   return NextResponse.json(result)
 }
 
-async function getDrugGeneInteractionsByCID(cid: number) {
+async function resolveMoleculeName(cid: number): Promise<string | null> {
   try {
-    const nameUrl = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title/JSON`
-    const nameRes = await fetch(nameUrl, { next: { revalidate: 86400 } })
-    if (!nameRes.ok) return []
-    const nameData = await nameRes.json()
-    const name = nameData.PropertyTable?.Properties?.[0]?.Title
-    if (!name) return []
-    return getDrugGeneInteractionsByName(name)
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title/JSON`
+    const res = await fetch(url, { next: { revalidate: 86400 } })
+    if (!res.ok) return null
+    const data = await res.json()
+    return data.PropertyTable?.Properties?.[0]?.Title ?? null
   } catch {
-    return []
+    return null
   }
 }

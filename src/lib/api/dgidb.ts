@@ -14,9 +14,8 @@ export async function getTargetRelatedMolecules(geneSymbols: string[], excludeDr
   if (geneSymbols.length === 0) return []
   try {
     const topGenes = geneSymbols.slice(0, 8)
-    const geneFilters = topGenes.map(g => `"${g.replace(/"/g, '\\"')}"`).join(',')
-    const query = `{
-      genes(names: [${geneFilters}]) {
+    const query = `query($names: [String!]) {
+      genes(names: $names) {
         nodes {
           name
           interactions {
@@ -32,7 +31,7 @@ export async function getTargetRelatedMolecules(geneSymbols: string[], excludeDr
       ...fetchOptions,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, variables: { names: topGenes } }),
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -77,8 +76,8 @@ export async function getTargetRelatedMolecules(geneSymbols: string[], excludeDr
 
 export async function getDrugGeneInteractionsByName(name: string): Promise<DrugGeneInteraction[]> {
   try {
-    const query = `{
-      drugs(names: ["${name.replace(/"/g, '\\"')}"]) {
+    const query = `query($names: [String!]) {
+      drugs(names: $names) {
         nodes {
           conceptId
           name
@@ -95,7 +94,7 @@ export async function getDrugGeneInteractionsByName(name: string): Promise<DrugG
       ...fetchOptions,
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
+      body: JSON.stringify({ query, variables: { names: [name] } }),
     })
 
     if (!res.ok) return []
