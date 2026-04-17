@@ -198,6 +198,11 @@ export const LazyEbiProteinsPanel = dynamic(
   { loading: LoadingComponent }
 )
 
+export const LazyEbiCrossRefsPanel = dynamic(
+  () => import('@/components/profile/EbiCrossRefsPanel').then(m => ({ default: m.EbiCrossRefsPanel })),
+  { loading: LoadingComponent }
+)
+
 export const LazyProteinAtlasPanel = dynamic(
   () => import('@/components/profile/ProteinAtlasPanel').then(m => ({ default: m.ProteinAtlasPanel })),
   { loading: LoadingComponent }

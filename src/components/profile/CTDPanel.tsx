@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useState } from 'react'
+import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { CTDInteraction, CTDDiseaseAssociation } from '@/lib/types'
@@ -77,14 +78,23 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
           {diseases.map((disease, idx) => (
             <div key={idx} className="py-1.5 border-b border-slate-700/50 last:border-0">
               <div className="flex items-center justify-between">
-                <a
-                  href={`http://ctdbase.org/detail.go?type=disease&acc=${disease.diseaseId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-blue-400 hover:text-blue-300"
-                >
-                  {disease.diseaseName}
-                </a>
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={`/disease?q=${encodeURIComponent(disease.diseaseName)}`}
+                    className="text-sm font-medium text-slate-200 hover:text-indigo-300 transition-colors"
+                  >
+                    {disease.diseaseName}
+                  </Link>
+                  <a
+                    href={`http://ctdbase.org/detail.go?type=disease&acc=${disease.diseaseId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-blue-400 hover:text-blue-300"
+                    title="View on CTD"
+                  >
+                    ↗
+                  </a>
+                </div>
                 {disease.inferenceScore > 0 && (
                   <span className="text-xs px-1.5 py-0.5 bg-orange-900/50 text-orange-300 rounded">
                     Score: {disease.inferenceScore.toFixed(2)}

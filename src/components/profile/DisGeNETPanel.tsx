@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { DisGeNetAssociation } from '@/lib/types'
@@ -25,14 +26,23 @@ export const DisGeNETPanel = memo(function DisGeNETPanel({ associations, panelId
           <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <a
-                  href={`https://www.disgenet.org/browser/0/1/${assoc.diseaseId}/`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 text-sm font-medium"
-                >
-                  {assoc.diseaseName}
-                </a>
+                <div className="flex items-center gap-1.5">
+                  <Link
+                    href={`/disease?q=${encodeURIComponent(assoc.diseaseName)}`}
+                    className="text-sm font-medium text-slate-200 hover:text-indigo-300 transition-colors"
+                  >
+                    {assoc.diseaseName}
+                  </Link>
+                  <a
+                    href={`https://www.disgenet.org/browser/0/1/${assoc.diseaseId}/`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-blue-400 hover:text-blue-300"
+                    title="View on DisGeNET"
+                  >
+                    ↗
+                  </a>
+                </div>
                 <p className="text-xs text-slate-400 mt-1">
                   Score: {assoc.score?.toFixed(3) ?? 'N/A'}
                   {assoc.confidenceScore && ` | Confidence: ${assoc.confidenceScore.toFixed(2)}`}

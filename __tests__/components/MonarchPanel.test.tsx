@@ -40,6 +40,18 @@ describe('MonarchPanel', () => {
     expect(screen.getByText('type 2 diabetes mellitus')).toBeInTheDocument()
   })
 
+  test('renders internal disease page links', () => {
+    render(<MonarchPanel diseases={mockDiseases} />)
+    const links = screen.getAllByRole('link', { name: 'type 2 diabetes mellitus' })
+    expect(links[0]).toHaveAttribute('href', '/disease?q=type%202%20diabetes%20mellitus')
+  })
+
+  test('renders external Monarch links', () => {
+    render(<MonarchPanel diseases={mockDiseases} />)
+    const externalLinks = screen.getAllByTitle('View on Monarch')
+    expect(externalLinks[0]).toHaveAttribute('href', 'https://monarchinitiative.org/MONDO:0011993')
+  })
+
   test('renders description', () => {
     render(<MonarchPanel diseases={mockDiseases} />)
     expect(screen.getByText(/characterized by insulin resistance/)).toBeInTheDocument()

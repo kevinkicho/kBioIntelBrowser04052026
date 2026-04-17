@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { MonarchDisease } from '@/lib/types'
@@ -22,7 +23,23 @@ export const MonarchPanel = memo(function MonarchPanel({ diseases, panelId, last
                 {disease.id}
               </span>
             </div>
-            <p className="text-sm text-slate-200 mt-1 font-medium">{disease.name}</p>
+            <div className="flex items-center gap-1.5 mt-1">
+              <Link
+                href={`/disease?q=${encodeURIComponent(disease.name)}`}
+                className="text-sm font-medium text-slate-200 hover:text-indigo-300 transition-colors"
+              >
+                {disease.name}
+              </Link>
+              <a
+                href={disease.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[10px] text-blue-400 hover:text-blue-300"
+                title="View on Monarch"
+              >
+                ↗
+              </a>
+            </div>
             {disease.description && (
               <p className="text-xs text-slate-500 mt-1">
                 {disease.description.length > 150
