@@ -21,6 +21,7 @@ import { NetworkGraph } from '@/components/graph/NetworkGraph'
 import { InsightsSection } from '@/components/profile/InsightsSection'
 import { SimilarMolecules } from '@/components/profile/SimilarMolecules'
 import { ChangeAlerts } from '@/components/profile/ChangeAlerts'
+import { GeneTargetStrip } from '@/components/profile/GeneTargetStrip'
 import { ResearchBrief } from '@/components/profile/ResearchBrief'
 import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetection'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
@@ -567,6 +568,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         />
         </ErrorBoundary>
       </div>
+
+      <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
 
       <ErrorBoundary><ChangeAlerts changes={detectedChanges} cid={cid} /></ErrorBoundary>
 
