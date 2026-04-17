@@ -24,6 +24,8 @@ import { ComparePageClient } from './ComparePageClient'
 import { CompareSection } from '@/components/compare/CompareSection'
 import { PropertiesCompare } from '@/components/compare/PropertiesCompare'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
+import { ComparisonInsights } from './ComparisonInsights'
+import { computeDelta, computePhaseDistribution, type PhaseDistribution, type DeltaResult } from './comparisonUtils'
 import type {
   Molecule, CompanyProduct, Patent, ClinicalTrial, AdverseEvent,
   ComputedProperties, GhsHazardData, DrugLabel, OrangeBookEntry,
@@ -32,7 +34,7 @@ import type {
   NihGrant, SemanticPaper, PdbStructure, ReactomePathway,
 } from '@/lib/types'
 
-interface MoleculeData {
+export interface MoleculeData {
   molecule: Molecule
   companies: CompanyProduct[]
   patents: Patent[]
@@ -56,18 +58,15 @@ interface MoleculeData {
   reactomePathways: ReactomePathway[]
 }
 
+function settled<T>(result: PromiseSettledResult<T>, fallback: T): T {
+  return result.status === 'fulfilled' ? result.value : fallback
+}
+
 async function fetchMoleculeData(cid: number): Promise<MoleculeData | null> {
   const molecule = await getMoleculeById(cid)
   if (!molecule) return null
 
-  const [
-    companies, patents, trials, adverseEvents,
-    computedProperties, ghsHazards,
-    drugLabels, orangeBookEntries, drugInteractions, drugRecalls, ndcProducts,
-    chemblActivities, chemblMechanisms, chemblIndications, uniprotEntries,
-    literature, nihGrants, semanticPapers,
-    pdbStructures, reactomePathways,
-  ] = await Promise.all([
+  const results = await Promise.allSettled([
     getDrugsByIngredient(molecule.name),
     getPatentsByMoleculeName(molecule.name),
     getClinicalTrialsByName(molecule.name),
@@ -90,6 +89,27 @@ async function fetchMoleculeData(cid: number): Promise<MoleculeData | null> {
     getReactomePathwaysByName(molecule.name),
   ])
 
+  const companies = settled(results[0], [] as CompanyProduct[])
+  const patents = settled(results[1], [] as Patent[])
+  const trials = settled(results[2], [] as ClinicalTrial[])
+  const adverseEvents = settled(results[3], [] as AdverseEvent[])
+  const computedProperties = settled(results[4], null as ComputedProperties | null)
+  const ghsHazards = settled(results[5], null as GhsHazardData | null)
+  const drugLabels = settled(results[6], [] as DrugLabel[])
+  const orangeBookEntries = settled(results[7], [] as OrangeBookEntry[])
+  const drugInteractions = settled(results[8], [] as DrugInteraction[])
+  const drugRecalls = settled(results[9], [] as DrugRecall[])
+  const ndcProducts = settled(results[10], [] as NdcProduct[])
+  const chemblActivities = settled(results[11], [] as ChemblActivity[])
+  const chemblMechanisms = settled(results[12], [] as ChemblMechanism[])
+  const chemblIndications = settled(results[13], [] as ChemblIndication[])
+  const uniprotEntries = settled(results[14], [] as UniprotEntry[])
+  const literature = settled(results[15], [] as LiteratureResult[])
+  const nihGrants = settled(results[16], [] as NihGrant[])
+  const semanticPapers = settled(results[17], [] as SemanticPaper[])
+  const pdbStructures = settled(results[18], [] as PdbStructure[])
+  const reactomePathways = settled(results[19], [] as ReactomePathway[])
+
   return {
     molecule, companies, patents, trials, adverseEvents,
     computedProperties, ghsHazards,
@@ -100,10 +120,28 @@ async function fetchMoleculeData(cid: number): Promise<MoleculeData | null> {
   }
 }
 
-function StatValue({ label, value }: { label: string; value: string | number }) {
+function DeltaBadge({ delta }: { delta: DeltaResult }) {
+  if (delta.direction === 'neutral') {
+    return <span className="text-[10px] text-slate-600 ml-1.5">equal</span>
+  }
+  const color = delta.direction === 'positive'
+    ? 'text-emerald-400 bg-emerald-900/30 border-emerald-800/40'
+    : 'text-red-400 bg-red-900/30 border-red-800/40'
+  const sign = delta.direction === 'positive' ? '+' : ''
+  return (
+    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${color} ml-1.5`}>
+      {sign}{delta.diff}
+    </span>
+  )
+}
+
+function StatValueWithDelta({ label, value, delta }: { label: string; value: string | number; delta: DeltaResult }) {
   return (
     <div>
-      <p className="text-2xl font-bold text-slate-100">{value}</p>
+      <p className="text-2xl font-bold text-slate-100">
+        {value}
+        <DeltaBadge delta={delta} />
+      </p>
       <p className="text-xs text-slate-500">{label}</p>
     </div>
   )
@@ -129,16 +167,34 @@ function CategoryHeader({ icon, title }: { icon: string; title: string }) {
   )
 }
 
-function phaseBreakdown(trials: ClinicalTrial[]): string {
-  const counts: Record<string, number> = {}
-  for (const t of trials) {
-    const phase = (t.phase || '').toLowerCase()
-    if (phase.includes('phase 1')) counts['P1'] = (counts['P1'] || 0) + 1
-    if (phase.includes('phase 2')) counts['P2'] = (counts['P2'] || 0) + 1
-    if (phase.includes('phase 3')) counts['P3'] = (counts['P3'] || 0) + 1
-    if (phase.includes('phase 4')) counts['P4'] = (counts['P4'] || 0) + 1
-  }
-  return Object.entries(counts).map(([k, v]) => `${k}: ${v}`).join(' · ') || '—'
+function PhaseBarChart({ distribution, totalTrials }: { distribution: PhaseDistribution; totalTrials: number }) {
+  if (totalTrials === 0) return <p className="text-xs text-slate-500">No trials</p>
+
+  const phases = [
+    { label: 'P1', count: distribution.phase1, color: 'bg-blue-500' },
+    { label: 'P2', count: distribution.phase2, color: 'bg-indigo-500' },
+    { label: 'P3', count: distribution.phase3, color: 'bg-violet-500' },
+    { label: 'P4', count: distribution.phase4, color: 'bg-emerald-500' },
+  ]
+
+  const barHeight = 'h-4'
+
+  return (
+    <div className="space-y-1.5 mt-2">
+      {phases.map(phase => (
+        <div key={phase.label} className="flex items-center gap-2">
+          <span className="text-[10px] text-slate-500 w-5 text-right">{phase.label}</span>
+          <div className="flex-1 bg-slate-800 rounded-sm overflow-hidden">
+            <div
+              className={`${barHeight} ${phase.color} rounded-sm transition-all`}
+              style={{ width: totalTrials > 0 ? `${(phase.count / totalTrials) * 100}%` : '0%' }}
+            />
+          </div>
+          <span className="text-[10px] text-slate-400 w-5 text-right">{phase.count}</span>
+        </div>
+      ))}
+    </div>
+  )
 }
 
 function uniqueTargets(activities: ChemblActivity[]): number {
@@ -150,19 +206,22 @@ export default async function ComparePage({
 }: {
   searchParams: { a?: string; b?: string }
 }) {
-  const cidA = searchParams.a ? parseInt(searchParams.a, 10) : NaN
-  const cidB = searchParams.b ? parseInt(searchParams.b, 10) : NaN
-
-  const hasComparison = !isNaN(cidA) && !isNaN(cidB)
+  const cidARaw = searchParams.a ? parseInt(searchParams.a, 10) : NaN
+  const cidBRaw = searchParams.b ? parseInt(searchParams.b, 10) : NaN
+  const cidAValid = !isNaN(cidARaw) && cidARaw > 0 && Number.isInteger(cidARaw)
+  const cidBValid = !isNaN(cidBRaw) && cidBRaw > 0 && Number.isInteger(cidBRaw)
+  const hasValidCids = cidAValid && cidBValid
 
   let dataA: MoleculeData | null = null
   let dataB: MoleculeData | null = null
 
-  if (hasComparison) {
-    ;[dataA, dataB] = await Promise.all([
-      fetchMoleculeData(cidA),
-      fetchMoleculeData(cidB),
+  if (hasValidCids) {
+    const [settledA, settledB] = await Promise.allSettled([
+      fetchMoleculeData(cidARaw),
+      fetchMoleculeData(cidBRaw),
     ])
+    dataA = settledA.status === 'fulfilled' ? settledA.value : null
+    dataB = settledB.status === 'fulfilled' ? settledB.value : null
   }
 
   return (
@@ -176,8 +235,32 @@ export default async function ComparePage({
 
         <ComparePageClient />
 
-        {hasComparison && dataA && dataB && (
+        {!cidAValid && searchParams.a && (
+          <p className="text-red-400 text-center py-4">Invalid CID for molecule A. Please provide a positive integer.</p>
+        )}
+        {!cidBValid && searchParams.b && (
+          <p className="text-red-400 text-center py-4">Invalid CID for molecule B. Please provide a positive integer.</p>
+        )}
+
+        {hasValidCids && !dataA && !dataB && (
+          <p className="text-red-400 text-center py-8">Neither molecule could be found. Please check the CIDs and try again.</p>
+        )}
+        {hasValidCids && dataA && !dataB && (
+          <p className="text-amber-400 text-center py-4">Molecule A ({dataA.molecule.name}) was found, but molecule B (CID {cidBRaw}) could not be loaded. Please try a different CID for molecule B.</p>
+        )}
+        {hasValidCids && !dataA && dataB && (
+          <p className="text-amber-400 text-center py-4">Molecule B ({dataB.molecule.name}) was found, but molecule A (CID {cidARaw}) could not be loaded. Please try a different CID for molecule A.</p>
+        )}
+
+        {dataA && dataB && (
           <div>
+            <ComparisonInsights
+              dataA={dataA}
+              dataB={dataB}
+              nameA={dataA.molecule.name}
+              nameB={dataB.molecule.name}
+            />
+
             {/* Molecule Identity */}
             <CompareSection title="Molecule">
               <div><ProfileHeader molecule={dataA.molecule} /></div>
@@ -197,16 +280,16 @@ export default async function ComparePage({
             </CompareSection>
 
             <CompareSection title="GHS Hazards">
-              <StatValue label="hazard pictograms" value={dataA.ghsHazards?.pictogramUrls?.length ?? 0} />
-              <StatValue label="hazard pictograms" value={dataB.ghsHazards?.pictogramUrls?.length ?? 0} />
+              <StatValueWithDelta label="hazard pictograms" value={dataA.ghsHazards?.pictogramUrls?.length ?? 0} delta={computeDelta(dataA.ghsHazards?.pictogramUrls?.length ?? 0, dataB.ghsHazards?.pictogramUrls?.length ?? 0, false)} />
+              <StatValueWithDelta label="hazard pictograms" value={dataB.ghsHazards?.pictogramUrls?.length ?? 0} delta={computeDelta(dataB.ghsHazards?.pictogramUrls?.length ?? 0, dataA.ghsHazards?.pictogramUrls?.length ?? 0, false)} />
             </CompareSection>
 
             {/* Pharmaceutical */}
             <CategoryHeader icon="💊" title="Pharmaceutical" />
 
             <CompareSection title="Manufacturers">
-              <StatValue label="manufacturers" value={dataA.companies.length} />
-              <StatValue label="manufacturers" value={dataB.companies.length} />
+              <StatValueWithDelta label="manufacturers" value={dataA.companies.length} delta={computeDelta(dataA.companies.length, dataB.companies.length, true)} />
+              <StatValueWithDelta label="manufacturers" value={dataB.companies.length} delta={computeDelta(dataB.companies.length, dataA.companies.length, true)} />
             </CompareSection>
 
             <CompareSection title="Top Manufacturers">
@@ -215,23 +298,23 @@ export default async function ComparePage({
             </CompareSection>
 
             <CompareSection title="NDC Products">
-              <StatValue label="NDC codes" value={dataA.ndcProducts.length} />
-              <StatValue label="NDC codes" value={dataB.ndcProducts.length} />
+              <StatValueWithDelta label="NDC codes" value={dataA.ndcProducts.length} delta={computeDelta(dataA.ndcProducts.length, dataB.ndcProducts.length, true)} />
+              <StatValueWithDelta label="NDC codes" value={dataB.ndcProducts.length} delta={computeDelta(dataB.ndcProducts.length, dataA.ndcProducts.length, true)} />
             </CompareSection>
 
             <CompareSection title="Orange Book Entries">
-              <StatValue label="entries" value={dataA.orangeBookEntries.length} />
-              <StatValue label="entries" value={dataB.orangeBookEntries.length} />
+              <StatValueWithDelta label="entries" value={dataA.orangeBookEntries.length} delta={computeDelta(dataA.orangeBookEntries.length, dataB.orangeBookEntries.length, true)} />
+              <StatValueWithDelta label="entries" value={dataB.orangeBookEntries.length} delta={computeDelta(dataB.orangeBookEntries.length, dataA.orangeBookEntries.length, true)} />
             </CompareSection>
 
             <CompareSection title="Drug Labels">
-              <StatValue label="labels" value={dataA.drugLabels.length} />
-              <StatValue label="labels" value={dataB.drugLabels.length} />
+              <StatValueWithDelta label="labels" value={dataA.drugLabels.length} delta={computeDelta(dataA.drugLabels.length, dataB.drugLabels.length, true)} />
+              <StatValueWithDelta label="labels" value={dataB.drugLabels.length} delta={computeDelta(dataB.drugLabels.length, dataA.drugLabels.length, true)} />
             </CompareSection>
 
             <CompareSection title="Drug Interactions">
-              <StatValue label="interactions" value={dataA.drugInteractions.length} />
-              <StatValue label="interactions" value={dataB.drugInteractions.length} />
+              <StatValueWithDelta label="interactions" value={dataA.drugInteractions.length} delta={computeDelta(dataA.drugInteractions.length, dataB.drugInteractions.length, false)} />
+              <StatValueWithDelta label="interactions" value={dataB.drugInteractions.length} delta={computeDelta(dataB.drugInteractions.length, dataA.drugInteractions.length, false)} />
             </CompareSection>
 
             {/* Clinical & Safety */}
@@ -239,18 +322,18 @@ export default async function ComparePage({
 
             <CompareSection title="Clinical Trials">
               <div>
-                <StatValue label="trials" value={dataA.trials.length} />
-                <p className="text-xs text-slate-400 mt-1">{phaseBreakdown(dataA.trials)}</p>
+                <StatValueWithDelta label="trials" value={dataA.trials.length} delta={computeDelta(dataA.trials.length, dataB.trials.length, true)} />
+                <PhaseBarChart distribution={computePhaseDistribution(dataA.trials)} totalTrials={dataA.trials.length} />
               </div>
               <div>
-                <StatValue label="trials" value={dataB.trials.length} />
-                <p className="text-xs text-slate-400 mt-1">{phaseBreakdown(dataB.trials)}</p>
+                <StatValueWithDelta label="trials" value={dataB.trials.length} delta={computeDelta(dataB.trials.length, dataA.trials.length, true)} />
+                <PhaseBarChart distribution={computePhaseDistribution(dataB.trials)} totalTrials={dataB.trials.length} />
               </div>
             </CompareSection>
 
             <CompareSection title="Indications (ChEMBL)">
-              <StatValue label="indications" value={dataA.chemblIndications.length} />
-              <StatValue label="indications" value={dataB.chemblIndications.length} />
+              <StatValueWithDelta label="indications" value={dataA.chemblIndications.length} delta={computeDelta(dataA.chemblIndications.length, dataB.chemblIndications.length, true)} />
+              <StatValueWithDelta label="indications" value={dataB.chemblIndications.length} delta={computeDelta(dataB.chemblIndications.length, dataA.chemblIndications.length, true)} />
             </CompareSection>
 
             <CompareSection title="Adverse Events (Top 5)">
@@ -259,8 +342,8 @@ export default async function ComparePage({
             </CompareSection>
 
             <CompareSection title="Drug Recalls">
-              <StatValue label="recalls" value={dataA.drugRecalls.length} />
-              <StatValue label="recalls" value={dataB.drugRecalls.length} />
+              <StatValueWithDelta label="recalls" value={dataA.drugRecalls.length} delta={computeDelta(dataA.drugRecalls.length, dataB.drugRecalls.length, false)} />
+              <StatValueWithDelta label="recalls" value={dataB.drugRecalls.length} delta={computeDelta(dataB.drugRecalls.length, dataA.drugRecalls.length, false)} />
             </CompareSection>
 
             {/* Bioactivity & Targets */}
@@ -268,11 +351,11 @@ export default async function ComparePage({
 
             <CompareSection title="ChEMBL Bioactivity">
               <div>
-                <StatValue label="activities" value={dataA.chemblActivities.length} />
+                <StatValueWithDelta label="activities" value={dataA.chemblActivities.length} delta={computeDelta(dataA.chemblActivities.length, dataB.chemblActivities.length, true)} />
                 <p className="text-xs text-slate-400 mt-1">{uniqueTargets(dataA.chemblActivities)} unique targets</p>
               </div>
               <div>
-                <StatValue label="activities" value={dataB.chemblActivities.length} />
+                <StatValueWithDelta label="activities" value={dataB.chemblActivities.length} delta={computeDelta(dataB.chemblActivities.length, dataA.chemblActivities.length, true)} />
                 <p className="text-xs text-slate-400 mt-1">{uniqueTargets(dataB.chemblActivities)} unique targets</p>
               </div>
             </CompareSection>
@@ -291,29 +374,29 @@ export default async function ComparePage({
             <CategoryHeader icon="🧬" title="Protein & Structure" />
 
             <CompareSection title="PDB Structures">
-              <StatValue label="crystal structures" value={dataA.pdbStructures.length} />
-              <StatValue label="crystal structures" value={dataB.pdbStructures.length} />
+              <StatValueWithDelta label="crystal structures" value={dataA.pdbStructures.length} delta={computeDelta(dataA.pdbStructures.length, dataB.pdbStructures.length, true)} />
+              <StatValueWithDelta label="crystal structures" value={dataB.pdbStructures.length} delta={computeDelta(dataB.pdbStructures.length, dataA.pdbStructures.length, true)} />
             </CompareSection>
 
             {/* Interactions & Pathways */}
             <CategoryHeader icon="🔗" title="Interactions & Pathways" />
 
             <CompareSection title="Reactome Pathways">
-              <StatValue label="pathways" value={dataA.reactomePathways.length} />
-              <StatValue label="pathways" value={dataB.reactomePathways.length} />
+              <StatValueWithDelta label="pathways" value={dataA.reactomePathways.length} delta={computeDelta(dataA.reactomePathways.length, dataB.reactomePathways.length, true)} />
+              <StatValueWithDelta label="pathways" value={dataB.reactomePathways.length} delta={computeDelta(dataB.reactomePathways.length, dataA.reactomePathways.length, true)} />
             </CompareSection>
 
             {/* Research & Literature */}
             <CategoryHeader icon="📚" title="Research & Literature" />
 
             <CompareSection title="Publications">
-              <StatValue label="papers" value={Math.max(dataA.literature.length, dataA.semanticPapers.length)} />
-              <StatValue label="papers" value={Math.max(dataB.literature.length, dataB.semanticPapers.length)} />
+              <StatValueWithDelta label="papers" value={Math.max(dataA.literature.length, dataA.semanticPapers.length)} delta={computeDelta(Math.max(dataA.literature.length, dataA.semanticPapers.length), Math.max(dataB.literature.length, dataB.semanticPapers.length), true)} />
+              <StatValueWithDelta label="papers" value={Math.max(dataB.literature.length, dataB.semanticPapers.length)} delta={computeDelta(Math.max(dataB.literature.length, dataB.semanticPapers.length), Math.max(dataA.literature.length, dataA.semanticPapers.length), true)} />
             </CompareSection>
 
             <CompareSection title="Patents">
-              <StatValue label="patents" value={dataA.patents.length} />
-              <StatValue label="patents" value={dataB.patents.length} />
+              <StatValueWithDelta label="patents" value={dataA.patents.length} delta={computeDelta(dataA.patents.length, dataB.patents.length, true)} />
+              <StatValueWithDelta label="patents" value={dataB.patents.length} delta={computeDelta(dataB.patents.length, dataA.patents.length, true)} />
             </CompareSection>
 
             <CompareSection title="Top Patent Assignees">
@@ -322,13 +405,13 @@ export default async function ComparePage({
             </CompareSection>
 
             <CompareSection title="NIH Grants">
-              <StatValue label="active grants" value={dataA.nihGrants.length} />
-              <StatValue label="active grants" value={dataB.nihGrants.length} />
+              <StatValueWithDelta label="active grants" value={dataA.nihGrants.length} delta={computeDelta(dataA.nihGrants.length, dataB.nihGrants.length, true)} />
+              <StatValueWithDelta label="active grants" value={dataB.nihGrants.length} delta={computeDelta(dataB.nihGrants.length, dataA.nihGrants.length, true)} />
             </CompareSection>
           </div>
         )}
 
-        {!hasComparison && (
+        {!hasValidCids && !searchParams.a && !searchParams.b && (
           <p className="text-slate-500 text-center py-12">
             Search for two molecules above to compare them side by side.
           </p>
