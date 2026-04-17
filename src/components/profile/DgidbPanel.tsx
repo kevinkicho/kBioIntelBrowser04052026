@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { DrugGeneInteraction } from '@/lib/types'
@@ -18,9 +19,12 @@ export const DgidbPanel = memo(function DgidbPanel({ interactions, panelId, last
         {interactions.map((interaction, i) => (
           <div key={i} className="py-3 border-b border-slate-700 last:border-0">
             <div className="flex items-start justify-between gap-2">
-              <span className="text-xs font-semibold bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-2 py-0.5 rounded shrink-0">
+              <Link
+                href={`/gene?q=${encodeURIComponent(interaction.geneSymbol || interaction.geneName)}`}
+                className="text-xs font-semibold bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-2 py-0.5 rounded shrink-0 hover:bg-cyan-800/60 transition-colors"
+              >
                 {interaction.geneName}
-              </span>
+              </Link>
               {interaction.interactionType && (
                 <span className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/30 px-2 py-0.5 rounded shrink-0">
                   {interaction.interactionType}
