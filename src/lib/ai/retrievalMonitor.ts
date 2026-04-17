@@ -63,6 +63,7 @@ const KNOWN_PANEL_KEYS: Record<string, string[]> = {
   'interactions-pathways': ['proteinInteractions', 'chemicalProteinInteractions', 'molecularInteractions', 'reactomePathways', 'wikiPathways', 'pathwayCommonsResults', 'bioCycPathways', 'smpdbPathways', 'ctdDiseaseAssociations', 'keggData'],
   'nih-high-impact': ['cadsrData', 'translatorData', 'anvilData', 'immPortData', 'neuroMMSigData'],
   'research-literature': ['nihGrants', 'patents', 'secFilings', 'literature', 'pubmedArticles', 'semanticPapers', 'openAlexWorks', 'citationMetrics', 'crossRefWorks', 'arxivPapers'],
+  'gene': ['geneOverview', 'geneDrugs', 'geneDiseases', 'geneVariants', 'geneExpressionData', 'genePathways'],
 }
 
 function countItems(val: unknown): number {

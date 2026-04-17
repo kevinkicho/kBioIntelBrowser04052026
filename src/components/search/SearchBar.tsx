@@ -33,6 +33,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
   const [query, setQuery] = useState('')
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [suggestionsAreDiseases, setSuggestionsAreDiseases] = useState(false)
+  const [suggestionsAreGenes, setSuggestionsAreGenes] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
@@ -48,6 +49,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     if (query.length < 2) {
       setSuggestions([])
       setSuggestionsAreDiseases(false)
+      setSuggestionsAreGenes(false)
       setIsOpen(false)
       return
     }
@@ -61,6 +63,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
           const data = await res.json()
           setSuggestions(data.suggestions ?? [])
           setSuggestionsAreDiseases(data.searchType === 'disease')
+          setSuggestionsAreGenes(data.searchType === 'gene')
           setIsOpen(true)
         }
       } finally {
@@ -97,6 +100,15 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
 
     if (searchType === 'disease') {
       router.push(`/disease?q=${encodeURIComponent(name)}`)
+      return
+    }
+
+    if (searchType === 'gene') {
+      if (name.includes('-') && /^\d+-/.test(name)) {
+        router.push(`/gene/${encodeURIComponent(name)}`)
+      } else {
+        router.push(`/gene?q=${encodeURIComponent(name)}`)
+      }
       return
     }
 
@@ -145,6 +157,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     inchi: 'Enter an InChI string...',
     formula: 'Enter a molecular formula (e.g. C9H8O4)...',
     disease: 'Search a disease or condition (e.g. diabetes)...',
+    gene: 'Search a gene symbol or name (e.g. BRCA1, TP53)...',
   }
 
   return (
@@ -178,6 +191,9 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
               >
                 {suggestionsAreDiseases && (
                   <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-900/60 text-rose-300 border border-rose-700/50 shrink-0">DISEASE</span>
+                )}
+                {suggestionsAreGenes && (
+                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-900/60 text-violet-300 border border-violet-700/50 shrink-0">GENE</span>
                 )}
                 <span>{s}</span>
               </button>

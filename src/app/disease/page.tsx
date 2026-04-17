@@ -90,7 +90,7 @@ export default function DiseasePage() {
     const status: Record<string, CategoryLoadState> = {}
     const allIds: CategoryId[] = [
       'pharmaceutical', 'clinical-safety', 'molecular-chemical', 'bioactivity-targets',
-      'protein-structure', 'genomics-disease', 'interactions-pathways', 'research-literature', 'nih-high-impact',
+      'protein-structure', 'genomics-disease', 'interactions-pathways', 'research-literature', 'nih-high-impact', 'gene',
     ]
     for (const id of allIds) {
       status[id] = id === 'genomics-disease' && results.length > 0 ? 'loaded' : 'idle'

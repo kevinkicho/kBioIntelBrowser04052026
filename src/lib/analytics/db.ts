@@ -252,6 +252,7 @@ const CATEGORY_ORDER = [
   'interactions-pathways',
   'nih-high-impact',
   'research-literature',
+  'gene',
   'search',
 ]
 

@@ -8,6 +8,7 @@ export type CategoryId =
   | 'interactions-pathways'
   | 'research-literature'
   | 'nih-high-impact'
+  | 'gene'
 
 export interface PanelDef {
   id: string
@@ -206,6 +207,19 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'open-citations', title: 'OpenCitations', propKey: 'citationMetrics', isNullable: false },
       { id: 'crossref', title: 'CrossRef', propKey: 'crossRefWorks', isNullable: true },
       { id: 'arxiv', title: 'arXiv', propKey: 'arxivPapers', isNullable: true },
+    ],
+  },
+  {
+    id: 'gene',
+    label: 'Gene',
+    icon: '🧬',
+    panels: [
+      { id: 'gene-overview', title: 'GeneOverview', propKey: 'geneOverview', isNullable: false },
+      { id: 'gene_drugs', title: 'TargetedDrugs', propKey: 'geneDrugs', isNullable: true },
+      { id: 'gene-diseases', title: 'GeneDiseases', propKey: 'geneDiseases', isNullable: true },
+      { id: 'gene-variants', title: 'GeneVariants', propKey: 'geneVariants', isNullable: true },
+      { id: 'gene-expression', title: 'GeneExpression', propKey: 'geneExpressionData', isNullable: true },
+      { id: 'gene-pathways', title: 'GenePathways', propKey: 'genePathways', isNullable: true },
     ],
   },
 ]

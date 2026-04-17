@@ -3,9 +3,10 @@ import { searchByType } from '@/lib/api/pubchem'
 import { searchDiseases as searchOpenTargetsDiseases } from '@/lib/api/opentargets'
 import { searchOrphanetDiseases } from '@/lib/api/orphanet'
 import { getGenesByDisease } from '@/lib/api/disgenet'
+import { searchGenes } from '@/lib/api/mygene'
 import type { SearchType } from '@/lib/apiIdentifiers'
 
-const VALID_SEARCH_TYPES = new Set<string>(['name', 'cid', 'cas', 'smiles', 'inchikey', 'inchi', 'formula', 'disease'])
+const VALID_SEARCH_TYPES = new Set<string>(['name', 'cid', 'cas', 'smiles', 'inchikey', 'inchi', 'formula', 'disease', 'gene'])
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')
@@ -16,12 +17,19 @@ export async function GET(request: NextRequest) {
   }
 
   if (!VALID_SEARCH_TYPES.has(typeParam)) {
-    return NextResponse.json({ error: `Invalid search type: ${typeParam}. Valid types: name, cid, cas, smiles, inchikey, inchi, formula, disease` }, { status: 400 })
+    return NextResponse.json({ error: `Invalid search type: ${typeParam}. Valid types: name, cid, cas, smiles, inchikey, inchi, formula, disease, gene` }, { status: 400 })
   }
 
   const query = q.trim()
 
   try {
+    if (typeParam === 'gene') {
+      const genes = await searchGenes(query)
+      const suggestions = genes.slice(0, 10).map(g => `${g.geneId}-${g.symbol}`)
+
+      return NextResponse.json({ suggestions, searchType: 'gene' })
+    }
+
     if (typeParam === 'disease') {
       const [otResults, orphanetResults, disgenetResults] = await Promise.allSettled([
         searchOpenTargetsDiseases(query),

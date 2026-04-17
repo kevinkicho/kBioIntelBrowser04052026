@@ -1,4 +1,4 @@
-export type SearchType = 'name' | 'cid' | 'cas' | 'smiles' | 'inchikey' | 'inchi' | 'formula' | 'disease'
+export type SearchType = 'name' | 'cid' | 'cas' | 'smiles' | 'inchikey' | 'inchi' | 'formula' | 'disease' | 'gene'
 
 export type ApiIdentifierType = SearchType | 'gene_symbol' | 'uniprot_accession' | 'pdb_id'
 
@@ -119,6 +119,7 @@ export const IDENTIFIER_TYPE_LABELS: Record<ApiIdentifierType, { short: string; 
   inchi: { short: 'InChI', label: 'InChI', description: 'IUPAC International Chemical Identifier' },
   formula: { short: 'Formula', label: 'Molecular Formula', description: 'Molecular formula (e.g. C9H8O4)' },
   disease: { short: 'Disease', label: 'Disease/Condition', description: 'Disease or condition name (e.g. diabetes)' },
+  gene: { short: 'Gene', label: 'Gene', description: 'Gene symbol or name (e.g. BRCA1)' },
   gene_symbol: { short: 'Gene', label: 'Gene Symbol', description: 'HGNC gene symbol (e.g. TP53)' },
   uniprot_accession: { short: 'UniProt', label: 'UniProt Accession', description: 'UniProt protein accession (e.g. P04637)' },
   pdb_id: { short: 'PDB', label: 'PDB ID', description: 'RCSB Protein Data Bank ID (e.g. 1TUP)' },

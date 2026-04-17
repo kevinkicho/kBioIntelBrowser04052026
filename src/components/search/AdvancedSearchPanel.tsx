@@ -25,6 +25,7 @@ const SEARCH_TYPES: { value: SearchType; label: string; placeholder: string; des
   { value: 'inchi', label: 'InChI', placeholder: 'e.g. InChI=1S/C9H8O4/c1-6...', description: 'IUPAC International Chemical Identifier' },
   { value: 'formula', label: 'Formula', placeholder: 'e.g. C9H8O4', description: 'Molecular formula' },
   { value: 'disease', label: 'Disease', placeholder: 'e.g. diabetes, hypertension, melanoma', description: 'Disease or condition name' },
+  { value: 'gene', label: 'Gene', placeholder: 'e.g. BRCA1, TP53, EGFR', description: 'Gene symbol or name' },
 ]
 
 const PANEL_FIELDS: Record<string, string[]> = {
@@ -148,6 +149,7 @@ const CAT_TABS: { label: string; id: CategoryId }[] = [
   { label: 'Genomics', id: 'genomics-disease' },
   { label: 'Pathways', id: 'interactions-pathways' },
   { label: 'Literature', id: 'research-literature' },
+  { label: 'Gene', id: 'gene' },
 ]
 
 const PANEL_TO_CAT: Record<string, CategoryId> = {}
@@ -166,6 +168,7 @@ const CAT_LABELS: Record<CategoryId, string> = {
   'interactions-pathways': 'Pathways',
   'research-literature': 'Literature',
   'nih-high-impact': 'NIH',
+  'gene': 'Gene',
 }
 
 function ParamCell({ panelId, params, currentParams, onParamChange }: {

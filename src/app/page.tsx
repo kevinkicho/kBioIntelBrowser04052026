@@ -14,6 +14,7 @@ const EXAMPLE_SEARCHES = [
 
 const NAV_LINKS = [
   { href: '/browse', label: 'Browse by Category', color: 'slate' },
+  { href: '/gene', label: 'Gene Search', color: 'slate' },
   { href: '/compare', label: 'Compare Molecules', color: 'slate' },
   { href: '/interactions', label: 'Interaction Checker', color: 'slate' },
   { href: '/batch', label: 'Batch Lookup', color: 'slate' },
