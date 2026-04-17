@@ -1,4 +1,5 @@
 import { memo } from 'react'
+import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { MyGeneAnnotation } from '@/lib/types'
@@ -26,7 +27,13 @@ export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetch
             <div className="flex items-start justify-between gap-2">
               <div className="flex-1">
                 <div className="flex items-center gap-2">
-                  <h4 className="text-sm font-medium text-slate-200">{gene.symbol}</h4>
+                  <h4 className="text-sm font-medium text-slate-200">
+                    {gene.entrezId ? (
+                      <Link href={`/gene/${gene.entrezId}-${gene.symbol}`} className="text-indigo-300 hover:text-indigo-200 hover:underline">{gene.symbol}</Link>
+                    ) : (
+                      <Link href={`/gene?q=${encodeURIComponent(gene.symbol)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline">{gene.symbol}</Link>
+                    )}
+                  </h4>
                   {gene.entrezId && (
                     <a
                       href={`https://www.ncbi.nlm.nih.gov/gene/${gene.entrezId}`}

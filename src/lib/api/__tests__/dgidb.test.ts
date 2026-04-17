@@ -1,5 +1,4 @@
 import { getTargetRelatedMolecules } from '@/lib/api/dgidb'
-import type { TargetRelatedMolecule } from '@/lib/api/dgidb'
 
 function mockDGIdbResponse(geneNodes: Array<{ name: string; interactions: Array<{ drug: { name: string; conceptId: string }; interactionTypes: Array<{ type: string }>; sources: Array<{ sourceDbName: string }> }> }>) {
   return {

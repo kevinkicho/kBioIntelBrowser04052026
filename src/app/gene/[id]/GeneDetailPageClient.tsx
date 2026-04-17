@@ -79,7 +79,7 @@ function GeneDiseasesPanel({ data }: { data: Record<string, unknown> | null }) {
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {diseases.slice(0, 30).map((d, i) => (
           <div key={`${d.diseaseId}-${i}`} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
-            <span className="text-slate-300 truncate mr-2">{d.diseaseName}</span>
+            <Link href={`/disease?q=${encodeURIComponent(d.diseaseName)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2">{d.diseaseName}</Link>
             <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 shrink-0">{d.score.toFixed(2)}</span>
           </div>
         ))}
@@ -180,8 +180,15 @@ function TargetedDrugsPanel({ data }: { data: Record<string, unknown> | null }) 
                   {d.drugName}
                 </Link>
               )}
+              {d.drugName && /^\d+$/.test(String(d.drugName)) && (
+                <Link
+                  href={`/molecule/${String(d.drugName)}`}
+                  className="text-indigo-400 hover:underline truncate font-mono"
+                >
+                  CID {d.drugName}
+                </Link>
+              )}
               {!d.drugName && <span className="text-slate-500">Unknown</span>}
-              {d.drugName && /^\d+$/.test(String(d.drugName)) && <span className="text-slate-300">{d.drugName}</span>}
             </div>
             <div className="flex items-center gap-2 shrink-0">
               {d.interactionType && (
