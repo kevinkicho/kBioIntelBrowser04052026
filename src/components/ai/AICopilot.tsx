@@ -13,7 +13,7 @@ interface Props {
   categoryData: Partial<Record<CategoryId, Record<string, unknown>>>
   categoryStatus: Record<CategoryId, CategoryLoadState>
   fetchedAt: Partial<Record<CategoryId, Date>>
-  identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string }
+  identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string; geneSymbol?: string }
 }
 
 export function AICopilot(props: Props) {

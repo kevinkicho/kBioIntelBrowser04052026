@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
-import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock } from '@/lib/ai/contextBuilder'
-import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
+import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
+import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
@@ -28,7 +28,7 @@ export function useAICopilot(
   categoryData: Partial<Record<CategoryId, Record<string, unknown>>>,
   categoryStatus: Record<CategoryId, CategoryLoadState>,
   fetchedAt: Partial<Record<CategoryId, Date>>,
-  identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string },
+  identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string; geneSymbol?: string },
 ) {
   const ai = useAI()
   const [messages, setMessages] = useState<CopilotMessage[]>([])
@@ -60,6 +60,7 @@ export function useAICopilot(
   }, [categoryData])
 
   const isDiseaseContext = identity.cid === 0 && Array.isArray(allData.diseaseResults)
+  const isGeneContext = !!identity.geneSymbol
 
   const context = useMemo(
     () => buildMoleculeContext(categoryData, identity, allData, snapshot),
@@ -73,11 +74,20 @@ export function useAICopilot(
     [identity.name, allData, isDiseaseContext]
   )
 
+  const geneCtx = useMemo(
+    () => isGeneContext
+      ? buildGeneContext(identity.geneSymbol!, allData, snapshot)
+      : null,
+    [identity.geneSymbol, allData, snapshot, isGeneContext]
+  )
+
   const contextBlock = useMemo(
-    () => isDiseaseContext && diseaseCtx
-      ? diseaseContextToPromptBlock(diseaseCtx)
-      : contextToPromptBlock(context),
-    [isDiseaseContext, diseaseCtx, context]
+    () => isGeneContext && geneCtx
+      ? geneContextToPromptBlock(geneCtx)
+      : isDiseaseContext && diseaseCtx
+        ? diseaseContextToPromptBlock(diseaseCtx)
+        : contextToPromptBlock(context),
+    [isGeneContext, geneCtx, isDiseaseContext, diseaseCtx, context]
   )
 
   const aiAvailable = ai.enabled && ai.status === 'available'
@@ -131,6 +141,30 @@ export function useAICopilot(
           break
         default:
           prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
+      }
+    } else if (isGeneContext && geneCtx) {
+      switch (mode) {
+        case 'auto_insight':
+        case 'gene_therapeutic':
+          prompts = buildGeneTherapeuticPrompt(geneCtx)
+          break
+        case 'gene_repurposing':
+          prompts = buildGeneRepurposingPrompt(geneCtx)
+          break
+        case 'gene_mechanism':
+          prompts = buildGeneMechanismPrompt(geneCtx)
+          break
+        case 'gene_target_assessment':
+          prompts = buildGeneTargetAssessmentPrompt(geneCtx)
+          break
+        case 'executive_brief':
+          prompts = buildGeneTherapeuticPrompt(geneCtx)
+          break
+        case 'gap_analysis':
+          prompts = buildGeneTargetAssessmentPrompt(geneCtx)
+          break
+        default:
+          prompts = buildGeneTherapeuticPrompt(geneCtx)
       }
     } else {
       switch (mode) {
@@ -203,7 +237,7 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, isDiseaseContext, diseaseCtx])
+  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx])
 
   const askQuestion = useCallback(async (question: string) => {
     if (!aiAvailable) {
@@ -226,6 +260,12 @@ export function useAICopilot(
     if (isDiseaseContext && diseaseCtx) {
       const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
       const { system, user } = buildDiseaseQAPrompt(diseaseBlock, question)
+      chatMessages = [
+        { role: 'system', content: system },
+        { role: 'user', content: user },
+      ]
+    } else if (isGeneContext && geneCtx) {
+      const { system, user } = buildGeneQAPrompt(geneCtx, question)
       chatMessages = [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -263,7 +303,7 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, addMessage, isDiseaseContext, diseaseCtx])
+  }, [ai, aiAvailable, context, addMessage, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
@@ -315,6 +355,7 @@ export function useAICopilot(
     context,
     contextBlock,
     isDiseaseContext,
+    isGeneContext,
     messages,
     isStreaming,
     activeTab,

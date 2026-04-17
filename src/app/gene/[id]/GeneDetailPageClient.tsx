@@ -4,6 +4,18 @@ import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { GeneOverview as GeneOverviewType } from '@/lib/categoryFetchers/gene'
+import { AICopilot } from '@/components/ai/AICopilot'
+import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
+
+type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
+
+function buildFullStatus(catId: CategoryId, state: CategoryLoadState): Record<CategoryId, CategoryLoadState> {
+  const result = {} as Record<CategoryId, CategoryLoadState>
+  for (const cat of CATEGORIES) {
+    result[cat.id] = cat.id === catId ? state : 'idle'
+  }
+  return result
+}
 
 interface GeneDetailPageClientProps {
   geneId: string
@@ -257,6 +269,10 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
 
+  const categoryDataMap: Partial<Record<CategoryId, Record<string, unknown>>> = loaded ? { gene: categoryData } : {}
+  const categoryStatusMap = buildFullStatus('gene', loaded ? 'loaded' : loading ? 'loading' : 'error')
+  const fetchedAtMap: Partial<Record<CategoryId, Date>> = loaded ? { gene: new Date() } : {}
+
   const geneIdParam = `${geneId}-${symbol}`
 
   const loadGeneCategory = useCallback(async () => {
@@ -399,6 +415,12 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
             {activePanel === 'gene-pathways' && <GenePathwaysPanel data={categoryData} />}
           </div>
         )}
+        <AICopilot
+          categoryData={categoryDataMap}
+          categoryStatus={categoryStatusMap}
+          fetchedAt={fetchedAtMap}
+          identity={{ name: symbol, cid: 0, geneSymbol: symbol }}
+        />
       </main>
     </div>
   )
