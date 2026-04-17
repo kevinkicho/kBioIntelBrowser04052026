@@ -196,7 +196,7 @@ export function BatchClient() {
                   <div className="flex-1">
                     <MoleculeSearch
                       label={`Molecule ${idx + 1}`}
-                      value={slot.name}
+                      initialName={slot.name}
                       onSelect={(name, cid) => handleSelect(slot.id, name, cid)}
                     />
                   </div>

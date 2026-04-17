@@ -85,8 +85,23 @@ async function getExtendedIdentifiers(cid: number) {
 
 export async function GET(request: NextRequest) {
   const name = request.nextUrl.searchParams.get('name')
+  const cidParam = request.nextUrl.searchParams.get('cid')
   const typeParam = request.nextUrl.searchParams.get('type') ?? 'name'
   const extended = request.nextUrl.searchParams.get('extended') === 'true'
+
+  if (cidParam) {
+    const cid = parseInt(cidParam, 10)
+    if (isNaN(cid) || cid <= 0) return NextResponse.json({ error: 'Invalid CID' }, { status: 400 })
+    try {
+      const res = await fetch(`${PUBCHEM_PUG}/compound/cid/${cid}/property/Title/JSON`, PC_FETCH_OPTS)
+      if (!res.ok) return NextResponse.json({ cid, name: null })
+      const data = await res.json()
+      const title = data.PropertyTable?.Properties?.[0]?.Title ?? null
+      return NextResponse.json({ cid, name: title })
+    } catch {
+      return NextResponse.json({ cid, name: null })
+    }
+  }
 
   if (!name) return NextResponse.json({ error: 'Name required' }, { status: 400 })
 

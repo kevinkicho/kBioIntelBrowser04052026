@@ -1,26 +1,52 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
 
 interface MoleculeSearchProps {
   label: string
-  value: string
+  initialName: string
   onSelect: (name: string, cid: number) => void
 }
 
-export function MoleculeSearch({ label, value, onSelect }: MoleculeSearchProps) {
-  const [query, setQuery] = useState(value)
+export function MoleculeSearch({ label, initialName, onSelect }: MoleculeSearchProps) {
+  const [query, setQuery] = useState(initialName)
   const [suggestions, setSuggestions] = useState<string[]>([])
   const [isOpen, setIsOpen] = useState(false)
+  const [selected, setSelected] = useState(false)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  const closeDropdown = useCallback(() => {
+    setIsOpen(false)
+  }, [])
 
   useEffect(() => {
-    setQuery(value)
-  }, [value])
+    setQuery(initialName)
+    setSelected(!!initialName)
+  }, [initialName])
 
   useEffect(() => {
-    if (query.length < 2) {
+    function handleOutsideClick(e: MouseEvent | TouchEvent) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+        closeDropdown()
+      }
+    }
+    function handleEscape(e: KeyboardEvent) {
+      if (e.key === 'Escape') closeDropdown()
+    }
+    document.addEventListener('mousedown', handleOutsideClick)
+    document.addEventListener('touchstart', handleOutsideClick)
+    document.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick)
+      document.removeEventListener('touchstart', handleOutsideClick)
+      document.removeEventListener('keydown', handleEscape)
+    }
+  }, [closeDropdown])
+
+  useEffect(() => {
+    if (selected || query.length < 2) {
       setSuggestions([])
       setIsOpen(false)
       return
@@ -39,11 +65,12 @@ export function MoleculeSearch({ label, value, onSelect }: MoleculeSearchProps) 
     }, 300)
 
     return () => clearTimeout(debounceRef.current)
-  }, [query])
+  }, [query, selected])
 
   async function handleSelect(name: string) {
     setIsOpen(false)
     setQuery(name)
+    setSelected(true)
     try {
       const res = await clientFetch(`/api/search/resolve?name=${encodeURIComponent(name)}`)
       if (res.ok) {
@@ -56,13 +83,18 @@ export function MoleculeSearch({ label, value, onSelect }: MoleculeSearchProps) 
     } catch {}
   }
 
+  function handleInputChange(text: string) {
+    setQuery(text)
+    setSelected(false)
+  }
+
   return (
-    <div className="relative">
+    <div className="relative" ref={containerRef}>
       <label className="block text-xs text-slate-400 mb-1">{label}</label>
       <input
         type="text"
         value={query}
-        onChange={e => setQuery(e.target.value)}
+        onChange={e => handleInputChange(e.target.value)}
         placeholder="Search molecule..."
         className="w-full bg-slate-800 border border-slate-600 rounded-lg px-4 py-2 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 text-sm"
       />
