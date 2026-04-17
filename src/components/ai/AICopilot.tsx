@@ -125,6 +125,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
                 onGenerate={copilot.generateInsight}
                 aiAvailable={copilot.aiAvailable}
                 hasComparisons={compareCount > 1}
+                isDiseaseContext={!!copilot.isDiseaseContext}
               />
             )}
 
@@ -282,26 +283,31 @@ function InsightsTab({
   onGenerate,
   aiAvailable,
   hasComparisons,
+  isDiseaseContext,
 }: {
   messages: CopilotMessage[]
   isStreaming: boolean
   onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare') => void
   aiAvailable: boolean
   hasComparisons: boolean
+  isDiseaseContext: boolean
 }) {
   return (
     <div className="space-y-3">
-      {/* Quick action buttons */}
       <div className="grid grid-cols-2 gap-2">
         <InsightButton label="Executive Brief" onClick={() => onGenerate('executive_brief')} disabled={isStreaming || !aiAvailable} icon="brief" />
-        <InsightButton label="Safety Deep Dive" onClick={() => onGenerate('safety_deep_dive')} disabled={isStreaming || !aiAvailable} icon="safety" />
+        {!isDiseaseContext && (
+          <InsightButton label="Safety Deep Dive" onClick={() => onGenerate('safety_deep_dive')} disabled={isStreaming || !aiAvailable} icon="safety" />
+        )}
         <InsightButton label="Mechanism Analysis" onClick={() => onGenerate('mechanism_analysis')} disabled={isStreaming || !aiAvailable} icon="mechanism" />
         <InsightButton label="Repurposing Scan" onClick={() => onGenerate('repurposing_scan')} disabled={isStreaming || !aiAvailable} icon="repurpose" />
         <InsightButton label="Therapeutic Hypotheses" onClick={() => onGenerate('therapeutic_hypothesis')} disabled={isStreaming || !aiAvailable} icon="hypothesis" />
-        <InsightButton label="Competitive Position" onClick={() => onGenerate('competitive_position')} disabled={isStreaming || !aiAvailable} icon="competitive" />
+        {!isDiseaseContext && (
+          <InsightButton label="Competitive Position" onClick={() => onGenerate('competitive_position')} disabled={isStreaming || !aiAvailable} icon="competitive" />
+        )}
         <InsightButton label="Gap Analysis" onClick={() => onGenerate('gap_analysis')} disabled={isStreaming || !aiAvailable} icon="gap" />
         <InsightButton label="Auto Insights" onClick={() => onGenerate('auto_insight')} disabled={isStreaming || !aiAvailable} icon="auto" />
-        {hasComparisons && (
+        {!isDiseaseContext && hasComparisons && (
           <InsightButton label="Compare Molecules" onClick={() => onGenerate('cross_molecule_compare')} disabled={isStreaming || !aiAvailable} icon="compare" />
         )}
       </div>

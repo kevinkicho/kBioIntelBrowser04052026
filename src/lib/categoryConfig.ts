@@ -61,6 +61,7 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'chembl-indications', title: 'ChemblIndications', propKey: 'chemblIndications', isNullable: false },
       { id: 'clinvar', title: 'ClinVar', propKey: 'clinVarVariants', isNullable: false },
       { id: 'drug-shortages', title: 'DrugShortages', propKey: 'drugShortages', isNullable: true },
+      { id: 'therapeutic-landscape', title: 'TherapeuticLandscape', propKey: 'therapeuticLandscape', isNullable: true },
       { id: 'gwas', title: 'GwasCatalog', propKey: 'gwasAssociations', isNullable: false },
       { id: 'toxcast', title: 'ToxCast', propKey: 'toxcast', isNullable: true },
       { id: 'sider', title: 'SIDER', propKey: 'siderSideEffects', isNullable: true },

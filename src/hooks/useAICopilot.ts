@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
 import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock } from '@/lib/ai/contextBuilder'
-import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
+import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
@@ -112,14 +112,22 @@ export function useAICopilot(
       const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
       switch (mode) {
         case 'auto_insight':
-        case 'executive_brief':
-        case 'gap_analysis':
-        case 'safety_deep_dive':
-        case 'mechanism_analysis':
-        case 'therapeutic_hypothesis':
-        case 'competitive_position':
-        case 'repurposing_scan':
           prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
+          break
+        case 'executive_brief':
+          prompts = buildDiseaseSearchBriefPrompt(diseaseBlock)
+          break
+        case 'gap_analysis':
+          prompts = buildDiseaseSearchGapPrompt(diseaseBlock)
+          break
+        case 'mechanism_analysis':
+          prompts = buildDiseaseSearchMechanismPrompt(diseaseBlock)
+          break
+        case 'therapeutic_hypothesis':
+          prompts = buildDiseaseSearchHypothesisPrompt(diseaseBlock)
+          break
+        case 'repurposing_scan':
+          prompts = buildDiseaseSearchRepurposingPrompt(diseaseBlock)
           break
         default:
           prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
@@ -306,6 +314,7 @@ export function useAICopilot(
     snapshot,
     context,
     contextBlock,
+    isDiseaseContext,
     messages,
     isStreaming,
     activeTab,

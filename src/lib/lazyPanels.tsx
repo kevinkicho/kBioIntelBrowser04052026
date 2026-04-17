@@ -577,3 +577,8 @@ export const LazyNindsNeurommsigPanel = dynamic(
   () => import('@/components/profile/NindsNeurommsigPanel').then(m => ({ default: m.NindsNeurommsigPanel })),
   { loading: LoadingComponent }
 )
+
+export const LazyTherapeuticLandscapePanel = dynamic(
+  () => import('@/components/profile/TherapeuticLandscapePanel').then(m => ({ default: m.TherapeuticLandscapePanel })),
+  { loading: LoadingComponent }
+)

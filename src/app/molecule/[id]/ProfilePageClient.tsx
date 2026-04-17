@@ -357,6 +357,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'kegg': (panelId, lastFetched) => <LazyPanels.LazyKEGGPanel data={d('keggData')} panelId={panelId} lastFetched={lastFetched} />,
       // Missing panel renderers
       'drug-shortages': (panelId, lastFetched) => <LazyPanels.LazyDrugShortagesPanel shortages={d('drugShortages')} panelId={panelId} lastFetched={lastFetched} />,
+      'therapeutic-landscape': (panelId, lastFetched) => <LazyPanels.LazyTherapeuticLandscapePanel chemblIndications={d('chemblIndications')} openTargetsDiseases={d('diseaseAssociations')} disgenetAssociations={d('disgenetAssociations')} orphanetDiseases={d('orphanetDiseases')} ctdDiseaseAssociations={d('ctdDiseaseAssociations')} panelId={panelId} lastFetched={lastFetched} />,
       'gsrs': (panelId, lastFetched) => <LazyPanels.LazyGSRSPanel substances={d('gsrsSubstances')} panelId={panelId} lastFetched={lastFetched} />,
       'lipidmaps': (panelId, lastFetched) => <LazyPanels.LazyLipidMapsPanel lipids={d('lipidMapsLipids')} panelId={panelId} lastFetched={lastFetched} />,
       'unichem': (panelId, lastFetched) => <LazyPanels.LazyUniChemPanel mappings={d('unichemMappings')} panelId={panelId} lastFetched={lastFetched} />,

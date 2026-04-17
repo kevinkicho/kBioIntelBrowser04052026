@@ -1,5 +1,6 @@
 import { searchDiseases, getDiseaseGeneAssociations, deduplicateMolecules } from '@/lib/diseaseSearch'
 import { searchClinicalTrialsByCondition, sortTrials, extractDrugInterventions } from '@/lib/api/clinicaltrials'
+import { DiseaseIntelligencePanel } from '@/components/disease/DiseaseIntelligencePanel'
 import Link from 'next/link'
 
 interface DiseasePageProps {
@@ -36,6 +37,26 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
 
   const trials = sortTrials(await searchClinicalTrialsByCondition(diseaseName))
   const drugInterventions = extractDrugInterventions(trials)
+
+  const trialSummary = {
+    total: trials.length,
+    recruiting: trials.filter(t => t.status === 'RECRUITING').length,
+    phases: trials.reduce<Record<string, number>>((acc, t) => {
+      const p = t.phase || 'N/A'
+      acc[p] = (acc[p] || 0) + 1
+      return acc
+    }, {}),
+  }
+
+  const intelligenceContext = {
+    diseaseName,
+    description,
+    therapeuticAreas,
+    genes,
+    drugInterventions,
+    molecules: dedupedMolecules,
+    trialSummary,
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8">
@@ -256,6 +277,8 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
             </div>
           </section>
         )}
+
+        <DiseaseIntelligencePanel context={intelligenceContext} />
 
         {genes.length === 0 && dedupedMolecules.length === 0 && trials.length === 0 && (
           <p className="text-sm text-slate-500 text-center py-8">No gene, molecule, or clinical trial data available for this disease.</p>
