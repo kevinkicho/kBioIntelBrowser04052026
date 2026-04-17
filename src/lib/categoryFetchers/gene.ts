@@ -11,6 +11,23 @@ import { getGeneExpressionBySymbols } from '@/lib/api/expression-atlas'
 import { getReactomePathwaysByName } from '@/lib/api/reactome'
 import { getWikiPathwaysByName } from '@/lib/api/wikipathways'
 import { searchGOTerms } from '@/lib/api/gene-ontology'
+import type { SectionStatus, DataLoadStatus } from '@/lib/dataStatus'
+
+type TrackedResult<T> = { data: T; status: SectionStatus }
+
+async function trackedStatus<T>(
+  source: string,
+  promise: Promise<T>,
+  fallback: T,
+  isEmpty: (v: T) => boolean = (v) => Array.isArray(v) ? v.length === 0 : v == null,
+): Promise<TrackedResult<T>> {
+  try {
+    const result = await trackedSafe(source, promise, fallback)
+    return { data: result, status: { status: isEmpty(result) ? 'empty' : 'loaded' as DataLoadStatus } }
+  } catch (err) {
+    return { data: fallback, status: { status: 'error' as DataLoadStatus, error: err instanceof Error ? err.message : 'Request failed' } }
+  }
+}
 
 export interface TargetedDrug {
   drugName: string
@@ -117,45 +134,54 @@ export async function fetchGene(
 
   const ensemblGenes = await trackedSafe('ensembl', getEnsemblGenesBySymbols([symbol]), [])
 
-  const [disgenetAssociations, clinvarVariants, dbsnpVariants, geneDrugs] = await Promise.all([
-    trackedSafe('disgenet', getDiseasesByGene(symbol), []),
-    trackedSafe('clinvar', getClinVarByGene(symbol), []),
-    trackedSafe('dbsnp', getDbSNPVariants(symbol), []),
-    trackedSafe('dgidb', getTargetedDrugs(symbol), []),
+  const [disgenetResult, clinvarResult, dbsnpResult, drugsResult] = await Promise.all([
+    trackedStatus('disgenet', getDiseasesByGene(symbol), []),
+    trackedStatus('clinvar', getClinVarByGene(symbol), []),
+    trackedStatus('dbsnp', getDbSNPVariants(symbol), []),
+    trackedStatus('dgidb', getTargetedDrugs(symbol), []),
   ])
 
-  const [gtexExpressions, bgeeData, expressionAtlas, goTerms] = await Promise.all([
-    trackedSafe('gtex', getGTExTopTissues(symbol, 10), []),
-    trackedSafe('bgee', getBgeeData(symbol), { expressions: [] }),
-    trackedSafe('expression-atlas', getGeneExpressionBySymbols([symbol]), []),
-    trackedSafe('gene-ontology', searchGOTerms(symbol).then(r => r.terms).catch(() => []), []),
+  const [gtexResult, bgeeResult, atlasResult, goResult] = await Promise.all([
+    trackedStatus('gtex', getGTExTopTissues(symbol, 10), []),
+    trackedStatus('bgee', getBgeeData(symbol), { expressions: [] }),
+    trackedStatus('expression-atlas', getGeneExpressionBySymbols([symbol]), []),
+    trackedStatus('gene-ontology', searchGOTerms(symbol).then(r => r.terms).catch(() => []), []),
   ])
 
-  const [reactomePathways, wikiPathways] = await Promise.all([
-    trackedSafe('reactome', getReactomePathwaysByName(symbol), []),
-    trackedSafe('wikipathways', getWikiPathwaysByName(symbol), []),
+  const [reactomeResult, wikiResult] = await Promise.all([
+    trackedStatus('reactome', getReactomePathwaysByName(symbol), []),
+    trackedStatus('wikipathways', getWikiPathwaysByName(symbol), []),
   ])
+
+  const sectionStatus: Record<string, SectionStatus> = {
+    drugs: drugsResult.status,
+    diseases: disgenetResult.status,
+    variants: { status: clinvarResult.status.status === 'error' || dbsnpResult.status.status === 'error' ? 'error' : clinvarResult.status.status === 'loaded' || dbsnpResult.status.status === 'loaded' ? 'loaded' : 'empty' as DataLoadStatus, error: clinvarResult.status.error || dbsnpResult.status.error },
+    expression: { status: gtexResult.status.status === 'error' && bgeeResult.status.status === 'error' && atlasResult.status.status === 'error' ? 'error' as DataLoadStatus : (gtexResult.status.status === 'loaded' || bgeeResult.status.status === 'loaded' || atlasResult.status.status === 'loaded') ? 'loaded' as DataLoadStatus : 'empty' as DataLoadStatus, error: gtexResult.status.error || bgeeResult.status.error || atlasResult.status.error },
+    pathways: { status: reactomeResult.status.status === 'error' && wikiResult.status.status === 'error' ? 'error' as DataLoadStatus : (reactomeResult.status.status === 'loaded' || wikiResult.status.status === 'loaded') ? 'loaded' as DataLoadStatus : 'empty' as DataLoadStatus, error: reactomeResult.status.error || wikiResult.status.error },
+  }
 
   return {
     geneOverview: overview,
-    geneDrugs,
+    geneDrugs: drugsResult.data,
     geneDiseases: {
-      disgenetAssociations: disgenetAssociations as Array<{ geneSymbol: string; diseaseName: string; score: number; diseaseId: string; source: string }>,
+      disgenetAssociations: disgenetResult.data as Array<{ geneSymbol: string; diseaseName: string; score: number; diseaseId: string; source: string }>,
       ensemblGenes,
     },
     geneVariants: {
-      clinvarVariants,
-      dbsnpVariants,
+      clinvarVariants: clinvarResult.data,
+      dbsnpVariants: dbsnpResult.data,
     },
     geneExpressionData: {
-      gtexExpressions,
-      bgeeExpressions: (bgeeData as { expressions?: unknown[] }).expressions ?? [],
-      expressionAtlasData: expressionAtlas as unknown[],
+      gtexExpressions: gtexResult.data,
+      bgeeExpressions: (bgeeResult.data as { expressions?: unknown[] }).expressions ?? [],
+      expressionAtlasData: atlasResult.data as unknown[],
     },
     genePathways: {
-      reactomePathways,
-      wikiPathways,
-      goTerms: Array.isArray(goTerms) ? goTerms : [],
+      reactomePathways: reactomeResult.data,
+      wikiPathways: wikiResult.data,
+      goTerms: Array.isArray(goResult.data) ? goResult.data : [],
     },
+    _sectionStatus: sectionStatus,
   }
 }

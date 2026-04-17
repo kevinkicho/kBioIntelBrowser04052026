@@ -6,6 +6,8 @@ import Link from 'next/link'
 import { GeneOverview as GeneOverviewType } from '@/lib/categoryFetchers/gene'
 import { AICopilot } from '@/components/ai/AICopilot'
 import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
+import { EmptySection, ErrorSection } from '@/components/ui/DataStatus'
+import type { SectionStatus } from '@/lib/dataStatus'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -70,9 +72,10 @@ function GeneOverview({ overview }: { overview: GeneOverviewType | null }) {
   )
 }
 
-function GeneDiseasesPanel({ data }: { data: Record<string, unknown> | null }) {
+function GeneDiseasesPanel({ data, status }: { data: Record<string, unknown> | null; status?: SectionStatus }) {
   const diseases = (data?.geneDiseases as Record<string, unknown>)?.disgenetAssociations as Array<{ diseaseName: string; score: number; diseaseId: string; source: string; geneSymbol?: string }> | undefined
-  if (!diseases || diseases.length === 0) return <div className="text-slate-500 text-sm py-4">No disease associations found.</div>
+  if (status?.status === 'error') return <ErrorSection label="disease associations" error={status.error} />
+  if (!diseases || diseases.length === 0) return <EmptySection label="disease associations" hint="DisGeNET may not have associations for this gene" />
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-3">Associated Diseases ({diseases.length})</h3>
@@ -313,6 +316,7 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
   }, [activePanel, router])
 
   const overview = categoryData?.geneOverview as GeneOverviewType | null ?? null
+  const sectionStatus = (categoryData?._sectionStatus ?? {}) as Record<string, SectionStatus>
 
   const displaySymbol = overview?.symbol || symbol
   const displayName = overview?.name || name
