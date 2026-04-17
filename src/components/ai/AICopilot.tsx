@@ -126,6 +126,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
                 aiAvailable={copilot.aiAvailable}
                 hasComparisons={compareCount > 1}
                 isDiseaseContext={!!copilot.isDiseaseContext}
+                isGeneContext={!!copilot.isGeneContext}
               />
             )}
 
@@ -136,6 +137,9 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
                 aiAvailable={copilot.aiAvailable}
                 onAsk={(q) => { copilot.askQuestion(q); setInputValue('') }}
                 previousMolecules={sessionHistory.getRecentMolecules(5).filter(m => m.name !== identity.name).map(m => m.name)}
+                isDiseaseContext={!!copilot.isDiseaseContext}
+                isGeneContext={!!copilot.isGeneContext}
+                geneSymbol={identity.geneSymbol}
               />
             )}
 
@@ -163,7 +167,13 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity }: P
                     copilot.setActiveTab('ask')
                   }
                 }}
-                placeholder={copilot.aiAvailable ? "Ask about this molecule..." : "Connect Ollama in Settings first"}
+                placeholder={copilot.aiAvailable
+                  ? copilot.isDiseaseContext
+                    ? 'Ask about these diseases...'
+                    : copilot.isGeneContext
+                      ? `Ask about gene ${identity.geneSymbol}...`
+                      : 'Ask about this molecule...'
+                  : 'Connect Ollama in Settings first'}
                 className="flex-1 text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
                 disabled={!copilot.aiAvailable || copilot.isStreaming}
               />
@@ -284,31 +294,51 @@ function InsightsTab({
   aiAvailable,
   hasComparisons,
   isDiseaseContext,
+  isGeneContext,
 }: {
   messages: CopilotMessage[]
   isStreaming: boolean
-  onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare') => void
+  onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare' | 'gene_therapeutic' | 'gene_repurposing' | 'gene_mechanism' | 'gene_target_assessment') => void
   aiAvailable: boolean
   hasComparisons: boolean
   isDiseaseContext: boolean
+  isGeneContext: boolean
 }) {
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
-        <InsightButton label="Executive Brief" onClick={() => onGenerate('executive_brief')} disabled={isStreaming || !aiAvailable} icon="brief" />
-        {!isDiseaseContext && (
-          <InsightButton label="Safety Deep Dive" onClick={() => onGenerate('safety_deep_dive')} disabled={isStreaming || !aiAvailable} icon="safety" />
-        )}
-        <InsightButton label="Mechanism Analysis" onClick={() => onGenerate('mechanism_analysis')} disabled={isStreaming || !aiAvailable} icon="mechanism" />
-        <InsightButton label="Repurposing Scan" onClick={() => onGenerate('repurposing_scan')} disabled={isStreaming || !aiAvailable} icon="repurpose" />
-        <InsightButton label="Therapeutic Hypotheses" onClick={() => onGenerate('therapeutic_hypothesis')} disabled={isStreaming || !aiAvailable} icon="hypothesis" />
-        {!isDiseaseContext && (
-          <InsightButton label="Competitive Position" onClick={() => onGenerate('competitive_position')} disabled={isStreaming || !aiAvailable} icon="competitive" />
-        )}
-        <InsightButton label="Gap Analysis" onClick={() => onGenerate('gap_analysis')} disabled={isStreaming || !aiAvailable} icon="gap" />
-        <InsightButton label="Auto Insights" onClick={() => onGenerate('auto_insight')} disabled={isStreaming || !aiAvailable} icon="auto" />
-        {!isDiseaseContext && hasComparisons && (
-          <InsightButton label="Compare Molecules" onClick={() => onGenerate('cross_molecule_compare')} disabled={isStreaming || !aiAvailable} icon="compare" />
+        {isGeneContext ? (
+          <>
+            <InsightButton label="Therapeutic Opportunity" onClick={() => onGenerate('gene_therapeutic')} disabled={isStreaming || !aiAvailable} icon="hypothesis" />
+            <InsightButton label="Drug Repurposing" onClick={() => onGenerate('gene_repurposing')} disabled={isStreaming || !aiAvailable} icon="repurpose" />
+            <InsightButton label="Mechanism Deep Dive" onClick={() => onGenerate('gene_mechanism')} disabled={isStreaming || !aiAvailable} icon="mechanism" />
+            <InsightButton label="Target Assessment" onClick={() => onGenerate('gene_target_assessment')} disabled={isStreaming || !aiAvailable} icon="safety" />
+            <InsightButton label="Gap Analysis" onClick={() => onGenerate('gap_analysis')} disabled={isStreaming || !aiAvailable} icon="gap" />
+            <InsightButton label="Auto Insights" onClick={() => onGenerate('auto_insight')} disabled={isStreaming || !aiAvailable} icon="auto" />
+          </>
+        ) : isDiseaseContext ? (
+          <>
+            <InsightButton label="Executive Brief" onClick={() => onGenerate('executive_brief')} disabled={isStreaming || !aiAvailable} icon="brief" />
+            <InsightButton label="Mechanism Analysis" onClick={() => onGenerate('mechanism_analysis')} disabled={isStreaming || !aiAvailable} icon="mechanism" />
+            <InsightButton label="Repurposing Scan" onClick={() => onGenerate('repurposing_scan')} disabled={isStreaming || !aiAvailable} icon="repurpose" />
+            <InsightButton label="Therapeutic Hypotheses" onClick={() => onGenerate('therapeutic_hypothesis')} disabled={isStreaming || !aiAvailable} icon="hypothesis" />
+            <InsightButton label="Gap Analysis" onClick={() => onGenerate('gap_analysis')} disabled={isStreaming || !aiAvailable} icon="gap" />
+            <InsightButton label="Auto Insights" onClick={() => onGenerate('auto_insight')} disabled={isStreaming || !aiAvailable} icon="auto" />
+          </>
+        ) : (
+          <>
+            <InsightButton label="Executive Brief" onClick={() => onGenerate('executive_brief')} disabled={isStreaming || !aiAvailable} icon="brief" />
+            <InsightButton label="Safety Deep Dive" onClick={() => onGenerate('safety_deep_dive')} disabled={isStreaming || !aiAvailable} icon="safety" />
+            <InsightButton label="Mechanism Analysis" onClick={() => onGenerate('mechanism_analysis')} disabled={isStreaming || !aiAvailable} icon="mechanism" />
+            <InsightButton label="Repurposing Scan" onClick={() => onGenerate('repurposing_scan')} disabled={isStreaming || !aiAvailable} icon="repurpose" />
+            <InsightButton label="Therapeutic Hypotheses" onClick={() => onGenerate('therapeutic_hypothesis')} disabled={isStreaming || !aiAvailable} icon="hypothesis" />
+            <InsightButton label="Competitive Position" onClick={() => onGenerate('competitive_position')} disabled={isStreaming || !aiAvailable} icon="competitive" />
+            <InsightButton label="Gap Analysis" onClick={() => onGenerate('gap_analysis')} disabled={isStreaming || !aiAvailable} icon="gap" />
+            <InsightButton label="Auto Insights" onClick={() => onGenerate('auto_insight')} disabled={isStreaming || !aiAvailable} icon="auto" />
+            {hasComparisons && (
+              <InsightButton label="Compare Molecules" onClick={() => onGenerate('cross_molecule_compare')} disabled={isStreaming || !aiAvailable} icon="compare" />
+            )}
+          </>
         )}
       </div>
 
@@ -337,22 +367,44 @@ function AskTab({
   aiAvailable,
   onAsk,
   previousMolecules,
+  isDiseaseContext,
+  isGeneContext,
+  geneSymbol,
 }: {
   messages: CopilotMessage[]
   isStreaming: boolean
   aiAvailable: boolean
   onAsk: (question: string) => void
   previousMolecules: string[]
+  isDiseaseContext: boolean
+  isGeneContext: boolean
+  geneSymbol?: string
 }) {
-  const suggestions = [
-    'What is the primary mechanism of action?',
-    'Could this drug be repurposed for other diseases?',
-    'Which adverse events are mechanism-related vs off-target?',
-    'What genes and pathways connect this drug to its indications?',
-    'What experiments should a researcher run next?',
-  ]
+  const suggestions = isGeneContext
+    ? [
+        'What is this gene\'s primary therapeutic opportunity?',
+        'Which drugs targeting this gene could be repurposed?',
+        'What are the key safety concerns for targeting this gene?',
+        'What pathways does this gene participate in?',
+        'What experiments should a researcher run next?',
+      ]
+    : isDiseaseContext
+      ? [
+          'What molecules are most promising for this condition?',
+          'What are the key mechanisms across these diseases?',
+          'What repurposing opportunities exist?',
+          'What are the main therapeutic gaps?',
+          'Which gene targets are most druggable?',
+        ]
+      : [
+          'What is the primary mechanism of action?',
+          'Could this drug be repurposed for other diseases?',
+          'Which adverse events are mechanism-related vs off-target?',
+          'What genes and pathways connect this drug to its indications?',
+          'What experiments should a researcher run next?',
+        ]
 
-  if (previousMolecules.length > 0) {
+  if (!isGeneContext && !isDiseaseContext && previousMolecules.length > 0) {
     suggestions.push(`How does this compare to ${previousMolecules[0]}?`)
   }
 
@@ -360,7 +412,9 @@ function AskTab({
     <div className="space-y-3">
       {messages.length === 0 && (
         <div className="text-center py-8">
-          <p className="text-[10px] text-slate-500">Ask anything about this molecule</p>
+          <p className="text-[10px] text-slate-500">
+            {isGeneContext ? `Ask anything about gene ${geneSymbol}` : isDiseaseContext ? 'Ask anything about these diseases' : 'Ask anything about this molecule'}
+          </p>
           <div className="mt-3 space-y-1.5">
             {suggestions.map((s) => (
               <button

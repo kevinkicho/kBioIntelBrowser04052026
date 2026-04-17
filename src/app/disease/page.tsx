@@ -9,13 +9,6 @@ import type { CategoryLoadState } from '@/lib/fetchCategory'
 import { deduplicateMolecules } from '@/lib/diseaseSearch'
 import Link from 'next/link'
 
-function hashString(str: string): number {
-  let hash = 0
-  for (let i = 0; i < str.length; i++) {
-    hash = ((hash << 5) - hash + str.charCodeAt(i)) | 0
-  }
-  return Math.abs(hash)
-}
 
 interface DiseaseResult {
   id: string
@@ -105,7 +98,7 @@ export default function DiseasePage() {
 
   const identity = useMemo(() => ({
     name: q || 'Disease Search',
-    cid: q ? hashString(q) : 0,
+    cid: 0,
   }), [q])
 
   const allMolecules = useMemo(() => deduplicateMolecules(results), [results])

@@ -38,6 +38,8 @@ export function useAICopilot(
   const abortRef = useRef<AbortController | null>(null)
   const prevLoadedCountRef = useRef(0)
   const prevCidRef = useRef(identity.cid)
+  const prevGeneRef = useRef(identity.geneSymbol)
+  const prevNameRef = useRef(identity.name)
   const messageIdRef = useRef(0)
   const isStreamingRef = useRef(false)
   const messagesRef = useRef<CopilotMessage[]>([])
@@ -106,7 +108,14 @@ export function useAICopilot(
 
   const generateInsight = useCallback(async (mode: PromptMode) => {
     if (!aiAvailable) {
-      addMessage('system', 'AI is not available. Connect Ollama to enable AI insights.', mode)
+      const recent = messagesRef.current.slice(-3)
+      if (!recent.some(m => m.content.includes('AI is not available'))) {
+        addMessage('system', 'AI is not available. Connect Ollama to enable AI insights.', mode)
+      }
+      return
+    }
+    if (!isDiseaseContext && !isGeneContext && context.identity.cid === 0) {
+      addMessage('system', 'No entity loaded. Search for a molecule, disease, or gene first.', mode)
       return
     }
     if (isStreamingRef.current) return
@@ -245,6 +254,11 @@ export function useAICopilot(
       addMessage('system', 'AI is not available. Connect Ollama to enable Q&A.', 'free_qa')
       return
     }
+    if (!isDiseaseContext && !isGeneContext && context.identity.cid === 0) {
+      addMessage('user', question, 'free_qa')
+      addMessage('system', 'No entity loaded. Search for a molecule, disease, or gene first.', 'free_qa')
+      return
+    }
     if (isStreamingRef.current) return
     isStreamingRef.current = true
     setIsStreaming(true)
@@ -317,20 +331,31 @@ export function useAICopilot(
   }, [])
 
   useEffect(() => {
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [])
+
+  useEffect(() => {
     generateInsightRef.current = generateInsight
   }, [generateInsight])
 
   useEffect(() => {
-    if (identity.cid !== prevCidRef.current) {
+    const entityKey = `${identity.cid}-${identity.geneSymbol ?? ''}-${identity.name}`
+    const prevKey = `${prevCidRef.current}-${prevGeneRef.current ?? ''}-${prevNameRef.current}`
+    if (entityKey !== prevKey) {
       prevCidRef.current = identity.cid
+      prevGeneRef.current = identity.geneSymbol
+      prevNameRef.current = identity.name
       abortRef.current?.abort()
       isStreamingRef.current = false
       setIsStreaming(false)
       setMessages([])
       setAutoInsightGenerated(false)
+      setActiveTab('monitor')
       prevLoadedCountRef.current = 0
     }
-  }, [identity.cid])
+  }, [identity.cid, identity.geneSymbol, identity.name])
 
   useEffect(() => {
     const loadedCount = Object.values(categoryStatus).filter(s => s === 'loaded').length
