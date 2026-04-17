@@ -8,8 +8,16 @@ import { FavoritesBar } from '@/components/home/FavoritesBar'
 import { AIBanner } from '@/components/ai/AIBanner'
 import { AIStatusIndicator } from '@/components/ai/AIStatusIndicator'
 
-const EXAMPLE_SEARCHES = [
-  'insulin', 'aspirin', 'metformin', 'caffeine', 'penicillin', 'amylase', 'doxorubicin', 'glucose'
+const EXAMPLE_SEARCHES: Record<string, string[]> = {
+  name: ['insulin', 'aspirin', 'metformin', 'caffeine', 'penicillin', 'amylase', 'doxorubicin', 'glucose'],
+  disease: ['diabetes', 'hypertension', 'melanoma', 'Alzheimer', 'asthma', 'rheumatoid arthritis'],
+  gene: ['BRCA1', 'TP53', 'EGFR', 'IL6', 'ACE2', 'APOE', 'CFTR', 'MYC'],
+}
+
+const ENTITY_MODES: { value: SearchType; label: string; icon: string }[] = [
+  { value: 'name', label: 'Molecule', icon: '🧬' },
+  { value: 'disease', label: 'Disease', icon: '🦠' },
+  { value: 'gene', label: 'Gene', icon: '🔬' },
 ]
 
 const NAV_LINKS = [
@@ -103,13 +111,30 @@ function HomePageContent() {
           The commercial and scientific landscape of biological molecules.
         </p>
         <p className="text-slate-500">
-          Search any molecule, drug, enzyme, or gene — see who makes it, how it&apos;s synthesized, and what products it&apos;s in.
+          Search molecules, diseases, and genes — explore relationships, therapeutic data, and the scientific landscape.
         </p>
       </div>
 
       <AIBanner />
 
       <div className="flex flex-col items-center w-full max-w-2xl">
+        <div className="flex bg-slate-800/80 border border-slate-700 rounded-xl p-1 mb-3">
+          {ENTITY_MODES.map(mode => (
+            <button
+              key={mode.value}
+              onClick={() => setSearchType(mode.value)}
+              className={`flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                searchType === mode.value
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/30'
+                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/50'
+              }`}
+            >
+              <span className="text-base">{mode.icon}</span>
+              {mode.label}
+            </button>
+          ))}
+        </div>
+
         <SearchBar onNavigating={handleNavigating} searchType={searchType} apiOverrides={apiOverrides} apiParams={apiParams} />
         <AdvancedSearchPanel
           searchType={searchType}
@@ -128,10 +153,14 @@ function HomePageContent() {
       <div className="mt-8 text-center">
         <p className="text-xs text-slate-600 uppercase tracking-wider mb-3">Try searching for</p>
         <div className="flex flex-wrap justify-center gap-2">
-          {EXAMPLE_SEARCHES.map(s => (
+          {(EXAMPLE_SEARCHES[searchType] ?? EXAMPLE_SEARCHES.name).map(s => (
             <ChipLink
               key={s}
-              href={`/molecule/name/${encodeURIComponent(s)}`}
+              href={
+                searchType === 'disease' ? `/disease?q=${encodeURIComponent(s)}` :
+                searchType === 'gene' ? `/gene?q=${encodeURIComponent(s)}` :
+                `/molecule/name/${encodeURIComponent(s)}`
+              }
               label={s}
               disabled={isNavigating}
             />

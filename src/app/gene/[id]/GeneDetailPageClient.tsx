@@ -173,12 +173,12 @@ function TargetedDrugsPanel({ data }: { data: Record<string, unknown> | null }) 
           <div key={`${d.drugName}-${i}`} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
             <div className="flex items-center gap-2 min-w-0">
               {d.drugName && /^\d+$/.test(String(d.drugName)) === false && (
-                <a
+                <Link
                   href={`/molecule/name/${encodeURIComponent(String(d.drugName))}`}
                   className="text-indigo-400 hover:underline truncate"
                 >
                   {d.drugName}
-                </a>
+                </Link>
               )}
               {!d.drugName && <span className="text-slate-500">Unknown</span>}
               {d.drugName && /^\d+$/.test(String(d.drugName)) && <span className="text-slate-300">{d.drugName}</span>}
