@@ -239,8 +239,13 @@ export default function DiseasePage() {
 }
 
 function DiseaseCard({ result }: { result: DiseaseResult }) {
+  const detailHref = `/disease/${encodeURIComponent(result.id)}?source=${encodeURIComponent(result.source)}&q=${encodeURIComponent(result.name)}`
+
   return (
-    <div className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 hover:border-indigo-600 transition-colors">
+    <Link
+      href={detailHref}
+      className="block bg-slate-800/80 border border-slate-700 rounded-xl p-5 hover:border-indigo-600 transition-colors"
+    >
       <div className="flex items-start justify-between gap-3 mb-2">
         <h2 className="text-lg font-semibold text-slate-100">{result.name}</h2>
         <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300 whitespace-nowrap">{result.source}</span>
@@ -264,13 +269,15 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
           <div className="flex flex-wrap gap-2">
             {result.molecules.map(m => (
               m.cid ? (
-                <Link
+                <span
                   key={m.cid}
-                  href={`/molecule/${m.cid}`}
-                  className="text-sm px-3 py-1.5 rounded-lg bg-emerald-900/30 text-emerald-300 border border-emerald-800/50 hover:bg-emerald-900/50 transition-colors"
+                  className="text-sm px-3 py-1.5 rounded-lg bg-emerald-900/30 text-emerald-300 border border-emerald-800/50"
+                  onClick={e => e.stopPropagation()}
                 >
-                  {m.name}
-                </Link>
+                  <Link href={`/molecule/${m.cid}`} onClick={e => e.stopPropagation()}>
+                    {m.name}
+                  </Link>
+                </span>
               ) : (
                 <span key={m.name} className="text-sm px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400">
                   {m.name}
@@ -280,7 +287,6 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
           </div>
         </div>
       )}
-
-    </div>
+    </Link>
   )
 }

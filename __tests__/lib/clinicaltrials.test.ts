@@ -1,4 +1,5 @@
-import { getClinicalTrialsByName } from '@/lib/api/clinicaltrials'
+import { getClinicalTrialsByName, sortTrials, extractDrugInterventions } from '@/lib/api/clinicaltrials'
+import type { ClinicalTrial } from '@/lib/types'
 
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
@@ -63,5 +64,154 @@ describe('getClinicalTrialsByName', () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
     const results = await getClinicalTrialsByName('aspirin')
     expect(results).toEqual([])
+  })
+})
+
+describe('sortTrials', () => {
+  it('sorts by phase descending', () => {
+    const trials: ClinicalTrial[] = [
+      { nctId: '1', title: 'A', status: 'RECRUITING', phase: 'Phase 1', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '2', title: 'B', status: 'RECRUITING', phase: 'Phase 3', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '3', title: 'C', status: 'RECRUITING', phase: 'Phase 2', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+    ]
+    const result = sortTrials(trials)
+    expect(result.map(t => t.phase)).toEqual(['Phase 3', 'Phase 2', 'Phase 1'])
+  })
+
+  it('sorts by status within same phase', () => {
+    const trials: ClinicalTrial[] = [
+      { nctId: '1', title: 'A', status: 'COMPLETED', phase: 'Phase 2', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '2', title: 'B', status: 'RECRUITING', phase: 'Phase 2', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+    ]
+    const result = sortTrials(trials)
+    expect(result[0].status).toBe('RECRUITING')
+  })
+
+  it('ranks multi-phase trials between their component phases', () => {
+    const trials: ClinicalTrial[] = [
+      { nctId: '1', title: 'A', status: 'RECRUITING', phase: 'Phase 2', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '2', title: 'B', status: 'RECRUITING', phase: 'Phase 2/Phase 3', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '3', title: 'C', status: 'RECRUITING', phase: 'Phase 3', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+    ]
+    const result = sortTrials(trials)
+    expect(result.map(t => t.nctId)).toEqual(['3', '2', '1'])
+  })
+
+  it('handles N/A phase', () => {
+    const trials: ClinicalTrial[] = [
+      { nctId: '1', title: 'A', status: 'RECRUITING', phase: 'N/A', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '2', title: 'B', status: 'RECRUITING', phase: 'Phase 1', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+    ]
+    const result = sortTrials(trials)
+    expect(result[0].phase).toBe('Phase 1')
+  })
+
+  it('does not mutate original array', () => {
+    const trials: ClinicalTrial[] = [
+      { nctId: '1', title: 'A', status: '', phase: 'Phase 1', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+      { nctId: '2', title: 'B', status: '', phase: 'Phase 3', startDate: '', completionDate: '', conditions: [], interventions: [], sponsor: '' },
+    ]
+    const result = sortTrials(trials)
+    expect(result[0].nctId).toBe('2')
+    expect(trials[0].nctId).toBe('1')
+  })
+})
+
+describe('extractDrugInterventions', () => {
+  it('extracts only DRUG/BIOLOGICAL/COMBINATION_PRODUCT interventions', () => {
+    const trials: ClinicalTrial[] = [
+      {
+        nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: ['Aspirin', 'MRI'], sponsor: '',
+        interventionDetails: [
+          { name: 'Aspirin', type: 'DRUG' },
+          { name: 'MRI', type: 'DIAGNOSTIC_TEST' },
+        ],
+      },
+    ]
+    const drugs = extractDrugInterventions(trials)
+    expect(drugs).toHaveLength(1)
+    expect(drugs[0].name).toBe('Aspirin')
+  })
+
+  it('counts trials per drug', () => {
+    const trials: ClinicalTrial[] = [
+      {
+        nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Aspirin', type: 'DRUG' }],
+      },
+      {
+        nctId: '2', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Aspirin', type: 'DRUG' }, { name: 'Ibuprofen', type: 'DRUG' }],
+      },
+    ]
+    const drugs = extractDrugInterventions(trials)
+    expect(drugs).toHaveLength(2)
+    const aspirin = drugs.find(d => d.name === 'Aspirin')
+    expect(aspirin?.trialCount).toBe(2)
+  })
+
+  it('deduplicates case-insensitively', () => {
+    const trials: ClinicalTrial[] = [
+      {
+        nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Aspirin', type: 'DRUG' }],
+      },
+      {
+        nctId: '2', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'aspirin', type: 'DRUG' }],
+      },
+    ]
+    const drugs = extractDrugInterventions(trials)
+    expect(drugs).toHaveLength(1)
+    expect(drugs[0].trialCount).toBe(2)
+  })
+
+  it('sorts by trial count descending', () => {
+    const trials: ClinicalTrial[] = [
+      {
+        nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Ibuprofen', type: 'DRUG' }],
+      },
+      {
+        nctId: '2', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Aspirin', type: 'DRUG' }],
+      },
+      {
+        nctId: '3', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Aspirin', type: 'DRUG' }],
+      },
+    ]
+    const drugs = extractDrugInterventions(trials)
+    expect(drugs[0].name).toBe('Aspirin')
+    expect(drugs[0].trialCount).toBe(2)
+  })
+
+  it('returns empty for trials without interventionDetails', () => {
+    const trials: ClinicalTrial[] = [
+      { nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '', conditions: [], interventions: ['Aspirin'], sponsor: '' },
+    ]
+    const drugs = extractDrugInterventions(trials)
+    expect(drugs).toHaveLength(0)
+  })
+
+  it('handles biological intervention type', () => {
+    const trials: ClinicalTrial[] = [
+      {
+        nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '',
+        conditions: [], interventions: [], sponsor: '',
+        interventionDetails: [{ name: 'Adalimumab', type: 'BIOLOGICAL' }],
+      },
+    ]
+    const drugs = extractDrugInterventions(trials)
+    expect(drugs).toHaveLength(1)
+    expect(drugs[0].type).toBe('BIOLOGICAL')
   })
 })

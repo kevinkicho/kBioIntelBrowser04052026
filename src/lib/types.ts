@@ -286,6 +286,8 @@ export interface ClinicalTrial {
   conditions: string[]
   interventions: string[]
   sponsor: string
+  enrollment?: number
+  interventionDetails?: { name: string; type: string }[]
 }
 
 export interface AdverseEvent {

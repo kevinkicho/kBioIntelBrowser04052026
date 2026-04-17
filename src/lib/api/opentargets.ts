@@ -169,3 +169,38 @@ export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
     return []
   }
 }
+
+export async function getTargetsForDisease(diseaseId: string): Promise<{ id: string; name: string; overallScore: number }[]> {
+  try {
+    const query = `
+      query {
+        disease(efoId: "${escapeGraphQLString(diseaseId)}") {
+          linkedTargets {
+            rows {
+              id
+              target { id name }
+              score
+            }
+          }
+        }
+      }
+    `
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+      ...fetchOptions,
+    })
+    if (!res.ok) return []
+    const data = await res.json()
+    if (data.errors) return []
+    const rows: { id: string; target: { id: string; name: string }; score: number }[] = data.data?.disease?.linkedTargets?.rows ?? []
+    return rows.map(r => ({
+      id: r.target?.id ?? r.id ?? '',
+      name: r.target?.name ?? '',
+      overallScore: r.score ?? 0,
+    })).filter(t => t.name).slice(0, 30)
+  } catch {
+    return []
+  }
+}

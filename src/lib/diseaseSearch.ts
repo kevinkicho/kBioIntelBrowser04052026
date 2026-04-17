@@ -1,4 +1,4 @@
-import { searchDiseases as searchOpenTargetsDiseases, getDrugsForDisease } from '@/lib/api/opentargets'
+import { searchDiseases as searchOpenTargetsDiseases, getDrugsForDisease, getTargetsForDisease } from '@/lib/api/opentargets'
 import { searchOrphanetDiseases, getOrphanetGenes } from '@/lib/api/orphanet'
 import { getGenesByDisease } from '@/lib/api/disgenet'
 import { getMoleculeCidByName } from '@/lib/api/pubchem'
@@ -10,6 +10,14 @@ export interface DiseaseResult {
   therapeuticAreas?: string[]
   source: string
   molecules?: { name: string; cid: number | null }[]
+}
+
+export interface GeneAssociation {
+  geneSymbol: string
+  geneId: string
+  source: string
+  score: number
+  entrezId?: string
 }
 
 export function rankDiseaseResults(results: DiseaseResult[], query: string): DiseaseResult[] {
@@ -208,4 +216,75 @@ export function deduplicateMolecules(results: DiseaseResult[]): { name: string; 
     }
   }
   return Array.from(seen.values())
+}
+
+export function deduplicateGenes(genes: GeneAssociation[]): GeneAssociation[] {
+  const seen = new Map<string, GeneAssociation>()
+  for (const g of genes) {
+    const key = g.geneSymbol.toUpperCase()
+    const existing = seen.get(key)
+    if (existing) {
+      if (g.score > existing.score) {
+        existing.score = g.score
+      }
+      if (!existing.geneId && g.geneId) {
+        existing.geneId = g.geneId
+      }
+      if (!existing.entrezId && g.entrezId) {
+        existing.entrezId = g.entrezId
+      }
+      if (!existing.source.includes(g.source)) {
+        existing.source = `${existing.source}, ${g.source}`
+      }
+    } else {
+      seen.set(key, { ...g })
+    }
+  }
+  return Array.from(seen.values()).sort((a, b) => b.score - a.score)
+}
+
+export async function getDiseaseGeneAssociations(id: string, source: string, name: string): Promise<GeneAssociation[]> {
+  const genes: GeneAssociation[] = []
+
+  try {
+    if (source === 'Open Targets' && id) {
+      const targets = await getTargetsForDisease(id)
+      for (const t of targets) {
+        const symbol = t.name.split(' ')[0]
+        genes.push({
+          geneSymbol: symbol,
+          geneId: t.id,
+          source: 'Open Targets',
+          score: t.overallScore,
+        })
+      }
+    }
+
+    if (source === 'Orphanet' && id) {
+      const symbols = await getOrphanetGenes(id)
+      for (const symbol of symbols) {
+        genes.push({
+          geneSymbol: symbol,
+          geneId: '',
+          source: 'Orphanet',
+          score: 0,
+        })
+      }
+    }
+
+    if (source === 'DisGeNET' && name) {
+      const associations = await getGenesByDisease(name)
+      for (const a of associations) {
+        genes.push({
+          geneSymbol: a.geneSymbol,
+          geneId: a.geneId,
+          source: 'DisGeNET',
+          score: a.score,
+          entrezId: a.geneId,
+        })
+      }
+    }
+  } catch {}
+
+  return deduplicateGenes(genes)
 }
