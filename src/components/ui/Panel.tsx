@@ -10,9 +10,10 @@ interface PanelProps {
   lastFetched?: Date
   children: React.ReactNode
   className?: string
+  titleExtra?: React.ReactNode
 }
 
-export function Panel({ title, panelId, lastFetched, children, className = '' }: PanelProps) {
+export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra }: PanelProps) {
   const [showSource, setShowSource] = useState(false)
   const freshness = panelId && lastFetched ? getFreshnessStatus(panelId, lastFetched) : null
   const sourceInfo = panelId ? getPanelSource(panelId) : null
@@ -20,7 +21,10 @@ export function Panel({ title, panelId, lastFetched, children, className = '' }:
   return (
     <div className={`bg-slate-800/50 border border-slate-700 rounded-xl p-5 ${className}`}>
       <div className="flex justify-between items-start mb-4">
-        <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+        <div className="flex items-baseline gap-2">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+          {titleExtra}
+        </div>
         {freshness && (
           <span className={`text-xs ${freshness.colorClass}`}>
             {freshness.statusText}

@@ -2,11 +2,18 @@
 
 import { useState } from 'react'
 import { useAI } from '@/lib/ai/useAI'
+import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
 
 export function AIBanner() {
   const ai = useAI()
-  const [urlInput, setUrlInput] = useState(ai.ollamaUrl || 'localhost:11434')
+  const [hostInput, setHostInput] = useState(() => {
+    try { return new URL(ai.ollamaUrl || 'http://localhost:11434').hostname } catch { return 'localhost' }
+  })
+  const [portInput, setPortInput] = useState(() => {
+    try { return String(new URL(ai.ollamaUrl || 'http://localhost:11434').port || OLLAMA_DEFAULT_PORT) } catch { return String(OLLAMA_DEFAULT_PORT) }
+  })
   const [connecting, setConnecting] = useState(false)
+  const [validationHint, setValidationHint] = useState<string | null>(null)
 
   if (!ai.mounted) return null
 
@@ -20,7 +27,7 @@ export function AIBanner() {
             <svg className="w-5 h-5 text-indigo-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
             </svg>
-            <p className="text-xs text-indigo-300">Connecting to {ai.ollamaUrl}...</p>
+            <p className="text-xs text-indigo-300">Connecting to {hostInput}:{portInput}...</p>
           </div>
         </div>
       </div>
@@ -53,8 +60,21 @@ export function AIBanner() {
   }
 
   const handleConnect = async () => {
+    const portNum = parseInt(portInput, 10)
+    const port = isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
+    const fullUrl = `${hostInput.trim() || 'localhost'}:${port}`
+    const validation = validateOllamaUrl(fullUrl)
+    if (!validation.valid) {
+      setValidationHint(validation.error || 'Invalid URL')
+      return
+    }
+    if (validation.warning === 'lan-warning') {
+      setValidationHint('Connecting to a non-localhost address. Ensure this server is trusted and on your network.')
+    } else {
+      setValidationHint(null)
+    }
     setConnecting(true)
-    await ai.connect(urlInput)
+    await ai.connect(validation.normalized || fullUrl)
     setConnecting(false)
   }
 
@@ -68,32 +88,50 @@ export function AIBanner() {
             </svg>
           </div>
           <div className="flex-1 min-w-0">
-            <h3 className="text-sm font-semibold text-slate-300">AI Mode — Not Connected</h3>
+            <h3 className="text-sm font-semibold text-slate-300">AI Copilot — Connect Ollama</h3>
             <p className="text-xs text-slate-500 mt-1">
-              Enter your Ollama server address to enable local AI. 100% local, no data leaves your machine.
+              All AI processing stays local. Install from <span className="text-cyan-400">ollama.com</span>, then run <code className="text-slate-400 bg-slate-800 px-1 rounded">ollama serve</code>.
             </p>
 
             <div className="mt-3 flex gap-2">
               <div className="flex-1">
+                <label className="text-[10px] text-slate-500 block mb-1">Host</label>
                 <input
                   type="text"
-                  value={urlInput}
-                  onChange={(e) => setUrlInput(e.target.value)}
-                  onKeyDown={(e) => { if (e.key === 'Enter' && urlInput.trim()) handleConnect() }}
-                  placeholder="localhost:11434"
+                  value={hostInput}
+                  onChange={(e) => { setHostInput(e.target.value); setValidationHint(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleConnect() }}
+                  placeholder="localhost"
                   className="w-full text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none font-mono"
                 />
               </div>
-              <button
-                onClick={handleConnect}
-                disabled={connecting || !urlInput.trim()}
-                className="px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
-              >
-                {connecting ? 'Connecting...' : 'Connect'}
-              </button>
+              <div className="w-24">
+                <label className="text-[10px] text-slate-500 block mb-1">Port</label>
+                <input
+                  type="text"
+                  value={portInput}
+                  onChange={(e) => { setPortInput(e.target.value); setValidationHint(null) }}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleConnect() }}
+                  placeholder={String(OLLAMA_DEFAULT_PORT)}
+                  className="w-full text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none font-mono"
+                />
+              </div>
+              <div className="flex items-end">
+                <button
+                  onClick={handleConnect}
+                  disabled={connecting || !hostInput.trim()}
+                  className="px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors whitespace-nowrap"
+                >
+                  {connecting ? 'Connecting...' : 'Connect'}
+                </button>
+              </div>
             </div>
 
-            {ai.error && (
+            {validationHint && (
+              <p className={`text-[10px] mt-2 ${validationHint.includes('non-localhost') ? 'text-amber-400' : 'text-red-400'}`}>{validationHint}</p>
+            )}
+
+            {ai.error && !validationHint && (
               <p className="text-[10px] text-red-400 mt-2">{ai.error}</p>
             )}
 

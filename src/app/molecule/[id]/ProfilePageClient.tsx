@@ -27,6 +27,9 @@ import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetect
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
 import { AICopilot } from '@/components/ai/AICopilot'
+import { NextStepsPanel, DiscoverBreadcrumb } from '@/components/profile/NextStepsPanel'
+import { PipelinePanel } from '@/components/profile/PipelinePanel'
+import { VendorsPanel } from '@/components/profile/VendorsPanel'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 
@@ -44,6 +47,39 @@ type CategoriesData = Partial<Record<CategoryId, Record<string, unknown>>>
 type CategoriesStatus = Record<CategoryId, CategoryLoadState>
 
 const ALL_CATEGORY_IDS: CategoryId[] = CATEGORIES.map(c => c.id)
+
+const DISCOVER_PRIORITY_CATEGORIES: CategoryId[] = ['clinical-safety', 'bioactivity-targets', 'molecular-chemical']
+
+function AutoLoadIndicator({ categoryStatus }: { categoryStatus: CategoriesStatus }) {
+  const [visible, setVisible] = useState(true)
+  const priorityLoaded = DISCOVER_PRIORITY_CATEGORIES.every(id => categoryStatus[id] === 'loaded')
+  const anyLoading = DISCOVER_PRIORITY_CATEGORIES.some(id => categoryStatus[id] === 'loading')
+
+  useEffect(() => {
+    if (priorityLoaded) {
+      const timer = setTimeout(() => setVisible(false), 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [priorityLoaded])
+
+  if (!visible && (priorityLoaded || !anyLoading)) return null
+
+  return (
+    <div className={`text-[10px] text-indigo-400/70 transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
+      {anyLoading ? (
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+          Auto-loading key data from discovery...
+        </span>
+      ) : priorityLoaded ? (
+        <span className="flex items-center gap-1">
+          <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          Key data loaded
+        </span>
+      ) : null}
+    </div>
+  )
+}
 
 function initStatus(): CategoriesStatus {
   const s = {} as CategoriesStatus
@@ -176,6 +212,19 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     loadCategory('pharmaceutical')
   }, [loadCategory])
 
+  const fromDiscover = searchParams.get('from') === 'discover'
+
+  // When arriving from discover, immediately load priority categories in parallel
+  const discoverLoadedRef = useRef(false)
+  useEffect(() => {
+    if (!fromDiscover || discoverLoadedRef.current) return
+    discoverLoadedRef.current = true
+    const priorityCategories: CategoryId[] = ['clinical-safety', 'bioactivity-targets', 'pharmaceutical', 'molecular-chemical']
+    for (const catId of priorityCategories) {
+      loadCategory(catId)
+    }
+  }, [fromDiscover, loadCategory])
+
   // When hideEmpty is toggled on, load all idle categories so we can evaluate them
   useEffect(() => {
     if (!hideEmpty) return
@@ -266,10 +315,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'drug-interactions': (panelId, lastFetched) => <LazyPanels.LazyDrugInteractionsPanel interactions={d('drugInteractions')} panelId={panelId} lastFetched={lastFetched} />,
       'dailymed': (panelId, lastFetched) => <LazyPanels.LazyDailyMedPanel labels={d('drugLabels')} panelId={panelId} lastFetched={lastFetched} />,
       'atc': (panelId, lastFetched) => <LazyPanels.LazyAtcPanel classifications={d('atcClassifications')} panelId={panelId} lastFetched={lastFetched} />,
-      'clinical-trials': (panelId, lastFetched) => <LazyPanels.LazyClinicalTrialsPanel trials={d('clinicalTrials')} panelId={panelId} lastFetched={lastFetched} />,
+      'clinical-trials': (panelId, lastFetched) => <LazyPanels.LazyClinicalTrialsPanel trials={d('clinicalTrials')} panelId={panelId} lastFetched={lastFetched} diseaseName={searchParams.get('disease') ?? undefined} />,
       'adverse-events': (panelId, lastFetched) => <LazyPanels.LazyAdverseEventsPanel adverseEvents={d('adverseEvents')} panelId={panelId} lastFetched={lastFetched} />,
       'recalls': (panelId, lastFetched) => <LazyPanels.LazyRecallsPanel recalls={d('drugRecalls')} panelId={panelId} lastFetched={lastFetched} />,
-      'chembl-indications': (panelId, lastFetched) => <LazyPanels.LazyChemblIndicationsPanel indications={d('chemblIndications')} panelId={panelId} lastFetched={lastFetched} />,
+      'chembl-indications': (panelId, lastFetched) => <LazyPanels.LazyChemblIndicationsPanel indications={d('chemblIndications')} panelId={panelId} lastFetched={lastFetched} diseaseName={searchParams.get('disease') ?? undefined} />,
       'clinvar': (panelId, lastFetched) => <LazyPanels.LazyClinVarPanel variants={d('clinVarVariants')} panelId={panelId} lastFetched={lastFetched} />,
       'gwas': (panelId, lastFetched) => <LazyPanels.LazyGwasCatalogPanel associations={d('gwasAssociations')} panelId={panelId} lastFetched={lastFetched} />,
       'properties': (panelId, lastFetched) => <LazyPanels.LazyPropertiesPanel properties={d('computedProperties')} molecularWeight={molecularWeight} panelId={panelId} lastFetched={lastFetched} />,
@@ -406,7 +455,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         return <LazyPanels.LazyNindsNeurommsigPanel data={signatures} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
       },
     } as Record<string, PanelRenderer>
-  }, [d, molecularWeight, moleculeName])
+  }, [d, molecularWeight, moleculeName, searchParams])
 
   const allLoaded = ALL_CATEGORY_IDS.every(id => categoryStatus[id] === 'loaded')
 
@@ -548,6 +597,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           freshness={freshnessMap}
           disabled={isBusy}
         />
+        {fromDiscover && (
+          <AutoLoadIndicator categoryStatus={categoryStatus} />
+        )}
       </div>
 
       <div className="mb-4">
@@ -568,6 +620,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         />
         </ErrorBoundary>
       </div>
+
+      <ErrorBoundary><DiscoverBreadcrumb disease={searchParams.get('disease') ?? ''} rank={parseInt(searchParams.get('rank') ?? '0', 10) || 0} score={parseFloat(searchParams.get('score') ?? '0') || 0} /></ErrorBoundary>
+
+      <ErrorBoundary><NextStepsPanel moleculeName={moleculeName} data={mergedData} /></ErrorBoundary>
+
+      <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
+
+      <ErrorBoundary><VendorsPanel cid={cid} /></ErrorBoundary>
 
       <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
 
@@ -691,6 +751,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           categoryStatus={categoryStatus}
           fetchedAt={fetchedAt}
           identity={{ name: moleculeName, cid, molecularWeight, inchiKey, iupacName }}
+          diseaseName={fromDiscover ? (searchParams.get('disease') ?? undefined) : undefined}
         />
     </div>
   )

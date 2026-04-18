@@ -29,6 +29,7 @@ export function useAICopilot(
   categoryStatus: Record<CategoryId, CategoryLoadState>,
   fetchedAt: Partial<Record<CategoryId, Date>>,
   identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string; geneSymbol?: string },
+  diseaseName?: string,
 ) {
   const ai = useAI()
   const [messages, setMessages] = useState<CopilotMessage[]>([])
@@ -83,14 +84,19 @@ export function useAICopilot(
     [identity.geneSymbol, allData, snapshot, isGeneContext]
   )
 
-  const contextBlock = useMemo(
-    () => isGeneContext && geneCtx
-      ? geneContextToPromptBlock(geneCtx)
-      : isDiseaseContext && diseaseCtx
-        ? diseaseContextToPromptBlock(diseaseCtx)
-        : contextToPromptBlock(context),
-    [isGeneContext, geneCtx, isDiseaseContext, diseaseCtx, context]
-  )
+  const diseasePromptSuffix = useMemo(() => {
+    if (isGeneContext || isDiseaseContext) return ''
+    if (diseaseName && context.identity.cid !== 0) {
+      return `\n\n// DISEASE CONTEXT (user arrived from discovery for "${diseaseName}"):\nThis molecule is being evaluated as a candidate for treating "${diseaseName}". Prioritize analysis that relates this molecule's targets, mechanisms, safety profile, and clinical evidence to the disease "${diseaseName}". When evaluating therapeutic potential, repurposing opportunities, or safety concerns, frame insights in terms of their relevance to "${diseaseName}" treatment.`
+    }
+    return ''
+  }, [isGeneContext, isDiseaseContext, diseaseName, context.identity.cid])
+
+  const contextBlock = useMemo(() => {
+    if (isGeneContext && geneCtx) return geneContextToPromptBlock(geneCtx)
+    if (isDiseaseContext && diseaseCtx) return diseaseContextToPromptBlock(diseaseCtx)
+    return contextToPromptBlock(context) + diseasePromptSuffix
+  }, [isGeneContext, geneCtx, isDiseaseContext, diseaseCtx, context, diseasePromptSuffix])
 
   const aiAvailable = ai.enabled && ai.status === 'available'
 
@@ -231,7 +237,7 @@ export function useAICopilot(
     try {
       const chatMessages = [
         { role: 'system' as const, content: prompts.system },
-        { role: 'user' as const, content: prompts.user },
+        { role: 'user' as const, content: prompts.user + diseasePromptSuffix },
       ]
 
       for await (const token of ai.askAI(chatMessages)) {
@@ -246,7 +252,7 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx])
+  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
 
   const askQuestion = useCallback(async (question: string) => {
     if (!aiAvailable) {
@@ -292,11 +298,15 @@ export function useAICopilot(
           content: m.content,
         }))
       chatMessages = buildFollowUpPrompt(recentHistory, context, question)
+      if (diseasePromptSuffix) {
+        const lastUserIdx = chatMessages.length - 1
+        chatMessages[lastUserIdx] = { ...chatMessages[lastUserIdx], content: chatMessages[lastUserIdx].content + diseasePromptSuffix }
+      }
     } else {
       const { system, user } = buildFreeQAPrompt(context, question)
       chatMessages = [
         { role: 'system', content: system },
-        { role: 'user', content: user },
+        { role: 'user', content: user + diseasePromptSuffix },
       ]
     }
 
@@ -317,7 +327,7 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, addMessage, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx])
+  }, [ai, aiAvailable, context, addMessage, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()

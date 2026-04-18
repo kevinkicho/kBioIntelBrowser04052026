@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import { Suspense } from 'react'
 import { getMoleculeById } from '@/lib/api/pubchem'
 import { getDrugsByIngredient } from '@/lib/api/openfda'
 import { getPatentsByMoleculeName } from '@/lib/api/patents'
@@ -25,6 +26,7 @@ import { CompareSection } from '@/components/compare/CompareSection'
 import { PropertiesCompare } from '@/components/compare/PropertiesCompare'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
 import { ComparisonInsights } from './ComparisonInsights'
+import { DiseaseCompareHeaderWrapper } from './DiseaseCompareHeaderWrapper'
 import { computeDelta, computePhaseDistribution, type PhaseDistribution, type DeltaResult } from './comparisonUtils'
 import type {
   Molecule, CompanyProduct, Patent, ClinicalTrial, AdverseEvent,
@@ -204,7 +206,7 @@ function uniqueTargets(activities: ChemblActivity[]): number {
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: { a?: string; b?: string }
+  searchParams: { a?: string; b?: string; disease?: string; scoreA?: string; scoreB?: string; confidenceA?: string; confidenceB?: string; nameA?: string; nameB?: string }
 }) {
   const cidARaw = searchParams.a ? parseInt(searchParams.a, 10) : NaN
   const cidBRaw = searchParams.b ? parseInt(searchParams.b, 10) : NaN
@@ -254,6 +256,17 @@ export default async function ComparePage({
 
         {dataA && dataB && (
           <div>
+            {searchParams.disease && (
+              <Suspense fallback={<div className="h-4" />}>
+                <DiseaseCompareHeaderWrapper
+                  dataA={dataA as unknown as Record<string, unknown>}
+                  dataB={dataB as unknown as Record<string, unknown>}
+                  cidA={cidARaw}
+                  cidB={cidBRaw}
+                />
+              </Suspense>
+            )}
+
             <ComparisonInsights
               dataA={dataA}
               dataB={dataB}
