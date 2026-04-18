@@ -7,6 +7,7 @@ import { DiscoveryHero } from './components/DiscoveryHero'
 import { DiscoveryProgress, EmptyState, ErrorState } from './components/DiscoveryProgress'
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
+import { ExportResults } from './components/ExportResults'
 import type { DiseaseGene } from '@/lib/candidateRanker'
 
 function GeneTable({ genes }: { genes: DiseaseGene[] }) {
@@ -72,9 +73,12 @@ export default function DiscoverPage() {
                       </div>
                     )}
                   </div>
-                  <span className="text-sm text-slate-500">
-                    {state.result.candidates.length} candidate{state.result.candidates.length !== 1 ? 's' : ''}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-sm text-slate-500">
+                      {state.result.candidates.length} candidate{state.result.candidates.length !== 1 ? 's' : ''}
+                    </span>
+                    <ExportResults result={state.result} />
+                  </div>
                 </div>
 
                 <GeneTable genes={state.result.genes} />

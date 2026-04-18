@@ -15,6 +15,7 @@ export interface CopilotMessage {
   content: string
   mode: PromptMode
   timestamp: number
+  error?: string
 }
 
 export interface CopilotState {
@@ -99,6 +100,14 @@ export function useAICopilot(
   }, [isGeneContext, geneCtx, isDiseaseContext, diseaseCtx, context, diseasePromptSuffix])
 
   const aiAvailable = ai.enabled && ai.status === 'available'
+
+  function extractStreamError(content: string): { content: string; error?: string } {
+    const match = content.match(/\[Error: (.+?)\]/)
+    if (!match) return { content }
+    const errorText = match[1]
+    const cleaned = content.replace(/\s*\[Error: .+?\]\s*/g, '').trim()
+    return { content: cleaned || '', error: errorText }
+  }
 
   const addMessage = useCallback((role: CopilotMessage['role'], content: string, mode: PromptMode): CopilotMessage => {
     const msg: CopilotMessage = {
@@ -234,6 +243,7 @@ export function useAICopilot(
     setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode, timestamp: Date.now() }])
 
     let fullContent = ''
+    let streamError: string | null = null
     try {
       const chatMessages = [
         { role: 'system' as const, content: prompts.system },
@@ -246,8 +256,13 @@ export function useAICopilot(
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
       }
     } catch (err) {
-      fullContent += `\n[Error: ${err instanceof Error ? err.message : String(err)}]`
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+      streamError = err instanceof Error ? err.message : String(err)
+    }
+
+    const { content: finalContent, error: inlineError } = extractStreamError(fullContent)
+    const msgError = streamError || inlineError
+    if (msgError || finalContent !== fullContent) {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent || fullContent, ...(msgError ? { error: msgError } : {}) } : m))
     }
 
     isStreamingRef.current = false
@@ -314,6 +329,7 @@ export function useAICopilot(
     setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode: 'followup', timestamp: Date.now() }])
 
     let fullContent = ''
+    let streamError: string | null = null
     try {
       for await (const token of ai.askAI(chatMessages)) {
         if (controller.signal.aborted) break
@@ -321,8 +337,13 @@ export function useAICopilot(
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
       }
     } catch (err) {
-      fullContent += `\n[Error: ${err instanceof Error ? err.message : String(err)}]`
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+      streamError = err instanceof Error ? err.message : String(err)
+    }
+
+    const { content: finalContent, error: inlineError } = extractStreamError(fullContent)
+    const msgError = streamError || inlineError
+    if (msgError || finalContent !== fullContent) {
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent || fullContent, ...(msgError ? { error: msgError } : {}) } : m))
     }
 
     isStreamingRef.current = false

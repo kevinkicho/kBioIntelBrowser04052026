@@ -509,6 +509,11 @@ function MessageBubble({ message, isStreaming }: { message: CopilotMessage; isSt
       }`}>
         {isUser ? message.content || (isStreaming ? '' : '...') : rendered}
       </div>
+      {message.error && (
+        <div className="mt-1.5 mr-2 rounded-md px-3 py-2 text-[11px] leading-relaxed bg-red-950/30 border border-red-800/30 text-red-300">
+          <span className="font-semibold">Stream error:</span> {message.error}
+        </div>
+      )}
       {isStreaming && !message.content && (
         <div className="flex gap-1 mt-1 px-3">
           <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
