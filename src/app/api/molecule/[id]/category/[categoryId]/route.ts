@@ -116,7 +116,7 @@ export async function GET(
       }
     })()
 
-    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 5000)
+    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000)
 
     for (const m of flushApiMetrics()) {
       recordMetric({

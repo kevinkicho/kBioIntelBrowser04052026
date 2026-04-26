@@ -47,7 +47,7 @@ export async function GET(
       return await fetchGene(geneId, symbol)
     })()
 
-    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 5000)
+    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000)
 
     for (const m of flushApiMetrics()) {
       recordMetric({

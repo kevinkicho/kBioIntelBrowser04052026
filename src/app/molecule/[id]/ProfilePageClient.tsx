@@ -260,19 +260,23 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'interactions-pathways',
     ]
 
+    const PREFETCH_CONCURRENCY = 2
+
     let cancelled = false
-    async function prefetchSequentially() {
-      for (const catId of prefetchOrder) {
-        if (cancelled) break
-        if (categoryStatusRef.current[catId] !== 'idle') continue
-        await new Promise(r => setTimeout(r, 300))
-        if (cancelled) break
-        loadCategory(catId)
-        await new Promise(r => setTimeout(r, 1500))
-      }
+    async function prefetchWithConcurrency() {
+      const queue = prefetchOrder.filter(id => categoryStatusRef.current[id] === 'idle')
+      const workers = Array.from({ length: PREFETCH_CONCURRENCY }, async () => {
+        while (queue.length > 0 && !cancelled) {
+          const catId = queue.shift()
+          if (!catId) break
+          if (categoryStatusRef.current[catId] !== 'idle') continue
+          await loadCategory(catId)
+        }
+      })
+      await Promise.all(workers)
     }
 
-    const timer = setTimeout(prefetchSequentially, 500)
+    const timer = setTimeout(prefetchWithConcurrency, 200)
     return () => { cancelled = true; clearTimeout(timer) }
   }, [pharmaceuticalLoaded, loadCategory])
 

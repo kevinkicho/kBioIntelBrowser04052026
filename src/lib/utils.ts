@@ -48,27 +48,42 @@ export function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
   return withTimeout(promise, DEFAULT_API_TIMEOUT).catch(() => fallback)
 }
 
+// Timeout strategy:
+//   Each category fetcher fans out to 5-15 public APIs in parallel via Promise.all.
+//   The slowest API in the group determines first-paint latency for that panel group.
+//   Free public APIs that take >8s to respond are degraded — the user is better
+//   served by an empty panel quickly than a 15s+ wait for a single laggy source.
+//
+//   - DEFAULT_API_TIMEOUT (8s) covers most healthy free APIs (typical p99 <3s).
+//   - API_SOURCE_TIMEOUTS overrides for known-slow but important sources (cap 12s).
+//   - API_TIMEOUTS caps the whole category response at 12s so a stuck Promise.all
+//     can't hold the route open longer than the slowest per-source override.
+//   - Tune API_SOURCE_TIMEOUTS from the analytics dashboard (/analytics) once
+//     you have real p95/p99 latency data per source.
+
+const DEFAULT_API_TIMEOUT = 8000
+
 const API_TIMEOUTS: Record<string, number> = {
-  'molecular-chemical': 20000,
-  'bioactivity-targets': 20000,
-  'genomics-disease': 20000,
-  'interactions-pathways': 15000,
-  'protein-structure': 15000,
-  'clinical-safety': 15000,
-  'pharmaceutical': 15000,
-  'research-literature': 15000,
-  'nih-high-impact': 15000,
+  'molecular-chemical': 12000,
+  'bioactivity-targets': 12000,
+  'genomics-disease': 12000,
+  'interactions-pathways': 12000,
+  'protein-structure': 12000,
+  'clinical-safety': 12000,
+  'pharmaceutical': 12000,
+  'research-literature': 12000,
+  'nih-high-impact': 12000,
+  'gene': 12000,
 }
 
 export const API_SOURCE_TIMEOUTS: Record<string, number> = {
-  lincs: 30000,
-  massbank: 25000,
-  chembl: 25000,
-  'chembl-mechanisms': 25000,
-  opentargets: 30000,
+  // Known-slow sources from prior tuning — kept just above DEFAULT_API_TIMEOUT.
+  lincs: 12000,
+  massbank: 12000,
+  chembl: 12000,
+  'chembl-mechanisms': 12000,
+  opentargets: 12000,
 }
-
-const DEFAULT_API_TIMEOUT = 15000
 
 export function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
   const timeout = ms ?? DEFAULT_API_TIMEOUT
