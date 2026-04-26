@@ -5,6 +5,7 @@ import { SearchBar } from '@/components/search/SearchBar'
 import { AdvancedSearchPanel } from '@/components/search/AdvancedSearchPanel'
 import { API_IDENTIFIER_CONFIGS, API_PARAMETERS, type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
 import { FavoritesBar } from '@/components/home/FavoritesBar'
+import { GuidedTour } from '@/components/home/GuidedTour'
 import { AIBanner } from '@/components/ai/AIBanner'
 import { AIStatusIndicator } from '@/components/ai/AIStatusIndicator'
 
@@ -150,6 +151,8 @@ function HomePageContent() {
       </div>
 
       <FavoritesBar />
+
+      <GuidedTour searchType={searchType} />
 
       <div className="mt-8 text-center">
         <p className="text-xs text-slate-600 uppercase tracking-wider mb-3">Try searching for</p>
