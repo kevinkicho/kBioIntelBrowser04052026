@@ -4,6 +4,46 @@ A public open-science web portal that aggregates molecular, pharmaceutical, clin
 
 Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI — with per-API identifier overrides and parameter controls — then browse by category, compare side-by-side, or explore relationships through an interactive network graph.
 
+![BioIntel Explorer homepage](screenshots/homepage.png)
+
+## Getting Started
+
+```bash
+npm install
+npm run dev
+```
+
+App runs on **http://localhost:33424** by default (configurable via `PORT` env var).
+
+> **First load is slow** — Next.js dev compiles each page on first request, and this app has 100+ dynamic-import panels. Expect 30–90 seconds the first time you hit a route after `npm run dev`. Subsequent navigations and edits are fast.
+>
+> **If port 33424 is in use:** `PORT=3000 npm run dev` (or any free port).
+>
+> **If you see `EACCES`** on a port: Windows reserves dynamic port ranges for Hyper-V/WSL/Docker. Pick a port outside the excluded ranges (`netsh interface ipv4 show excludedportrange protocol=tcp`).
+>
+> **For a clean rebuild:** `npm run dev -- --clean` wipes the `.next/` cache before starting.
+
+### Optional Environment Variables
+
+```env
+OPENFDA_API_KEY=your_key_here          # Increases openFDA rate limits
+NCBI_EMAIL=your_email_here             # NCBI Entrez (required)
+NCBI_API_KEY=your_key_here             # NCBI API key (increases rate limits)
+OMIM_API_KEY=your_key_here             # OMIM genetic disorder data
+```
+
+### AI Copilot (optional)
+
+For AI-driven summaries, prior-art queries, differential safety profiles, and the hypothesis seed feature, install [Ollama](https://ollama.com) and pull a small local model:
+
+```bash
+ollama pull gemma3:4b
+```
+
+Everything runs on your machine — no data leaves your computer.
+
+![Molecule profile with AI Copilot](screenshots/molecule-profile.png)
+
 ## Built With Claude Code
 
 This project was designed and engineered almost entirely by [Claude Code](https://claude.ai/claude-code) (Anthropic's AI coding agent), working in collaboration with a bioengineering domain expert who provided the scientific vision, feature direction, and quality review. Claude Code authored the architecture, all API integrations, UI components, test suite, and documentation — from initial scaffold through 110+ data source integrations across multiple iterative development cycles.
@@ -204,32 +244,6 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 - **Visualization:** D3.js, 3Dmol.js
 - **Virtualization:** @tanstack/react-virtual
 - **Testing:** Jest + React Testing Library
-
-## Getting Started
-
-```bash
-npm install
-npm run dev
-```
-
-App runs on **http://localhost:33424** by default (configurable via `PORT` env var).
-
-> **First load is slow** — Next.js dev compiles each page on first request, and this app has 100+ dynamic-import panels. Expect 30–90 seconds the first time you hit a route after `npm run dev`. Subsequent navigations and edits are fast.
->
-> **If port 33424 is in use:** `PORT=3000 npm run dev` (or any free port).
->
-> **If you see `EACCES`** on a port: Windows reserves dynamic port ranges for Hyper-V/WSL/Docker. Pick a port outside the excluded ranges (`netsh interface ipv4 show excludedportrange protocol=tcp`).
->
-> **For a clean rebuild:** `npm run dev -- --clean` wipes the `.next/` cache before starting.
-
-### Optional Environment Variables
-
-```env
-OPENFDA_API_KEY=your_key_here          # Increases openFDA rate limits
-NCBI_EMAIL=your_email_here             # NCBI Entrez (required)
-NCBI_API_KEY=your_key_here             # NCBI API key (increases rate limits)
-OMIM_API_KEY=your_key_here             # OMIM genetic disorder data
-```
 
 ## Project Structure
 
