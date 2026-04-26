@@ -23,6 +23,7 @@ const ENTITY_MODES: { value: SearchType; label: string; icon: string }[] = [
 
 const NAV_LINKS = [
   { href: '/discover', label: 'Discover', color: 'emerald' },
+  { href: '/hypothesis', label: 'Hypothesis Builder', color: 'emerald' },
   { href: '/browse', label: 'Browse by Category', color: 'slate' },
   { href: '/gene', label: 'Gene Search', color: 'slate' },
   { href: '/compare', label: 'Compare Molecules', color: 'slate' },
