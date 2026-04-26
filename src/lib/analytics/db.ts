@@ -23,6 +23,8 @@ export interface SourceSummary {
   error_count: number
   empty_count: number
   avg_duration_ms: number
+  p50_ms: number
+  p95_ms: number
   last_success_at: string | null
   last_error: string | null
   last_error_at: string | null
@@ -334,6 +336,7 @@ function summarizeGroup(group: MetricRow[]): SourceSummary {
   const errors = group.filter(r => r.status >= 400 || r.status === 0).length
   const empty = group.filter(r => r.has_data === 0).length
   const avgMs = total > 0 ? Math.round(group.reduce((s, r) => s + r.duration_ms, 0) / total) : 0
+  const sortedDurations = group.map(r => r.duration_ms).sort((a, b) => a - b)
   const successRows = group.filter(r => r.status >= 200 && r.status < 300)
   const errorRows = group.filter(r => r.status >= 400 || r.status === 0)
   return {
@@ -343,6 +346,8 @@ function summarizeGroup(group: MetricRow[]): SourceSummary {
     error_count: errors,
     empty_count: empty,
     avg_duration_ms: avgMs,
+    p50_ms: percentile(sortedDurations, 50),
+    p95_ms: percentile(sortedDurations, 95),
     last_success_at: successRows.length > 0 ? successRows.sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0].timestamp : null,
     last_error: errorRows.length > 0 ? (errorRows.sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0].error || 'Unknown error') : null,
     last_error_at: errorRows.length > 0 ? errorRows.sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0].timestamp : null,

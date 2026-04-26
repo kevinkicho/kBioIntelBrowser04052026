@@ -44,6 +44,6 @@ next-env.d.ts
 # superpowers
 .superpowers/
 
-# analytics data
+# analytics data (includes auto-tuned timeout-overrides.json)
 /data/
 build_output.txt

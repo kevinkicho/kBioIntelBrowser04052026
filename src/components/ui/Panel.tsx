@@ -4,6 +4,8 @@ import { useState } from 'react'
 import { getFreshnessStatus } from '@/lib/dataFreshness'
 import { getPanelSource } from '@/lib/panelSources'
 
+type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
+
 interface PanelProps {
   title: string
   panelId?: string
@@ -12,9 +14,15 @@ interface PanelProps {
   className?: string
   titleExtra?: React.ReactNode
   empty?: string
+  sourceHealth?: SourceHealth
 }
 
-export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra, empty }: PanelProps) {
+const HEALTH_BADGE: Record<Exclude<SourceHealth, 'unknown' | 'healthy'>, { text: string; className: string }> = {
+  slow: { text: 'slow', className: 'bg-amber-900/40 text-amber-300 border border-amber-700/30' },
+  errors: { text: 'errors', className: 'bg-red-900/40 text-red-300 border border-red-700/30' },
+}
+
+export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra, empty, sourceHealth }: PanelProps) {
   const [showSource, setShowSource] = useState(false)
   const freshness = panelId && lastFetched ? getFreshnessStatus(panelId, lastFetched) : null
   const sourceInfo = panelId ? getPanelSource(panelId) : null
@@ -49,6 +57,11 @@ export function Panel({ title, panelId, lastFetched, children, className = '', t
             <span>Source: {sourceInfo.source}</span>
             <span className="text-slate-600">|</span>
             <span className="font-mono">{sourceInfo.api}</span>
+            {sourceHealth && sourceHealth !== 'healthy' && sourceHealth !== 'unknown' && (
+              <span className={`ml-1 text-[9px] px-1.5 py-0.5 rounded ${HEALTH_BADGE[sourceHealth].className}`}>
+                {HEALTH_BADGE[sourceHealth].text}
+              </span>
+            )}
           </button>
           {showSource && (
             <div className="mt-1.5 space-y-1 text-[10px]">

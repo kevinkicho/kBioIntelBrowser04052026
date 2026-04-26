@@ -55,11 +55,15 @@ export function safe<T>(promise: Promise<T>, fallback: T): Promise<T> {
 //   served by an empty panel quickly than a 15s+ wait for a single laggy source.
 //
 //   - DEFAULT_API_TIMEOUT (8s) covers most healthy free APIs (typical p99 <3s).
-//   - API_SOURCE_TIMEOUTS overrides for known-slow but important sources (cap 12s).
+//   - API_SOURCE_TIMEOUTS_BASE: hardcoded overrides for sources known to be slow.
+//   - data/timeout-overrides.json: optional auto-tuned overrides (run
+//     `npm run tune-timeouts` after collecting telemetry); merged on top of
+//     the base map by API_SOURCE_TIMEOUTS getter below. Loader clamps to
+//     [5000, 15000] ms so a runaway tuning run can't blow the budget.
 //   - API_TIMEOUTS caps the whole category response at 12s so a stuck Promise.all
 //     can't hold the route open longer than the slowest per-source override.
-//   - Tune API_SOURCE_TIMEOUTS from the analytics dashboard (/analytics) once
-//     you have real p95/p99 latency data per source.
+
+import { loadTunedTimeouts } from './analytics/timeouts'
 
 const DEFAULT_API_TIMEOUT = 8000
 
@@ -76,7 +80,7 @@ const API_TIMEOUTS: Record<string, number> = {
   'gene': 12000,
 }
 
-export const API_SOURCE_TIMEOUTS: Record<string, number> = {
+const API_SOURCE_TIMEOUTS_BASE: Record<string, number> = {
   // Known-slow sources from prior tuning — kept just above DEFAULT_API_TIMEOUT.
   lincs: 12000,
   massbank: 12000,
@@ -84,6 +88,13 @@ export const API_SOURCE_TIMEOUTS: Record<string, number> = {
   'chembl-mechanisms': 12000,
   opentargets: 12000,
 }
+
+export const API_SOURCE_TIMEOUTS: Record<string, number> = new Proxy({}, {
+  get(_, source: string) {
+    const tuned = loadTunedTimeouts()
+    return tuned[source] ?? API_SOURCE_TIMEOUTS_BASE[source]
+  },
+}) as Record<string, number>
 
 export function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
   const timeout = ms ?? DEFAULT_API_TIMEOUT

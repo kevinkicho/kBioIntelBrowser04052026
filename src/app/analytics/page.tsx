@@ -42,6 +42,8 @@ interface ApiSummary {
   error_count: number
   empty_count: number
   avg_duration_ms: number
+  p50_ms: number
+  p95_ms: number
   last_success_at: string | null
   last_error: string | null
   last_error_at: string | null
@@ -449,7 +451,9 @@ export default function AnalyticsPage() {
                     <th className="text-right py-2 px-3 font-medium">OK</th>
                     <th className="text-right py-2 px-3 font-medium">Errors</th>
                     <th className="text-right py-2 px-3 font-medium">Empty</th>
-                    <th className="text-right py-2 px-3 font-medium">Avg Time</th>
+                    <th className="text-right py-2 px-3 font-medium">Avg</th>
+                    <th className="text-right py-2 px-3 font-medium">p50</th>
+                    <th className="text-right py-2 px-3 font-medium">p95</th>
                     <th className="text-right py-2 px-3 font-medium">Last OK</th>
                     <th className="text-right py-2 px-3 font-medium">Last Error</th>
                   </tr>
@@ -472,7 +476,9 @@ export default function AnalyticsPage() {
                       <td className="py-2 px-3 text-right text-emerald-400">{api.success_count}</td>
                       <td className="py-2 px-3 text-right text-red-400">{api.error_count}</td>
                       <td className="py-2 px-3 text-right text-yellow-400/70">{api.empty_count}</td>
-                      <td className="py-2 px-3 text-right text-slate-300">{api.avg_duration_ms}ms</td>
+                      <td className="py-2 px-3 text-right text-slate-300">{fmtMs(api.avg_duration_ms)}</td>
+                      <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p50_ms)}</td>
+                      <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p95_ms)}</td>
                       <td className="py-2 px-3 text-right text-slate-400 text-xs">{timeAgo(api.last_success_at)}</td>
                       <td className="py-2 px-3 text-right text-slate-400 text-xs">
                         {api.last_error ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 40)}` : '\u2014'}
@@ -481,7 +487,7 @@ export default function AnalyticsPage() {
                   ))}
                   {flatApis.filter(api => !filter || apiName(api.source).toLowerCase().includes(filter.toLowerCase()) || api.categoryLabel.toLowerCase().includes(filter.toLowerCase())).length === 0 && (
                     <tr>
-                      <td colSpan={10} className="py-8 text-center text-slate-500">No APIs match your filter.</td>
+                      <td colSpan={12} className="py-8 text-center text-slate-500">No APIs match your filter.</td>
                     </tr>
                   )}
                 </tbody>
@@ -539,7 +545,9 @@ export default function AnalyticsPage() {
                           <th className="text-right py-2 px-3 font-medium">OK</th>
                           <th className="text-right py-2 px-3 font-medium">Errors</th>
                           <th className="text-right py-2 px-3 font-medium">Empty</th>
-                          <th className="text-right py-2 px-3 font-medium">Avg Time</th>
+                          <th className="text-right py-2 px-3 font-medium">Avg</th>
+                          <th className="text-right py-2 px-3 font-medium">p50</th>
+                          <th className="text-right py-2 px-3 font-medium">p95</th>
                           <th className="text-right py-2 px-3 font-medium">Last OK</th>
                           <th className="text-right py-2 px-3 font-medium">Last Error</th>
                         </tr>
@@ -560,7 +568,9 @@ export default function AnalyticsPage() {
                             <td className="py-2 px-3 text-right text-emerald-400">{api.success_count}</td>
                             <td className="py-2 px-3 text-right text-red-400">{api.error_count}</td>
                             <td className="py-2 px-3 text-right text-yellow-400/70">{api.empty_count}</td>
-                            <td className="py-2 px-3 text-right text-slate-300">{api.avg_duration_ms}ms</td>
+                            <td className="py-2 px-3 text-right text-slate-300">{fmtMs(api.avg_duration_ms)}</td>
+                            <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p50_ms)}</td>
+                            <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p95_ms)}</td>
                             <td className="py-2 px-3 text-right text-slate-400 text-xs">{timeAgo(api.last_success_at)}</td>
                             <td className="py-2 px-3 text-right text-slate-400 text-xs">
                               {api.last_error ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 40)}` : '\u2014'}
