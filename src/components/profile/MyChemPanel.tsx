@@ -10,13 +10,8 @@ interface MyChemPanelProps {
 }
 
 export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastFetched }: MyChemPanelProps) {
-  if (!chemicals || chemicals.length === 0) {
-    return (
-      <Panel title="MyChem" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No chemical annotations found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = !chemicals || chemicals.length === 0
+  const title = isEmpty ? "MyChem" : "MyChem.info Annotations"
 
   function displayName(chem: MyChemAnnotation): string {
     if (chem.name) return chem.name
@@ -26,7 +21,13 @@ export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastF
   }
 
   return (
-    <Panel title="MyChem.info Annotations" panelId={panelId} lastFetched={lastFetched}>
+    <Panel
+      title={title}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No chemical annotations found for this molecule." : undefined}
+    >
+      {!isEmpty && chemicals && (
       <PaginatedList className="space-y-2">
         {chemicals.map((chem, idx) => (
           <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
@@ -124,6 +125,7 @@ export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastF
           </div>
         ))}
       </PaginatedList>
+      )}
     </Panel>
   )
 })

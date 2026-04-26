@@ -73,37 +73,39 @@ function VariantItem({ variant }: { variant: ClinGenVariant }) {
 
 export const ClinGenPanel = memo(function ClinGenPanel({ data, panelId, lastFetched }: { data: ClinGenData, panelId?: string, lastFetched?: Date }) {
   const hasData = data.geneDiseases.length > 0 || data.variants.length > 0
-
-  if (!hasData) {
-    return (
-      <Panel title="ClinGen" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No ClinGen data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = !hasData
 
   return (
-    <Panel title="ClinGen" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Clinical genomics gene-disease validity</p>
-      {data.geneDiseases.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-300 mb-2">Gene-Disease Associations</h4>
-          <PaginatedList className="space-y-3">
-            {data.geneDiseases.map((item, i) => (
-              <GeneDiseaseItem key={`${item.geneDiseaseId}-${i}`} item={item} />
-            ))}
-          </PaginatedList>
-        </div>
-      )}
-      {data.variants.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-slate-300 mb-2">Variants</h4>
-          <PaginatedList className="space-y-3">
-            {data.variants.map((variant, i) => (
-              <VariantItem key={`${variant.variantId}-${i}`} variant={variant} />
-            ))}
-          </PaginatedList>
-        </div>
+    <Panel
+      title="ClinGen"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No ClinGen data found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Clinical genomics gene-disease validity</p>
+          {data.geneDiseases.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-300 mb-2">Gene-Disease Associations</h4>
+              <PaginatedList className="space-y-3">
+                {data.geneDiseases.map((item, i) => (
+                  <GeneDiseaseItem key={`${item.geneDiseaseId}-${i}`} item={item} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
+          {data.variants.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-300 mb-2">Variants</h4>
+              <PaginatedList className="space-y-3">
+                {data.variants.map((variant, i) => (
+                  <VariantItem key={`${variant.variantId}-${i}`} variant={variant} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
+        </>
       )}
     </Panel>
   )

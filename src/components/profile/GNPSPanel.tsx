@@ -123,47 +123,49 @@ type GNPSData = {
 
 export const GNPSPanel = memo(function GNPSPanel({ data, panelId, lastFetched }: { data: GNPSData, panelId?: string, lastFetched?: Date }) {
   const { spectra, clusters } = data
-
-  if (spectra.length === 0 && clusters.length === 0) {
-    return (
-      <Panel title="GNPS" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No GNPS mass spectrometry data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = spectra.length === 0 && clusters.length === 0
 
   return (
-    <Panel title="GNPS" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Global Natural Products Social Molecular Networking
-      </p>
+    <Panel
+      title="GNPS"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No GNPS mass spectrometry data found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Global Natural Products Social Molecular Networking
+          </p>
 
-      {spectra.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-cyan-400">Library Spectra</span>
-            <span className="text-xs text-slate-500">({spectra.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {spectra.map((spectrum, i) => (
-              <SpectrumItem key={`${spectrum.id}-${i}`} spectrum={spectrum} />
-            ))}
-          </PaginatedList>
-        </div>
-      )}
+          {spectra.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-cyan-400">Library Spectra</span>
+                <span className="text-xs text-slate-500">({spectra.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {spectra.map((spectrum, i) => (
+                  <SpectrumItem key={`${spectrum.id}-${i}`} spectrum={spectrum} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
 
-      {clusters.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-purple-400">Network Clusters</span>
-            <span className="text-xs text-slate-500">({clusters.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {clusters.map((cluster, i) => (
-              <ClusterItem key={`${cluster.clusterId}-${i}`} cluster={cluster} />
-            ))}
-          </PaginatedList>
-        </div>
+          {clusters.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-purple-400">Network Clusters</span>
+                <span className="text-xs text-slate-500">({clusters.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {clusters.map((cluster, i) => (
+                  <ClusterItem key={`${cluster.clusterId}-${i}`} cluster={cluster} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
+        </>
       )}
     </Panel>
   )

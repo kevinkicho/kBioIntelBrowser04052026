@@ -11,45 +11,45 @@ function aspectColor(aspect: string): string {
 }
 
 export const QuickGoPanel = memo(function QuickGoPanel({ annotations, panelId, lastFetched }: { annotations: GoAnnotation[], panelId?: string, lastFetched?: Date }) {
-  if (annotations.length === 0) {
-    return (
-      <Panel title="Gene Ontology (QuickGO)" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No Gene Ontology annotations found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = annotations.length === 0
   return (
-    <Panel title="Gene Ontology (QuickGO)" panelId={panelId} lastFetched={lastFetched}>
-      <PaginatedList className="space-y-3">
-        {annotations.map((ann, i) => (
-          <div key={i} className="py-3 border-b border-slate-700 last:border-0">
-            <div className="flex items-start justify-between gap-2">
-              <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${aspectColor(ann.goAspect)}`}>
-                {ann.goAspect}
-              </span>
-              <span className="text-xs font-mono text-slate-400">{ann.goId}</span>
-            </div>
-            <p className="text-sm text-slate-200 mt-1">{ann.goName}</p>
-            {ann.qualifier && (
-              <p className="text-xs text-slate-400 mt-0.5">{ann.qualifier}</p>
-            )}
-            <div className="flex items-center justify-between mt-2">
-              {ann.evidence && (
-                <span className="text-xs font-mono text-slate-500">{ann.evidence}</span>
+    <Panel
+      title="Gene Ontology (QuickGO)"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No Gene Ontology annotations found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <PaginatedList className="space-y-3">
+          {annotations.map((ann, i) => (
+            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+              <div className="flex items-start justify-between gap-2">
+                <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${aspectColor(ann.goAspect)}`}>
+                  {ann.goAspect}
+                </span>
+                <span className="text-xs font-mono text-slate-400">{ann.goId}</span>
+              </div>
+              <p className="text-sm text-slate-200 mt-1">{ann.goName}</p>
+              {ann.qualifier && (
+                <p className="text-xs text-slate-400 mt-0.5">{ann.qualifier}</p>
               )}
-              <a
-                href={ann.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-xs text-blue-400 hover:text-blue-300"
-              >
-                View in QuickGO →
-              </a>
+              <div className="flex items-center justify-between mt-2">
+                {ann.evidence && (
+                  <span className="text-xs font-mono text-slate-500">{ann.evidence}</span>
+                )}
+                <a
+                  href={ann.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300"
+                >
+                  View in QuickGO →
+                </a>
+              </div>
             </div>
-          </div>
-        ))}
-      </PaginatedList>
+          ))}
+        </PaginatedList>
+      )}
     </Panel>
   )
 })

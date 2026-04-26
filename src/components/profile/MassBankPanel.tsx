@@ -44,22 +44,24 @@ function SpectrumItem({ spectrum }: { spectrum: MassBankSpectrum }) {
 }
 
 export const MassBankPanel = memo(function MassBankPanel({ spectra, panelId, lastFetched }: { spectra: MassBankSpectrum[], panelId?: string, lastFetched?: Date }) {
-  if (spectra.length === 0) {
-    return (
-      <Panel title="MassBank" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No mass spectrometry spectra found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = spectra.length === 0
   return (
-    <Panel title="MassBank" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Mass spectrometry reference spectra</p>
-      <PaginatedList className="space-y-3">
-        {spectra.map((spectrum, i) => (
-          <SpectrumItem key={`${spectrum.accession}-${i}`} spectrum={spectrum} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="MassBank"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No mass spectrometry spectra found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Mass spectrometry reference spectra</p>
+          <PaginatedList className="space-y-3">
+            {spectra.map((spectrum, i) => (
+              <SpectrumItem key={`${spectrum.accession}-${i}`} spectrum={spectrum} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

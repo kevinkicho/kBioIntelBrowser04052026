@@ -52,27 +52,31 @@ function GuidelineItem({ guideline }: { guideline: CPICGuideline }) {
 }
 
 export const CPICPanel = memo(function CPICPanel({ guidelines, panelId, lastFetched }: { guidelines: CPICGuideline[], panelId?: string, lastFetched?: Date }) {
-  if (guidelines.length === 0) {
-    return (
-      <Panel title="CPIC Guidelines" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No clinical pharmacogenetic guidelines found for this molecule.</p>
-      </Panel>
-    )
-  }
-
-  const uniqueGenes = new Set(guidelines.map(g => g.gene))
-  const uniqueDrugs = new Set(guidelines.map(g => g.drugName))
+  const isEmpty = guidelines.length === 0
 
   return (
-    <Panel title="CPIC Guidelines" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Clinical Pharmacogenetics Implementation Consortium — {uniqueDrugs.size} drug{uniqueDrugs.size !== 1 ? 's' : ''}, {uniqueGenes.size} gene{uniqueGenes.size !== 1 ? 's' : ''}
-      </p>
-      <PaginatedList className="space-y-2">
-        {guidelines.map((guideline, i) => (
-          <GuidelineItem key={`${guideline.id}-${i}`} guideline={guideline} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="CPIC Guidelines"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No clinical pharmacogenetic guidelines found for this molecule." : undefined}
+    >
+      {!isEmpty && (() => {
+        const uniqueGenes = new Set(guidelines.map(g => g.gene))
+        const uniqueDrugs = new Set(guidelines.map(g => g.drugName))
+        return (
+          <>
+            <p className="text-xs text-slate-400 mb-3">
+              Clinical Pharmacogenetics Implementation Consortium — {uniqueDrugs.size} drug{uniqueDrugs.size !== 1 ? 's' : ''}, {uniqueGenes.size} gene{uniqueGenes.size !== 1 ? 's' : ''}
+            </p>
+            <PaginatedList className="space-y-2">
+              {guidelines.map((guideline, i) => (
+                <GuidelineItem key={`${guideline.id}-${i}`} guideline={guideline} />
+              ))}
+            </PaginatedList>
+          </>
+        )
+      })()}
     </Panel>
   )
 })

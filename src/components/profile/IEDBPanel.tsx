@@ -13,25 +13,28 @@ interface IEDBPanelProps {
 
 export const IEDBPanel = memo(function IEDBPanel({ epitopes, panelId, lastFetched }: IEDBPanelProps) {
   const [activeTab, setActiveTab] = useState<'all' | 'bcell' | 'tcell'>('all')
+  const isEmpty = !epitopes || epitopes.length === 0
 
-  if (!epitopes || epitopes.length === 0) {
-    return (
-      <Panel title="IEDB" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No epitope data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const bCellEpitopes = !isEmpty ? epitopes!.filter(e => e.epitopeType === 'B cell') : []
+  const tCellEpitopes = !isEmpty ? epitopes!.filter(e => e.epitopeType === 'T cell') : []
 
-  const bCellEpitopes = epitopes.filter(e => e.epitopeType === 'B cell')
-  const tCellEpitopes = epitopes.filter(e => e.epitopeType === 'T cell')
-
-  const filteredEpitopes =
+  const filteredEpitopes = isEmpty ? [] : (
     activeTab === 'bcell' ? bCellEpitopes :
     activeTab === 'tcell' ? tCellEpitopes :
-    epitopes
+    epitopes!
+  )
+
+  const title = isEmpty ? "IEDB" : `IEDB Epitopes (${bCellEpitopes.length} B-cell, ${tCellEpitopes.length} T-cell)`
 
   return (
-    <Panel title={`IEDB Epitopes (${bCellEpitopes.length} B-cell, ${tCellEpitopes.length} T-cell)`} panelId={panelId} lastFetched={lastFetched}>
+    <Panel
+      title={title}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No epitope data found for this molecule." : undefined}
+    >
+      {!isEmpty && epitopes && (
+        <>
       {/* Tabs */}
       <div className="flex gap-2 mb-3">
         <button
@@ -133,6 +136,8 @@ export const IEDBPanel = memo(function IEDBPanel({ epitopes, panelId, lastFetche
           </p>
         )}
       </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

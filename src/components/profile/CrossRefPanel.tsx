@@ -47,22 +47,24 @@ function WorkItem({ work }: { work: CrossRefWork }) {
 }
 
 export const CrossRefPanel = memo(function CrossRefPanel({ works, panelId, lastFetched }: { works: CrossRefWork[], panelId?: string, lastFetched?: Date }) {
-  if (works.length === 0) {
-    return (
-      <Panel title="CrossRef" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No CrossRef publications found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = works.length === 0
   return (
-    <Panel title="CrossRef" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">DOI metadata from CrossRef</p>
-      <PaginatedList className="space-y-3">
-        {works.map((work, i) => (
-          <WorkItem key={`${work.doi}-${i}`} work={work} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="CrossRef"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No CrossRef publications found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">DOI metadata from CrossRef</p>
+          <PaginatedList className="space-y-3">
+            {works.map((work, i) => (
+              <WorkItem key={`${work.doi}-${i}`} work={work} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

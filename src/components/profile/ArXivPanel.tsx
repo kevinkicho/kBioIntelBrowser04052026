@@ -65,22 +65,24 @@ function PaperItem({ paper }: { paper: ArXivPaper }) {
 }
 
 export const ArXivPanel = memo(function ArXivPanel({ papers, panelId, lastFetched }: { papers: ArXivPaper[], panelId?: string, lastFetched?: Date }) {
-  if (papers.length === 0) {
-    return (
-      <Panel title="arXiv" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No arXiv papers found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = papers.length === 0
   return (
-    <Panel title="arXiv" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Biology preprints from arXiv</p>
-      <PaginatedList className="space-y-3">
-        {papers.map((paper, i) => (
-          <PaperItem key={`${paper.arxivId}-${i}`} paper={paper} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="arXiv"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No arXiv papers found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Biology preprints from arXiv</p>
+          <PaginatedList className="space-y-3">
+            {papers.map((paper, i) => (
+              <PaperItem key={`${paper.arxivId}-${i}`} paper={paper} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

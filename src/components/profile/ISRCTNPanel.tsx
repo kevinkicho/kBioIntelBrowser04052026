@@ -66,27 +66,31 @@ function TrialItem({ trial }: { trial: ISRCTNTrial }) {
 }
 
 export const ISRCTNPanel = memo(function ISRCTNPanel({ trials, panelId, lastFetched }: { trials: ISRCTNTrial[], panelId?: string, lastFetched?: Date }) {
-  if (trials.length === 0) {
-    return (
-      <Panel title="ISRCTN" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No ISRCTN clinical trials found for this molecule.</p>
-      </Panel>
-    )
-  }
-
-  const recruitingCount = trials.filter(t => t.status === 'Recruiting' || t.recruitmentStatus === 'Recruiting').length
+  const isEmpty = trials.length === 0
 
   return (
-    <Panel title="ISRCTN" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        UK Clinical Trials Registry — {trials.length} trial{trials.length !== 1 ? 's' : ''}
-        {recruitingCount > 0 && <span className="text-green-400 ml-2">{recruitingCount} recruiting</span>}
-      </p>
-      <PaginatedList className="space-y-2">
-        {trials.map((trial, i) => (
-          <TrialItem key={`${trial.isRCTN}-${i}`} trial={trial} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="ISRCTN"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No ISRCTN clinical trials found for this molecule." : undefined}
+    >
+      {!isEmpty && (() => {
+        const recruitingCount = trials.filter(t => t.status === 'Recruiting' || t.recruitmentStatus === 'Recruiting').length
+        return (
+          <>
+            <p className="text-xs text-slate-400 mb-3">
+              UK Clinical Trials Registry — {trials.length} trial{trials.length !== 1 ? 's' : ''}
+              {recruitingCount > 0 && <span className="text-green-400 ml-2">{recruitingCount} recruiting</span>}
+            </p>
+            <PaginatedList className="space-y-2">
+              {trials.map((trial, i) => (
+                <TrialItem key={`${trial.isRCTN}-${i}`} trial={trial} />
+              ))}
+            </PaginatedList>
+          </>
+        )
+      })()}
     </Panel>
   )
 })

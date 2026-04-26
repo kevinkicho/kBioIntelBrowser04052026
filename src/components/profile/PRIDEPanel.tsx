@@ -44,22 +44,24 @@ function ProjectItem({ project }: { project: PRIDEProject }) {
 }
 
 export const PRIDEPanel = memo(function PRIDEPanel({ projects, panelId, lastFetched }: { projects: PRIDEProject[], panelId?: string, lastFetched?: Date }) {
-  if (projects.length === 0) {
-    return (
-      <Panel title="PRIDE" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No PRIDE proteomics projects found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = projects.length === 0
   return (
-    <Panel title="PRIDE" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Proteomics data from PRIDE Archive</p>
-      <PaginatedList className="space-y-3">
-        {projects.map((project, i) => (
-          <ProjectItem key={`${project.accession}-${i}`} project={project} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="PRIDE"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No PRIDE proteomics projects found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Proteomics data from PRIDE Archive</p>
+          <PaginatedList className="space-y-3">
+            {projects.map((project, i) => (
+              <ProjectItem key={`${project.accession}-${i}`} project={project} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

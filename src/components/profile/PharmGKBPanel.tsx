@@ -69,29 +69,33 @@ function DrugItem({ drug }: { drug: PharmGKBDrug }) {
 }
 
 export const PharmGKBPanel = memo(function PharmGKBPanel({ drugs, panelId, lastFetched }: { drugs: PharmGKBDrug[], panelId?: string, lastFetched?: Date }) {
-  if (drugs.length === 0) {
-    return (
-      <Panel title="PharmGKB" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No pharmacogenomic data found for this molecule.</p>
-      </Panel>
-    )
-  }
-
-  const totalGenes = drugs.reduce((sum, d) => sum + d.genes.length, 0)
-  const totalGuidelines = drugs.reduce((sum, d) => sum + d.guidelines.length, 0)
+  const isEmpty = drugs.length === 0
 
   return (
-    <Panel title="PharmGKB" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Pharmacogenomics Knowledgebase — {drugs.length} drug{drugs.length !== 1 ? 's' : ''}
-        {totalGenes > 0 && <span className="text-purple-400 ml-2">{totalGenes} gene associations</span>}
-        {totalGuidelines > 0 && <span className="text-cyan-400 ml-2">{totalGuidelines} guidelines</span>}
-      </p>
-      <PaginatedList className="space-y-2">
-        {drugs.map((drug, i) => (
-          <DrugItem key={`${drug.id}-${i}`} drug={drug} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="PharmGKB"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No pharmacogenomic data found for this molecule." : undefined}
+    >
+      {!isEmpty && (() => {
+        const totalGenes = drugs.reduce((sum, d) => sum + d.genes.length, 0)
+        const totalGuidelines = drugs.reduce((sum, d) => sum + d.guidelines.length, 0)
+        return (
+          <>
+            <p className="text-xs text-slate-400 mb-3">
+              Pharmacogenomics Knowledgebase — {drugs.length} drug{drugs.length !== 1 ? 's' : ''}
+              {totalGenes > 0 && <span className="text-purple-400 ml-2">{totalGenes} gene associations</span>}
+              {totalGuidelines > 0 && <span className="text-cyan-400 ml-2">{totalGuidelines} guidelines</span>}
+            </p>
+            <PaginatedList className="space-y-2">
+              {drugs.map((drug, i) => (
+                <DrugItem key={`${drug.id}-${i}`} drug={drug} />
+              ))}
+            </PaginatedList>
+          </>
+        )
+      })()}
     </Panel>
   )
 })

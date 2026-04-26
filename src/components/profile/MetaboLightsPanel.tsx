@@ -132,47 +132,49 @@ type MetaboLightsData = {
 
 export const MetaboLightsPanel = memo(function MetaboLightsPanel({ data, panelId, lastFetched }: { data: MetaboLightsData, panelId?: string, lastFetched?: Date }) {
   const { studies, metabolites } = data
-
-  if (studies.length === 0 && metabolites.length === 0) {
-    return (
-      <Panel title="MetaboLights" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No metabolomics data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = studies.length === 0 && metabolites.length === 0
 
   return (
-    <Panel title="MetaboLights" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Metabolomics Repository
-      </p>
+    <Panel
+      title="MetaboLights"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No metabolomics data found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Metabolomics Repository
+          </p>
 
-      {studies.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-green-400">Studies</span>
-            <span className="text-xs text-slate-500">({studies.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {studies.map((study, i) => (
-              <StudyItem key={`${study.id}-${i}`} study={study} />
-            ))}
-          </PaginatedList>
-        </div>
-      )}
+          {studies.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-green-400">Studies</span>
+                <span className="text-xs text-slate-500">({studies.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {studies.map((study, i) => (
+                  <StudyItem key={`${study.id}-${i}`} study={study} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
 
-      {metabolites.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-cyan-400">Metabolites</span>
-            <span className="text-xs text-slate-500">({metabolites.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {metabolites.map((metabolite, i) => (
-              <MetaboliteItem key={`${metabolite.id}-${i}`} metabolite={metabolite} />
-            ))}
-          </PaginatedList>
-        </div>
+          {metabolites.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-cyan-400">Metabolites</span>
+                <span className="text-xs text-slate-500">({metabolites.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {metabolites.map((metabolite, i) => (
+                  <MetaboliteItem key={`${metabolite.id}-${i}`} metabolite={metabolite} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
+        </>
       )}
     </Panel>
   )

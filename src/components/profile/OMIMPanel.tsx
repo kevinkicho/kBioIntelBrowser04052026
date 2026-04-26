@@ -10,13 +10,8 @@ interface OMIMPanelProps {
 }
 
 export const OMIMPanel = memo(function OMIMPanel({ entries, panelId, lastFetched }: OMIMPanelProps) {
-  if (!entries || entries.length === 0) {
-    return (
-      <Panel title="OMIM" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No OMIM entries found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = !entries || entries.length === 0
+  const title = isEmpty ? "OMIM" : "OMIM Genetic Disorders"
 
   // Get status badge color
   const getStatusColor = (status: string) => {
@@ -47,62 +42,69 @@ export const OMIMPanel = memo(function OMIMPanel({ entries, panelId, lastFetched
   }
 
   return (
-    <Panel title="OMIM Genetic Disorders" panelId={panelId} lastFetched={lastFetched}>
-      <PaginatedList className="space-y-2">
-        {entries.map((entry, idx) => (
-          <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <a
-                    href={entry.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-blue-400 hover:text-blue-300 text-sm font-medium"
-                  >
-                    {entry.name}
-                  </a>
-                  <span className={`text-xs px-1.5 py-0.5 rounded ${getPrefixColor(entry.prefix)}`}>
-                    OMIM:{entry.mimNumber}
-                  </span>
-                </div>
-
-                <div className="flex gap-1 mt-1">
-                  {entry.status && (
-                    <span className={`text-xs px-1.5 py-0.5 rounded ${getStatusColor(entry.status)}`}>
-                      {entry.status}
+    <Panel
+      title={title}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No OMIM entries found for this molecule." : undefined}
+    >
+      {!isEmpty && entries && (
+        <PaginatedList className="space-y-2">
+          {entries.map((entry, idx) => (
+            <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2">
+                    <a
+                      href={entry.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-blue-400 hover:text-blue-300 text-sm font-medium"
+                    >
+                      {entry.name}
+                    </a>
+                    <span className={`text-xs px-1.5 py-0.5 rounded ${getPrefixColor(entry.prefix)}`}>
+                      OMIM:{entry.mimNumber}
                     </span>
+                  </div>
+
+                  <div className="flex gap-1 mt-1">
+                    {entry.status && (
+                      <span className={`text-xs px-1.5 py-0.5 rounded ${getStatusColor(entry.status)}`}>
+                        {entry.status}
+                      </span>
+                    )}
+                  </div>
+
+                  {entry.description && (
+                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{entry.description}</p>
+                  )}
+
+                  {entry.geneSymbols && entry.geneSymbols.length > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Associated genes: {entry.geneSymbols.slice(0, 5).join(', ')}
+                      {entry.geneSymbols.length > 5 && ` +${entry.geneSymbols.length - 5} more`}
+                    </p>
+                  )}
+
+                  {entry.phenotypes && entry.phenotypes.length > 0 && (
+                    <p className="text-xs text-slate-500">
+                      Phenotypes: {entry.phenotypes.slice(0, 3).map(p => p.name).join(', ')}
+                      {entry.phenotypes.length > 3 && ` +${entry.phenotypes.length - 3} more`}
+                    </p>
+                  )}
+
+                  {entry.references && entry.references.length > 0 && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      {entry.references.length} references
+                    </p>
                   )}
                 </div>
-
-                {entry.description && (
-                  <p className="text-xs text-slate-400 mt-1 line-clamp-2">{entry.description}</p>
-                )}
-
-                {entry.geneSymbols && entry.geneSymbols.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    Associated genes: {entry.geneSymbols.slice(0, 5).join(', ')}
-                    {entry.geneSymbols.length > 5 && ` +${entry.geneSymbols.length - 5} more`}
-                  </p>
-                )}
-
-                {entry.phenotypes && entry.phenotypes.length > 0 && (
-                  <p className="text-xs text-slate-500">
-                    Phenotypes: {entry.phenotypes.slice(0, 3).map(p => p.name).join(', ')}
-                    {entry.phenotypes.length > 3 && ` +${entry.phenotypes.length - 3} more`}
-                  </p>
-                )}
-
-                {entry.references && entry.references.length > 0 && (
-                  <p className="text-xs text-slate-500 mt-1">
-                    {entry.references.length} references
-                  </p>
-                )}
               </div>
             </div>
-          </div>
-        ))}
-      </PaginatedList>
+          ))}
+        </PaginatedList>
+      )}
     </Panel>
   )
 })

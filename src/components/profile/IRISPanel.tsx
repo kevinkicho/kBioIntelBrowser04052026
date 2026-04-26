@@ -97,24 +97,26 @@ function AssessmentItem({ assessment }: { assessment: IRISAssessment }) {
 }
 
 export const IRISPanel = memo(function IRISPanel({ assessments, panelId, lastFetched }: { assessments: IRISAssessment[], panelId?: string, lastFetched?: Date }) {
-  if (assessments.length === 0) {
-    return (
-      <Panel title="EPA IRIS" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No EPA IRIS toxicological assessments found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = assessments.length === 0
   return (
-    <Panel title="EPA IRIS" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Integrated Risk Information System — {assessments.length} assessment{assessments.length !== 1 ? 's' : ''}
-      </p>
-      <PaginatedList className="space-y-2">
-        {assessments.map((assessment, i) => (
-          <AssessmentItem key={`${assessment.id}-${i}`} assessment={assessment} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="EPA IRIS"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No EPA IRIS toxicological assessments found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Integrated Risk Information System — {assessments.length} assessment{assessments.length !== 1 ? 's' : ''}
+          </p>
+          <PaginatedList className="space-y-2">
+            {assessments.map((assessment, i) => (
+              <AssessmentItem key={`${assessment.id}-${i}`} assessment={assessment} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

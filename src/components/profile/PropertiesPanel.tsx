@@ -25,26 +25,26 @@ function PropertyCard({ label, value, violation }: PropertyCardProps) {
 }
 
 export const PropertiesPanel = memo(function PropertiesPanel({ properties, molecularWeight, panelId, lastFetched }: Props) {
-  if (!properties) {
-    return (
-      <Panel title="Computed Properties (PubChem)" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No computed properties available.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = !properties
   return (
-    <Panel title="Computed Properties (PubChem)" panelId={panelId} lastFetched={lastFetched}>
-      <div className="grid grid-cols-2 gap-2">
-        <PropertyCard label="LogP" value={properties.xLogP ?? 'N/A'} violation={properties.xLogP !== null && properties.xLogP > 5} />
-        <PropertyCard label="Polar Surface Area (Å²)" value={properties.tpsa ?? 'N/A'} />
-        <PropertyCard label="H-Bond Donors" value={properties.hBondDonorCount} violation={properties.hBondDonorCount > 5} />
-        <PropertyCard label="H-Bond Acceptors" value={properties.hBondAcceptorCount} violation={properties.hBondAcceptorCount > 10} />
-        <PropertyCard label="Molecular Weight" value={molecularWeight.toFixed(2)} violation={molecularWeight > 500} />
-        <PropertyCard label="Complexity" value={properties.complexity} />
-        <PropertyCard label="Exact Mass" value={Number(properties.exactMass).toFixed(3)} />
-        <PropertyCard label="Rotatable Bonds" value={properties.rotatableBondCount} />
-      </div>
+    <Panel
+      title="Computed Properties (PubChem)"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No computed properties available." : undefined}
+    >
+      {!isEmpty && properties && (
+        <div className="grid grid-cols-2 gap-2">
+          <PropertyCard label="LogP" value={properties.xLogP ?? 'N/A'} violation={properties.xLogP !== null && properties.xLogP > 5} />
+          <PropertyCard label="Polar Surface Area (Å²)" value={properties.tpsa ?? 'N/A'} />
+          <PropertyCard label="H-Bond Donors" value={properties.hBondDonorCount} violation={properties.hBondDonorCount > 5} />
+          <PropertyCard label="H-Bond Acceptors" value={properties.hBondAcceptorCount} violation={properties.hBondAcceptorCount > 10} />
+          <PropertyCard label="Molecular Weight" value={molecularWeight.toFixed(2)} violation={molecularWeight > 500} />
+          <PropertyCard label="Complexity" value={properties.complexity} />
+          <PropertyCard label="Exact Mass" value={Number(properties.exactMass).toFixed(3)} />
+          <PropertyCard label="Rotatable Bonds" value={properties.rotatableBondCount} />
+        </div>
+      )}
     </Panel>
   )
 })

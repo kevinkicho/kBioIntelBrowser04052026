@@ -22,16 +22,18 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
   const atcCodes = enhancedData?.atcCodes ?? []
   const products = enhancedData?.products ?? []
 
-  if (!drug) {
-    return (
-      <Panel title="DrugCentral" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No DrugCentral data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = !drug
 
   return (
-    <Panel title="DrugCentral" panelId={panelId} lastFetched={lastFetched} className="space-y-4">
+    <Panel
+      title="DrugCentral"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      className="space-y-4"
+      empty={isEmpty ? "No DrugCentral data found for this molecule." : undefined}
+    >
+      {!isEmpty && drug && (
+        <>
       <div className="space-y-2">
         <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">Drug Info</h3>
         <div className="text-sm text-slate-300">
@@ -117,6 +119,8 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
             ))}
           </div>
         </div>
+      )}
+        </>
       )}
     </Panel>
   )

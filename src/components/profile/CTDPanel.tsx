@@ -17,17 +17,18 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
   const [activeTab, setActiveTab] = useState<'interactions' | 'diseases'>('interactions')
   const items = interactions ?? []
   const diseases = diseaseAssociations ?? []
-
-  if (items.length === 0 && diseases.length === 0) {
-    return (
-      <Panel title="CTD" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No CTD interactions found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = items.length === 0 && diseases.length === 0
+  const title = isEmpty ? "CTD" : "CTD Chemical-Gene-Disease Interactions"
 
   return (
-    <Panel title={`CTD Chemical-Gene-Disease Interactions`} panelId={panelId} lastFetched={lastFetched}>
+    <Panel
+      title={title}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No CTD interactions found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
       {/* Tabs */}
       <div className="flex gap-2 mb-3">
         <button
@@ -119,6 +120,8 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
             </div>
           ))}
         </PaginatedList>
+      )}
+        </>
       )}
     </Panel>
   )

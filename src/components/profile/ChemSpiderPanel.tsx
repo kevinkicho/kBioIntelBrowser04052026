@@ -80,24 +80,26 @@ function CompoundItem({ compound }: { compound: ChemSpiderCompound }) {
 }
 
 export const ChemSpiderPanel = memo(function ChemSpiderPanel({ compounds, panelId, lastFetched }: { compounds: ChemSpiderCompound[], panelId?: string, lastFetched?: Date }) {
-  if (compounds.length === 0) {
-    return (
-      <Panel title="ChemSpider" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No ChemSpider compounds found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = compounds.length === 0
   return (
-    <Panel title="ChemSpider" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Royal Society of Chemistry Database — {compounds.length} compound{compounds.length !== 1 ? 's' : ''}
-      </p>
-      <PaginatedList className="space-y-2">
-        {compounds.map((compound, i) => (
-          <CompoundItem key={`${compound.csId}-${i}`} compound={compound} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="ChemSpider"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No ChemSpider compounds found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Royal Society of Chemistry Database — {compounds.length} compound{compounds.length !== 1 ? 's' : ''}
+          </p>
+          <PaginatedList className="space-y-2">
+            {compounds.map((compound, i) => (
+              <CompoundItem key={`${compound.csId}-${i}`} compound={compound} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

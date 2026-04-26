@@ -126,47 +126,49 @@ type CATHData = {
 
 export const CATHPanel = memo(function CATHPanel({ data, panelId, lastFetched }: { data: CATHData, panelId?: string, lastFetched?: Date }) {
   const { domains, gene3dEntries } = data
-
-  if (domains.length === 0 && gene3dEntries.length === 0) {
-    return (
-      <Panel title="CATH/Gene3D" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No CATH domain classifications found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = domains.length === 0 && gene3dEntries.length === 0
 
   return (
-    <Panel title="CATH/Gene3D" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Protein Domain Classification Database
-      </p>
+    <Panel
+      title="CATH/Gene3D"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No CATH domain classifications found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Protein Domain Classification Database
+          </p>
 
-      {domains.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-purple-400">Domains</span>
-            <span className="text-xs text-slate-500">({domains.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {domains.map((domain, i) => (
-              <DomainItem key={`${domain.domainId}-${i}`} domain={domain} />
-            ))}
-          </PaginatedList>
-        </div>
-      )}
+          {domains.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-purple-400">Domains</span>
+                <span className="text-xs text-slate-500">({domains.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {domains.map((domain, i) => (
+                  <DomainItem key={`${domain.domainId}-${i}`} domain={domain} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
 
-      {gene3dEntries.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-green-400">Gene3D Entries</span>
-            <span className="text-xs text-slate-500">({gene3dEntries.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {gene3dEntries.map((entry, i) => (
-              <GeneItem key={`${entry.geneId}-${i}`} entry={entry} />
-            ))}
-          </PaginatedList>
-        </div>
+          {gene3dEntries.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-green-400">Gene3D Entries</span>
+                <span className="text-xs text-slate-500">({gene3dEntries.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {gene3dEntries.map((entry, i) => (
+                  <GeneItem key={`${entry.geneId}-${i}`} entry={entry} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
+        </>
       )}
     </Panel>
   )

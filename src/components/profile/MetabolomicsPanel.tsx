@@ -24,17 +24,18 @@ function MetaboliteBadge({ label, value }: { label: string, value?: string | num
 export const MetabolomicsPanel = memo(function MetabolomicsPanel({ data, panelId, lastFetched }: MetabolomicsPanelProps) {
   const metabolites = data?.metabolites ?? []
   const studies = data?.studies ?? []
-
-  if (metabolites.length === 0 && studies.length === 0) {
-    return (
-      <Panel title="Metabolomics Workbench" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No metabolomics data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = metabolites.length === 0 && studies.length === 0
 
   return (
-    <Panel title="Metabolomics Workbench" panelId={panelId} lastFetched={lastFetched} className="space-y-4">
+    <Panel
+      title="Metabolomics Workbench"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      className="space-y-4"
+      empty={isEmpty ? "No metabolomics data found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
       {metabolites.length > 0 && (
         <div className="space-y-2">
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
@@ -143,6 +144,8 @@ export const MetabolomicsPanel = memo(function MetabolomicsPanel({ data, panelId
             ))}
           </PaginatedList>
         </div>
+      )}
+        </>
       )}
     </Panel>
   )

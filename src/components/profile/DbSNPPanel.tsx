@@ -52,22 +52,24 @@ function VariantItem({ variant }: { variant: dbSNPVariant }) {
 }
 
 export const DbSNPPanel = memo(function DbSNPPanel({ variants, panelId, lastFetched }: { variants: dbSNPVariant[], panelId?: string, lastFetched?: Date }) {
-  if (variants.length === 0) {
-    return (
-      <Panel title="dbSNP" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No genetic variants found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = variants.length === 0
   return (
-    <Panel title="dbSNP" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Genetic variants from NCBI dbSNP</p>
-      <PaginatedList className="space-y-3">
-        {variants.map((variant, i) => (
-          <VariantItem key={`${variant.rsId}-${i}`} variant={variant} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="dbSNP"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No genetic variants found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Genetic variants from NCBI dbSNP</p>
+          <PaginatedList className="space-y-3">
+            {variants.map((variant, i) => (
+              <VariantItem key={`${variant.rsId}-${i}`} variant={variant} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

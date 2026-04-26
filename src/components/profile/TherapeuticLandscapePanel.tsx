@@ -34,45 +34,46 @@ export const TherapeuticLandscapePanel = memo(function TherapeuticLandscapePanel
     [chemblIndications, openTargetsDiseases, disgenetAssociations, orphanetDiseases, ctdDiseaseAssociations],
   )
 
-  if (landscape.totalDiseases === 0) {
-    return (
-      <Panel title="Therapeutic Landscape" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No disease associations found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = landscape.totalDiseases === 0
 
   return (
-    <Panel title="Therapeutic Landscape" panelId={panelId} lastFetched={lastFetched}>
-      <div className="space-y-5">
-        {landscape.approved.length > 0 && (
-          <DiseaseGroup
-            title="Approved Indications"
-            count={landscape.approved.length}
-            diseases={landscape.approved}
-            accent="emerald"
-            icon="check"
-          />
-        )}
-        {landscape.investigational.length > 0 && (
-          <DiseaseGroup
-            title="Investigational"
-            count={landscape.investigational.length}
-            diseases={landscape.investigational}
-            accent="blue"
-            icon="flask"
-          />
-        )}
-        {landscape.repurposingCandidates.length > 0 && (
-          <DiseaseGroup
-            title="Repurposing Candidates"
-            count={landscape.repurposingCandidates.length}
-            diseases={landscape.repurposingCandidates}
-            accent="amber"
-            icon="spark"
-          />
-        )}
-      </div>
+    <Panel
+      title="Therapeutic Landscape"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No disease associations found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <div className="space-y-5">
+          {landscape.approved.length > 0 && (
+            <DiseaseGroup
+              title="Approved Indications"
+              count={landscape.approved.length}
+              diseases={landscape.approved}
+              accent="emerald"
+              icon="check"
+            />
+          )}
+          {landscape.investigational.length > 0 && (
+            <DiseaseGroup
+              title="Investigational"
+              count={landscape.investigational.length}
+              diseases={landscape.investigational}
+              accent="blue"
+              icon="flask"
+            />
+          )}
+          {landscape.repurposingCandidates.length > 0 && (
+            <DiseaseGroup
+              title="Repurposing Candidates"
+              count={landscape.repurposingCandidates.length}
+              diseases={landscape.repurposingCandidates}
+              accent="amber"
+              icon="spark"
+            />
+          )}
+        </div>
+      )}
     </Panel>
   )
 })

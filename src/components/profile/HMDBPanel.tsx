@@ -10,16 +10,17 @@ interface HMDBPanelProps {
 }
 
 export const HMDBPanel = memo(function HMDBPanel({ metabolites, panelId, lastFetched }: HMDBPanelProps) {
-  if (!metabolites || metabolites.length === 0) {
-    return (
-      <Panel title="HMDB" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No metabolite data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = !metabolites || metabolites.length === 0
+  const title = isEmpty ? "HMDB" : "HMDB Metabolites"
 
   return (
-    <Panel title="HMDB Metabolites" panelId={panelId} lastFetched={lastFetched}>
+    <Panel
+      title={title}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No metabolite data found for this molecule." : undefined}
+    >
+      {!isEmpty && metabolites && (
       <PaginatedList className="space-y-2">
         {metabolites.map((metabolite, idx) => (
           <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
@@ -83,6 +84,7 @@ export const HMDBPanel = memo(function HMDBPanel({ metabolites, panelId, lastFet
           </div>
         ))}
       </PaginatedList>
+      )}
     </Panel>
   )
 })

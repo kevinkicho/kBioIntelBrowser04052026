@@ -132,61 +132,63 @@ type KEGGData = {
 
 export const KEGGPanel = memo(function KEGGPanel({ data, panelId, lastFetched }: { data: KEGGData, panelId?: string, lastFetched?: Date }) {
   const { pathways, compounds, drugs } = data
-
-  if (pathways.length === 0 && compounds.length === 0 && drugs.length === 0) {
-    return (
-      <Panel title="KEGG" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No KEGG pathway, compound, or drug data found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = pathways.length === 0 && compounds.length === 0 && drugs.length === 0
 
   return (
-    <Panel title="KEGG" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Kyoto Encyclopedia of Genes and Genomes
-      </p>
+    <Panel
+      title="KEGG"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No KEGG pathway, compound, or drug data found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Kyoto Encyclopedia of Genes and Genomes
+          </p>
 
-      {pathways.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-purple-400">Pathways</span>
-            <span className="text-xs text-slate-500">({pathways.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {pathways.map((pathway, i) => (
-              <PathwayItem key={`${pathway.id}-${i}`} pathway={pathway} />
-            ))}
-          </PaginatedList>
-        </div>
-      )}
+          {pathways.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-purple-400">Pathways</span>
+                <span className="text-xs text-slate-500">({pathways.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {pathways.map((pathway, i) => (
+                  <PathwayItem key={`${pathway.id}-${i}`} pathway={pathway} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
 
-      {compounds.length > 0 && (
-        <div className="mb-4">
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-cyan-400">Compounds</span>
-            <span className="text-xs text-slate-500">({compounds.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {compounds.map((compound, i) => (
-              <CompoundItem key={`${compound.id}-${i}`} compound={compound} />
-            ))}
-          </PaginatedList>
-        </div>
-      )}
+          {compounds.length > 0 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-cyan-400">Compounds</span>
+                <span className="text-xs text-slate-500">({compounds.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {compounds.map((compound, i) => (
+                  <CompoundItem key={`${compound.id}-${i}`} compound={compound} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
 
-      {drugs.length > 0 && (
-        <div>
-          <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
-            <span className="text-green-400">Drugs</span>
-            <span className="text-xs text-slate-500">({drugs.length})</span>
-          </h4>
-          <PaginatedList className="space-y-2">
-            {drugs.map((drug, i) => (
-              <DrugItem key={`${drug.id}-${i}`} drug={drug} />
-            ))}
-          </PaginatedList>
-        </div>
+          {drugs.length > 0 && (
+            <div>
+              <h4 className="text-sm font-semibold text-slate-200 mb-2 flex items-center gap-2">
+                <span className="text-green-400">Drugs</span>
+                <span className="text-xs text-slate-500">({drugs.length})</span>
+              </h4>
+              <PaginatedList className="space-y-2">
+                {drugs.map((drug, i) => (
+                  <DrugItem key={`${drug.id}-${i}`} drug={drug} />
+                ))}
+              </PaginatedList>
+            </div>
+          )}
+        </>
       )}
     </Panel>
   )

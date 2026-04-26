@@ -8,12 +8,13 @@ interface PanelProps {
   title: string
   panelId?: string
   lastFetched?: Date
-  children: React.ReactNode
+  children?: React.ReactNode
   className?: string
   titleExtra?: React.ReactNode
+  empty?: string
 }
 
-export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra }: PanelProps) {
+export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra, empty }: PanelProps) {
   const [showSource, setShowSource] = useState(false)
   const freshness = panelId && lastFetched ? getFreshnessStatus(panelId, lastFetched) : null
   const sourceInfo = panelId ? getPanelSource(panelId) : null
@@ -31,7 +32,11 @@ export function Panel({ title, panelId, lastFetched, children, className = '', t
           </span>
         )}
       </div>
-      {children}
+      {empty ? (
+        <p className="text-slate-500 text-sm">{empty}</p>
+      ) : (
+        children
+      )}
       {sourceInfo && (
         <div className="mt-3 pt-2 border-t border-slate-700/40">
           <button

@@ -52,22 +52,24 @@ function PathwayItem({ pathway }: { pathway: SMPDBPathway }) {
 }
 
 export const SMPDBPanel = memo(function SMPDBPanel({ pathways, panelId, lastFetched }: { pathways: SMPDBPathway[], panelId?: string, lastFetched?: Date }) {
-  if (pathways.length === 0) {
-    return (
-      <Panel title="SMPDB" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No SMPDB pathways found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = pathways.length === 0
   return (
-    <Panel title="SMPDB" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Small molecule pathways from SMPDB</p>
-      <PaginatedList className="space-y-3">
-        {pathways.map((pathway, i) => (
-          <PathwayItem key={`${pathway.smpdbId}-${i}`} pathway={pathway} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="SMPDB"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No SMPDB pathways found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Small molecule pathways from SMPDB</p>
+          <PaginatedList className="space-y-3">
+            {pathways.map((pathway, i) => (
+              <PathwayItem key={`${pathway.smpdbId}-${i}`} pathway={pathway} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

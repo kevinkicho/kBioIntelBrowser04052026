@@ -34,22 +34,24 @@ function GEOItem({ dataset }: { dataset: GEODataset }) {
 }
 
 export const GEOPanel = memo(function GEOPanel({ datasets, panelId, lastFetched }: { datasets: GEODataset[], panelId?: string, lastFetched?: Date }) {
-  if (datasets.length === 0) {
-    return (
-      <Panel title="GEO" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No GEO datasets found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = datasets.length === 0
   return (
-    <Panel title="GEO" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Gene Expression Omnibus datasets</p>
-      <PaginatedList className="space-y-3">
-        {datasets.map((dataset, i) => (
-          <GEOItem key={`${dataset.geoId}-${i}`} dataset={dataset} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="GEO"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No GEO datasets found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Gene Expression Omnibus datasets</p>
+          <PaginatedList className="space-y-3">
+            {datasets.map((dataset, i) => (
+              <GEOItem key={`${dataset.geoId}-${i}`} dataset={dataset} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

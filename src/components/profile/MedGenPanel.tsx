@@ -59,23 +59,25 @@ export const MedGenPanel = memo(function MedGenPanel({
 }) {
   // Safeguard: ensure concepts is an array
   const safeConcepts = Array.isArray(concepts) ? concepts : []
-
-  if (safeConcepts.length === 0) {
-    return (
-      <Panel title="MedGen" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No MedGen concepts found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = safeConcepts.length === 0
 
   return (
-    <Panel title="MedGen" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Medical genetics concepts from NCBI</p>
-      <PaginatedList className="space-y-3">
-        {safeConcepts.map((concept, i) => (
-          <ConceptItem key={`${concept.conceptId || i}-${i}`} concept={concept} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="MedGen"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No MedGen concepts found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Medical genetics concepts from NCBI</p>
+          <PaginatedList className="space-y-3">
+            {safeConcepts.map((concept, i) => (
+              <ConceptItem key={`${concept.conceptId || i}-${i}`} concept={concept} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })

@@ -11,16 +11,17 @@ interface MyGenePanelProps {
 }
 
 export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetched }: MyGenePanelProps) {
-  if (!genes || genes.length === 0) {
-    return (
-      <Panel title="MyGene" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No gene annotations found for this molecule.</p>
-      </Panel>
-    )
-  }
+  const isEmpty = !genes || genes.length === 0
+  const title = isEmpty ? "MyGene" : "MyGene.info Annotations"
 
   return (
-    <Panel title="MyGene.info Annotations" panelId={panelId} lastFetched={lastFetched}>
+    <Panel
+      title={title}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No gene annotations found for this molecule." : undefined}
+    >
+      {!isEmpty && genes && (
       <PaginatedList className="space-y-2">
         {genes.map((gene, idx) => (
           <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
@@ -112,6 +113,7 @@ export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetch
           </div>
         ))}
       </PaginatedList>
+      )}
     </Panel>
   )
 })

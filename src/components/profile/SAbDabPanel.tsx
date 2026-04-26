@@ -112,41 +112,46 @@ function EntryItem({ entry }: { entry: SAbDabEntry }) {
 }
 
 export const SAbDabPanel = memo(function SAbDabPanel({ entries, panelId, lastFetched }: { entries: SAbDabEntry[], panelId?: string, lastFetched?: Date }) {
-  if (entries.length === 0) {
-    return (
-      <Panel title="SAbDab" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No antibody structure data found for this molecule.</p>
-      </Panel>
-    )
-  }
-
-  const typeCounts = entries.reduce((acc, e) => {
-    acc[e.antibodyType] = (acc[e.antibodyType] || 0) + 1
-    return acc
-  }, {} as Record<string, number>)
-
-  const withAffinity = entries.filter(e => e.affinity !== null).length
+  const isEmpty = entries.length === 0
 
   return (
-    <Panel title="SAbDab" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">
-        Structural Antibody Database — {entries.length} structure{entries.length !== 1 ? 's' : ''}
-        {withAffinity > 0 && <span className="text-cyan-400 ml-2">{withAffinity} with affinity data</span>}
-      </p>
+    <Panel
+      title="SAbDab"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No antibody structure data found for this molecule." : undefined}
+    >
+      {!isEmpty && (() => {
+        const typeCounts = entries.reduce((acc, e) => {
+          acc[e.antibodyType] = (acc[e.antibodyType] || 0) + 1
+          return acc
+        }, {} as Record<string, number>)
 
-      <div className="flex flex-wrap gap-1.5 mb-3">
-        {Object.entries(typeCounts).map(([type, count]) => (
-          <span key={type} className="text-xs bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
-            {type}: {count}
-          </span>
-        ))}
-      </div>
+        const withAffinity = entries.filter(e => e.affinity !== null).length
 
-      <PaginatedList className="space-y-2">
-        {entries.map((entry, i) => (
-          <EntryItem key={`${entry.pdbId}-${i}`} entry={entry} />
-        ))}
-      </PaginatedList>
+        return (
+          <>
+            <p className="text-xs text-slate-400 mb-3">
+              Structural Antibody Database — {entries.length} structure{entries.length !== 1 ? 's' : ''}
+              {withAffinity > 0 && <span className="text-cyan-400 ml-2">{withAffinity} with affinity data</span>}
+            </p>
+
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {Object.entries(typeCounts).map(([type, count]) => (
+                <span key={type} className="text-xs bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
+                  {type}: {count}
+                </span>
+              ))}
+            </div>
+
+            <PaginatedList className="space-y-2">
+              {entries.map((entry, i) => (
+                <EntryItem key={`${entry.pdbId}-${i}`} entry={entry} />
+              ))}
+            </PaginatedList>
+          </>
+        )
+      })()}
     </Panel>
   )
 })

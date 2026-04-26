@@ -30,22 +30,24 @@ function PathwayItem({ pathway }: { pathway: BioCycPathway }) {
 }
 
 export const BioCycPanel = memo(function BioCycPanel({ pathways, panelId, lastFetched }: { pathways: BioCycPathway[], panelId?: string, lastFetched?: Date }) {
-  if (pathways.length === 0) {
-    return (
-      <Panel title="BioCyc" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No BioCyc pathways found for this molecule.</p>
-      </Panel>
-    )
-  }
-
+  const isEmpty = pathways.length === 0
   return (
-    <Panel title="BioCyc" panelId={panelId} lastFetched={lastFetched}>
-      <p className="text-xs text-slate-400 mb-3">Metabolic pathways from BioCyc</p>
-      <PaginatedList className="space-y-3">
-        {pathways.map((pathway, i) => (
-          <PathwayItem key={`${pathway.pathwayId}-${i}`} pathway={pathway} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title="BioCyc"
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={isEmpty ? "No BioCyc pathways found for this molecule." : undefined}
+    >
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">Metabolic pathways from BioCyc</p>
+          <PaginatedList className="space-y-3">
+            {pathways.map((pathway, i) => (
+              <PathwayItem key={`${pathway.pathwayId}-${i}`} pathway={pathway} />
+            ))}
+          </PaginatedList>
+        </>
+      )}
     </Panel>
   )
 })
