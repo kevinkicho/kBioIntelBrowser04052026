@@ -12,7 +12,7 @@ describe('fetchCategoryData', () => {
 
     const result = await fetchCategoryData(2244, 'pharmaceutical')
 
-    expect(mockFetch).toHaveBeenCalledWith('/api/molecule/2244/category/pharmaceutical')
+    expect(mockFetch).toHaveBeenCalledWith('/api/molecule/2244/category/pharmaceutical', undefined)
     expect(result).toEqual(mockData)
   })
 

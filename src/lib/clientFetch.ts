@@ -90,7 +90,7 @@ export async function clientFetch(
   try {
     const response = await promise
     const duration = Math.round(performance.now() - start)
-    const size = response.headers.get('content-length')
+    const size = response.headers?.get?.('content-length')
     const sizeStr = size ? ` ${Math.round(parseInt(size) / 1024)}KB` : ''
 
     const source = url.includes('/category/')

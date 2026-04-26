@@ -1,6 +1,6 @@
 import { getTargetRelatedMolecules } from '@/lib/api/dgidb'
 
-function mockDGIdbResponse(geneNodes: Array<{ name: string; interactions: Array<{ drug: { name: string; conceptId: string }; interactionTypes: Array<{ type: string }>; sources: Array<{ sourceDbName: string }> }> }>) {
+function mockDGIdbResponse(geneNodes: Array<{ name: string | null; interactions: Array<{ drug: { name: string; conceptId: string }; interactionTypes: Array<{ type: string }>; sources: Array<{ sourceDbName: string }> }> }>) {
   return {
     data: {
       genes: {

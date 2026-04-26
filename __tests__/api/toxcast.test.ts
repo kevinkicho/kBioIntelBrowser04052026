@@ -1,4 +1,5 @@
 import { getToxCastData, getToxCastByDtxsid, getAssayDetails } from '@/lib/api/toxcast'
+import { mockJsonResponse } from '../utils/mockFetch'
 
 // Mock global fetch
 global.fetch = jest.fn()
@@ -10,80 +11,73 @@ describe('ToxCast API', () => {
 
   describe('getToxCastData', () => {
     it('should fetch ToxCast data successfully', async () => {
-      // Mock searchChemical
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [{ dtxsid: 'DTXSID12345' }] })
-      })
-
-      // Mock getToxCastBioactivity
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          assays: [
-            { assay_id: 'ASSAY1', assay_name: 'Test Assay', endpoint: 'Test', outcome: 'Active' }
-          ]
+      // 1) searchChemical -> CompTox /equal endpoint returns a result
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse([
+          {
+            dtxsid: 'DTXSID12345',
+            dtxcid: '',
+            searchWord: '50-00-0',
+            searchMatch: 'CASRN',
+            rank: 1,
+          },
+        ])
+      )
+      // 2) getChemicalDetail -> CompTox detail
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse({
+          preferredName: 'Test Chemical',
+          casRegistryNumber: '50-00-0',
+          molecularFormula: '',
+          molecularWeight: 0,
+          synonyms: [],
+          toxcastActiveAssays: 3,
+          toxcastTotalAssays: 10,
         })
-      })
-
-      // Mock getToxCastSummary
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          totalAssays: 10,
-          activeAssays: 3,
-          inactiveAssays: 5,
-          inconclusiveAssays: 2,
-          topHitSubcategory: 'Nuclear Receptor'
-        })
-      })
-
-      // Mock getChemicalName
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ preferred_name: 'Test Chemical' })
-      })
-
-      const result = await getToxCastData('50-00-0')
-
-      expect(result).toEqual({
-        casrn: '50-00-0',
-        dtxsid: 'DTXSID12345',
-        chemicalName: 'Test Chemical',
-        assays: [
+      )
+      // 3) getToxCastBioactivity -> array of assays
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse([
           {
             assayId: 'ASSAY1',
             assayName: 'Test Assay',
             endpoint: 'Test',
-            outcome: 'Active',
-            potencyValue: undefined,
-            potencyUnit: undefined,
-            nConst: undefined,
-            nGain: undefined,
-            nLoss: undefined
-          }
-        ],
-        summary: {
-          totalAssays: 10,
-          activeAssays: 3,
-          inactiveAssays: 5,
-          inconclusiveAssays: 2,
-          topHitSubcategory: 'Nuclear Receptor'
-        }
-      })
+            hitCall: 'Active',
+            ac50: 0,
+            potencyUnit: 'uM',
+            nConst: 0,
+            nGain: 0,
+            nLoss: 0,
+          },
+        ])
+      )
+
+      const result = await getToxCastData('50-00-0')
+
+      expect(result).not.toBeNull()
+      expect(result!.casrn).toBe('50-00-0')
+      expect(result!.dtxsid).toBe('DTXSID12345')
+      expect(result!.chemicalName).toBe('Test Chemical')
+      expect(result!.assays).toHaveLength(1)
+      expect(result!.assays[0].assayId).toBe('ASSAY1')
+      expect(result!.assays[0].assayName).toBe('Test Assay')
+      expect(result!.assays[0].outcome).toBe('Active')
+      expect(result!.summary.totalAssays).toBe(10)
+      expect(result!.summary.activeAssays).toBe(3)
     })
 
     it('should return null when chemical not found', async () => {
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ results: [] })
-      })
+      // searchChemical: equal endpoint empty
+      ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse([]))
+      // searchChemical: start-with endpoint also empty
+      ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse([]))
 
       const result = await getToxCastData('invalid-cas')
       expect(result).toBeNull()
     })
 
     it('should return null on fetch error', async () => {
+      // searchChemical: equal endpoint throws -> returns null
       ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'))
 
       const result = await getToxCastData('50-00-0')
@@ -92,46 +86,61 @@ describe('ToxCast API', () => {
   })
 
   describe('getToxCastByDtxsid', () => {
-    it('should fetch ToxCast data by DTXSID', async () => {
-      // Mock getToxCastBioactivity
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ assays: [] })
-      })
-
-      // Mock getToxCastSummary
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          totalAssays: 0,
-          activeAssays: 0,
-          inactiveAssays: 0,
-          inconclusiveAssays: 0,
-          topHitSubcategory: ''
+    it('returns null when bioactivity has no assays', async () => {
+      // getChemicalDetail
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse({
+          preferredName: 'Test Chemical',
+          casRegistryNumber: '',
+          molecularFormula: '',
+          molecularWeight: 0,
+          synonyms: [],
+          toxcastActiveAssays: 0,
+          toxcastTotalAssays: 0,
         })
-      })
-
-      // Mock getChemicalName
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ preferred_name: 'Test Chemical' })
-      })
+      )
+      // getToxCastBioactivity (empty array)
+      ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse([]))
 
       const result = await getToxCastByDtxsid('DTXSID12345')
 
-      expect(result).toEqual({
-        casrn: '',
-        dtxsid: 'DTXSID12345',
-        chemicalName: 'Test Chemical',
-        assays: [],
-        summary: {
-          totalAssays: 0,
-          activeAssays: 0,
-          inactiveAssays: 0,
-          inconclusiveAssays: 0,
-          topHitSubcategory: ''
-        }
-      })
+      expect(result).toBeNull()
+    })
+
+    it('returns ToxCast data when bioactivity has assays', async () => {
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse({
+          preferredName: 'Test Chemical',
+          casRegistryNumber: '',
+          molecularFormula: '',
+          molecularWeight: 0,
+          synonyms: [],
+          toxcastActiveAssays: 1,
+          toxcastTotalAssays: 1,
+        })
+      )
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse([
+          {
+            assayId: 'ASSAY1',
+            assayName: 'Test Assay',
+            endpoint: 'Test',
+            hitCall: 'Active',
+            ac50: 0,
+            potencyUnit: 'uM',
+            nConst: 0,
+            nGain: 0,
+            nLoss: 0,
+          },
+        ])
+      )
+
+      const result = await getToxCastByDtxsid('DTXSID12345')
+
+      expect(result).not.toBeNull()
+      expect(result!.dtxsid).toBe('DTXSID12345')
+      expect(result!.chemicalName).toBe('Test Chemical')
+      expect(result!.assays).toHaveLength(1)
     })
   })
 
@@ -139,10 +148,7 @@ describe('ToxCast API', () => {
     it('should fetch assay details successfully', async () => {
       const mockAssay = { assay_id: 'ASSAY1', assay_name: 'Test Assay' }
 
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockAssay
-      })
+      ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse(mockAssay))
 
       const result = await getAssayDetails('ASSAY1')
 
@@ -150,9 +156,9 @@ describe('ToxCast API', () => {
     })
 
     it('should return null on fetch failure', async () => {
-      ;(fetch as jest.Mock).mockResolvedValueOnce({
-        ok: false
-      })
+      ;(fetch as jest.Mock).mockResolvedValueOnce(
+        mockJsonResponse({}, { status: 500 })
+      )
 
       const result = await getAssayDetails('INVALID')
       expect(result).toBeNull()

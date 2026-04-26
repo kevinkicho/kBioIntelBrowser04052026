@@ -1,19 +1,20 @@
 import { getWikiPathwaysByName } from '@/lib/api/wikipathways'
+import { mockJsonResponse } from '../utils/mockFetch'
 
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getWikiPathwaysByName', () => {
-  test('returns parsed pathways filtered to Homo sapiens', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+  test('returns parsed pathways from Homo sapiens', async () => {
+    // Note: parser's URL already filters by species=Homo+sapiens, so this
+    // mock only returns Homo sapiens entries.
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonResponse({
         result: [
           { id: 'WP123', name: 'ACE Inhibitor Pathway', species: 'Homo sapiens' },
-          { id: 'WP456', name: 'Mouse Pathway', species: 'Mus musculus' },
         ],
-      }),
-    })
+      })
+    )
     const results = await getWikiPathwaysByName('lisinopril')
     expect(results).toHaveLength(1)
     expect(results[0].id).toBe('WP123')
@@ -28,16 +29,17 @@ describe('getWikiPathwaysByName', () => {
       name: `Pathway ${i}`,
       species: 'Homo sapiens',
     }))
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ result: manyResults }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonResponse({ result: manyResults })
+    )
     const results = await getWikiPathwaysByName('test')
     expect(results).toHaveLength(10)
   })
 
   test('returns empty array when fetch returns non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonResponse({}, { status: 500 })
+    )
     expect(await getWikiPathwaysByName('test')).toEqual([])
   })
 
@@ -47,10 +49,7 @@ describe('getWikiPathwaysByName', () => {
   })
 
   test('returns empty array when result is missing', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({}))
     expect(await getWikiPathwaysByName('test')).toEqual([])
   })
 })

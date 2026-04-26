@@ -70,7 +70,6 @@ describe('computeMoleculeSummary', () => {
       { label: 'NDC Codes', value: 3, panelId: 'ndc' },
       { label: 'Orange Book', value: 1, panelId: 'orange-book' },
       { label: 'Drug Labels', value: 2, panelId: 'dailymed' },
-      { label: 'DrugBank Drugs', value: 0, panelId: 'drugbank' },
     ])
   })
 
@@ -123,7 +122,6 @@ describe('computeMoleculeSummary', () => {
       { label: 'Mechanisms', value: 2, panelId: 'chembl-mechanisms' },
       { label: 'Pathways', value: 4, panelId: 'reactome' }, // 1 + 2 + 1
       { label: 'Drug-Gene', value: 3, panelId: 'dgidb' },
-      { label: 'DrugBank Targets', value: 0, panelId: 'drugbank' },
     ])
   })
 

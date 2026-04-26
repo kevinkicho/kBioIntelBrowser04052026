@@ -9,16 +9,16 @@ import {
 
 describe('categoryConfig', () => {
   describe('CATEGORIES', () => {
-    it('defines exactly 8 categories', () => {
-      expect(CATEGORIES).toHaveLength(8)
+    it('defines exactly 10 categories', () => {
+      expect(CATEGORIES).toHaveLength(10)
     })
 
-    it('contains 110 total panels across all categories', () => {
+    it('contains 119 total panels across all categories', () => {
       const totalPanels = CATEGORIES.reduce(
         (sum, cat) => sum + cat.panels.length,
         0
       )
-      expect(totalPanels).toBe(110)
+      expect(totalPanels).toBe(119)
     })
 
     it('has no duplicate panel IDs', () => {
@@ -67,7 +67,7 @@ describe('categoryConfig', () => {
       }
       const counts = getCategoryDataCounts(props)
       expect(counts['pharmaceutical'].withData).toBe(1)
-      expect(counts['pharmaceutical'].total).toBe(13)
+      expect(counts['pharmaceutical'].total).toBe(11)
     })
 
     it('counts nullable props with data correctly', () => {

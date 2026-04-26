@@ -5,8 +5,7 @@ describe('Disease context detection regression tests', () => {
     const allData = [
       { id: 'C0001', name: 'Breast cancer', source: 'DISGENET' },
     ]
-    const snapshot = { totalApisSucceeded: 1, totalApisCalled: 2, gaps: [] }
-    const ctx = buildDiseaseContext('Breast cancer', allData as Array<{ id: string; name: string; description?: string; therapeuticAreas?: string[]; source: string; molecules?: { name: string; cid: number | null }[] }>, snapshot)
+    const ctx = buildDiseaseContext('Breast cancer', allData as Array<{ id: string; name: string; description?: string; therapeuticAreas?: string[]; source: string; molecules?: { name: string; cid: number | null }[] }>)
     const block = diseaseContextToPromptBlock(ctx)
 
     expect(block).toContain('Breast cancer')
@@ -62,7 +61,7 @@ describe('No-entity context guard regression tests', () => {
   test('context guard: cid>0 with molecule data works normally', () => {
     const isDiseaseContext = false
     const isGeneContext = false
-    const cid = 2244
+    const cid: number = 2244
     const needsGuard = !isDiseaseContext && !isGeneContext && cid === 0
 
     expect(needsGuard).toBe(false)
@@ -117,8 +116,7 @@ describe('Context block fallback chain', () => {
       { id: 'C0001', name: 'Diabetes', description: 'A metabolic disease', source: 'test',
         molecules: [{ name: 'Metformin', cid: 4048 }] },
     ]
-    const snapshot = { totalApisSucceeded: 1, totalApisCalled: 2, gaps: [] }
-    const diseaseCtx = buildDiseaseContext('Diabetes', results, snapshot)
+    const diseaseCtx = buildDiseaseContext('Diabetes', results)
     const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
 
     expect(diseaseBlock).toContain('Diabetes')

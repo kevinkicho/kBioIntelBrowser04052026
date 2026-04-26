@@ -1,12 +1,12 @@
 import { buildExportSections, exportToCsv, exportToJson } from '@/lib/exportData'
 
 describe('buildExportSections', () => {
-  it('groups props into 8 categories', () => {
+  it('groups props into 9 categories', () => {
     const sections = buildExportSections({
       companies: [{ brandName: 'Test', company: 'Acme' }],
       clinicalTrials: [{ nctId: 'NCT001', phase: 'Phase 2' }],
     })
-    expect(sections.length).toBe(8)
+    expect(sections.length).toBe(9)
   })
 
   it('filters out panels with no data', () => {

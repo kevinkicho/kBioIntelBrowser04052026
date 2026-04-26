@@ -12,11 +12,11 @@ function makeCounts(overrides: Partial<Record<CategoryId, CategoryDataCount>> = 
 }
 
 describe('CategoryTabs', () => {
-  it('renders All tab plus all 8 category tabs', () => {
+  it('renders All tab plus all 10 category tabs', () => {
     const counts = makeCounts()
     render(<CategoryTabs active="all" counts={counts} onChange={() => {}} />)
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(9) // All + 8 categories
+    expect(tabs).toHaveLength(11) // All + 10 categories
   })
 
   it('shows correct total in All tab', () => {

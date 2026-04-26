@@ -10,8 +10,8 @@ describe('GET /api/search', () => {
   })
 
   test('returns suggestions for a valid query', async () => {
-    const mockSearchMolecules = jest.mocked(pubchem.searchMolecules)
-    mockSearchMolecules.mockResolvedValue(['insulin', 'Insulin Glargine'])
+    const mockSearchByType = jest.mocked(pubchem.searchByType)
+    mockSearchByType.mockResolvedValue(['insulin', 'Insulin Glargine'])
 
     const req = new NextRequest('http://localhost/api/search?q=insulin')
     const res = await GET(req)

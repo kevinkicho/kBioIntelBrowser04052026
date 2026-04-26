@@ -59,14 +59,15 @@ describe('getGeneExpressionBySymbols', () => {
     expect(results).toHaveLength(1)
   })
 
-  test('limits symbols to 5', async () => {
+  test('limits symbols to 3', async () => {
     const symbols = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
     ;(fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({ experiments: [] }),
+      headers: new Headers({ 'content-type': 'application/json' }),
     })
     await getGeneExpressionBySymbols(symbols)
-    expect(fetch).toHaveBeenCalledTimes(5)
+    expect(fetch).toHaveBeenCalledTimes(3)
   })
 
   test('returns empty array for empty symbols', async () => {
