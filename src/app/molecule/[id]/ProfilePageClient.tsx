@@ -12,6 +12,7 @@ import { CATEGORIES, getCategoryDataCounts, type CategoryId } from '@/lib/catego
 import { MoleculeSummary } from '@/components/profile/MoleculeSummary'
 import { ExportButton } from '@/components/profile/ExportButton'
 import { CiteButton } from '@/components/profile/CiteButton'
+import { ShareButton } from '@/components/profile/ShareButton'
 import { computeMoleculeSummary } from '@/lib/moleculeSummary'
 import { fetchCategoryData, type CategoryLoadState } from '@/lib/fetchCategory'
 import type { FreshnessMap } from '@/lib/dataFreshness'
@@ -34,12 +35,24 @@ import { VendorsPanel } from '@/components/profile/VendorsPanel'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 
+export interface EmbedMode {
+  /**
+   * Allowlist of panel ids that should render in embed mode.
+   * If undefined, defaults to ['summary', 'structure'] in the embed page.
+   * Use literal panel ids from `CATEGORIES` (e.g., 'companies', 'clinical-trials')
+   * plus the synthetic ids 'summary' and 'structure' which gate the top
+   * MoleculeSummary card and the molecule viewer respectively.
+   */
+  allowedPanels?: string[]
+}
+
 interface Props {
   cid: number
   moleculeName: string
   molecularWeight: number
   inchiKey: string
   iupacName: string
+  embedMode?: EmbedMode
 }
 
 type PanelRenderer = (panelId: string, lastFetched?: Date) => React.ReactNode
@@ -88,15 +101,24 @@ function initStatus(): CategoriesStatus {
   return s
 }
 
-export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName }: Props) {
+export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName, embedMode }: Props) {
   return (
     <Suspense fallback={<div className="animate-pulse h-96 bg-slate-800/50 rounded-xl" />}>
-      <ProfilePageClientInner cid={cid} moleculeName={moleculeName} molecularWeight={molecularWeight} inchiKey={inchiKey} iupacName={iupacName} />
+      <ProfilePageClientInner cid={cid} moleculeName={moleculeName} molecularWeight={molecularWeight} inchiKey={inchiKey} iupacName={iupacName} embedMode={embedMode} />
     </Suspense>
   )
 }
 
-function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, iupacName }: Props) {
+function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, iupacName, embedMode }: Props) {
+  const isEmbed = !!embedMode
+  const allowedPanelSet = useMemo(() => {
+    if (!embedMode?.allowedPanels) return null
+    return new Set(embedMode.allowedPanels)
+  }, [embedMode])
+  const isPanelAllowed = useCallback((panelId: string) => {
+    if (!allowedPanelSet) return true
+    return allowedPanelSet.has(panelId)
+  }, [allowedPanelSet])
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialTab = searchParams.get('tab')
@@ -164,12 +186,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   }, [categoryStatus, fetchedAt])
 
   useEffect(() => {
+    if (isEmbed) return // embed iframes shouldn't churn the host URL
     const params = new URLSearchParams()
     if (activeCategory !== 'pharmaceutical') params.set('tab', activeCategory)
     if (view !== 'panels') params.set('view', view)
     const search = params.toString()
     router.replace(search ? `?${search}` : '?', { scroll: false })
-  }, [activeCategory, view, router])
+  }, [activeCategory, view, router, isEmbed])
 
 
 
@@ -593,8 +616,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           return Array.isArray(value) ? value.length > 0 : hasRealData(value)
         })
       : panels
-    if (visiblePanels.length === 0 && hideEmpty) return null
-    return visiblePanels.map(p => (
+    const allowedVisible = allowedPanelSet
+      ? visiblePanels.filter(p => isPanelAllowed(p.id))
+      : visiblePanels
+    if (allowedVisible.length === 0 && hideEmpty) return null
+    return allowedVisible.map(p => (
       <div key={p.id}>
         <ErrorBoundary>
           {panelRegistry[p.id](p.id, categoryFetchedAt)}
@@ -609,97 +635,109 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         <LoadingOverlay categoryStatus={categoryStatus} dataCounts={dataCounts} />
       )}
 
-      <div className="sticky top-0 z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4">
-        <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-mono text-slate-500">
-          <Link href="/" className="text-slate-500 hover:text-slate-300 shrink-0">Home</Link>
-          <span className="text-slate-700">/</span>
-          <span className="text-indigo-300/80">CID:{cid}</span>
-          {inchiKey && <><span className="text-slate-700">|</span><span className="text-emerald-300/60" title="InChIKey">{inchiKey}</span></>}
-          {iupacName && <><span className="text-slate-700">|</span><span className="text-slate-400 truncate max-w-[200px]" title={iupacName}>{iupacName}</span></>}
-          <div className="ml-auto flex items-center gap-2">
-            <ViewToggle active={view} onChange={setView} disabled={isBusy} />
-            <CiteButton data={mergedData} entityName={moleculeName} entityType="molecule" entityId={cid} />
-            <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
+      {!isEmbed && (
+        <div className="sticky top-0 z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4">
+          <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-mono text-slate-500">
+            <Link href="/" className="text-slate-500 hover:text-slate-300 shrink-0">Home</Link>
+            <span className="text-slate-700">/</span>
+            <span className="text-indigo-300/80">CID:{cid}</span>
+            {inchiKey && <><span className="text-slate-700">|</span><span className="text-emerald-300/60" title="InChIKey">{inchiKey}</span></>}
+            {iupacName && <><span className="text-slate-700">|</span><span className="text-slate-400 truncate max-w-[200px]" title={iupacName}>{iupacName}</span></>}
+            <div className="ml-auto flex items-center gap-2">
+              <ViewToggle active={view} onChange={setView} disabled={isBusy} />
+              <CiteButton data={mergedData} entityName={moleculeName} entityType="molecule" entityId={cid} />
+              <ShareButton entityType="molecule" entityId={cid} entityName={moleculeName} data={mergedData} />
+              <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
+            </div>
           </div>
+          <CategoryTabBar
+            active={activeCategory}
+            counts={dataCounts}
+            onChange={scrollToCategory}
+            freshness={freshnessMap}
+            disabled={isBusy}
+          />
+          {fromDiscover && (
+            <AutoLoadIndicator categoryStatus={categoryStatus} />
+          )}
+          {snapshotMeta && (
+            <div className="text-[10px] text-amber-400/70 mt-1 flex items-center gap-1">
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
+              Viewing frozen snapshot from {new Date(snapshotMeta.createdAt).toLocaleString()} — APIs not queried.
+            </div>
+          )}
+          {snapshotError && (
+            <div className="text-[10px] text-red-400/80 mt-1">{snapshotError}</div>
+          )}
         </div>
-        <CategoryTabBar
-          active={activeCategory}
-          counts={dataCounts}
-          onChange={scrollToCategory}
-          freshness={freshnessMap}
-          disabled={isBusy}
-        />
-        {fromDiscover && (
-          <AutoLoadIndicator categoryStatus={categoryStatus} />
-        )}
-        {snapshotMeta && (
-          <div className="text-[10px] text-amber-400/70 mt-1 flex items-center gap-1">
-            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
-            Viewing frozen snapshot from {new Date(snapshotMeta.createdAt).toLocaleString()} — APIs not queried.
-          </div>
-        )}
-        {snapshotError && (
-          <div className="text-[10px] text-red-400/80 mt-1">{snapshotError}</div>
-        )}
-      </div>
+      )}
 
-      <div className="mb-4">
-        <ErrorBoundary>
-        <MoleculeSummary
-          data={summaryData}
-          onCategoryClick={isBusy ? () => {} : (id) => {
-            setView('panels')
-            scrollToCategory(id as CategoryId)
-          }}
-          onMetricClick={isBusy ? () => {} : (categoryId, panelId) => {
-            const catId = categoryId as CategoryId
-            setQuickViewPanel({ categoryId: catId, panelId })
-            if (categoryStatus[catId] === 'idle') {
-              loadCategory(catId)
-            }
-          }}
-        />
-        </ErrorBoundary>
-      </div>
+      {isPanelAllowed('summary') && (
+        <div className="mb-4">
+          <ErrorBoundary>
+          <MoleculeSummary
+            data={summaryData}
+            onCategoryClick={isBusy || isEmbed ? () => {} : (id) => {
+              setView('panels')
+              scrollToCategory(id as CategoryId)
+            }}
+            onMetricClick={isBusy || isEmbed ? () => {} : (categoryId, panelId) => {
+              const catId = categoryId as CategoryId
+              setQuickViewPanel({ categoryId: catId, panelId })
+              if (categoryStatus[catId] === 'idle') {
+                loadCategory(catId)
+              }
+            }}
+          />
+          </ErrorBoundary>
+        </div>
+      )}
 
-      <ErrorBoundary><DiscoverBreadcrumb disease={searchParams.get('disease') ?? ''} rank={parseInt(searchParams.get('rank') ?? '0', 10) || 0} score={parseFloat(searchParams.get('score') ?? '0') || 0} /></ErrorBoundary>
+      {!isEmbed && (
+        <>
+          <ErrorBoundary><DiscoverBreadcrumb disease={searchParams.get('disease') ?? ''} rank={parseInt(searchParams.get('rank') ?? '0', 10) || 0} score={parseFloat(searchParams.get('score') ?? '0') || 0} /></ErrorBoundary>
 
-      <ErrorBoundary><NextStepsPanel moleculeName={moleculeName} data={mergedData} /></ErrorBoundary>
+          <ErrorBoundary><NextStepsPanel moleculeName={moleculeName} data={mergedData} /></ErrorBoundary>
 
-      <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
 
-      <ErrorBoundary><VendorsPanel cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><VendorsPanel cid={cid} /></ErrorBoundary>
 
-      <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
+          <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
 
-      <ErrorBoundary><ChangeAlerts changes={detectedChanges} cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><ChangeAlerts changes={detectedChanges} cid={cid} /></ErrorBoundary>
 
-      <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
+          <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
 
-      <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
 
-      <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
+          <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
+        </>
+      )}
 
         {view === 'panels' ? (
           <div>
-            <div className="mb-4 flex items-center gap-3">
-              <PanelSearch value={searchQuery} onChange={setSearchQuery} disabled={isBusy} />
-              <button
-                onClick={() => setHideEmpty(!hideEmpty)}
-                disabled={isBusy}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
-                  hideEmpty
-                    ? 'bg-indigo-600 border-indigo-500 text-white'
-                    : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
-                }`}
-              >
-                {hideEmpty ? 'Show all' : 'Hide empty'}
-              </button>
-            </div>
+            {!isEmbed && (
+              <div className="mb-4 flex items-center gap-3">
+                <PanelSearch value={searchQuery} onChange={setSearchQuery} disabled={isBusy} />
+                <button
+                  onClick={() => setHideEmpty(!hideEmpty)}
+                  disabled={isBusy}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors shrink-0 disabled:opacity-50 disabled:cursor-not-allowed ${
+                    hideEmpty
+                      ? 'bg-indigo-600 border-indigo-500 text-white'
+                      : 'bg-slate-800 border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500'
+                  }`}
+                >
+                  {hideEmpty ? 'Show all' : 'Hide empty'}
+                </button>
+              </div>
+            )}
             <div className="space-y-6">
               {CATEGORIES.map(cat => {
                 const matchingPanels = cat.panels.filter(p =>
-                  !searchQuery || p.title.toLowerCase().includes(searchLower)
+                  (!searchQuery || p.title.toLowerCase().includes(searchLower)) &&
+                  isPanelAllowed(p.id)
                 )
                 if (matchingPanels.length === 0) return null
                 const count = dataCounts[cat.id]
@@ -742,8 +780,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           </div>
         )}
 
-        {/* Quick View Modal */}
-        {quickViewPanel && (() => {
+        {/* Quick View Modal — disabled in embed mode (no overlay UI) */}
+        {!isEmbed && quickViewPanel && (() => {
           const catId = quickViewPanel.categoryId
           const status = categoryStatus[catId]
 
@@ -787,13 +825,25 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             </Modal>
           )
         })()}
-        <AICopilot
-          categoryData={categoryData}
-          categoryStatus={categoryStatus}
-          fetchedAt={fetchedAt}
-          identity={{ name: moleculeName, cid, molecularWeight, inchiKey, iupacName }}
-          diseaseName={fromDiscover ? (searchParams.get('disease') ?? undefined) : undefined}
-        />
+        {!isEmbed && (
+          <AICopilot
+            categoryData={categoryData}
+            categoryStatus={categoryStatus}
+            fetchedAt={fetchedAt}
+            identity={{ name: moleculeName, cid, molecularWeight, inchiKey, iupacName }}
+            diseaseName={fromDiscover ? (searchParams.get('disease') ?? undefined) : undefined}
+          />
+        )}
+        {isEmbed && (
+          <a
+            href={`/molecule/${cid}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="fixed bottom-4 right-4 z-40 bg-slate-900/90 backdrop-blur-sm border border-slate-700 hover:border-indigo-500 hover:text-indigo-300 text-slate-300 text-xs px-3 py-1.5 rounded-full shadow-lg transition-colors"
+          >
+            View full profile →
+          </a>
+        )}
     </div>
   )
 }
