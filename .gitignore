@@ -47,3 +47,8 @@ next-env.d.ts
 # analytics data (includes auto-tuned timeout-overrides.json)
 /data/
 build_output.txt
+
+# playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

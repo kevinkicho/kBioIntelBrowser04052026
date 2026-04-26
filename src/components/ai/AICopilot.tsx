@@ -75,25 +75,41 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
   }
 
   const showFab = true
+  // Disable the fab while category data is still loading. Opening the copilot
+  // mid-fetch sends partial data to the model and tends to produce confusing
+  // output (and made the user anxious about crashes). Re-enable once at least
+  // one category has finished loading.
+  const anyLoading = Object.values(categoryStatus).some(s => s === 'loading')
+  const anyLoaded = Object.values(categoryStatus).some(s => s === 'loaded')
+  const fabDisabled = anyLoading && !anyLoaded
 
   return (
     <>
       {!isOpen && showFab && (
         <button
-          onClick={() => setIsOpen(true)}
-          className="fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-900/40 flex items-center justify-center transition-all hover:scale-105 group"
-          title="Open BioIntel Copilot"
+          onClick={() => { if (!fabDisabled) setIsOpen(true) }}
+          disabled={fabDisabled}
+          aria-disabled={fabDisabled}
+          className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full text-white shadow-lg shadow-indigo-900/40 flex items-center justify-center transition-all group ${
+            fabDisabled
+              ? 'bg-slate-700 opacity-50 cursor-not-allowed'
+              : 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 hover:scale-105'
+          }`}
+          title={fabDisabled ? 'Loading molecule data — copilot ready in a moment…' : 'Open BioIntel Copilot'}
         >
           <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.455 2.456L21.75 6l-1.036.259a3.375 3.375 0 00-2.455 2.456z" />
           </svg>
-          {copilot.isStreaming && (
+          {fabDisabled && (
+            <span className="absolute top-0 right-0 w-3 h-3 bg-slate-400 rounded-full animate-pulse border-2 border-slate-900" />
+          )}
+          {!fabDisabled && copilot.isStreaming && (
             <span className="absolute top-0 right-0 w-3 h-3 bg-emerald-400 rounded-full animate-pulse border-2 border-slate-900" />
           )}
-          {!copilot.aiAvailable && !copilot.isStreaming && (
+          {!fabDisabled && !copilot.aiAvailable && !copilot.isStreaming && (
             <span className="absolute top-0 right-0 w-3 h-3 bg-amber-400 rounded-full border-2 border-slate-900" />
           )}
-          {copilot.aiAvailable && !copilot.isStreaming && (
+          {!fabDisabled && copilot.aiAvailable && !copilot.isStreaming && (
             <span className="absolute top-0 right-0 w-3 h-3 bg-emerald-400 rounded-full border-2 border-slate-900" />
           )}
         </button>

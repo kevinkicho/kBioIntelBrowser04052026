@@ -60,7 +60,9 @@ type PanelRenderer = (panelId: string, lastFetched?: Date) => React.ReactNode
 type CategoriesData = Partial<Record<CategoryId, Record<string, unknown>>>
 type CategoriesStatus = Record<CategoryId, CategoryLoadState>
 
-const ALL_CATEGORY_IDS: CategoryId[] = CATEGORIES.map(c => c.id)
+// 'gene' is a category for the gene detail page, not the molecule profile page.
+// The molecule API route doesn't accept it, so iterating it here would 400.
+const ALL_CATEGORY_IDS: CategoryId[] = CATEGORIES.map(c => c.id).filter(id => id !== 'gene') as CategoryId[]
 
 const DISCOVER_PRIORITY_CATEGORIES: CategoryId[] = ['clinical-safety', 'bioactivity-targets', 'molecular-chemical']
 
