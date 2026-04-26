@@ -212,11 +212,11 @@ npm install
 npm run dev
 ```
 
-App runs on **http://localhost:3000** by default (configurable via `PORT` env var).
+App runs on **http://localhost:33424** by default (configurable via `PORT` env var).
 
 > **First load is slow** — Next.js dev compiles each page on first request, and this app has 100+ dynamic-import panels. Expect 30–90 seconds the first time you hit a route after `npm run dev`. Subsequent navigations and edits are fast.
 >
-> **If port 3000 is in use:** `PORT=3001 npm run dev` (or any free port).
+> **If port 33424 is in use:** `PORT=3000 npm run dev` (or any free port).
 >
 > **If you see `EACCES`** on a port: Windows reserves dynamic port ranges for Hyper-V/WSL/Docker. Pick a port outside the excluded ranges (`netsh interface ipv4 show excludedportrange protocol=tcp`).
 >

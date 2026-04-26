@@ -3,10 +3,10 @@ const { spawn } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
-// Default to 3000 (Next.js convention). Override with PORT env var.
+// Default 33424. Override with PORT env var.
 // 52167 used to be the default but landed inside Windows' Hyper-V/WinNAT
 // excluded port range on some machines, surfacing as EACCES.
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 33424
 
 // Pass --clean to wipe the .next/ cache before starting. Wiping every run
 // forces a full first-compile (slow on a 100+-panel app); keeping the
