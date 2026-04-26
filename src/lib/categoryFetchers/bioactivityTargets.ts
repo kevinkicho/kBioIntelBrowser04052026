@@ -1,5 +1,5 @@
 import { trackedSafe } from '@/lib/api-tracker'
-import { API_SOURCE_TIMEOUTS } from '@/lib/utils'
+import { API_SOURCE_TIMEOUTS } from '@/lib/analytics/timeouts'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 import { getApiParamNumber } from '@/lib/resolveApiQuery'
 

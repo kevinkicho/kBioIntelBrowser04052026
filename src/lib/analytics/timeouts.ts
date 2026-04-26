@@ -1,3 +1,4 @@
+import 'server-only'
 import path from 'path'
 import fs from 'fs'
 
@@ -36,3 +37,27 @@ export function loadTunedTimeouts(): Record<string, number> {
     return cached
   }
 }
+
+const API_SOURCE_TIMEOUTS_BASE: Record<string, number> = {
+  // Known-slow sources from prior tuning — kept just above DEFAULT_API_TIMEOUT.
+  lincs: 12000,
+  massbank: 12000,
+  chembl: 12000,
+  'chembl-mechanisms': 12000,
+  opentargets: 12000,
+}
+
+/**
+ * Per-source timeout map — server-only.
+ *
+ * Lazy Proxy: each lookup re-checks the tuned overrides file (cheap because
+ * the loader caches by mtime). Callers in `src/lib/categoryFetchers/*` import
+ * this directly. Do NOT re-export from `src/lib/utils.ts` — that module is
+ * imported by client components, and `'server-only'` would explode the bundle.
+ */
+export const API_SOURCE_TIMEOUTS: Record<string, number> = new Proxy({}, {
+  get(_, source: string) {
+    const tuned = loadTunedTimeouts()
+    return tuned[source] ?? API_SOURCE_TIMEOUTS_BASE[source]
+  },
+}) as Record<string, number>

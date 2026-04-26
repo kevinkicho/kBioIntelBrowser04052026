@@ -1,6 +1,6 @@
 import { safe } from '@/lib/utils'
 import { trackedSafe } from '@/lib/api-tracker'
-import { API_SOURCE_TIMEOUTS } from '@/lib/utils'
+import { API_SOURCE_TIMEOUTS } from '@/lib/analytics/timeouts'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 import type { SynthesisRoute } from '@/lib/types'
 
