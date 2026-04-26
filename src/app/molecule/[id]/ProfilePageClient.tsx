@@ -11,6 +11,7 @@ import { PanelSearch } from '@/components/profile/PanelSearch'
 import { CATEGORIES, getCategoryDataCounts, type CategoryId } from '@/lib/categoryConfig'
 import { MoleculeSummary } from '@/components/profile/MoleculeSummary'
 import { ExportButton } from '@/components/profile/ExportButton'
+import { CiteButton } from '@/components/profile/CiteButton'
 import { computeMoleculeSummary } from '@/lib/moleculeSummary'
 import { fetchCategoryData, type CategoryLoadState } from '@/lib/fetchCategory'
 import type { FreshnessMap } from '@/lib/dataFreshness'
@@ -134,6 +135,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [fetchedAt, setFetchedAt] = useState<Partial<Record<CategoryId, Date>>>({})
   const [hideEmpty, setHideEmpty] = useState(true)
 
+  const snapshotId = searchParams.get('snapshot')
+  const [snapshotMeta, setSnapshotMeta] = useState<{ createdAt: string } | null>(null)
+  const [snapshotError, setSnapshotError] = useState<string | null>(null)
+
   const isBusy = useMemo(() =>
     ALL_CATEGORY_IDS.some(id => categoryStatus[id] === 'loading'),
     [categoryStatus]
@@ -207,10 +212,32 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
   }, [activeCategory, loadCategory])
 
-  // Auto-load default category on mount
+  // Snapshot mode: short-circuit live fetching with frozen data
   useEffect(() => {
+    if (!snapshotId) return
+    let cancelled = false
+    fetch(`/api/snapshot/${snapshotId}`)
+      .then(r => r.ok ? r.json() : Promise.reject(new Error(`HTTP ${r.status}`)))
+      .then(snap => {
+        if (cancelled) return
+        setCategoryData({ pharmaceutical: snap.data })
+        const allLoaded = {} as CategoriesStatus
+        for (const id of ALL_CATEGORY_IDS) allLoaded[id] = 'loaded'
+        setCategoryStatus(allLoaded)
+        setFetchedAt({ pharmaceutical: new Date(snap.createdAt) })
+        setSnapshotMeta({ createdAt: snap.createdAt })
+      })
+      .catch(() => {
+        if (!cancelled) setSnapshotError('Snapshot not found or expired (snapshots have a 30-day TTL).')
+      })
+    return () => { cancelled = true }
+  }, [snapshotId])
+
+  // Auto-load default category on mount (skipped in snapshot mode)
+  useEffect(() => {
+    if (snapshotId) return
     loadCategory('pharmaceutical')
-  }, [loadCategory])
+  }, [loadCategory, snapshotId])
 
   const fromDiscover = searchParams.get('from') === 'discover'
 
@@ -591,6 +618,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           {iupacName && <><span className="text-slate-700">|</span><span className="text-slate-400 truncate max-w-[200px]" title={iupacName}>{iupacName}</span></>}
           <div className="ml-auto flex items-center gap-2">
             <ViewToggle active={view} onChange={setView} disabled={isBusy} />
+            <CiteButton data={mergedData} entityName={moleculeName} entityType="molecule" entityId={cid} />
             <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
           </div>
         </div>
@@ -603,6 +631,15 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         />
         {fromDiscover && (
           <AutoLoadIndicator categoryStatus={categoryStatus} />
+        )}
+        {snapshotMeta && (
+          <div className="text-[10px] text-amber-400/70 mt-1 flex items-center gap-1">
+            <span className="inline-block w-1.5 h-1.5 rounded-full bg-amber-400" />
+            Viewing frozen snapshot from {new Date(snapshotMeta.createdAt).toLocaleString()} — APIs not queried.
+          </div>
+        )}
+        {snapshotError && (
+          <div className="text-[10px] text-red-400/80 mt-1">{snapshotError}</div>
         )}
       </div>
 
