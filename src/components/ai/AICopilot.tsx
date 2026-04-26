@@ -1,8 +1,9 @@
 'use client'
 
 import React, { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
-import { useAICopilot, type CopilotMessage } from '@/hooks/useAICopilot'
+import { useAICopilot, type CopilotMessage, type GenerateInsightOptions } from '@/hooks/useAICopilot'
 import { renderSimpleMarkdown } from '@/lib/sanitize'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
@@ -152,6 +153,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
                 hasComparisons={compareCount > 1}
                 isDiseaseContext={!!copilot.isDiseaseContext}
                 isGeneContext={!!copilot.isGeneContext}
+                previousMolecules={sessionHistory.getRecentMolecules(8).filter(m => m.name !== identity.name).map(m => m.name)}
               />
             )}
 
@@ -323,15 +325,29 @@ function InsightsTab({
   hasComparisons,
   isDiseaseContext,
   isGeneContext,
+  previousMolecules,
 }: {
   messages: CopilotMessage[]
   isStreaming: boolean
-  onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare' | 'gene_therapeutic' | 'gene_repurposing' | 'gene_mechanism' | 'gene_target_assessment') => void
+  onGenerate: (mode: 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare' | 'gene_therapeutic' | 'gene_repurposing' | 'gene_mechanism' | 'gene_target_assessment' | 'prior_art_query' | 'differential_safety' | 'suggest_next' | 'hypothesis_seed', opts?: GenerateInsightOptions) => void
   aiAvailable: boolean
   hasComparisons: boolean
   isDiseaseContext: boolean
   isGeneContext: boolean
+  previousMolecules: string[]
 }) {
+  // State for the Plan-06 task widgets (only shown for molecule entities).
+  const [diffTarget, setDiffTarget] = useState<string>('')
+  const [hypothesisQuestion, setHypothesisQuestion] = useState<string>('')
+
+  // Ensure the diff-target dropdown picks up newly-added molecules.
+  useEffect(() => {
+    if (diffTarget && !previousMolecules.includes(diffTarget)) {
+      setDiffTarget('')
+    }
+  }, [previousMolecules, diffTarget])
+
+  const showTasks = !isGeneContext && !isDiseaseContext
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-2">
@@ -369,6 +385,66 @@ function InsightsTab({
           </>
         )}
       </div>
+
+      {showTasks && (
+        <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30 space-y-2.5">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">Tasks</p>
+
+          <div className="grid grid-cols-2 gap-2">
+            <InsightButton label="Prior-Art Query" onClick={() => onGenerate('prior_art_query')} disabled={isStreaming || !aiAvailable} icon="patent" />
+            <InsightButton label="Suggest Next" onClick={() => onGenerate('suggest_next')} disabled={isStreaming || !aiAvailable} icon="next" />
+          </div>
+
+          {/* Differential Safety: dropdown of recent molecules + run button. */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-slate-500 uppercase tracking-wider">Differential Safety</label>
+            <div className="flex gap-1.5">
+              <select
+                value={diffTarget}
+                onChange={e => setDiffTarget(e.target.value)}
+                disabled={isStreaming || !aiAvailable || previousMolecules.length === 0}
+                className="flex-1 text-[10px] px-2 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+              >
+                <option value="">{previousMolecules.length === 0 ? 'No previous molecules' : 'Pick a molecule…'}</option>
+                {previousMolecules.map(name => (
+                  <option key={name} value={name}>{name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => onGenerate('differential_safety', { diffTargetName: diffTarget })}
+                disabled={isStreaming || !aiAvailable || !diffTarget}
+                className="px-2.5 py-1.5 rounded-md text-[10px] font-medium bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+              >
+                Diff
+              </button>
+            </div>
+          </div>
+
+          {/* Hypothesis Seed: free-text question + run button. */}
+          <div className="space-y-1">
+            <label className="text-[10px] text-slate-500 uppercase tracking-wider">Hypothesis Seed</label>
+            <div className="flex gap-1.5">
+              <input
+                type="text"
+                value={hypothesisQuestion}
+                onChange={e => setHypothesisQuestion(e.target.value)}
+                placeholder="e.g. EGFR inhibitors in late-stage trials"
+                disabled={isStreaming || !aiAvailable}
+                className="flex-1 text-[10px] px-2 py-1.5 rounded-md bg-slate-800 border border-slate-700 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none disabled:opacity-50"
+              />
+              <button
+                type="button"
+                onClick={() => onGenerate('hypothesis_seed', { researchQuestion: hypothesisQuestion })}
+                disabled={isStreaming || !aiAvailable || !hypothesisQuestion.trim()}
+                className="px-2.5 py-1.5 rounded-md text-[10px] font-medium bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
+              >
+                Seed
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Message list */}
       {messages.map((msg) => (
@@ -498,6 +574,38 @@ function MessageBubble({ message, isStreaming }: { message: CopilotMessage; isSt
     )
   }
 
+  // Plan-06 task message: render the structured payload (the raw model output
+  // is hidden behind a "Show raw output" disclosure for debugging).
+  if (!isUser && message.task && !isStreaming) {
+    return (
+      <div className="mr-2">
+        <TaskBubble task={message.task} rawContent={message.content} />
+        {message.error && (
+          <div className="mt-1.5 rounded-md px-3 py-2 text-[11px] leading-relaxed bg-red-950/30 border border-red-800/30 text-red-300">
+            <span className="font-semibold">Stream error:</span> {message.error}
+          </div>
+        )}
+      </div>
+    )
+  }
+
+  // Plan-06 task validation failure: show the polite message instead of raw text.
+  if (!isUser && message.validationError && !isStreaming) {
+    return (
+      <div className="mr-2">
+        <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-amber-950/30 border border-amber-800/30 text-amber-200">
+          {message.validationError}
+        </div>
+        <details className="mt-1.5 text-[10px] text-slate-500">
+          <summary className="cursor-pointer hover:text-slate-300">Show raw output</summary>
+          <div className="mt-1 px-3 py-2 rounded-md bg-slate-900/40 border border-slate-800/30 text-slate-400 font-mono whitespace-pre-wrap break-words">
+            {message.content || '(empty)'}
+          </div>
+        </details>
+      </div>
+    )
+  }
+
   const rendered = isUser ? message.content : renderMarkdown(message.content || (isStreaming ? '' : '...'))
 
   return (
@@ -523,6 +631,106 @@ function MessageBubble({ message, isStreaming }: { message: CopilotMessage; isSt
       )}
     </div>
   )
+}
+
+function TaskBubble({ task, rawContent }: { task: NonNullable<CopilotMessage['task']>; rawContent: string }) {
+  if (task.kind === 'prior_art') {
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">Prior-art query</p>
+        <code className="block font-mono text-[11px] bg-slate-950/60 border border-slate-800/40 rounded p-2 text-emerald-300 whitespace-pre-wrap break-words">{task.query}</code>
+        <div className="flex gap-2 mt-2">
+          <button
+            type="button"
+            onClick={() => { navigator.clipboard?.writeText(task.query).catch(() => {}) }}
+            className="text-[10px] text-slate-400 hover:text-indigo-300 transition-colors"
+          >
+            Copy
+          </button>
+          <a
+            href={`https://patents.google.com/?q=${encodeURIComponent(task.query)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-slate-400 hover:text-indigo-300 transition-colors"
+          >
+            Google Patents →
+          </a>
+          <a
+            href={`https://europepmc.org/search?query=${encodeURIComponent(task.query)}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-[10px] text-slate-400 hover:text-indigo-300 transition-colors"
+          >
+            EuropePMC →
+          </a>
+        </div>
+      </div>
+    )
+  }
+
+  if (task.kind === 'diff_safety') {
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">
+          Differential safety: {task.currentName} vs {task.otherName}
+        </p>
+        <div className="space-y-2">
+          {task.text.split(/\n\s*\n+/).map((p, i) => (
+            <p key={i} className="text-xs leading-relaxed">{p}</p>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
+  if (task.kind === 'suggest_next') {
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">Suggested next entities</p>
+        <ul className="space-y-1.5">
+          {task.entities.map((e, i) => (
+            <li key={i} className="flex items-start gap-2">
+              <span className={`shrink-0 inline-block px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider ${
+                e.type === 'molecule' ? 'bg-purple-900/40 text-purple-300' :
+                e.type === 'gene' ? 'bg-emerald-900/40 text-emerald-300' :
+                'bg-cyan-900/40 text-cyan-300'
+              }`}>{e.type}</span>
+              <div className="flex-1">
+                <p className="text-xs font-medium text-slate-200">{e.name}</p>
+                <p className="text-[10px] text-slate-400 mt-0.5">{e.reason}</p>
+              </div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    )
+  }
+
+  if (task.kind === 'hypothesis_seed') {
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">Hypothesis seed</p>
+        <ul className="space-y-1 mb-2">
+          {task.filters.map((f, i) => (
+            <li key={i} className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-slate-500 font-mono">{f.axis}</span>
+              <span className="text-slate-600">=</span>
+              <span className="text-slate-200 font-medium">{f.value}</span>
+            </li>
+          ))}
+        </ul>
+        <Link
+          href={task.url}
+          className="inline-flex items-center gap-1 text-[10px] font-medium text-indigo-300 hover:text-indigo-200 transition-colors"
+        >
+          Run in Hypothesis Builder →
+        </Link>
+      </div>
+    )
+  }
+
+  // Fallback (should not happen).
+  return <pre className="text-[10px] text-slate-400 whitespace-pre-wrap">{rawContent}</pre>
 }
 
 function renderMarkdown(text: string) {
@@ -566,7 +774,7 @@ function renderMarkdown(text: string) {
 }
 
 function InsightButton({ label, onClick, disabled, icon }: { label: string; onClick: () => void; disabled: boolean; icon: string }) {
-  const icons: Record<string, string> = { brief: '📋', safety: '🛡️', gap: '🔍', auto: '✨', mechanism: '🎯', hypothesis: '💡', competitive: '📊', repurpose: '🔄', compare: '⚗️' }
+  const icons: Record<string, string> = { brief: '📋', safety: '🛡️', gap: '🔍', auto: '✨', mechanism: '🎯', hypothesis: '💡', competitive: '📊', repurpose: '🔄', compare: '⚗️', patent: '📜', next: '➡️' }
   return (
     <button
       onClick={onClick}

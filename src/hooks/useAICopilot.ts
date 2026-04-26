@@ -4,10 +4,25 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
 import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
-import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
+import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, buildPriorArtQueryPrompt, buildDifferentialSafetyPrompt, buildSuggestNextPrompt, buildHypothesisSeedPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
 import { sessionHistory } from '@/lib/sessionHistory'
+import { validatePriorArtQuery } from '@/lib/ai/aiTasks/priorArt'
+import { validateDiffSafety } from '@/lib/ai/aiTasks/diffSafety'
+import { validateSuggestNext, type SuggestedEntity } from '@/lib/ai/aiTasks/suggestNext'
+import { validateHypothesisSeed, buildHypothesisSeedUrl } from '@/lib/ai/aiTasks/hypothesisSeed'
+import type { Filter } from '@/lib/hypothesis/types'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
+
+export interface CopilotTaskResult {
+  /** Structured payload that survived validation; UI may render specially. */
+  kind: 'prior_art' | 'diff_safety' | 'suggest_next' | 'hypothesis_seed'
+  data:
+    | { kind: 'prior_art'; query: string }
+    | { kind: 'diff_safety'; text: string; paragraphCount: number; currentName: string; otherName: string }
+    | { kind: 'suggest_next'; entities: SuggestedEntity[] }
+    | { kind: 'hypothesis_seed'; filters: Filter[]; url: string }
+}
 
 export interface CopilotMessage {
   id: string
@@ -16,6 +31,10 @@ export interface CopilotMessage {
   mode: PromptMode
   timestamp: number
   error?: string
+  /** Validation failure message for task modes (shown in lieu of raw content). */
+  validationError?: string
+  /** Structured payload for task modes when validation succeeds. */
+  task?: CopilotTaskResult['data']
 }
 
 export interface CopilotState {
@@ -23,6 +42,13 @@ export interface CopilotState {
   isStreaming: boolean
   activeTab: 'monitor' | 'insights' | 'ask' | 'settings'
   autoInsightGenerated: boolean
+}
+
+export interface GenerateInsightOptions {
+  /** For `differential_safety`: the previously-viewed molecule's name to diff against. */
+  diffTargetName?: string
+  /** For `hypothesis_seed`: the user's free-form research question. */
+  researchQuestion?: string
 }
 
 export function useAICopilot(
@@ -47,7 +73,7 @@ export function useAICopilot(
   const messagesRef = useRef<CopilotMessage[]>([])
   messagesRef.current = messages
 
-  const generateInsightRef = useRef<((mode: PromptMode) => Promise<void>) | null>(null)
+  const generateInsightRef = useRef<((mode: PromptMode, opts?: GenerateInsightOptions) => Promise<void>) | null>(null)
 
   const snapshot = useMemo(
     () => buildRetrievalSnapshot(categoryData, categoryStatus, fetchedAt),
@@ -121,7 +147,7 @@ export function useAICopilot(
     return msg
   }, [])
 
-  const generateInsight = useCallback(async (mode: PromptMode) => {
+  const generateInsight = useCallback(async (mode: PromptMode, opts: GenerateInsightOptions = {}) => {
     if (!aiAvailable) {
       const recent = messagesRef.current.slice(-3)
       if (!recent.some(m => m.content.includes('AI is not available'))) {
@@ -133,6 +159,43 @@ export function useAICopilot(
       addMessage('system', 'No entity loaded. Search for a molecule, disease, or gene first.', mode)
       return
     }
+
+    // Plan-06 task modes are gated to molecule entities only.
+    const isTaskMode = mode === 'prior_art_query' || mode === 'differential_safety' || mode === 'suggest_next' || mode === 'hypothesis_seed'
+    if (isTaskMode && (isDiseaseContext || isGeneContext)) {
+      addMessage('system', `The "${mode.replace(/_/g, ' ')}" task is only available for molecule entities.`, mode)
+      return
+    }
+
+    // Resolve the differential-safety target up front so we can fail fast.
+    let diffTarget: SessionMoleculeSummary | null = null
+    if (mode === 'differential_safety') {
+      const targetName = opts.diffTargetName?.trim()
+      if (!targetName) {
+        addMessage('system', 'Pick a previously-viewed molecule to diff against.', mode)
+        return
+      }
+      const sm = sessionHistory.getMolecule(targetName)
+      if (!sm) {
+        addMessage('system', `No session data for "${targetName}".`, mode)
+        return
+      }
+      const rd = extractRichData(sm.drugData)
+      diffTarget = {
+        name: sm.name,
+        searchedAt: sm.searchedAt,
+        topTargets: rd.topTargetActivities.slice(0, 5).map(t => t.targetName),
+        topAEs: rd.topAdverseEvents.slice(0, 5).map(ae => ae.reactionName),
+        mechanisms: rd.mechanismDetails.slice(0, 3).map(m => `${m.mechanismOfAction} -> ${m.targetName}`),
+        indications: rd.indicationDetails.slice(0, 5).map(i => i.condition),
+      }
+    }
+
+    if (mode === 'hypothesis_seed' && !opts.researchQuestion?.trim()) {
+      addMessage('system', 'Type a research question first, then click Hypothesis Seed.', mode)
+      return
+    }
+
     if (isStreamingRef.current) return
     isStreamingRef.current = true
     setIsStreaming(true)
@@ -233,6 +296,18 @@ export function useAICopilot(
           prompts = buildCrossMoleculeComparePrompt(context, others)
           break
         }
+        case 'prior_art_query':
+          prompts = buildPriorArtQueryPrompt(context)
+          break
+        case 'differential_safety':
+          prompts = buildDifferentialSafetyPrompt(context, diffTarget!)
+          break
+        case 'suggest_next':
+          prompts = buildSuggestNextPrompt(context)
+          break
+        case 'hypothesis_seed':
+          prompts = buildHypothesisSeedPrompt(context, opts.researchQuestion!)
+          break
         default:
           prompts = buildAutoInsightPrompt(context, snapshot)
       }
@@ -261,8 +336,66 @@ export function useAICopilot(
 
     const { content: finalContent, error: inlineError } = extractStreamError(fullContent)
     const msgError = streamError || inlineError
-    if (msgError || finalContent !== fullContent) {
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent || fullContent, ...(msgError ? { error: msgError } : {}) } : m))
+
+    // Plan-06: validate task-mode outputs and either attach the structured
+    // payload or surface a polite "AI response was unclear" message.
+    let taskPayload: CopilotMessage['task'] | undefined
+    let validationError: string | undefined
+    const rawForValidation = finalContent || fullContent
+
+    if (!msgError && isTaskMode && rawForValidation) {
+      if (mode === 'prior_art_query') {
+        const v = validatePriorArtQuery(rawForValidation, {
+          name: context.identity.name,
+          synonyms: context.identity.synonyms,
+        })
+        if (v.ok) {
+          taskPayload = { kind: 'prior_art', query: v.query }
+        } else {
+          validationError = `AI response was unclear, try again. (${v.reason})`
+        }
+      } else if (mode === 'differential_safety' && diffTarget) {
+        const v = validateDiffSafety(rawForValidation, context.identity.name, diffTarget.name)
+        if (v.ok) {
+          taskPayload = {
+            kind: 'diff_safety',
+            text: v.text,
+            paragraphCount: v.paragraphCount,
+            currentName: context.identity.name,
+            otherName: diffTarget.name,
+          }
+        } else {
+          validationError = `AI response was unclear, try again. (${v.reason})`
+        }
+      } else if (mode === 'suggest_next') {
+        const v = validateSuggestNext(rawForValidation)
+        if (v.ok) {
+          taskPayload = { kind: 'suggest_next', entities: v.entities }
+        } else {
+          validationError = `AI response was unclear, try again. (${v.reason})`
+        }
+      } else if (mode === 'hypothesis_seed') {
+        const v = validateHypothesisSeed(rawForValidation)
+        if (v.ok) {
+          taskPayload = {
+            kind: 'hypothesis_seed',
+            filters: v.filters,
+            url: buildHypothesisSeedUrl(v.filters),
+          }
+        } else {
+          validationError = `AI response was unclear, try again. (${v.reason})`
+        }
+      }
+    }
+
+    if (msgError || validationError || taskPayload || finalContent !== fullContent) {
+      setMessages(prev => prev.map(m => m.id === msgId ? {
+        ...m,
+        content: finalContent || fullContent,
+        ...(msgError ? { error: msgError } : {}),
+        ...(validationError ? { validationError } : {}),
+        ...(taskPayload ? { task: taskPayload } : {}),
+      } : m))
     }
 
     isStreamingRef.current = false

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useCallback, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { clientFetch } from '@/lib/clientFetch'
 import { exportMatchesToCsv } from '@/lib/hypothesis/csv'
 import { downloadFile } from '@/lib/exportData'
@@ -8,10 +9,36 @@ import {
   listSavedHypotheses,
   saveHypothesis,
 } from '@/lib/hypothesis/savedHypotheses'
-import type { Filter, Hypothesis, IntersectedMatch } from '@/lib/hypothesis/types'
+import type { Filter, FilterAxis, Hypothesis, IntersectedMatch } from '@/lib/hypothesis/types'
 import { FilterSlot } from '@/components/hypothesis/FilterSlot'
 import { ResultCard } from '@/components/hypothesis/ResultCard'
 import { SavedHypotheses } from '@/components/hypothesis/SavedHypotheses'
+
+const VALID_AXES: FilterAxis[] = ['targets-gene', 'indicated-for', 'trial-phase', 'atc-class']
+
+/**
+ * Parse the `seed` query param: a JSON-encoded Filter[] dropped here by the AI
+ * Copilot's hypothesis_seed task. Returns null on any parse / shape error.
+ */
+function parseSeedParam(raw: string | null): Filter[] | null {
+  if (!raw) return null
+  try {
+    const decoded = JSON.parse(raw)
+    if (!Array.isArray(decoded) || decoded.length < 2 || decoded.length > 3) return null
+    const out: Filter[] = []
+    for (const item of decoded) {
+      if (!item || typeof item !== 'object') return null
+      const axis = (item as { axis?: unknown }).axis
+      const value = (item as { value?: unknown }).value
+      if (typeof axis !== 'string' || typeof value !== 'string' || !value.trim()) return null
+      if (!VALID_AXES.includes(axis as FilterAxis)) return null
+      out.push({ axis: axis as FilterAxis, value: value.trim() })
+    }
+    return out
+  } catch {
+    return null
+  }
+}
 
 interface ApiResponse {
   filters: Filter[]
@@ -31,7 +58,13 @@ type Status =
   | { kind: 'error'; message: string }
 
 export function HypothesisClient() {
-  const [filters, setFilters] = useState<Filter[]>(DEFAULT_FILTERS)
+  const searchParams = useSearchParams()
+  const [filters, setFilters] = useState<Filter[]>(() => {
+    // Pre-populate from `?seed=` (set by the AI Copilot's hypothesis_seed task)
+    // before the first paint so the user sees the seeded filters immediately.
+    const seed = parseSeedParam(searchParams?.get('seed') ?? null)
+    return seed ?? DEFAULT_FILTERS
+  })
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [saved, setSaved] = useState<Hypothesis[]>([])
   const [saveName, setSaveName] = useState('')
@@ -40,6 +73,16 @@ export function HypothesisClient() {
   useEffect(() => {
     setSaved(listSavedHypotheses())
   }, [])
+
+  // If the URL changes to a new seed (e.g. user clicks a fresh AI link without
+  // a full page reload), refresh the filter slots.
+  useEffect(() => {
+    const seed = parseSeedParam(searchParams?.get('seed') ?? null)
+    if (seed) {
+      setFilters(seed)
+      setStatus({ kind: 'idle' })
+    }
+  }, [searchParams])
 
   const allValid = filters.every(f => f.value.trim().length > 0)
 
