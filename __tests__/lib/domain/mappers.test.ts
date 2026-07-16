@@ -33,7 +33,8 @@ describe('mappers', () => {
     expect(m.origins).toEqual(
       expect.arrayContaining(['dgidb', 'clinicaltrials-intervention', 'chembl-indication']),
     )
-    expect(m.scores?.axes.clinicalStage).toBeCloseTo(0.75, 5)
+    // clinicalStage = 0.7*(maxPhase/4) + 0.3*trialNorm = 0.7*0.75 + 0.3*0.4 = 0.645
+    expect(m.scores?.axes.clinicalStage).toBeCloseTo(0.645, 5)
     expect(m.scores?.axes.efficacy).toBeCloseTo(0.8, 5)
     expect(m.scores?.axes.safety).toBeNull()
     expect(m.scores?.axisStatus.safety).toBe('not-retrieved')
@@ -94,6 +95,9 @@ describe('mappers', () => {
       therapeuticAreas: ['neurology'],
       genes: [{ symbol: 'APP', score: 0.9, source: 'Open Targets' }],
       candidates: [legacy],
+      sourceStatuses: [{ source: 'DGIdb', status: 'loaded', has_data: true }],
+      generatedAt: '2026-04-07T12:00:00.000Z',
+      warnings: ['Open Targets knownDrugs path excluded'],
     })
     expect(isDiscoveryResult(v2)).toBe(true)
     expect(v2.schemaVersion).toBe(2)
@@ -102,6 +106,11 @@ describe('mappers', () => {
     expect(v2.candidates).toHaveLength(1)
     expect(v2.needsDiseaseConfirmation).toBe(false)
     expect(v2.rubric.preset).toBe('balanced')
+    expect(v2.sourceStatuses).toEqual([
+      { source: 'DGIdb', status: 'loaded', has_data: true },
+    ])
+    expect(v2.generatedAt).toBe('2026-04-07T12:00:00.000Z')
+    expect(v2.warnings).toContain('Open Targets knownDrugs path excluded')
   })
 
   it('warns and marks disease unresolved when diseaseId missing', () => {

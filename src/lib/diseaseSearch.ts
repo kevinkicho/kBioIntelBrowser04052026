@@ -1,4 +1,6 @@
-import { searchDiseases as searchOpenTargetsDiseases, getDrugsForDisease, getTargetsForDisease } from '@/lib/api/opentargets'
+// getDrugsForDisease intentionally NOT used for molecule enrichment (PR3a decontamination).
+// It returns linked target names; PR3b restores knownDrugs GraphQL.
+import { searchDiseases as searchOpenTargetsDiseases, getTargetsForDisease } from '@/lib/api/opentargets'
 import { searchOrphanetDiseases, getOrphanetGenes } from '@/lib/api/orphanet'
 import { getGenesByDisease } from '@/lib/api/disgenet'
 import { getMoleculeCidByName } from '@/lib/api/pubchem'
@@ -164,12 +166,12 @@ export async function searchDiseases(query: string, limit: number): Promise<Dise
   const withMolecules = await Promise.all(
     topResults.map(async (r) => {
       try {
+        // PR3a intentional decontamination:
+        // Open Targets `getDrugsForDisease` queries linkedTargets and returns
+        // **target/protein names**, not known drugs. Attaching them as molecules
+        // contaminates disease search and discovery gather. PR3b restores real
+        // knownDrugs via GraphQL. Do not re-enable this path until then.
         if (r.source === 'Open Targets' && r.id) {
-          const targetNames = await getDrugsForDisease(r.id)
-          if (targetNames.length > 0) {
-            const molecules = await resolveMoleculesFromNames(targetNames)
-            if (molecules.length > 0) return { ...r, molecules }
-          }
           return r
         }
 

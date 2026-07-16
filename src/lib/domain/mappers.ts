@@ -14,12 +14,11 @@ import type {
 import { assessIdentityTrust } from './identity'
 import type { DiscoveryResult } from './discoveryResult'
 import {
-  computeComposite,
   createDefaultScoreRubric,
-  createEmptyScoreVector,
   type ScoreRubric,
   type ScoreVector,
 } from './score'
+import { buildScoreVector } from '../discovery/scoreAxes'
 
 const SOURCE_TO_ORIGIN: Record<string, CandidateOrigin> = {
   dgidb: 'dgidb',
@@ -108,49 +107,20 @@ function mapLegacyScores(
   rubric: ScoreRubric,
   identityTrustAxis: number,
 ): ScoreVector {
-  const base = createEmptyScoreVector('cheap', rubric)
-
-  // efficacy: prefer max of gene association + shared target ratio (both 0–1 proxies)
-  const efficacyParts = [legacy.geneAssociationScore, legacy.sharedTargetRatio].filter(
-    (n) => typeof n === 'number' && !Number.isNaN(n),
-  )
-  const efficacy =
-    efficacyParts.length > 0 ? Math.min(1, Math.max(0, Math.max(...efficacyParts))) : null
-
-  const clinicalStage =
-    typeof legacy.clinicalPhase === 'number' && !Number.isNaN(legacy.clinicalPhase)
-      ? Math.min(1, Math.max(0, legacy.clinicalPhase))
-      : null
-
-  const axes: ScoreVector['axes'] = {
-    efficacy,
-    clinicalStage,
-    safety: null,
-    novelty: null,
-    identityTrust: identityTrustAxis,
-  }
-
-  const axisStatus: ScoreVector['axisStatus'] = {
-    efficacy: efficacy != null ? 'computed' : 'empty',
-    clinicalStage: clinicalStage != null ? 'computed' : 'empty',
-    safety: 'not-retrieved',
-    novelty: 'not-retrieved',
-    identityTrust: 'computed',
-  }
-
-  // Always recompute from mapped axes — never overwrite a legitimate 0 composite
-  // with legacy.compositeScore (axes-all-zero is a valid cheap score).
-  const composite = computeComposite(axes, rubric)
-
-  return {
-    ...base,
-    composite,
-    axes,
-    axisStatus,
-    rubricId: rubric.preset,
-    weights: { ...rubric.weights },
+  // Multi-axis cheap formulas (PR4): efficacy / clinicalStage / identityTrust;
+  // safety + novelty remain not-retrieved until harvest.
+  return buildScoreVector({
+    rubric,
     scorePhase: 'cheap',
-  }
+    cheap: {
+      geneAssociationScore: legacy.geneAssociationScore,
+      sharedTargetRatio: legacy.sharedTargetRatio,
+      maxPhase: legacy.clinicalPhaseRaw,
+      trialNorm: legacy.trialCountNorm,
+      identityTrust: identityTrustAxis,
+      sources: legacy.sources,
+    },
+  })
 }
 
 /**
@@ -162,7 +132,8 @@ export function mapRankResultToDiscoveryResult(
   options?: { rubric?: ScoreRubric; generatedAt?: string },
 ): DiscoveryResult {
   const rubric = options?.rubric ?? createDefaultScoreRubric('balanced')
-  const generatedAt = options?.generatedAt ?? new Date().toISOString()
+  const generatedAt =
+    options?.generatedAt ?? rank.generatedAt ?? new Date().toISOString()
 
   const disease: DiseaseEntity | null = rank.diseaseName
     ? {
@@ -199,9 +170,10 @@ export function mapRankResultToDiscoveryResult(
     }),
   )
 
-  const warnings: string[] = []
+  const warnings: string[] = [...(rank.warnings ?? [])]
   if (!rank.diseaseId) {
-    warnings.push('Disease id missing — ranked from name only (legacy path).')
+    const msg = 'Disease id missing — ranked from name only (legacy path).'
+    if (!warnings.includes(msg)) warnings.push(msg)
   }
 
   return {
@@ -212,7 +184,7 @@ export function mapRankResultToDiscoveryResult(
     needsDiseaseConfirmation: false,
     targets,
     candidates,
-    sourceStatuses: [],
+    sourceStatuses: rank.sourceStatuses ? [...rank.sourceStatuses] : [],
     rubric,
     generatedAt,
     warnings,

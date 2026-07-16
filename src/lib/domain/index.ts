@@ -100,13 +100,20 @@ export {
   mapRankResultToDiscoveryResult,
 } from './mappers'
 
-// Discovery preferences (types + defaults; re-export for a single domain entrypoint)
+// Discovery preferences (types + defaults + pure helpers; re-export for domain entrypoint)
 export {
   type DiscoveryPreferences,
   type HarvestTimingPref,
   type AeAggressivenessPref,
   type TourExampleSetPref,
   type CollaborationModePref,
+  DISCOVERY_PREFS_STORAGE_KEY,
   DEFAULT_DISCOVERY_PREFERENCES,
   snapshotDiscoveryPreferences,
+  parseDiscoveryPreferences,
+  mergeDiscoveryPreferences,
+  scoreRubricFromPreferences,
+  harvestFlagsFromPreferences,
+  PREFERENCE_TOOLTIPS,
+  RUBRIC_PRESET_LABELS,
 } from '../discovery/preferences'
