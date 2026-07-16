@@ -11,7 +11,10 @@ import {
   createDefaultScoreRubric,
 } from '@/lib/domain'
 import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
-import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
+import {
+  SaveToProjectButton,
+  type SaveProjectContext,
+} from '@/components/projects/SaveToProjectButton'
 import { buildMoleculeLinkUrl, AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
@@ -31,6 +34,8 @@ interface Props {
   domainCandidate?: MoleculeCandidate
   /** Live scoring rubric (weights for explainer). */
   rubric?: ScoreRubric
+  /** Stamp disease/targets/rubric on board save (V2-03). */
+  projectContext?: SaveProjectContext
 }
 
 const PHASE_LABELS: Record<number, string> = {
@@ -191,6 +196,7 @@ export function CandidateCard({
   diseaseName,
   domainCandidate: domainCandidateProp,
   rubric,
+  projectContext,
 }: Props) {
   const phaseLabel =
     PHASE_LABELS[candidate.clinicalPhaseRaw] ??
@@ -247,6 +253,7 @@ export function CandidateCard({
               <SaveToProjectButton
                 candidate={domainCandidate}
                 defaultProjectName={diseaseName ? `${diseaseName} board` : undefined}
+                projectContext={projectContext}
                 compact
               />
             </div>

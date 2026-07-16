@@ -166,6 +166,13 @@ export interface ProjectPackIndexEntry {
  * Local-first project board (≤50 candidates).
  * Storage key pattern: biointel-project-v1-{id}
  */
+/** Sticky discovery prefs snapshotted at project create (v2). Optional for legacy boards. */
+export interface ProjectPreferencesSnapshot {
+  rubricPreset?: string
+  aeAggressiveness?: 'soft-flag' | 'hard-penalty'
+  harvestTiming?: 'board-promote' | 'rank-time'
+}
+
 export interface Project {
   schemaVersion: 1
   id: string
@@ -176,6 +183,8 @@ export interface Project {
   /** Board candidates (max 50 recommended) */
   candidates: MoleculeCandidate[]
   rubric?: ScoreRubric
+  /** Discovery prefs at stamp time (export round-trip) */
+  preferencesSnapshot?: ProjectPreferencesSnapshot
   packIndex: ProjectPackIndexEntry[]
   researchHypothesisIds?: string[]
   createdAt: string

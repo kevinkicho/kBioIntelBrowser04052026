@@ -74,6 +74,7 @@ export {
   type NextExperiment,
   type ResearchHypothesis,
   type ProjectPackIndexEntry,
+  type ProjectPreferencesSnapshot,
   type Project,
   type Disease,
   type Target,

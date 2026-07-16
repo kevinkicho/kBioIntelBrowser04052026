@@ -14,9 +14,10 @@ export type ProductEventName =
   | 'pack_export' // M6
   | 'decision_mode_open' // M7
   | 'hypothesis_send_to_board' // M8
+  | 'board_status_changed' // board triage (M2 depth)
   | 'similarity_expand'
   | 'pack_share'
-  | 'source_status_shown' // M6 — SourceStatusStrip (PR-V2-07)
+  | 'source_status_shown' // M6 — SourceStatusStrip
 
 export interface ProductEvent {
   name: ProductEventName

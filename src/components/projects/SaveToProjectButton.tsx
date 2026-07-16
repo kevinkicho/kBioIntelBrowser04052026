@@ -1,19 +1,40 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import type { MoleculeCandidate } from '@/lib/domain'
+import type {
+  DiseaseEntity,
+  MoleculeCandidate,
+  ProjectPreferencesSnapshot,
+  ScoreRubric,
+} from '@/lib/domain'
 import {
   addCandidateAndSave,
   createAndSaveProject,
   listProjects,
+  saveProject,
   type StoreResult,
 } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
+import {
+  loadDiscoveryPreferences,
+  scoreRubricFromPreferences,
+  snapshotDiscoveryPreferences,
+} from '@/lib/discovery/preferences'
+
+export interface SaveProjectContext {
+  disease?: DiseaseEntity | null
+  targetIds?: string[]
+  rubric?: ScoreRubric
+  preferencesSnapshot?: ProjectPreferencesSnapshot
+  defaultProjectName?: string
+}
 
 interface Props {
   candidate: MoleculeCandidate
   /** Optional disease name used when auto-creating a project */
   defaultProjectName?: string
+  /** Disease / targets / rubric stamp when creating or first-scoping a project */
+  projectContext?: SaveProjectContext
   className?: string
   /** Compact chip style for dense cards */
   compact?: boolean
@@ -26,6 +47,7 @@ interface Props {
 export function SaveToProjectButton({
   candidate,
   defaultProjectName,
+  projectContext,
   className = '',
   compact = false,
 }: Props) {
@@ -65,6 +87,31 @@ export function SaveToProjectButton({
     [flash],
   )
 
+  const stampContext = useCallback((): {
+    disease?: DiseaseEntity | null
+    targetIds?: string[]
+    rubric?: ScoreRubric
+    preferencesSnapshot?: ProjectPreferencesSnapshot
+  } => {
+    try {
+      const prefs = loadDiscoveryPreferences()
+      return {
+        disease: projectContext?.disease ?? null,
+        targetIds: projectContext?.targetIds?.slice(0, 10) ?? [],
+        rubric: projectContext?.rubric ?? scoreRubricFromPreferences(prefs),
+        preferencesSnapshot:
+          projectContext?.preferencesSnapshot ?? snapshotDiscoveryPreferences(prefs),
+      }
+    } catch {
+      return {
+        disease: projectContext?.disease ?? null,
+        targetIds: projectContext?.targetIds?.slice(0, 10) ?? [],
+        rubric: projectContext?.rubric,
+        preferencesSnapshot: projectContext?.preferencesSnapshot,
+      }
+    }
+  }, [projectContext])
+
   const saveTo = useCallback(
     (projectId: string) => {
       const result = addCandidateAndSave(projectId, candidate)
@@ -73,19 +120,57 @@ export function SaveToProjectButton({
           projectId,
           candidateId: candidate.candidateId,
         })
+        // Stamp empty disease/targets/rubric only (do not overwrite different disease)
+        const stamp = stampContext()
+        let proj = result.value
+        let note = ''
+        if (stamp.disease && !proj.disease) {
+          proj = { ...proj, disease: stamp.disease }
+        } else if (
+          stamp.disease &&
+          proj.disease &&
+          stamp.disease.id &&
+          proj.disease.id &&
+          stamp.disease.id !== proj.disease.id
+        ) {
+          note = ` (project already scoped to ${proj.disease.name})`
+        }
+        if ((!proj.targetIds || proj.targetIds.length === 0) && (stamp.targetIds?.length ?? 0) > 0) {
+          proj = { ...proj, targetIds: stamp.targetIds! }
+        }
+        if (!proj.rubric && stamp.rubric) {
+          proj = { ...proj, rubric: stamp.rubric }
+        }
+        if (!proj.preferencesSnapshot && stamp.preferencesSnapshot) {
+          proj = { ...proj, preferencesSnapshot: stamp.preferencesSnapshot }
+        }
+        if (proj !== result.value) {
+          const saved = saveProject(proj)
+          if (saved.ok) {
+            handleResult(saved, `Saved to project board${note}`)
+            return
+          }
+        }
       }
       handleResult(result, 'Saved to project board')
     },
-    [candidate, handleResult],
+    [candidate, handleResult, stampContext],
   )
 
   const createAndSave = useCallback(() => {
+    const stamp = stampContext()
     const name =
+      projectContext?.defaultProjectName?.trim() ||
       defaultProjectName?.trim() ||
+      stamp.disease?.name?.trim() ||
       `Board · ${candidate.identity.name}`.slice(0, 80)
     const created = createAndSaveProject({
-      name,
+      name: name.slice(0, 200),
       candidates: [{ ...candidate, boardStatus: candidate.boardStatus ?? 'untriaged' }],
+      disease: stamp.disease ?? null,
+      targetIds: stamp.targetIds ?? [],
+      rubric: stamp.rubric,
+      preferencesSnapshot: stamp.preferencesSnapshot,
     })
     if (created.ok) {
       emitProductEvent('project_create', { projectId: created.value.id })
@@ -95,7 +180,7 @@ export function SaveToProjectButton({
       })
     }
     handleResult(created, 'Created project and saved candidate')
-  }, [candidate, defaultProjectName, handleResult])
+  }, [candidate, defaultProjectName, handleResult, projectContext, stampContext])
 
   const baseBtn = compact
     ? 'text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/20 text-emerald-300 hover:bg-emerald-900/40 transition-colors'

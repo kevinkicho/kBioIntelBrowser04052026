@@ -7,8 +7,11 @@ import type { BoardStatus, Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import {
   addCandidateAndSave,
+  candidateNeedsHarvest,
   exportProjectToJson,
   getProject,
+  harvestCandidatesForBoard,
+  harvestTimingIsBoardPromote,
   listResearchHypothesesForProject,
   projectExportFilename,
   removeCandidateFromProject,
@@ -42,7 +45,11 @@ export default function ProjectBoardPage() {
   const [signalsLoading, setSignalsLoading] = useState(false)
   const [expandBusy, setExpandBusy] = useState<string | null>(null)
   const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([])
+  const [harvestingIds, setHarvestingIds] = useState<string[]>([])
+  const [harvestBusy, setHarvestBusy] = useState(false)
   const signalsLoadedFor = useRef<string | null>(null)
+  const harvestGen = useRef(0)
+  const harvestAbort = useRef<AbortController | null>(null)
 
   const refresh = useCallback(() => {
     if (!id) {
@@ -92,6 +99,47 @@ export default function ProjectBoardPage() {
     window.setTimeout(() => setBanner(null), 4000)
   }
 
+  const runHarvest = useCallback(
+    async (proj: Project, candidateIds: string[]) => {
+      if (candidateIds.length === 0) return
+      harvestAbort.current?.abort()
+      const ac = new AbortController()
+      harvestAbort.current = ac
+      const gen = ++harvestGen.current
+      setHarvestingIds(candidateIds)
+      setHarvestBusy(true)
+      try {
+        const res = await harvestCandidatesForBoard(proj, candidateIds, {
+          signal: ac.signal,
+          generation: gen,
+        })
+        if (gen !== harvestGen.current) return // stale
+        if (!res.ok) {
+          showBanner('err', res.warnings[0] ?? 'Harvest failed')
+          return
+        }
+        const saved = saveProject(res.project)
+        if (!saved.ok) {
+          showBanner('err', saved.message)
+          return
+        }
+        setProject(saved.value)
+        showBanner(
+          'ok',
+          res.warnings.length
+            ? `Safety scores updated (${res.warnings.length} note${res.warnings.length === 1 ? '' : 's'})`
+            : 'Safety & novelty scores loaded',
+        )
+      } finally {
+        if (gen === harvestGen.current) {
+          setHarvestingIds([])
+          setHarvestBusy(false)
+        }
+      }
+    },
+    [],
+  )
+
   const handleStatus = (candidateId: string, status: BoardStatus) => {
     if (!id) return
     const result = setBoardStatusAndSave(id, candidateId, status)
@@ -100,6 +148,35 @@ export default function ProjectBoardPage() {
       return
     }
     setProject(result.value)
+    emitProductEvent('board_status_changed', { candidateId, status, projectId: id })
+
+    // Promote-only auto-harvest (KD-V2-4); watching does not harvest
+    if (
+      status === 'promote' &&
+      harvestTimingIsBoardPromote(result.value)
+    ) {
+      const c = result.value.candidates.find((x) => x.candidateId === candidateId)
+      if (c && candidateNeedsHarvest(c)) {
+        void runHarvest(result.value, [candidateId])
+      }
+    } else if (status !== 'promote') {
+      // Leave promote mid-flight → invalidate late merge
+      harvestGen.current += 1
+      harvestAbort.current?.abort()
+    }
+  }
+
+  const handleLoadSafety = () => {
+    if (!project) return
+    const ids = project.candidates
+      .filter((c) => (c.boardStatus === 'promote' || c.boardStatus === 'watching') && candidateNeedsHarvest(c))
+      .map((c) => c.candidateId)
+      .slice(0, 15)
+    if (ids.length === 0) {
+      showBanner('ok', 'No promoted/watching candidates need safety scores')
+      return
+    }
+    void runHarvest(project, ids)
   }
 
   const handleRemove = (candidateId: string) => {
@@ -221,8 +298,32 @@ export default function ProjectBoardPage() {
             )}
             <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-500">
               {project.disease?.name && (
-                <span className="rounded-full border border-indigo-800/40 bg-indigo-900/20 px-2 py-0.5 text-indigo-300">
+                <Link
+                  href={`/discover?q=${encodeURIComponent(project.disease.name)}${
+                    project.disease.id
+                      ? `&diseaseId=${encodeURIComponent(project.disease.id)}`
+                      : ''
+                  }${
+                    project.targetIds?.length
+                      ? `&targets=${encodeURIComponent(project.targetIds.join(','))}`
+                      : ''
+                  }`}
+                  className="rounded-full border border-indigo-800/40 bg-indigo-900/20 px-2 py-0.5 text-indigo-300 hover:border-indigo-600"
+                >
                   {project.disease.name}
+                </Link>
+              )}
+              {(project.targetIds ?? []).slice(0, 8).map((t) => (
+                <span
+                  key={t}
+                  className="rounded-full border border-emerald-800/40 bg-emerald-900/20 px-2 py-0.5 font-mono text-emerald-300"
+                >
+                  {t}
+                </span>
+              ))}
+              {project.rubric?.preset && (
+                <span className="rounded-full border border-slate-700 bg-slate-800/50 px-2 py-0.5 text-slate-400">
+                  rubric: {project.rubric.preset}
                 </span>
               )}
               <span>
@@ -257,6 +358,15 @@ export default function ProjectBoardPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={handleLoadSafety}
+              disabled={harvestBusy}
+              className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-900/40 disabled:opacity-50"
+              title="Load safety & novelty for promote/watching candidates missing axes"
+            >
+              {harvestBusy ? 'Loading safety…' : 'Load safety scores'}
+            </button>
             <button
               type="button"
               onClick={handleExport}
@@ -415,6 +525,11 @@ export default function ProjectBoardPage() {
                       </td>
                       <td className="px-3 py-3 text-center">
                         <div className="flex items-center justify-center gap-1">
+                          {harvestingIds.includes(c.candidateId) && (
+                            <span className="text-[9px] text-amber-400 animate-pulse" title="Harvesting safety…">
+                              harvest…
+                            </span>
+                          )}
                           {(status === 'promote' || status === 'watching') &&
                             c.identity.pubchemCid != null && (
                               <button

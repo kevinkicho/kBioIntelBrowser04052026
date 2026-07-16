@@ -63,3 +63,12 @@ export {
   type SendIntersectToBoardInput,
   type SendIntersectToBoardResult,
 } from './bridgeFromIntersect'
+
+export {
+  BOARD_HARVEST_MAX,
+  candidateNeedsHarvest,
+  rubricForProject,
+  aeForProject,
+  harvestTimingIsBoardPromote,
+  harvestCandidatesForBoard,
+} from './boardHarvest'

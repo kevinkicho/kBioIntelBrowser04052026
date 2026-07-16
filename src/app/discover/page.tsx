@@ -17,6 +17,11 @@ import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
 import type { DiseaseEntity } from '@/lib/domain/entities'
 import { MAX_DISCOVER_TARGETS, parseTargetsParam } from '@/lib/discovery/discoverUrl'
 import { matchDomainCandidate } from '@/lib/discovery/matchDomainCandidate'
+import {
+  loadDiscoveryPreferences,
+  scoreRubricFromPreferences,
+  snapshotDiscoveryPreferences,
+} from '@/lib/discovery/preferences'
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams()
@@ -280,6 +285,25 @@ export default function DiscoverPage() {
                       state.result?.v2?.candidates,
                       state.result?.candidates.length ?? 0,
                     )
+                    let projectContext
+                    try {
+                      const prefs = loadDiscoveryPreferences()
+                      projectContext = {
+                        disease: state.result?.v2?.disease ?? null,
+                        targetIds: state.targets,
+                        rubric:
+                          state.result?.v2?.rubric ?? scoreRubricFromPreferences(prefs),
+                        preferencesSnapshot: snapshotDiscoveryPreferences(prefs),
+                        defaultProjectName: state.result?.diseaseName
+                          ? `${state.result.diseaseName} board`
+                          : undefined,
+                      }
+                    } catch {
+                      projectContext = {
+                        disease: state.result?.v2?.disease ?? null,
+                        targetIds: state.targets,
+                      }
+                    }
                     return (
                       <CandidateCard
                         key={candidate.name}
@@ -290,6 +314,7 @@ export default function DiscoverPage() {
                         diseaseGenes={state.result?.genes}
                         domainCandidate={domainCandidate}
                         rubric={state.result?.v2?.rubric}
+                        projectContext={projectContext}
                       />
                     )
                   })}

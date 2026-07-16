@@ -75,6 +75,7 @@ export interface CreateProjectInput {
   targetIds?: string[]
   candidates?: MoleculeCandidate[]
   rubric?: ScoreRubric
+  preferencesSnapshot?: Project['preferencesSnapshot']
   packIndex?: ProjectPackIndexEntry[]
   id?: string
 }
@@ -92,6 +93,7 @@ export function createProject(input: CreateProjectInput): Project {
     targetIds: input.targetIds ?? [],
     candidates,
     rubric: input.rubric,
+    preferencesSnapshot: input.preferencesSnapshot,
     packIndex: input.packIndex ?? [],
     researchHypothesisIds: [],
     createdAt: ts,
