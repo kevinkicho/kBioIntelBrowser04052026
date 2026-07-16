@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDiscovery } from './hooks/useDiscovery'
 import { DiscoveryHero } from './components/DiscoveryHero'
@@ -10,44 +9,14 @@ import { DiscoveryProgress, EmptyState, ErrorState } from './components/Discover
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
+import { GeneTable } from './components/GeneTable'
 import { SourceStatusStrip } from './components/SourceStatusStrip'
 import { TargetPinPanel } from '@/components/discover/TargetPinPanel'
 import { DiscoverySettingsDrawer } from '@/components/discovery/DiscoverySettingsDrawer'
 import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
-import type { DiseaseGene } from '@/lib/candidateRanker'
 import type { DiseaseEntity } from '@/lib/domain/entities'
-import { parseTargetsParam } from '@/lib/discovery/discoverUrl'
+import { MAX_DISCOVER_TARGETS, parseTargetsParam } from '@/lib/discovery/discoverUrl'
 import { matchDomainCandidate } from '@/lib/discovery/matchDomainCandidate'
-
-function GeneTable({ genes }: { genes: DiseaseGene[] }) {
-  if (genes.length === 0) return null
-  return (
-    <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 mb-6">
-      <h3 className="text-sm font-semibold text-slate-300 mb-3">
-        Disease-Associated Genes <span className="text-slate-500 font-normal">({genes.length})</span>
-      </h3>
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-        {genes.slice(0, 20).map((gene) => (
-          <Link
-            key={gene.symbol}
-            href={`/gene/${gene.symbol}`}
-            className="flex items-center gap-2 bg-slate-800/50 hover:bg-slate-800/80 rounded-lg px-3 py-1.5 transition-colors"
-          >
-            <span className="text-sm font-mono font-semibold text-indigo-300 hover:text-indigo-200">
-              {gene.symbol}
-            </span>
-            <span className="text-[10px] text-slate-500">{gene.score.toFixed(2)}</span>
-          </Link>
-        ))}
-        {genes.length > 20 && (
-          <div className="flex items-center justify-center text-xs text-slate-500">
-            +{genes.length - 20} more
-          </div>
-        )}
-      </div>
-    </div>
-  )
-}
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams()
@@ -118,27 +87,50 @@ export default function DiscoverPage() {
     reset()
   }
 
+  function applyTargets(next: string[]) {
+    const capped = next
+      .map((t) => t.trim())
+      .filter(Boolean)
+      .slice(0, MAX_DISCOVER_TARGETS)
+    setTargets(capped)
+    syncTargetsUrl(capped)
+    return capped
+  }
+
   function handleRemoveTarget(symbol: string) {
-    const next = state.targets.filter((t) => t !== symbol)
-    setTargets(next)
-    syncTargetsUrl(next)
+    const key = symbol.trim().toUpperCase()
+    const next = state.targets.filter((t) => t.trim().toUpperCase() !== key)
+    const capped = applyTargets(next)
     if (state.query || state.diseaseId) {
       void search(state.query || state.diseaseId || '', {
         diseaseId: state.diseaseId ?? undefined,
-        targets: next,
+        targets: capped,
       })
     }
   }
 
   function handleClearTargets() {
-    setTargets([])
-    syncTargetsUrl([])
+    applyTargets([])
     if (state.query || state.diseaseId) {
       void search(state.query || state.diseaseId || '', {
         diseaseId: state.diseaseId ?? undefined,
         targets: [],
       })
     }
+  }
+
+  /** Pin/unpin from GeneTable — updates state + URL targets= (max 10). Re-rank is optional. */
+  function handleTogglePin(symbol: string) {
+    const trimmed = symbol.trim()
+    if (!trimmed) return
+    const key = trimmed.toUpperCase()
+    const idx = state.targets.findIndex((t) => t.trim().toUpperCase() === key)
+    if (idx >= 0) {
+      applyTargets(state.targets.filter((_, i) => i !== idx))
+      return
+    }
+    if (state.targets.length >= MAX_DISCOVER_TARGETS) return
+    applyTargets([...state.targets, trimmed])
   }
 
   return (
@@ -269,7 +261,11 @@ export default function DiscoverPage() {
                   <SourceStatusStrip sourceStatuses={state.result.sourceStatuses ?? []} />
                 )}
 
-                <GeneTable genes={state.result.genes} />
+                <GeneTable
+                  genes={state.result.genes}
+                  pinnedTargets={state.targets}
+                  onTogglePin={handleTogglePin}
+                />
 
                 <CompareSelectionTray
                   candidates={state.result.candidates}
