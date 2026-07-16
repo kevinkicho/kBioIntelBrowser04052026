@@ -24,6 +24,8 @@ export {
   createAndSaveProject,
   addCandidateAndSave,
   setBoardStatusAndSave,
+  addPackIndexEntryToProject,
+  addPackIndexEntryAndSave,
 } from './store'
 
 export {

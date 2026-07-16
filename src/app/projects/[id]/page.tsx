@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import type { BoardStatus, Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
+import { PackBuilder } from '@/components/evidence/PackBuilder'
 import {
   exportProjectToJson,
   getProject,
@@ -192,6 +193,45 @@ export default function ProjectBoardPage() {
             onRemove={handleRemove}
           />
         )}
+
+        {/* Evidence packs — download-primary; board carries packIndex breadcrumbs only */}
+        <section className="mt-8 space-y-4">
+          <h2 className="text-lg font-semibold text-slate-100">Evidence packs</h2>
+          {project.packIndex.length > 0 && (
+            <ul className="space-y-2">
+              {project.packIndex.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <div className="font-medium text-slate-200">{entry.title}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {entry.candidateCount ?? 0} candidates ·{' '}
+                      {new Date(entry.createdAt).toLocaleString()} ·{' '}
+                      <span className="font-mono">{entry.id}</span>
+                    </div>
+                  </div>
+                  <span className="text-[10px] text-slate-600">
+                    File export only — full claims not stored
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          <PackBuilder
+            candidates={project.candidates}
+            disease={project.disease ?? null}
+            projectId={project.id}
+            defaultTitle={`${project.name} evidence pack`}
+            onExported={() => refresh()}
+          />
+          <p className="text-[11px] text-slate-600">
+            For claim-rich packs, open a molecule from the board (with project deep-link) and use{' '}
+            <strong className="font-medium text-slate-500">Export → Download evidence pack</strong> —
+            Core panel extractors fill claims (≤200).
+          </p>
+        </section>
       </div>
     </main>
   )
