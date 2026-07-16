@@ -5,6 +5,7 @@ import { getFreshnessStatus } from '@/lib/dataFreshness'
 import { getPanelSource } from '@/lib/panelSources'
 import type { DataLoadStatus } from '@/lib/dataStatus'
 import { emptyMessageForStatus } from '@/lib/dataStatus'
+import { getPanelTier, TIER_BADGE_CLASS, TIER_LABEL } from '@/lib/panelTiers'
 
 type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
 
@@ -39,6 +40,9 @@ export function Panel({ title, panelId, lastFetched, children, className = '', t
   const freshness = panelId && lastFetched ? getFreshnessStatus(panelId, lastFetched) : null
   const sourceInfo = panelId ? getPanelSource(panelId) : null
   const statusBadge = loadStatus ? LOAD_STATUS_BADGE[loadStatus] : undefined
+  // Subtle tier badge: only Supporting / Experimental (Core is the default mental model)
+  const tier = panelId ? getPanelTier(panelId) : null
+  const showTierBadge = tier === 'supporting' || tier === 'experimental'
   const emptyText = empty
     ? emptyMessageForStatus(loadStatus, empty)
     : loadStatus && loadStatus !== 'loaded'
@@ -51,6 +55,14 @@ export function Panel({ title, panelId, lastFetched, children, className = '', t
         <div className="flex items-baseline gap-2 flex-wrap">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
           {titleExtra}
+          {showTierBadge && tier && (
+            <span
+              className={`text-[9px] px-1.5 py-0.5 rounded tracking-wide ${TIER_BADGE_CLASS[tier]}`}
+              title={`Data tier: ${TIER_LABEL[tier]}`}
+            >
+              {TIER_LABEL[tier]}
+            </span>
+          )}
           {statusBadge && (
             <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide ${statusBadge.className}`}>
               {statusBadge.text}

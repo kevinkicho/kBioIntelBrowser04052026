@@ -8,6 +8,33 @@ describe('Panel', () => {
     expect(screen.getByText('Companies & Products')).toBeInTheDocument()
     expect(screen.getByText('Test content')).toBeInTheDocument()
   })
+
+  test('shows subtle Supporting tier badge when panelId is supporting', () => {
+    render(
+      <Panel title="DisGeNET" panelId="disgenet">
+        <p>assoc</p>
+      </Panel>
+    )
+    expect(screen.getByText('Supporting')).toBeInTheDocument()
+  })
+
+  test('shows subtle Experimental tier badge for NIH High-Impact panels', () => {
+    render(
+      <Panel title="NCI caDSR" panelId="nci-cadsr">
+        <p>data</p>
+      </Panel>
+    )
+    expect(screen.getByText('Experimental')).toBeInTheDocument()
+  })
+
+  test('does not show Core tier badge (default mental model)', () => {
+    render(
+      <Panel title="ChEMBL" panelId="chembl">
+        <p>acts</p>
+      </Panel>
+    )
+    expect(screen.queryByText('Core')).not.toBeInTheDocument()
+  })
 })
 
 describe('Badge', () => {

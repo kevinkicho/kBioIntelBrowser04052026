@@ -42,13 +42,15 @@ describe('categoryConfig', () => {
       }
     })
 
-    it('each panel has id, title, propKey, and isNullable', () => {
+    it('each panel has id, title, propKey, isNullable, and tier', () => {
+      const validTiers = ['core', 'supporting', 'experimental']
       for (const cat of CATEGORIES) {
         for (const panel of cat.panels) {
           expect(panel.id).toBeDefined()
           expect(panel.title).toBeDefined()
           expect(panel.propKey).toBeDefined()
           expect(typeof panel.isNullable).toBe('boolean')
+          expect(validTiers).toContain(panel.tier)
         }
       }
     })
