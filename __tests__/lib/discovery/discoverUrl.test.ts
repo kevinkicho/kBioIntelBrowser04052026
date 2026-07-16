@@ -1,5 +1,6 @@
 import {
   buildDiscoverHref,
+  mergeOrphanetGenesIntoTargets,
   parseTargetsParam,
   MAX_DISCOVER_TARGETS,
 } from '@/lib/discovery/discoverUrl'
@@ -56,5 +57,31 @@ describe('buildDiscoverHref', () => {
 
   it('gene-only CTA omits disease fields', () => {
     expect(buildDiscoverHref({ targets: ['TP53'] })).toBe('/discover?targets=TP53')
+  })
+})
+
+describe('mergeOrphanetGenesIntoTargets', () => {
+  it('appends new Orphanet genes after existing pins', () => {
+    expect(mergeOrphanetGenesIntoTargets(['EGFR'], ['MEFV', 'TNFRSF1A'])).toEqual([
+      'EGFR',
+      'MEFV',
+      'TNFRSF1A',
+    ])
+  })
+
+  it('dedupes case-insensitively and keeps existing first', () => {
+    expect(mergeOrphanetGenesIntoTargets(['egfr'], ['EGFR', 'BRCA1'])).toEqual(['egfr', 'BRCA1'])
+  })
+
+  it(`caps at ${MAX_DISCOVER_TARGETS}`, () => {
+    const existing = Array.from({ length: 8 }, (_, i) => `E${i}`)
+    const orphan = Array.from({ length: 8 }, (_, i) => `O${i}`)
+    const merged = mergeOrphanetGenesIntoTargets(existing, orphan)
+    expect(merged).toHaveLength(MAX_DISCOVER_TARGETS)
+    expect(merged.slice(0, 8)).toEqual(existing)
+  })
+
+  it('returns existing when orphanet list empty', () => {
+    expect(mergeOrphanetGenesIntoTargets(['TP53'], [])).toEqual(['TP53'])
   })
 })

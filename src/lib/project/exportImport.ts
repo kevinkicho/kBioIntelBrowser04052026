@@ -55,6 +55,11 @@ function normalizeForExport(project: Project): Project {
     candidates: (project.candidates ?? []).slice(0, MAX_CANDIDATES_PER_PROJECT),
     packIndex: project.packIndex ?? [],
     targetIds: project.targetIds ?? [],
+    // Preserve v2 scope stamp for round-trip (DoD)
+    preferencesSnapshot: project.preferencesSnapshot,
+    rubric: project.rubric,
+    disease: project.disease ?? null,
+    researchHypothesisIds: project.researchHypothesisIds ?? [],
   }
 }
 

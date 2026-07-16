@@ -32,6 +32,7 @@ describe('discovery preferences pure functions', () => {
         harvestTimingSticky: false,
         tourExampleSet: 'rare-only',
         collaborationMode: 'share-links-when-available',
+        rareDiseaseBoost: true,
         bogus: true,
         rubricPreset_invalid: 'nope',
       })
@@ -42,6 +43,14 @@ describe('discovery preferences pure functions', () => {
       expect(p.harvestTimingSticky).toBe(false)
       expect(p.tourExampleSet).toBe('rare-only')
       expect(p.collaborationMode).toBe('share-links-when-available')
+      expect(p.rareDiseaseBoost).toBe(true)
+    })
+
+    it('defaults rareDiseaseBoost to false', () => {
+      expect(parseDiscoveryPreferences({}).rareDiseaseBoost).toBe(false)
+      expect(
+        parseDiscoveryPreferences({ rareDiseaseBoost: 'yes' as unknown as boolean }).rareDiseaseBoost,
+      ).toBe(false)
     })
 
     it('rejects invalid preset / mode strings', () => {
@@ -192,6 +201,7 @@ describe('discovery preferences pure functions', () => {
       expect(DEFAULT_DISCOVERY_PREFERENCES.harvestTimingSticky).toBe(true)
       expect(DEFAULT_DISCOVERY_PREFERENCES.tourExampleSet).toBe('mixed')
       expect(DEFAULT_DISCOVERY_PREFERENCES.collaborationMode).toBe('solo-export')
+      expect(DEFAULT_DISCOVERY_PREFERENCES.rareDiseaseBoost).toBe(false)
     })
   })
 
@@ -207,12 +217,13 @@ describe('discovery preferences pure functions', () => {
       expect(p.tourExampleSet).toBe('mixed')
     })
 
-    it('save + load round-trips including tourExampleSet', () => {
+    it('save + load round-trips including tourExampleSet and rareDiseaseBoost', () => {
       const next = mergeDiscoveryPreferences(DEFAULT_DISCOVERY_PREFERENCES, {
         rubricPreset: 'novel-bioactive',
         aeAggressiveness: 'hard-penalty',
         harvestTiming: 'rank-time',
         tourExampleSet: 'rare-only',
+        rareDiseaseBoost: true,
       })
       saveDiscoveryPreferences(next)
       const raw = localStorage.getItem(DISCOVERY_PREFS_STORAGE_KEY)
@@ -222,6 +233,7 @@ describe('discovery preferences pure functions', () => {
       expect(loaded.aeAggressiveness).toBe('hard-penalty')
       expect(loaded.harvestTiming).toBe('rank-time')
       expect(loaded.tourExampleSet).toBe('rare-only')
+      expect(loaded.rareDiseaseBoost).toBe(true)
     })
 
     it('updateDiscoveryPreferences patches tourExampleSet and persists', () => {

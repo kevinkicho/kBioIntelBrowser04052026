@@ -81,3 +81,16 @@ export {
   buildBoardPackClaims,
   type BoardPackClaimsResult,
 } from './packClaims'
+
+export {
+  PACK_IDB_LRU_MAX,
+  putPackInCache,
+  getPackFromCache,
+  deletePackFromCache,
+} from './packCache'
+
+export {
+  rehydrateClaimsForHypothesis,
+  orderClaimsByIds,
+  type RehydrateResult,
+} from './rehydrateClaims'

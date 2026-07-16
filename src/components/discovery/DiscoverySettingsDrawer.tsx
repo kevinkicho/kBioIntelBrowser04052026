@@ -190,6 +190,24 @@ export function DiscoverySettingsDrawer({
 
           <div>
             <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
+              Rare-disease boost (Orphanet)
+            </div>
+            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                checked={prefs.rareDiseaseBoost}
+                onChange={(e) => onChange({ rareDiseaseBoost: e.target.checked })}
+                className="mt-0.5 rounded border-slate-600 accent-indigo-500"
+              />
+              <span>
+                After ranking, fetch Orphanet gene associations for the disease name and merge into
+                pinned targets (max 10). Free Orphadata only; no effect when no Orphanet hit.
+              </span>
+            </label>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
               Guided tour examples
             </div>
             <div className="flex flex-col gap-2">

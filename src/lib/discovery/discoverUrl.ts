@@ -52,6 +52,29 @@ function normalizeTargets(targets?: string | string[] | null): string[] {
 }
 
 /**
+ * Merge Orphanet rare-disease gene symbols into existing pins.
+ * Existing pins keep priority; case-insensitive dedupe; cap at max.
+ */
+export function mergeOrphanetGenesIntoTargets(
+  existing: string[],
+  orphanetGenes: string[],
+  max: number = MAX_DISCOVER_TARGETS,
+): string[] {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const raw of [...existing, ...orphanetGenes]) {
+    const symbol = String(raw ?? '').trim()
+    if (!symbol) continue
+    const key = symbol.toUpperCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(symbol)
+    if (out.length >= max) break
+  }
+  return out
+}
+
+/**
  * Build a discover workbench href from disease/gene context.
  * Empty params → `/discover`.
  */

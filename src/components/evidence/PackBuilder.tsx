@@ -18,7 +18,7 @@ import {
   type CorePanelEvidenceInput,
   type EvidencePack,
 } from '@/lib/evidence'
-import { addPackIndexEntryAndSave } from '@/lib/project'
+import { addPackIndexEntryAndSave, putPackInCache } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { PackView } from './PackView'
 import { PackAiPanel } from './PackAiPanel'
@@ -143,6 +143,8 @@ export function PackBuilder({
         if (proj.error === 'quota_exceeded') flash('err', proj.message)
       }
     }
+    // Full pack in IDB for RH rehydrate (never localStorage claims)
+    void putPackInCache(pack)
   }
 
   const handleDownload = (format: 'json' | 'md') => {

@@ -28,6 +28,11 @@ export interface DiscoveryPreferences {
   harvestTimingSticky: boolean
   tourExampleSet: TourExampleSetPref
   collaborationMode: CollaborationModePref
+  /**
+   * When true, after disease confirm try Orphanet gene associations and
+   * merge into pinned targets (rare-disease beachhead stretch).
+   */
+  rareDiseaseBoost: boolean
   /** Optional custom weights; when set, preset shows as "Custom" until reset */
   customWeights?: ScoreAxisWeights
   updatedAt: string
@@ -41,6 +46,7 @@ export const DEFAULT_DISCOVERY_PREFERENCES: DiscoveryPreferences = {
   harvestTimingSticky: true,
   tourExampleSet: 'mixed',
   collaborationMode: 'solo-export',
+  rareDiseaseBoost: false,
   updatedAt: new Date(0).toISOString(),
 }
 
@@ -112,6 +118,9 @@ export function parseDiscoveryPreferences(raw: unknown): DiscoveryPreferences {
       ? (o.collaborationMode as CollaborationModePref)
       : base.collaborationMode
 
+  const rareDiseaseBoost =
+    typeof o.rareDiseaseBoost === 'boolean' ? o.rareDiseaseBoost : base.rareDiseaseBoost
+
   const customWeights = isScoreAxisWeights(o.customWeights)
     ? { ...o.customWeights }
     : undefined
@@ -129,6 +138,7 @@ export function parseDiscoveryPreferences(raw: unknown): DiscoveryPreferences {
     harvestTimingSticky,
     tourExampleSet,
     collaborationMode,
+    rareDiseaseBoost,
     ...(customWeights ? { customWeights } : {}),
     updatedAt,
   }
@@ -151,6 +161,7 @@ export function mergeDiscoveryPreferences(
   if (patch.harvestTimingSticky !== undefined) {
     next.harvestTimingSticky = patch.harvestTimingSticky
   }
+  if (patch.rareDiseaseBoost !== undefined) next.rareDiseaseBoost = patch.rareDiseaseBoost
   if (patch.tourExampleSet !== undefined) next.tourExampleSet = patch.tourExampleSet
   if (patch.collaborationMode !== undefined) next.collaborationMode = patch.collaborationMode
 

@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import type { NextExperiment, ResearchHypothesis } from '@/lib/domain'
+import type { EvidenceClaim, NextExperiment, ResearchHypothesis } from '@/lib/domain'
 import {
   appendNextExperiment,
+  getProject,
   getResearchHypothesis,
+  rehydrateClaimsForHypothesis,
   saveResearchHypothesis,
   updateResearchHypothesis,
 } from '@/lib/project'
@@ -24,6 +26,37 @@ export default function ResearchHypothesisEditorPage() {
   const [thesis, setThesis] = useState('')
   const [expText, setExpText] = useState('')
   const [banner, setBanner] = useState<string | null>(null)
+  const [claims, setClaims] = useState<EvidenceClaim[]>([])
+  const [rehydrateSource, setRehydrateSource] = useState<string | null>(null)
+  const [rehydrateError, setRehydrateError] = useState<string | null>(null)
+  const [rehydrateBusy, setRehydrateBusy] = useState(false)
+
+  const flash = (msg: string) => {
+    setBanner(msg)
+    window.setTimeout(() => setBanner(null), 3000)
+  }
+
+  const runRehydrate = useCallback(async (h: ResearchHypothesis) => {
+    const project = getProject(h.projectId)
+    if (!project) {
+      setRehydrateError('Project not found — cannot rebuild claims')
+      setClaims([])
+      return
+    }
+    setRehydrateBusy(true)
+    setRehydrateError(null)
+    try {
+      const res = await rehydrateClaimsForHypothesis(h, project)
+      setClaims(res.claims)
+      setRehydrateSource(res.source)
+      if (res.error) setRehydrateError(res.error)
+      if (res.claims.length === 0 && !res.error) {
+        setRehydrateError('No claim statements available. Download a pack from the board first.')
+      }
+    } finally {
+      setRehydrateBusy(false)
+    }
+  }, [])
 
   useEffect(() => {
     if (!hypId) {
@@ -39,12 +72,10 @@ export default function ResearchHypothesisEditorPage() {
     setTitle(res.value.title)
     setThesis(res.value.thesis)
     emitProductEvent('research_hypothesis_opened', { hypId, projectId: res.value.projectId })
-  }, [hypId, projectId])
-
-  const flash = (msg: string) => {
-    setBanner(msg)
-    window.setTimeout(() => setBanner(null), 3000)
-  }
+    if (res.value.claimIds.length > 0) {
+      void runRehydrate(res.value)
+    }
+  }, [hypId, projectId, runRehydrate])
 
   const handleSave = useCallback(() => {
     if (!hyp) return
@@ -148,20 +179,59 @@ export default function ResearchHypothesisEditorPage() {
           </button>
         </div>
 
-        {hyp.claimIds.length > 0 && (
-          <section className="mt-8">
-            <h2 className="text-sm font-semibold text-slate-200">Linked claim ids</h2>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Seeded from pack export index. Full claim statements rehydrate when pack cache is
-              available (download pack after seed for density).
+        <section className="mt-8">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-200">Linked evidence claims</h2>
+            {hyp.claimIds.length > 0 && (
+              <button
+                type="button"
+                onClick={() => void runRehydrate(hyp)}
+                disabled={rehydrateBusy}
+                className="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-slate-200 disabled:opacity-50"
+              >
+                {rehydrateBusy ? 'Rebuilding…' : 'Rebuild evidence'}
+              </button>
+            )}
+          </div>
+          {rehydrateSource && claims.length > 0 && (
+            <p className="mt-1 text-[10px] text-slate-600">
+              Source: {rehydrateSource === 'idb' ? 'pack cache (IndexedDB)' : 'rebuilt from Core panels'}
             </p>
-            <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto font-mono text-[10px] text-slate-500">
+          )}
+          {rehydrateError && (
+            <p className="mt-1 text-[11px] text-amber-400/90" role="status">
+              {rehydrateError}
+            </p>
+          )}
+          {hyp.claimIds.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-600">
+              No claim ids — seed from a pack export on the project board.
+            </p>
+          ) : rehydrateBusy && claims.length === 0 ? (
+            <p className="mt-2 text-xs text-slate-500 animate-pulse">Loading claim statements…</p>
+          ) : claims.length > 0 ? (
+            <ul className="mt-2 max-h-64 space-y-2 overflow-y-auto" data-testid="rehydrated-claims">
+              {claims.map((c) => (
+                <li
+                  key={c.id}
+                  className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs"
+                >
+                  <span className="text-[9px] uppercase text-slate-500">
+                    {c.claimType} · {c.provenance?.source ?? 'unknown'}
+                  </span>
+                  <p className="mt-0.5 leading-relaxed text-slate-200">{c.statement}</p>
+                  <p className="mt-1 font-mono text-[9px] text-slate-600">{c.id}</p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto font-mono text-[10px] text-slate-600">
               {hyp.claimIds.map((id) => (
                 <li key={id}>{id}</li>
               ))}
             </ul>
-          </section>
-        )}
+          )}
+        </section>
 
         <section className="mt-8">
           <h2 className="text-sm font-semibold text-slate-200">Next experiments</h2>

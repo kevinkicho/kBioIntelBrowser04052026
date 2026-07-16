@@ -30,6 +30,7 @@ export type ProductEventName =
   | 'harvest_safety_done'
   | 'project_opened'
   | 'score_breakdown_opened'
+  | 'discover_orphanet_genes'
 
 export interface ProductEvent {
   name: ProductEventName

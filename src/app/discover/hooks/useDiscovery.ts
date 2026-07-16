@@ -15,6 +15,10 @@ import {
   scoreRubricFromPreferences,
   snapshotDiscoveryPreferences,
 } from '@/lib/discovery/preferences'
+import {
+  MAX_DISCOVER_TARGETS,
+  mergeOrphanetGenesIntoTargets,
+} from '@/lib/discovery/discoverUrl'
 import type { ScoreVector } from '@/lib/domain/score'
 import {
   emitDiscoverStagesFromTimingMs,
@@ -166,7 +170,7 @@ export function useDiscovery() {
       const targets = (options?.targets ?? state.targets)
         .map((t) => t.trim())
         .filter(Boolean)
-        .slice(0, 10)
+        .slice(0, MAX_DISCOVER_TARGETS)
 
       // Targets-only deep-link: park pins in state and wait for a disease query
       if ((!trimmed || trimmed.length < 2) && !diseaseId) {
@@ -279,6 +283,34 @@ export function useDiscovery() {
         })
         // Post-hoc stages from real engine timingMs only (never fake timer labels)
         emitDiscoverStagesFromTimingMs(data.v2?.timingMs)
+
+        // Rare-disease boost: merge Orphanet genes into pins (opt-in; free Orphadata)
+        let mergedTargets = targets
+        if (prefs.rareDiseaseBoost && data.diseaseName) {
+          try {
+            const geneRes = await clientFetch(
+              `/api/orphanet/genes?q=${encodeURIComponent(data.diseaseName)}`,
+              { signal: controller.signal },
+            )
+            if (geneRes.ok) {
+              const body = (await geneRes.json()) as { genes?: unknown }
+              const genes = Array.isArray(body.genes)
+                ? body.genes.filter((g): g is string => typeof g === 'string')
+                : []
+              mergedTargets = mergeOrphanetGenesIntoTargets(targets, genes, MAX_DISCOVER_TARGETS)
+              if (mergedTargets.length > targets.length) {
+                emitProductEvent('discover_orphanet_genes', {
+                  diseaseName: data.diseaseName,
+                  added: mergedTargets.length - targets.length,
+                  total: mergedTargets.length,
+                })
+              }
+            }
+          } catch {
+            // Non-fatal: ranking already succeeded
+          }
+        }
+
         setState((prev) => ({
           ...prev,
           status: 'success',
@@ -287,7 +319,7 @@ export function useDiscovery() {
           result: data,
           diseaseCandidates: [],
           diseaseId: data.diseaseId ?? diseaseId ?? null,
-          targets,
+          targets: mergedTargets,
           error: null,
           harvestStatus:
             data.v2?.scorePhase === 'full' ? 'done' : flags.runSafetyHarvest ? 'done' : 'idle',
@@ -420,7 +452,7 @@ export function useDiscovery() {
   const setTargets = useCallback((targets: string[]) => {
     setState((prev) => ({
       ...prev,
-      targets: targets.map((t) => t.trim()).filter(Boolean).slice(0, 10),
+      targets: targets.map((t) => t.trim()).filter(Boolean).slice(0, MAX_DISCOVER_TARGETS),
     }))
   }, [])
 

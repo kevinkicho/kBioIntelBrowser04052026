@@ -142,4 +142,46 @@ describe('exportImport pure functions', () => {
     expect(projectExportFilename(p)).toMatch(/^biointel-project-attr-amyloidosis/)
     expect(projectExportFilename()).toMatch(/^biointel-projects-\d{4}-\d{2}-\d{2}\.json$/)
   })
+
+  it('round-trips preferencesSnapshot, rubric, and disease', () => {
+    const storage = memoryStorage()
+    const snap = {
+      rubricPreset: 'repurposing',
+      aeAggressiveness: 'hard-penalty' as const,
+      harvestTiming: 'rank-time' as const,
+    }
+    const disease = {
+      id: 'EFO_0000249',
+      idNamespace: 'efo' as const,
+      name: 'Alzheimer disease',
+      synonyms: [],
+      therapeuticAreas: [],
+      xrefs: [],
+      identityTrust: 'high' as const,
+    }
+    const created = createAndSaveProject(
+      {
+        name: 'Scoped board',
+        preferencesSnapshot: snap,
+        disease,
+        candidates: [makeCandidate('cid:1')],
+      },
+      storage,
+    )
+    expect(created.ok).toBe(true)
+    if (!created.ok) return
+
+    const json = exportProjectToJson(created.value)
+    const parsed = parseProjectImport(json)
+    expect(parsed.ok).toBe(true)
+    if (!parsed.ok) return
+    expect(parsed.value[0].preferencesSnapshot).toEqual(snap)
+    expect(parsed.value[0].disease?.name).toBe('Alzheimer disease')
+
+    const imported = importProjectsFromJson(json, { storage, renameOnConflict: true })
+    expect(imported.ok).toBe(true)
+    if (!imported.ok) return
+    expect(imported.imported[0].preferencesSnapshot).toEqual(snap)
+    expect(imported.imported[0].disease?.id).toBe('EFO_0000249')
+  })
 })
