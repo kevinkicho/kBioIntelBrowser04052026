@@ -1,7 +1,7 @@
 /**
  * Discovery rank engine — gather + legacy score + dual-schema RankResult.
  * Ranking formulas intentionally unchanged (multi-axis = PR4).
- * ChEMBL-by-target / OT knownDrugs = PR3b.
+ * PR3b: OT knownDrugs (drugAndClinicalCandidates) + ChEMBL-by-target (5×15).
  */
 
 import { searchDiseases, resolveMoleculesFromNames, type DiseaseResult } from '../diseaseSearch'
@@ -13,11 +13,16 @@ import {
   gatherTargetMolecules,
   gatherTrialDrugs,
   gatherChemblIndications,
+  gatherOpenTargetsKnownDrugs,
+  gatherChemblByTarget,
 } from './sources'
 import type { CandidateMolecule, DiseaseGene, RankResult } from './types'
 import { withSourceStatus } from './sourceStatus'
 
-/** Documented intentional decontamination (PR3a). */
+/**
+ * Historical PR3a message (no longer emitted by the engine after PR3b restore).
+ * Kept exported for any external string matchers / golden fixtures.
+ */
 export const OT_KNOWN_DRUGS_DECONTAMINATION_WARNING =
   'Open Targets knownDrugs path excluded: getDrugsForDisease returns linked target/protein names, not drugs. Restored in PR3b via knownDrugs GraphQL.'
 
@@ -26,8 +31,9 @@ const MAX_CID_RESOLVE = 50
 
 /**
  * Safe disease-side molecule names for candidate gather.
- * Open Targets enrichment historically called getDrugsForDisease, which returns
- * **target names** (not molecules). Those must never enter the candidate set.
+ * Open Targets disease.molecules are still skipped here: rank gathers known drugs
+ * via {@link gatherOpenTargetsKnownDrugs} (single source of truth, no double-count).
+ * Contaminated target-name payloads from older clients are also ignored.
  */
 export function moleculeNamesFromDiseaseResult(disease: DiseaseResult): {
   names: string[]
@@ -110,39 +116,39 @@ export async function rankCandidatesForDisease(
     )
   }
 
-  // Single OT + DisGeNET gene walk for scoring and DGIdb (no double-fetch).
+  // Single OT + DisGeNET gene walk for scoring and DGIdb / ChEMBL-by-target.
   const geneGather = await gatherDiseaseGenes(diseaseId, diseaseName)
   sourceStatuses.push(...geneGather.statuses)
   const genes: DiseaseGene[] = geneGather.genes
 
-  const [targetGather, trialGather] = await Promise.all([
-    gatherTargetMolecules(genes),
-    gatherTrialDrugs(diseaseName),
-  ])
+  const [targetGather, trialGather, knownDrugsGather, chemblByTargetGather] =
+    await Promise.all([
+      gatherTargetMolecules(genes),
+      gatherTrialDrugs(diseaseName),
+      gatherOpenTargetsKnownDrugs(diseaseId),
+      gatherChemblByTarget(genes),
+    ])
 
   sourceStatuses.push(...targetGather.statuses)
   sourceStatuses.push(trialGather.status)
+  sourceStatuses.push(knownDrugsGather.status)
+  sourceStatuses.push(chemblByTargetGather.status)
 
   const moleculesFromTargets = targetGather.molecules
   const moleculesFromTrials = trialGather.drugCounts
+  const knownDrugNames = knownDrugsGather.names
+  const chemblByTargetNames = chemblByTargetGather.names
 
-  const { names: moleculeNamesFromDisease, skippedOtTargetNames } =
+  // Non-OT disease.molecules only (OT drugs come from knownDrugsGather).
+  const { names: moleculeNamesFromDisease } =
     moleculeNamesFromDiseaseResult(primaryDisease)
-
-  if (skippedOtTargetNames) {
-    warnings.push(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
-    sourceStatuses.push({
-      source: 'Open Targets (knownDrugs)',
-      status: 'disabled',
-      has_data: false,
-      error: 'Decontaminated: getDrugsForDisease returns target names (PR3b)',
-    })
-  }
 
   const allMoleculeNames = new Set<string>()
   for (const m of moleculesFromTargets) allMoleculeNames.add(m.name)
   moleculesFromTrials.forEach((_, name) => allMoleculeNames.add(name))
   for (const name of moleculeNamesFromDisease) allMoleculeNames.add(name)
+  for (const name of knownDrugNames) allMoleculeNames.add(name)
+  for (const name of chemblByTargetNames) allMoleculeNames.add(name)
 
   const moleculeArray = Array.from(allMoleculeNames).slice(0, MAX_MOLECULE_NAMES)
   const topTargetCount = Math.max(genes.length, 1)
@@ -165,6 +171,14 @@ export async function rankCandidatesForDisease(
     await gatherChemblIndications(moleculeArray)
   sourceStatuses.push(indicationStatus)
 
+  // Optional synthetic indications from OT maxPhase when ChEMBL indications empty
+  const knownDrugPhaseByName = new Map(
+    knownDrugsGather.drugs.map((d) => [d.name.toLowerCase(), d.maxPhase]),
+  )
+  const chemblPhaseByName = new Map(
+    chemblByTargetGather.molecules.map((m) => [m.name.toLowerCase(), m.maxPhase]),
+  )
+
   const candidates: CandidateMolecule[] = []
 
   for (const name of moleculeArray) {
@@ -173,15 +187,40 @@ export async function rankCandidatesForDisease(
     const targetMol = moleculesFromTargets.find((m) => m.name.toLowerCase() === lowerName)
     const trialCount =
       moleculesFromTrials.get(name) ?? moleculesFromTrials.get(lowerName) ?? 0
-    const indications = indicationMap.get(name) ?? []
+    let indications = indicationMap.get(name) ?? []
+
+    // If no ChEMBL indication rows, lift phase from OT known drug or ChEMBL activity
+    if (indications.length === 0) {
+      const otPhase = knownDrugPhaseByName.get(lowerName) ?? 0
+      const chemblPhase = chemblPhaseByName.get(lowerName) ?? 0
+      const phase = Math.max(otPhase, chemblPhase)
+      if (phase > 0) {
+        indications = [
+          {
+            meshHeading: diseaseName,
+            efoTerm: diseaseName,
+            maxPhaseForIndication: phase,
+          },
+        ]
+      }
+    }
 
     const sources: string[] = []
     if (targetMol) sources.push('DGIdb')
     if (trialCount > 0) sources.push('ClinicalTrials')
+    if (knownDrugNames.some((n) => n.toLowerCase() === lowerName)) {
+      sources.push('Open Targets')
+    }
+    if (chemblByTargetNames.some((n) => n.toLowerCase() === lowerName)) {
+      sources.push('ChEMBL')
+    }
     if (moleculeNamesFromDisease.some((n) => n.toLowerCase() === lowerName)) {
       sources.push(primaryDisease.source)
     }
-    if (indications.length > 0) sources.push('ChEMBL')
+    if (indications.length > 0 && !sources.includes('ChEMBL')) {
+      // Indication enrichment alone still credits ChEMBL
+      if ((indicationMap.get(name) ?? []).length > 0) sources.push('ChEMBL')
+    }
 
     candidates.push(
       scoreLegacyCandidate({

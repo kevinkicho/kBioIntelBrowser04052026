@@ -97,6 +97,10 @@ describe('rankDiseaseResults', () => {
 describe('searchDiseases integration', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    // PR3b default: no known drugs unless a test opts in
+    if (typeof opentargets.getDrugsForDisease === 'function') {
+      ;(opentargets.getDrugsForDisease as jest.Mock).mockResolvedValue([])
+    }
   })
 
   test('deduplicates diseases across sources by name', async () => {
@@ -136,25 +140,24 @@ describe('searchDiseases integration', () => {
     expect(results[0].source).toBe('DisGeNET')
   })
 
-  test('does not attach Open Targets getDrugsForDisease target names as molecules (PR3a decontamination)', async () => {
+  test('attaches Open Targets known drugs as molecules (PR3b)', async () => {
     const { searchDiseases } = await import('@/lib/diseaseSearch')
     ;(opentargets.searchDiseases as jest.Mock).mockResolvedValue([
       { diseaseId: 'EFO_0000311', diseaseName: 'Type 2 diabetes', therapeuticAreas: [] },
     ])
-    // getDrugsForDisease historically returned linked target/protein names — must not be used.
-    if (typeof opentargets.getDrugsForDisease === 'function') {
-      ;(opentargets.getDrugsForDisease as jest.Mock).mockResolvedValue(['APP', 'PSEN1'])
-    }
+    ;(opentargets.getDrugsForDisease as jest.Mock).mockResolvedValue(['Metformin', 'Sitagliptin'])
+    ;(pubchem.getMoleculeCidByName as jest.Mock).mockImplementation(async (name: string) =>
+      name === 'Metformin' ? 4091 : null,
+    )
     ;(orphanet.searchOrphanetDiseases as jest.Mock).mockResolvedValue([])
     ;(disgenet.getGenesByDisease as jest.Mock).mockResolvedValue([])
 
     const results = await searchDiseases('diabetes', 10)
     expect(results[0].name).toBe('Type 2 diabetes')
     expect(results[0].source).toBe('Open Targets')
-    expect(results[0].molecules).toBeUndefined()
-    if (typeof opentargets.getDrugsForDisease === 'function') {
-      expect(opentargets.getDrugsForDisease).not.toHaveBeenCalled()
-    }
+    expect(opentargets.getDrugsForDisease).toHaveBeenCalledWith('EFO_0000311')
+    expect(results[0].molecules?.some((m) => m.name === 'Metformin')).toBe(true)
+    expect(results[0].molecules?.every((m) => !/^(APP|PSEN1)$/i.test(m.name))).toBe(true)
   })
 
   test('respects limit parameter', async () => {

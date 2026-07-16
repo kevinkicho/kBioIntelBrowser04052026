@@ -78,7 +78,7 @@ describe('discovery engine contracts', () => {
           },
         ],
         generatedAt: '2026-04-07T12:00:00.000Z',
-        warnings: [OT_KNOWN_DRUGS_DECONTAMINATION_WARNING],
+        warnings: [],
       }
 
       for (const key of GOLDEN_RANK_REQUIRED_KEYS) {
@@ -96,7 +96,8 @@ describe('discovery engine contracts', () => {
       // Additive PR3a fields remain optional on the type but present when engine fills them
       expect(result.sourceStatuses?.[0]?.source).toBe('DGIdb')
       expect(result.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
-      expect(result.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
+      // PR3b no longer emits decontamination warning on live ranks
+      expect(typeof OT_KNOWN_DRUGS_DECONTAMINATION_WARNING).toBe('string')
     })
 
     it('accepts empty result without optional fields (backward compatible)', () => {
@@ -167,19 +168,19 @@ describe('discovery engine contracts', () => {
     })
   })
 
-  describe('OT decontamination', () => {
-    it('never treats Open Targets disease.molecules as drug names', () => {
-      const contaminated: DiseaseResult = {
+  describe('OT disease.molecules handling (PR3b)', () => {
+    it('skips Open Targets disease.molecules (rank uses dedicated knownDrugs gather)', () => {
+      const ot: DiseaseResult = {
         id: 'EFO_0000249',
         name: 'Alzheimer disease',
         source: 'Open Targets',
-        // These are target/protein names wrongly attached historically
+        // Even real drugs attached here are ignored to avoid double-count with gather
         molecules: [
+          { name: 'Donepezil', cid: 3152 },
           { name: 'Amyloid-beta precursor protein', cid: null },
-          { name: 'Presenilin-1', cid: null },
         ],
       }
-      const { names, skippedOtTargetNames } = moleculeNamesFromDiseaseResult(contaminated)
+      const { names, skippedOtTargetNames } = moleculeNamesFromDiseaseResult(ot)
       expect(skippedOtTargetNames).toBe(true)
       expect(names).toEqual([])
     })

@@ -137,18 +137,59 @@ export async function searchDiseases(queryString: string): Promise<DiseaseAssoci
   }))
 }
 
-export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
+/**
+ * Known drug / clinical candidate for a disease from Open Targets.
+ * Platform API 26.x exposes this as `drugAndClinicalCandidates` (successor to
+ * the historical `knownDrugs` field on Disease).
+ */
+export interface KnownDrugForDisease {
+  name: string
+  chemblId: string | null
+  /** Raw OT clinical-stage label (e.g. APPROVAL, PHASE_3, UNKNOWN). */
+  maxClinicalStage: string | null
+  /** Best-effort numeric phase 0–4 for scoring / UI. */
+  maxPhase: number
+}
+
+/** Map Open Targets clinical-stage strings → numeric phase 0–4. */
+export function clinicalStageToPhase(stage: string | null | undefined): number {
+  if (!stage) return 0
+  const s = stage.toUpperCase().replace(/[\s-]+/g, '_')
+  if (s === 'APPROVAL' || s === 'APPROVED' || s === 'PHASE_4' || s === 'PHASE_IV' || s.includes('APPROV')) {
+    return 4
+  }
+  if (s === 'PHASE_3' || s === 'PHASE_III' || s === 'PHASE_2_3' || s === 'PHASE_III_IV') return 3
+  if (s === 'PHASE_2' || s === 'PHASE_II' || s === 'PHASE_1_2' || s === 'PHASE_II_III') return 2
+  if (s === 'PHASE_1' || s === 'PHASE_I' || s === 'PHASE_0_1') return 1
+  return 0
+}
+
+/**
+ * Real known drugs / clinical candidates for a disease (Open Targets GraphQL).
+ * Uses `drugAndClinicalCandidates` — the live replacement for `knownDrugs`.
+ * Never returns target/protein names (PR3a decontamination fix completed in PR3b).
+ */
+export async function getKnownDrugsForDisease(
+  diseaseId: string,
+  limit: number = 50,
+): Promise<KnownDrugForDisease[]> {
+  if (!diseaseId?.trim()) return []
   try {
+    // OT Platform 26.x: Disease.knownDrugs was renamed to drugAndClinicalCandidates.
     const query = `
       query {
         disease(efoId: "${escapeGraphQLString(diseaseId)}") {
           id
           name
-          linkedTargets {
+          drugAndClinicalCandidates {
             count
             rows {
-              id
-              target { id name }
+              maxClinicalStage
+              drug {
+                id
+                name
+                maximumClinicalStage
+              }
             }
           }
         }
@@ -162,12 +203,51 @@ export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
     })
     if (!res.ok) return []
     const data = await res.json()
-    if (data.errors) return []
-    const targets: { target: { name: string } }[] = data.data?.disease?.linkedTargets?.rows ?? []
-    return targets.map((t: { target: { name: string } }) => t.target.name).filter(Boolean).slice(0, 10)
-  } catch {
+    if (data.errors) {
+      console.error('OpenTargets knownDrugs GraphQL errors:', data.errors)
+      return []
+    }
+
+    const rows: Array<{
+      maxClinicalStage?: string | null
+      drug?: { id?: string; name?: string; maximumClinicalStage?: string | null } | null
+    }> = data.data?.disease?.drugAndClinicalCandidates?.rows ?? []
+
+    // Dedupe by drug name (case-insensitive), keep highest phase
+    const byName = new Map<string, KnownDrugForDisease>()
+    for (const row of rows) {
+      const name = row.drug?.name?.trim()
+      if (!name) continue
+      const stage = row.maxClinicalStage ?? row.drug?.maximumClinicalStage ?? null
+      const entry: KnownDrugForDisease = {
+        name,
+        chemblId: row.drug?.id ?? null,
+        maxClinicalStage: stage,
+        maxPhase: clinicalStageToPhase(stage),
+      }
+      const key = name.toLowerCase()
+      const existing = byName.get(key)
+      if (!existing || existing.maxPhase < entry.maxPhase) {
+        byName.set(key, entry)
+      }
+    }
+
+    return Array.from(byName.values())
+      .sort((a, b) => b.maxPhase - a.maxPhase || a.name.localeCompare(b.name))
+      .slice(0, Math.max(1, limit))
+  } catch (error) {
+    console.error('OpenTargets getKnownDrugsForDisease error:', error)
     return []
   }
+}
+
+/**
+ * Drug **names** for a disease (known drugs / clinical candidates).
+ * Prefer {@link getKnownDrugsForDisease} when phase / ChEMBL id are needed.
+ */
+export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
+  const drugs = await getKnownDrugsForDisease(diseaseId, 50)
+  return drugs.map((d) => d.name).filter(Boolean)
 }
 
 export async function getTargetsForDisease(diseaseId: string): Promise<{ id: string; name: string; overallScore: number }[]> {

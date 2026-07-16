@@ -35,6 +35,11 @@ export {
   gatherTargetMolecules,
   gatherTrialDrugs,
   gatherChemblIndications,
+  gatherOpenTargetsKnownDrugs,
+  MAX_KNOWN_DRUGS,
+  gatherChemblByTarget,
+  MAX_CHEMBL_TARGETS,
+  MAX_COMPOUNDS_PER_TARGET,
 } from './sources'
 
 export {

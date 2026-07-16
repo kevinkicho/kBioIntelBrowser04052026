@@ -132,11 +132,20 @@ export async function getTargetDetails(targetId: string): Promise<{
 }
 
 /**
- * Get compounds related to a specific target
+ * Get compounds related to a specific target (IC50 activities).
+ * @param targetId ChEMBL target id (e.g. CHEMBL203)
+ * @param limit Max unique molecules (discovery default: 15 for 5×15 gather)
  */
-export async function getRelatedCompoundsByTarget(targetId: string): Promise<RelatedCompound[]> {
+export async function getRelatedCompoundsByTarget(
+  targetId: string,
+  limit: number = 15,
+): Promise<RelatedCompound[]> {
+  if (!targetId?.trim()) return []
   try {
-    const url = `${ACTIVITY_URL}?target_chembl_id=${targetId}&standard_type=IC50&limit=15&format=json`
+    const cap = Math.max(1, Math.min(limit, 50))
+    // Over-fetch activities so dedupe can still fill `cap` unique molecules
+    const fetchLimit = Math.min(cap * 3, 100)
+    const url = `${ACTIVITY_URL}?target_chembl_id=${encodeURIComponent(targetId)}&standard_type=IC50&limit=${fetchLimit}&format=json`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()
@@ -159,9 +168,14 @@ export async function getRelatedCompoundsByTarget(targetId: string): Promise<Rel
         activityValue: Number(a.standard_value) || 0,
         activityType: a.standard_type || 'IC50',
       })
+      if (results.length >= cap) break
     }
 
-    return results.sort((a, b) => a.maxPhase === b.maxPhase ? (a.activityValue ?? 0) - (b.activityValue ?? 0) : b.maxPhase - a.maxPhase)
+    return results.sort((a, b) =>
+      a.maxPhase === b.maxPhase
+        ? (a.activityValue ?? 0) - (b.activityValue ?? 0)
+        : b.maxPhase - a.maxPhase,
+    )
   } catch {
     return []
   }

@@ -34,10 +34,11 @@ export async function GET(request: NextRequest) {
         diseases.length === 0
           ? ['No disease matches.']
           : ([
-              // Document OT decontamination for clients that inspect disease.molecules
-              ...(diseases.some((d) => d.source === 'Open Targets')
+              ...(diseases.some(
+                (d) => d.source === 'Open Targets' && (!d.molecules || d.molecules.length === 0),
+              )
                 ? [
-                    'Open Targets results do not attach getDrugsForDisease target names as molecules (PR3a decontamination; knownDrugs in PR3b).',
+                    'Open Targets known drugs may be empty for this hit (no drugAndClinicalCandidates rows or id unresolved).',
                   ]
                 : []),
             ] as string[]),
