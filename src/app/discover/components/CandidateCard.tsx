@@ -5,7 +5,11 @@ import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import { buildDiscoverRationalePrompt } from '@/lib/ai/promptTemplates'
 import type { CandidateMolecule } from '@/lib/candidateRanker'
-import { mapLegacyCandidateToMoleculeCandidate } from '@/lib/domain'
+import {
+  mapLegacyCandidateToMoleculeCandidate,
+  type MoleculeCandidate,
+} from '@/lib/domain'
+import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
 import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
 import { ConfidenceBadge } from './DiscoveryProgress'
 
@@ -15,6 +19,11 @@ interface Props {
   diseaseName: string
   topCandidates: CandidateMolecule[]
   diseaseGenes?: { symbol: string; score: number }[]
+  /**
+   * Resolved domain candidate from RankResult.v2 (InChIKey + IdentityTrust).
+   * Falls back to mapping the legacy DTO when omitted.
+   */
+  domainCandidate?: MoleculeCandidate
 }
 
 function buildMoleculeLinkUrl(cid: number, rank: number, diseaseName: string, score: number): string {
@@ -197,13 +206,35 @@ function WhyRationalePanel({ diseaseName, candidate, topCandidates, diseaseGenes
   )
 }
 
-export function CandidateCard({ candidate, rank, diseaseName, topCandidates, diseaseGenes }: Props) {
+export function CandidateCard({
+  candidate,
+  rank,
+  diseaseName,
+  topCandidates,
+  diseaseGenes,
+  domainCandidate: domainCandidateProp,
+}: Props) {
   const phaseLabel = PHASE_LABELS[candidate.clinicalPhaseRaw] ?? (candidate.clinicalPhaseRaw > 0 ? `Phase ${candidate.clinicalPhaseRaw}` : 'Preclinical')
   const hasCid = candidate.cid !== null && candidate.cid !== undefined
 
   const domainCandidate = useMemo(
-    () => mapLegacyCandidateToMoleculeCandidate(candidate),
-    [candidate],
+    () => domainCandidateProp ?? mapLegacyCandidateToMoleculeCandidate(candidate),
+    [domainCandidateProp, candidate],
+  )
+
+  const identity = domainCandidate.identity
+  const identityKeys = useMemo(
+    () => ({
+      inchiKey: identity.inchiKey,
+      chemblId: identity.chemblId,
+      cid: identity.pubchemCid,
+      name: identity.name,
+      smiles: identity.smiles,
+      chebiId: identity.chebiId,
+      drugbankId: identity.drugbankId,
+      alternateCids: identity.alternateCids,
+    }),
+    [identity],
   )
 
   const cardContent = (
@@ -226,6 +257,10 @@ export function CandidateCard({ candidate, rank, diseaseName, topCandidates, dis
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
+            <IdentityTrustBadge
+              level={identity.identityTrust}
+              keys={identityKeys}
+            />
             <ConfidenceBadge confidence={candidate.confidence} />
             {candidate.clinicalPhaseRaw > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300 border border-indigo-700/50 font-medium">
@@ -233,6 +268,19 @@ export function CandidateCard({ candidate, rank, diseaseName, topCandidates, dis
               </span>
             )}
           </div>
+          {identity.inchiKey && (
+            <p
+              className="mb-1.5 max-w-full truncate font-mono text-[10px] text-slate-600"
+              title={identity.inchiKey}
+            >
+              InChIKey {identity.inchiKey}
+            </p>
+          )}
+          <AlternateCids
+            primaryCid={identity.pubchemCid ?? candidate.cid}
+            alternateCids={identity.alternateCids}
+            className="mb-2"
+          />
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-[10px] font-medium text-slate-400">Score breakdown</span>
             <ScoreExplainer />

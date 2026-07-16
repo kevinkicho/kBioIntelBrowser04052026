@@ -8,7 +8,22 @@ import { DiscoveryProgress, EmptyState, ErrorState } from './components/Discover
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
-import type { DiseaseGene } from '@/lib/candidateRanker'
+import type { CandidateMolecule, DiseaseGene } from '@/lib/candidateRanker'
+import type { MoleculeCandidate } from '@/lib/domain'
+
+/** Match legacy rank row to resolved v2 MoleculeCandidate (CID then name). */
+function findDomainCandidate(
+  legacy: CandidateMolecule,
+  v2Candidates: MoleculeCandidate[] | undefined,
+): MoleculeCandidate | undefined {
+  if (!v2Candidates?.length) return undefined
+  if (legacy.cid != null) {
+    const byCid = v2Candidates.find((c) => c.identity.pubchemCid === legacy.cid)
+    if (byCid) return byCid
+  }
+  const lower = legacy.name.toLowerCase()
+  return v2Candidates.find((c) => c.identity.name.toLowerCase() === lower)
+}
 
 function GeneTable({ genes }: { genes: DiseaseGene[] }) {
   if (genes.length === 0) return null
@@ -87,7 +102,15 @@ export default function DiscoverPage() {
 
                 <div className="space-y-3">
                   {state.result.candidates.map((candidate, i) => (
-                    <CandidateCard key={candidate.name} candidate={candidate} rank={i + 1} diseaseName={state.result?.diseaseName ?? ''} topCandidates={state.result?.candidates ?? []} diseaseGenes={state.result?.genes} />
+                    <CandidateCard
+                      key={candidate.name}
+                      candidate={candidate}
+                      rank={i + 1}
+                      diseaseName={state.result?.diseaseName ?? ''}
+                      topCandidates={state.result?.candidates ?? []}
+                      diseaseGenes={state.result?.genes}
+                      domainCandidate={findDomainCandidate(candidate, state.result?.v2?.candidates)}
+                    />
                   ))}
                 </div>
               </>
