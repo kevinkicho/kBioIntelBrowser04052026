@@ -41,7 +41,7 @@ function buildProfileCandidate(
     synonyms: [] as string[],
     pubchemCid: cid ?? null,
     inchiKey: inchiKey || undefined,
-    identityTrust: (inchiKey ? 'high' : cid != null ? 'medium' : 'low') as const,
+    identityTrust: (inchiKey ? 'high' : cid != null ? 'medium' : 'low') as 'high' | 'medium' | 'low',
   }
   return {
     candidateId: computeCandidateId({

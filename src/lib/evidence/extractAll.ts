@@ -126,5 +126,5 @@ export function claimSourceNames(claims: readonly EvidenceClaim[]): string[] {
   for (const c of claims) {
     if (c.provenance?.source) sources.add(c.provenance.source)
   }
-  return [...sources].sort()
+  return Array.from(sources).sort()
 }
