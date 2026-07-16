@@ -26,6 +26,7 @@ import { ChangeAlerts } from '@/components/profile/ChangeAlerts'
 import { GeneTargetStrip } from '@/components/profile/GeneTargetStrip'
 import { ResearchBrief } from '@/components/profile/ResearchBrief'
 import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetection'
+import { panelIdFromHash } from '@/lib/signals'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
 import { AICopilot } from '@/components/ai/AICopilot'
@@ -228,6 +229,56 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }, [loadCategory])
+
+  /** Scroll to a panel anchor (hash deep-link from board signal badges). */
+  const scrollToPanel = useCallback((panelId: string) => {
+    const cat = CATEGORIES.find((c) => c.panels.some((p) => p.id === panelId))
+    if (cat && cat.id !== 'gene') {
+      setActiveCategory(cat.id as CategoryId)
+      if (categoryStatusRef.current[cat.id as CategoryId] === 'idle') {
+        loadCategory(cat.id as CategoryId)
+      }
+    }
+    // Retry scroll until the panel node exists (category may still be loading)
+    let attempts = 0
+    const tryScroll = () => {
+      const el = document.getElementById(panelId)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        el.classList.add('ring-2', 'ring-amber-400/60', 'ring-offset-2', 'ring-offset-[#0f1117]')
+        window.setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-amber-400/60', 'ring-offset-2', 'ring-offset-[#0f1117]')
+        }, 2200)
+        return
+      }
+      if (attempts++ < 40) {
+        window.setTimeout(tryScroll, 150)
+      }
+    }
+    requestAnimationFrame(tryScroll)
+  }, [loadCategory])
+
+  // Deep-link: /molecule/{cid}#panel-id (and ?project=) from board signal badges
+  useEffect(() => {
+    if (typeof window === 'undefined' || isEmbed) return
+    const panelId = panelIdFromHash(window.location.hash)
+    if (!panelId) return
+    scrollToPanel(panelId)
+  }, [scrollToPanel, isEmbed])
+
+  // Re-attempt scroll when categories finish loading (hash still present)
+  useEffect(() => {
+    if (typeof window === 'undefined' || isEmbed) return
+    const panelId = panelIdFromHash(window.location.hash)
+    if (!panelId) return
+    const cat = CATEGORIES.find((c) => c.panels.some((p) => p.id === panelId))
+    if (!cat || cat.id === 'gene') return
+    if (categoryStatus[cat.id as CategoryId] === 'loaded') {
+      requestAnimationFrame(() => {
+        document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
+  }, [categoryStatus, isEmbed])
 
   // Auto-load the active category when it changes
   useEffect(() => {
@@ -653,9 +704,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           </div>
         )}
         {allowedVisible.map(p => (
-          <div key={p.id}>
+          <div
+            key={p.id}
+            id={p.id}
+            data-panel-id={p.id}
+            className="scroll-mt-28 rounded-xl"
+          >
             <ErrorBoundary>
-              {panelRegistry[p.id](p.id, categoryFetchedAt)}
+              {panelRegistry[p.id]?.(p.id, categoryFetchedAt) ?? null}
             </ErrorBoundary>
           </div>
         ))}
@@ -739,7 +795,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
           <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
 
-          <ErrorBoundary><ChangeAlerts changes={detectedChanges} cid={cid} /></ErrorBoundary>
+          <ErrorBoundary>
+            <ChangeAlerts
+              changes={detectedChanges}
+              cid={cid}
+              projectId={searchParams.get('project')}
+            />
+          </ErrorBoundary>
 
           <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
 

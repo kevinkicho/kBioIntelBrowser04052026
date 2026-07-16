@@ -3,13 +3,19 @@
 import { useState } from 'react'
 import type { ChangeItem } from '@/lib/changeDetection'
 import { getSnapshotAge } from '@/lib/changeDetection'
+import { buildMoleculePanelDeepLink } from '@/lib/signals'
 
 interface Props {
   changes: ChangeItem[]
   cid: number
+  /** Optional project context for deep links */
+  projectId?: string | null
 }
 
-export function ChangeAlerts({ changes, cid }: Props) {
+/**
+ * Profile change banner. Each chip deep-links to the affected panel (PR14 DoD).
+ */
+export function ChangeAlerts({ changes, cid, projectId }: Props) {
   const [dismissed, setDismissed] = useState(false)
 
   if (dismissed || changes.length === 0) return null
@@ -31,22 +37,53 @@ export function ChangeAlerts({ changes, cid }: Props) {
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
-        {changes.map((c, i) => (
-          <span
-            key={i}
-            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${
-              c.type === 'new'
-                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30'
-                : c.type === 'removed'
-                ? 'bg-red-500/15 text-red-400 border-red-500/30'
-                : 'bg-amber-500/15 text-amber-400 border-amber-500/30'
-            }`}
-          >
-            {c.type === 'new' ? '🆕' : c.type === 'removed' ? '📉' : '🔄'}
-            {c.count} {c.type} {c.label}
-          </span>
-        ))}
+        {changes.map((c, i) => {
+          const panelId = c.panelId
+          const href = panelId
+            ? buildMoleculePanelDeepLink(cid, panelId, { projectId })
+            : undefined
+          const chipClass = `inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border transition-colors ${
+            c.type === 'new'
+              ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+              : c.type === 'removed'
+                ? 'bg-red-500/15 text-red-400 border-red-500/30 hover:bg-red-500/25'
+                : 'bg-amber-500/15 text-amber-400 border-amber-500/30 hover:bg-amber-500/25'
+          }`
+          const content = (
+            <>
+              {c.type === 'new' ? '🆕' : c.type === 'removed' ? '📉' : '🔄'}
+              {c.count} {c.type} {c.label}
+              {href && (
+                <span className="text-[9px] opacity-60" aria-hidden>
+                  →
+                </span>
+              )}
+            </>
+          )
+
+          if (href) {
+            return (
+              <a
+                key={i}
+                href={href}
+                className={chipClass}
+                title={`Jump to ${c.label} panel`}
+              >
+                {content}
+              </a>
+            )
+          }
+
+          return (
+            <span key={i} className={chipClass}>
+              {content}
+            </span>
+          )
+        })}
       </div>
+      <p className="mt-2 text-[10px] text-slate-500">
+        Click a chip to open the corresponding data panel.
+      </p>
     </div>
   )
 }

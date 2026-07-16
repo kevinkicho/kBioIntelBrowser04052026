@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import type { BoardStatus, Project } from '@/lib/domain'
@@ -13,6 +13,8 @@ import {
   saveProject,
   setBoardStatusAndSave,
 } from '@/lib/project'
+import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
+import { SignalBadges } from '@/components/projects/SignalBadges'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
 
@@ -29,6 +31,9 @@ export default function ProjectBoardPage() {
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : ''
   const [project, setProject] = useState<Project | null | undefined>(undefined)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [signalRows, setSignalRows] = useState<CandidateSignalRow[] | null>(null)
+  const [signalsLoading, setSignalsLoading] = useState(false)
+  const signalsLoadedFor = useRef<string | null>(null)
 
   const refresh = useCallback(() => {
     if (!id) {
@@ -41,6 +46,35 @@ export default function ProjectBoardPage() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // Project-aware count diffs with panel deep-link badges (PR14)
+  useEffect(() => {
+    if (!project) {
+      setSignalRows(null)
+      return
+    }
+    const key = `${project.id}:${project.updatedAt}:${project.candidates.map((c) => c.candidateId).join(',')}`
+    if (signalsLoadedFor.current === key) return
+
+    let cancelled = false
+    setSignalsLoading(true)
+    loadProjectSignals(project, { concurrency: 3 })
+      .then((rows) => {
+        if (cancelled) return
+        signalsLoadedFor.current = key
+        setSignalRows(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setSignalRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setSignalsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [project])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })
@@ -112,6 +146,11 @@ export default function ProjectBoardPage() {
     {} as Record<BoardStatus, number>,
   )
 
+  const signalByCandidate = new Map(
+    (signalRows ?? []).map((r) => [r.candidateId, r] as const),
+  )
+  const totalSignals = (signalRows ?? []).reduce((n, r) => n + r.signals.length, 0)
+
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -139,6 +178,14 @@ export default function ProjectBoardPage() {
               <span>
                 Updated {new Date(project.updatedAt).toLocaleString()}
               </span>
+              {signalsLoading && (
+                <span className="text-cyan-500/80 animate-pulse">Checking signals…</span>
+              )}
+              {!signalsLoading && totalSignals > 0 && (
+                <span className="rounded-full border border-amber-700/40 bg-amber-900/20 px-2 py-0.5 text-amber-300">
+                  {totalSignals} signal{totalSignals === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {BOARD_STATUSES.map((s) => (
@@ -150,6 +197,11 @@ export default function ProjectBoardPage() {
                 </span>
               ))}
             </div>
+            {!signalsLoading && totalSignals > 0 && (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Signal badges deep-link to the changed data panel on the molecule profile — not badge-only.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -212,6 +264,9 @@ export default function ProjectBoardPage() {
                     Status
                   </th>
                   <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Signals
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
                     Origins
                   </th>
                   <th className="w-12 px-3 py-3" />
@@ -222,6 +277,7 @@ export default function ProjectBoardPage() {
                   const cid = c.identity.pubchemCid
                   const status = c.boardStatus ?? 'untriaged'
                   const score = c.scores?.composite
+                  const sigRow = signalByCandidate.get(c.candidateId)
                   return (
                     <tr
                       key={c.candidateId}
@@ -265,6 +321,27 @@ export default function ProjectBoardPage() {
                             </option>
                           ))}
                         </select>
+                      </td>
+                      <td className="px-3 py-3 min-w-[8rem]">
+                        {signalsLoading && !sigRow ? (
+                          <span className="text-[10px] text-slate-600 animate-pulse">…</span>
+                        ) : sigRow && sigRow.signals.length > 0 ? (
+                          <SignalBadges signals={sigRow.signals} compact />
+                        ) : sigRow?.status === 'baseline' ? (
+                          <span className="text-[10px] text-slate-600" title="Baseline snapshot saved">
+                            —
+                          </span>
+                        ) : sigRow?.status === 'no_cid' ? (
+                          <span className="text-[10px] text-slate-600" title="No PubChem CID">
+                            n/a
+                          </span>
+                        ) : sigRow?.status === 'error' ? (
+                          <span className="text-[10px] text-red-500/70" title={sigRow.error}>
+                            err
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600">—</span>
+                        )}
                       </td>
                       <td className="px-3 py-3">
                         <div className="flex flex-wrap gap-1">
