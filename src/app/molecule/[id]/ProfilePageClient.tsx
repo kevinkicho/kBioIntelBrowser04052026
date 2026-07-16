@@ -681,7 +681,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
               <ViewToggle active={view} onChange={setView} disabled={isBusy} />
               <CiteButton data={mergedData} entityName={moleculeName} entityType="molecule" entityId={cid} />
               <ShareButton entityType="molecule" entityId={cid} entityName={moleculeName} data={mergedData} />
-              <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
+              <ExportButton
+                data={mergedData}
+                moleculeName={moleculeName}
+                cid={cid}
+                inchiKey={inchiKey}
+                projectId={searchParams.get('project')}
+              />
             </div>
           </div>
           <CategoryTabBar

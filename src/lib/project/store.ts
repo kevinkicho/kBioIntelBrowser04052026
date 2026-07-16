@@ -382,3 +382,42 @@ export function setBoardStatusAndSave(
   if (!next.ok) return next
   return saveProject(next.value, storage)
 }
+
+/**
+ * Add or replace a pack breadcrumb on Project.packIndex (pure).
+ * Metadata only — never stores full claims (download-primary packs).
+ */
+export function addPackIndexEntryToProject(
+  project: Project,
+  entry: ProjectPackIndexEntry,
+): StoreResult<Project> {
+  if (!entry?.id || !entry.title) {
+    return { ok: false, error: 'invalid', message: 'Pack index entry requires id and title.' }
+  }
+  const rest = project.packIndex.filter((e) => e.id !== entry.id)
+  return {
+    ok: true,
+    value: {
+      ...project,
+      packIndex: [{ ...entry }, ...rest],
+      updatedAt: nowIso(),
+    },
+  }
+}
+
+/**
+ * Register pack breadcrumb on project and persist.
+ */
+export function addPackIndexEntryAndSave(
+  projectId: string,
+  entry: ProjectPackIndexEntry,
+  storage?: ProjectStorage | null,
+): StoreResult<Project> {
+  const existing = getProject(projectId, storage)
+  if (!existing) {
+    return { ok: false, error: 'not_found', message: `Project ${projectId} not found.` }
+  }
+  const next = addPackIndexEntryToProject(existing, entry)
+  if (!next.ok) return next
+  return saveProject(next.value, storage)
+}
