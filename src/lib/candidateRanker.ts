@@ -1,7 +1,7 @@
 /**
  * Facade over `src/lib/discovery/*`.
  * Existing Discover UI / API imports stay on this module path.
- * Implementation lives in the discovery engine (PR3a extract).
+ * Implementation lives in the discovery engine (PR3a extract + PR4 scoring).
  */
 
 export type {
@@ -17,4 +17,5 @@ export {
   rankCandidatesForDisease,
   moleculeNamesFromDiseaseResult,
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
+  type RankEngineOptions,
 } from './discovery/engine'

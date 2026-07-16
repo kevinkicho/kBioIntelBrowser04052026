@@ -31,3 +31,20 @@ export async function getLiteratureByName(name: string): Promise<LiteratureResul
     return []
   }
 }
+
+/**
+ * Total hit count for a molecule/query (discovery novelty axis).
+ * Uses Europe PMC `hitCount` without downloading full result rows.
+ */
+export async function getLiteratureHitCount(name: string): Promise<number> {
+  try {
+    const url = `${BASE_URL}?query=${encodeURIComponent(name)}&format=json&resultType=idlist&pageSize=1`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return 0
+    const data = await res.json()
+    const n = Number(data.hitCount ?? 0)
+    return Number.isFinite(n) && n > 0 ? Math.floor(n) : 0
+  } catch {
+    return 0
+  }
+}
