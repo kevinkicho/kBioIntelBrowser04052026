@@ -14,14 +14,41 @@ import {
 } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 
+const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
+
+function loadLastOpened(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(LAST_OPENED_KEY)
+    return raw ? (JSON.parse(raw) as Record<string, string>) : {}
+  } catch {
+    return {}
+  }
+}
+
+function promoteCount(p: Project): number {
+  return p.candidates.filter((c) => c.boardStatus === 'promote').length
+}
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [name, setName] = useState('')
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [lastOpened, setLastOpened] = useState<Record<string, string>>({})
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(() => {
-    setProjects(listProjects())
+    const list = listProjects()
+    const opened = loadLastOpened()
+    setLastOpened(opened)
+    // Sort: recently opened first, then updatedAt
+    setProjects(
+      [...list].sort((a, b) => {
+        const ao = opened[a.id] ?? ''
+        const bo = opened[b.id] ?? ''
+        if (ao || bo) return (bo || '').localeCompare(ao || '')
+        return b.updatedAt.localeCompare(a.updatedAt)
+      }),
+    )
   }, [])
 
   useEffect(() => {
@@ -187,13 +214,38 @@ export default function ProjectsPage() {
                     <span>
                       {p.candidates.length}/{50} candidates
                     </span>
+                    {promoteCount(p) > 0 && (
+                      <span className="text-emerald-400/90">
+                        {promoteCount(p)} promoted
+                      </span>
+                    )}
                     {p.disease?.name && <span>Disease: {p.disease.name}</span>}
+                    {(p.targetIds?.length ?? 0) > 0 && (
+                      <span className="font-mono text-slate-600">
+                        {p.targetIds!.slice(0, 3).join(', ')}
+                        {p.targetIds!.length > 3 ? '…' : ''}
+                      </span>
+                    )}
                     <span>Updated {new Date(p.updatedAt).toLocaleString()}</span>
+                    {lastOpened[p.id] && (
+                      <span className="text-slate-600">
+                        Opened {new Date(lastOpened[p.id]).toLocaleString()}
+                      </span>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/projects/${p.id}`}
+                    onClick={() => {
+                      try {
+                        const map = loadLastOpened()
+                        map[p.id] = new Date().toISOString()
+                        localStorage.setItem(LAST_OPENED_KEY, JSON.stringify(map))
+                      } catch {
+                        /* ignore */
+                      }
+                    }}
                     className="rounded-lg border border-emerald-800/40 bg-emerald-900/20 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-900/40"
                   >
                     Open board

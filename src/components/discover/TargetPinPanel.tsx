@@ -1,6 +1,8 @@
 'use client'
 
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
+import { TdlBadge } from '@/components/discover/TdlBadge'
 
 export interface TargetPinPanelProps {
   targets: string[]
@@ -12,8 +14,7 @@ export interface TargetPinPanelProps {
 }
 
 /**
- * Polished pinned-targets panel for Discover (PR15).
- * Stages already live in PR4; this is pin UX only.
+ * Polished pinned-targets panel for Discover (PR15 + V2-10 TDL).
  */
 export function TargetPinPanel({
   targets,
@@ -22,6 +23,27 @@ export function TargetPinPanel({
   waitingForDisease = false,
   className = '',
 }: TargetPinPanelProps) {
+  const [tdlMap, setTdlMap] = useState<Record<string, string>>({})
+
+  useEffect(() => {
+    if (targets.length === 0) {
+      setTdlMap({})
+      return
+    }
+    let cancelled = false
+    void fetch(`/api/pharos/tdl?symbols=${encodeURIComponent(targets.join(','))}`)
+      .then((r) => r.json())
+      .then((data: { tdl?: Record<string, string> }) => {
+        if (!cancelled && data.tdl) setTdlMap(data.tdl)
+      })
+      .catch(() => {
+        if (!cancelled) setTdlMap({})
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [targets])
+
   if (targets.length === 0) return null
 
   return (
@@ -65,6 +87,7 @@ export function TargetPinPanel({
             >
               {symbol}
             </Link>
+            <TdlBadge tdl={tdlMap[symbol.toUpperCase()]} />
             {onRemove && (
               <button
                 type="button"
