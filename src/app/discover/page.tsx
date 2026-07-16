@@ -10,6 +10,7 @@ import { DiscoveryProgress, EmptyState, ErrorState } from './components/Discover
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
+import { SourceStatusStrip } from './components/SourceStatusStrip'
 import { TargetPinPanel } from '@/components/discover/TargetPinPanel'
 import { DiscoverySettingsDrawer } from '@/components/discovery/DiscoverySettingsDrawer'
 import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
@@ -263,6 +264,10 @@ export default function DiscoverPage() {
                     <ExportResults result={state.result} />
                   </div>
                 </div>
+
+                {(state.result.sourceStatuses?.length ?? 0) > 0 && (
+                  <SourceStatusStrip sourceStatuses={state.result.sourceStatuses ?? []} />
+                )}
 
                 <GeneTable genes={state.result.genes} />
 
