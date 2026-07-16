@@ -1,16 +1,40 @@
 import { fetchImmPortData } from '@/lib/api/niaid-immport'
+import { isApiSourceDisabled } from '@/lib/api/sourceAvailability'
+
+jest.mock('@/lib/api/sourceAvailability', () => ({
+  isApiSourceDisabled: jest.fn(),
+  getApiSourceDisabledReason: jest.fn(),
+  DISABLED_API_SOURCES: {},
+}))
+
+function mockJsonFetch(body: unknown, ok = true) {
+  const text = JSON.stringify(body)
+  return {
+    ok,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    text: async () => text,
+    json: async () => body,
+  }
+}
 
 global.fetch = jest.fn()
 
 describe('NIAID ImmPort API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
+    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(false)
+  })
+
+  it('skips network when source is disabled', async () => {
+    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(true)
+    const result = await fetchImmPortData('test')
+    expect(fetch).not.toHaveBeenCalled()
+    expect(result.data.studies).toEqual([])
   })
 
   it('should fetch and parse NIAID ImmPort data', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonFetch({
         studies: [
           {
             study_id: '12345',
@@ -25,13 +49,13 @@ describe('NIAID ImmPort API', () => {
           },
         ],
       }),
-    })
+    )
 
     const result = await fetchImmPortData('test')
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('immport.org'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) })
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     )
     expect(result.source).toBe('NIAID ImmPort')
     expect(result.data.studies).toHaveLength(1)
@@ -40,10 +64,7 @@ describe('NIAID ImmPort API', () => {
   })
 
   it('should handle empty results gracefully', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonFetch({}))
 
     const result = await fetchImmPortData('nonexistent')
 

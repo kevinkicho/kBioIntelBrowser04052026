@@ -1,4 +1,10 @@
 import { normalizeOllamaUrl } from './config'
+import {
+  OLLAMA_CLOUD_BASE,
+  hasOllamaCloudFallback,
+  isOllamaCloudUrl,
+  ollamaRequestHeaders,
+} from './cloudConfig'
 
 export interface OllamaModel {
   name: string
@@ -23,6 +29,10 @@ export interface OllamaHealthResponse {
   models: string[]
   gpu?: string
   error?: string
+  /** True when the response came from ollama.com cloud fallback */
+  viaCloud?: boolean
+  /** Effective base URL used for the successful check */
+  effectiveUrl?: string
 }
 
 const OLLAMA_TIMEOUT = 15000
@@ -50,7 +60,7 @@ function extractModelNames(data: Record<string, unknown>): string[] {
   return []
 }
 
-export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealthResponse> {
+async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthResponse> {
   if (!ollamaUrl) {
     return { available: false, models: [], error: 'No Ollama URL provided' }
   }
@@ -62,7 +72,7 @@ export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealth
 
     const res = await fetch(`${url}/api/tags`, {
       signal: controller.signal,
-      headers: { 'Accept': 'application/json' },
+      headers: ollamaRequestHeaders(url),
       redirect: 'error',
     })
     clearTimeout(timeout)
@@ -77,7 +87,12 @@ export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealth
     const models = extractModelNames(data)
     console.log('[ai] Ollama is available. Models:', models.length > 0 ? models.join(', ') : `(none — raw: ${JSON.stringify(data).slice(0, 300)})`)
 
-    return { available: true, models }
+    return {
+      available: true,
+      models,
+      viaCloud: isOllamaCloudUrl(url),
+      effectiveUrl: url,
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('abort') || message.includes('AbortError') || message.includes('timeout')) {
@@ -89,16 +104,48 @@ export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealth
   }
 }
 
+/**
+ * Health check with optional Ollama Cloud fallback when local/LAN is down
+ * and OLLAMA_API_KEY is set.
+ */
+export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealthResponse> {
+  const primary = await checkOllamaHealthOnce(ollamaUrl)
+  if (primary.available) return primary
+
+  if (isOllamaCloudUrl(ollamaUrl) || !hasOllamaCloudFallback()) {
+    return primary
+  }
+
+  console.log('[ai] Local Ollama unavailable; falling back to Ollama Cloud')
+  const cloud = await checkOllamaHealthOnce(OLLAMA_CLOUD_BASE)
+  if (cloud.available) {
+    return {
+      ...cloud,
+      viaCloud: true,
+      effectiveUrl: OLLAMA_CLOUD_BASE,
+      error: undefined,
+    }
+  }
+
+  return {
+    available: false,
+    models: [],
+    error: primary.error
+      ? `${primary.error} (cloud fallback also failed: ${cloud.error ?? 'unknown'})`
+      : cloud.error,
+  }
+}
+
 export async function pullModel(
   ollamaUrl: string,
   modelName: string,
   onProgress: (status: string, progress: number) => void,
 ): Promise<{ success: boolean; error?: string }> {
-  console.log('[ai] Pulling model', modelName, 'from', ollamaUrl)
-  try {
-    const res = await fetch(`${ollamaUrl}/api/pull`, {
+  const tryPull = async (url: string) => {
+    console.log('[ai] Pulling model', modelName, 'from', url)
+    const res = await fetch(`${url}/api/pull`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ name: modelName, stream: true }),
       redirect: 'error',
     })
@@ -106,7 +153,7 @@ export async function pullModel(
     if (!res.ok || !res.body) {
       const text = await res.text().catch(() => '')
       console.error('[ai] Pull request failed:', res.status, text)
-      return { success: false, error: `Pull failed: ${res.status}` }
+      return { success: false as const, error: `Pull failed: ${res.status}` }
     }
 
     const reader = res.body.getReader()
@@ -134,7 +181,7 @@ export async function pullModel(
           }
           if (parsed.error) {
             console.error('[ai] Pull error:', parsed.error)
-            return { success: false, error: parsed.error }
+            return { success: false as const, error: parsed.error as string }
           }
         } catch {
           // skip unparseable lines
@@ -143,8 +190,27 @@ export async function pullModel(
     }
 
     console.log('[ai] Model pull complete:', modelName)
-    return { success: true }
+    return { success: true as const }
+  }
+
+  try {
+    let result = await tryPull(ollamaUrl)
+    if (!result.success && !isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+      console.log('[ai] Pull falling back to Ollama Cloud')
+      result = await tryPull(OLLAMA_CLOUD_BASE)
+    }
+    return result
   } catch (err) {
+    if (!isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+      try {
+        console.log('[ai] Pull exception; falling back to Ollama Cloud')
+        return await tryPull(OLLAMA_CLOUD_BASE)
+      } catch (cloudErr) {
+        const message = cloudErr instanceof Error ? cloudErr.message : String(cloudErr)
+        console.error('[ai] Pull cloud fallback exception:', message)
+        return { success: false, error: message }
+      }
+    }
     const message = err instanceof Error ? err.message : String(err)
     console.error('[ai] Pull exception:', message)
     return { success: false, error: message }
@@ -157,24 +223,51 @@ export async function generateChat(
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
   onToken: (token: string) => void,
   signal?: AbortSignal,
-): Promise<{ success: boolean; error?: string }> {
-  console.log('[ai] Generating chat with', model, 'at', ollamaUrl, '- messages:', messages.length)
-  try {
-    const res = await fetch(`${ollamaUrl}/api/chat`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ model, messages, stream: true }),
-      signal,
-      redirect: 'error',
-    })
+): Promise<{ success: boolean; error?: string; viaCloud?: boolean }> {
+  const openStream = async (url: string): Promise<{ res: Response } | { error: string }> => {
+    console.log('[ai] Generating chat with', model, 'at', url, '- messages:', messages.length)
+    try {
+      const res = await fetch(`${url}/api/chat`, {
+        method: 'POST',
+        headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ model, messages, stream: true }),
+        signal,
+        redirect: 'error',
+      })
 
-    if (!res.ok || !res.body) {
-      const text = await res.text().catch(() => '')
-      console.error('[ai] Chat request failed:', res.status, text)
-      return { success: false, error: `Chat failed: ${res.status}` }
+      if (!res.ok || !res.body) {
+        const text = await res.text().catch(() => '')
+        console.error('[ai] Chat request failed:', res.status, text)
+        return { error: `Chat failed: ${res.status}` }
+      }
+      return { res }
+    } catch (err) {
+      if (signal?.aborted) return { error: 'aborted' }
+      const message = err instanceof Error ? err.message : String(err)
+      console.error('[ai] Chat open exception:', message)
+      return { error: message }
     }
+  }
 
-    const reader = res.body.getReader()
+  let viaCloud = isOllamaCloudUrl(ollamaUrl)
+  let opened = await openStream(ollamaUrl)
+
+  if ('error' in opened && opened.error !== 'aborted'
+    && !isOllamaCloudUrl(ollamaUrl)
+    && hasOllamaCloudFallback()
+    && !signal?.aborted) {
+    console.log('[ai] Chat falling back to Ollama Cloud')
+    opened = await openStream(OLLAMA_CLOUD_BASE)
+    viaCloud = true
+  }
+
+  if ('error' in opened) {
+    if (opened.error === 'aborted' || signal?.aborted) return { success: true }
+    return { success: false, error: opened.error }
+  }
+
+  try {
+    const reader = opened.res.body!.getReader()
     const decoder = new TextDecoder()
     let buffer = ''
 
@@ -199,8 +292,8 @@ export async function generateChat(
             onToken(parsed.message.content)
           }
           if (parsed.done) {
-            console.log('[ai] Chat complete')
-            return { success: true }
+            console.log('[ai] Chat complete', viaCloud ? '(via cloud)' : '')
+            return { success: true, viaCloud }
           }
           if (parsed.error) {
             console.error('[ai] Chat error:', parsed.error)
@@ -212,12 +305,68 @@ export async function generateChat(
       }
     }
 
-    console.log('[ai] Chat stream ended')
-    return { success: true }
+    console.log('[ai] Chat stream ended', viaCloud ? '(via cloud)' : '')
+    return { success: true, viaCloud }
   } catch (err) {
     if (signal?.aborted) return { success: true }
     const message = err instanceof Error ? err.message : String(err)
     console.error('[ai] Chat exception:', message)
     return { success: false, error: message }
+  }
+}
+
+/** Non-streaming generate with cloud fallback (used by ai-brief). */
+export async function generateOnce(
+  ollamaUrl: string,
+  model: string,
+  prompt: string,
+  options?: { temperature?: number; num_predict?: number; signal?: AbortSignal },
+): Promise<{ success: true; response: string; viaCloud?: boolean } | { success: false; error: string }> {
+  const tryOnce = async (url: string) => {
+    const res = await fetch(`${url}/api/generate`, {
+      method: 'POST',
+      headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        model,
+        prompt,
+        stream: false,
+        options: {
+          temperature: options?.temperature ?? 0.3,
+          num_predict: options?.num_predict ?? 300,
+        },
+      }),
+      signal: options?.signal,
+      redirect: 'error',
+    })
+    if (!res.ok) {
+      const text = await res.text().catch(() => '')
+      return { ok: false as const, error: `Generate failed: ${res.status} ${text}`.trim() }
+    }
+    const data = await res.json()
+    return { ok: true as const, response: String(data.response?.trim() || '') }
+  }
+
+  try {
+    let result = await tryOnce(ollamaUrl)
+    let viaCloud = isOllamaCloudUrl(ollamaUrl)
+    if (!result.ok && !isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+      console.log('[ai] Generate falling back to Ollama Cloud')
+      result = await tryOnce(OLLAMA_CLOUD_BASE)
+      viaCloud = true
+    }
+    if (!result.ok) return { success: false, error: result.error }
+    return { success: true, response: result.response, viaCloud }
+  } catch (err) {
+    if (!isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+      try {
+        console.log('[ai] Generate exception; falling back to Ollama Cloud')
+        const result = await tryOnce(OLLAMA_CLOUD_BASE)
+        if (!result.ok) return { success: false, error: result.error }
+        return { success: true, response: result.response, viaCloud: true }
+      } catch (cloudErr) {
+        return { success: false, error: cloudErr instanceof Error ? cloudErr.message : String(cloudErr) }
+      }
+    }
+    return { success: false, error: err instanceof Error ? err.message : String(err) }
   }
 }

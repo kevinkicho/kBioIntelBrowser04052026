@@ -69,7 +69,7 @@ export function AIBanner() {
       return
     }
     if (validation.warning === 'lan-warning') {
-      setValidationHint('Connecting to a non-localhost address. Ensure this server is trusted and on your network.')
+      setValidationHint('LAN Ollama requires OLLAMA_ALLOW_LAN=1 on the Next.js server. Ensure this host is trusted and on your network.')
     } else {
       setValidationHint(null)
     }

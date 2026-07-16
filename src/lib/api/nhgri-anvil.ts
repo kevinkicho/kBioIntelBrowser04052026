@@ -35,7 +35,17 @@ export async function fetchAnvilData(query: string): Promise<ReturnType<typeof s
       return { data: { datasets: [] }, source: 'NHGRI AnVIL', timestamp: new Date().toISOString() }
     }
 
-    const data = await response.json()
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    if (contentType.includes('text/html')) {
+      return { data: { datasets: [] }, source: 'NHGRI AnVIL', timestamp: new Date().toISOString() }
+    }
+
+    const text = await response.text()
+    if (!text || text.trimStart().startsWith('<')) {
+      return { data: { datasets: [] }, source: 'NHGRI AnVIL', timestamp: new Date().toISOString() }
+    }
+
+    const data = JSON.parse(text)
     const items = Array.isArray(data) ? data : (data.datasets ?? data.results ?? data.items ?? [])
 
     const datasets = items.slice(0, 10).map((item: Record<string, unknown>, i: number) => ({
@@ -51,8 +61,7 @@ export async function fetchAnvilData(query: string): Promise<ReturnType<typeof s
 
     const parsedData = AnvilResponseSchema.parse({ datasets })
     return { data: parsedData, source: 'NHGRI AnVIL', timestamp: new Date().toISOString() }
-  } catch (error) {
-    console.error('Error fetching NHGRI AnVIL data:', error)
+  } catch {
     return { data: { datasets: [] }, source: 'NHGRI AnVIL', timestamp: new Date().toISOString() }
   }
 }

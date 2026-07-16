@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No Ollama URL provided' }, { status: 400 })
   }
 
-  const validation = validateOllamaUrl(ollamaUrl)
+  const validation = validateOllamaUrl(ollamaUrl, { forServer: true })
   if (!validation.valid) {
     return NextResponse.json({ error: validation.error }, { status: 400 })
   }

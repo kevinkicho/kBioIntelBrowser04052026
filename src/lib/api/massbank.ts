@@ -1,38 +1,15 @@
 import type { MassBankSpectrum } from '../types'
 import { LIMITS } from '../api-limits'
+import { fetchJsonWithSizeLimit, DEFAULT_MAX_RESPONSE_BYTES } from './fetchJsonWithSizeLimit'
 
 const BASE_URL = 'https://massbank.eu/MassBank-api'
-const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
-
-const MAX_RESPONSE_SIZE = 2 * 1024 * 1024
 
 async function fetchWithSizeLimit(url: string): Promise<unknown[] | null> {
-  try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 12000)
-    const res = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
-    })
-    clearTimeout(timeout)
-    if (!res.ok) return null
-
-    const contentLength = res.headers.get('content-length')
-    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
-      return null
-    }
-
-    const text = await res.text()
-    if (text.length > MAX_RESPONSE_SIZE) {
-      return null
-    }
-
-    const parsed = JSON.parse(text)
-    return Array.isArray(parsed) ? parsed : null
-  } catch {
-    return null
-  }
+  const parsed = await fetchJsonWithSizeLimit<unknown>(url, {
+    maxBytes: DEFAULT_MAX_RESPONSE_BYTES,
+    timeoutMs: 12000,
+  })
+  return Array.isArray(parsed) ? parsed : null
 }
 
 function parseRecord(record: Record<string, unknown>): MassBankSpectrum {
@@ -90,24 +67,13 @@ export async function searchMassBank(query: string, limit: number = LIMITS.MASSB
 
 export async function getMassBankSpectrum(accession: string): Promise<MassBankSpectrum | null> {
   try {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 12000)
     const spectrumUrl = `${BASE_URL}/records/${encodeURIComponent(accession)}`
-    const res = await fetch(spectrumUrl, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
-      signal: controller.signal,
+    const record = await fetchJsonWithSizeLimit<Record<string, unknown>>(spectrumUrl, {
+      maxBytes: DEFAULT_MAX_RESPONSE_BYTES,
+      timeoutMs: 12000,
     })
-    clearTimeout(timeout)
-    if (!res.ok) return null
-
-    const contentLength = res.headers.get('content-length')
-    if (contentLength && parseInt(contentLength) > MAX_RESPONSE_SIZE) {
-      return null
-    }
-
-    const record = await res.json()
-    return parseRecord(record as Record<string, unknown>)
+    if (!record || typeof record !== 'object') return null
+    return parseRecord(record)
   } catch {
     return null
   }

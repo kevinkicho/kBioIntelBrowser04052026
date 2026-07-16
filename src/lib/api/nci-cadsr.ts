@@ -1,5 +1,6 @@
 import { getApiKey, standardizeResponse } from "./utils"
 import { z } from "zod"
+import { isApiSourceDisabled } from "./sourceAvailability"
 
 const CadsrConceptSchema = z.object({
   conceptId: z.string(),
@@ -17,7 +18,18 @@ const CadsrResponseSchema = z.object({
 export type CadsrConcept = z.infer<typeof CadsrConceptSchema>
 export type CadsrResponse = z.infer<typeof CadsrResponseSchema>
 
+const EMPTY = (): ReturnType<typeof standardizeResponse<CadsrResponse>> => ({
+  data: { concepts: [] },
+  source: 'NCI caDSR',
+  timestamp: new Date().toISOString(),
+})
+
 export async function fetchCadsrData(query: string): Promise<ReturnType<typeof standardizeResponse<CadsrResponse>>> {
+  // Known-dead host — skip network until endpoint is updated (see sourceAvailability.ts)
+  if (isApiSourceDisabled('nci-cadsr')) {
+    return EMPTY()
+  }
+
   const apiKey = getApiKey('NCI_CADSR_API_KEY')
 
   try {
@@ -26,9 +38,17 @@ export async function fetchCadsrData(query: string): Promise<ReturnType<typeof s
     url.searchParams.append('q', query)
     if (apiKey) url.searchParams.append('api_key', apiKey)
 
-    const response = await fetch(url.toString())
+    const response = await fetch(url.toString(), {
+      headers: { Accept: 'application/json' },
+      cache: 'no-store',
+    })
     if (!response.ok) {
-      return { data: { concepts: [] }, source: 'NCI caDSR', timestamp: new Date().toISOString() }
+      return EMPTY()
+    }
+
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    if (contentType.includes('text/html')) {
+      return EMPTY()
     }
 
     const data = await response.json()
@@ -45,8 +65,8 @@ export async function fetchCadsrData(query: string): Promise<ReturnType<typeof s
 
     const parsedData = CadsrResponseSchema.parse({ concepts: parsedConcepts })
     return { data: parsedData, source: 'NCI caDSR', timestamp: new Date().toISOString() }
-  } catch (error) {
-    console.error('Error fetching NCI caDSR data:', error)
-    return { data: { concepts: [] }, source: 'NCI caDSR', timestamp: new Date().toISOString() }
+  } catch {
+    // Silent empty — avoid console spam for optional NIH sources
+    return EMPTY()
   }
 }

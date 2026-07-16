@@ -1,5 +1,6 @@
 import { standardizeResponse } from "./utils"
 import { z } from "zod"
+import { isApiSourceDisabled } from "./sourceAvailability"
 
 const ImmPortStudySchema = z.object({
   studyId: z.string(),
@@ -20,7 +21,18 @@ const ImmPortResponseSchema = z.object({
 export type ImmPortStudy = z.infer<typeof ImmPortStudySchema>
 export type ImmPortResponse = z.infer<typeof ImmPortResponseSchema>
 
+const EMPTY = (): ReturnType<typeof standardizeResponse<ImmPortResponse>> => ({
+  data: { studies: [] },
+  source: 'NIAID ImmPort',
+  timestamp: new Date().toISOString(),
+})
+
 export async function fetchImmPortData(query: string): Promise<ReturnType<typeof standardizeResponse<ImmPortResponse>>> {
+  // Known-broken: shared/data/search returns HTML UI, not JSON (see sourceAvailability.ts)
+  if (isApiSourceDisabled('niaid-immport')) {
+    return EMPTY()
+  }
+
   try {
     const baseUrl = 'https://www.immport.org/shared/data/search'
     const response = await fetch(
@@ -29,14 +41,25 @@ export async function fetchImmPortData(query: string): Promise<ReturnType<typeof
         headers: {
           Accept: 'application/json',
         },
+        cache: 'no-store',
       },
     )
 
     if (!response.ok) {
-      return { data: { studies: [] }, source: 'NIAID ImmPort', timestamp: new Date().toISOString() }
+      return EMPTY()
     }
 
-    const data = await response.json()
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    if (contentType.includes('text/html')) {
+      return EMPTY()
+    }
+
+    const text = await response.text()
+    if (!text || text.trimStart().startsWith('<')) {
+      return EMPTY()
+    }
+
+    const data = JSON.parse(text)
     const items = Array.isArray(data) ? data : (data.studies ?? data.results ?? data.items ?? data.data ?? [])
 
     const studies = items.slice(0, 10).map((item: Record<string, unknown>, i: number) => ({
@@ -53,8 +76,7 @@ export async function fetchImmPortData(query: string): Promise<ReturnType<typeof
 
     const parsedData = ImmPortResponseSchema.parse({ studies })
     return { data: parsedData, source: 'NIAID ImmPort', timestamp: new Date().toISOString() }
-  } catch (error) {
-    console.error('Error fetching NIAID ImmPort data:', error)
-    return { data: { studies: [] }, source: 'NIAID ImmPort', timestamp: new Date().toISOString() }
+  } catch {
+    return EMPTY()
   }
 }

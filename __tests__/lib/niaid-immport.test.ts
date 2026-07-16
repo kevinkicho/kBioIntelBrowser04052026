@@ -1,13 +1,28 @@
 "use strict"
 import { fetchImmPortData } from '@/lib/api/niaid-immport'
 import { mockJsonResponse } from '../utils/mockFetch'
+import { isApiSourceDisabled } from '@/lib/api/sourceAvailability'
+
+jest.mock('@/lib/api/sourceAvailability', () => ({
+  isApiSourceDisabled: jest.fn(),
+  getApiSourceDisabledReason: jest.fn(),
+  DISABLED_API_SOURCES: {},
+}))
 
 global.fetch = jest.fn()
 beforeEach(() => {
   jest.resetAllMocks()
+  ;(isApiSourceDisabled as jest.Mock).mockReturnValue(false)
 })
 
 describe('fetchImmPortData', () => {
+  test('returns empty without fetch when source is disabled', async () => {
+    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(true)
+    const response = await fetchImmPortData('COVID-19')
+    expect(response.data.studies).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
   test('returns parsed studies on success', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse({
@@ -33,6 +48,17 @@ describe('fetchImmPortData', () => {
     expect(results[0].title).toBe('Immune Response in COVID-19 Patients')
     expect(results[0].studyType).toBe('Observational')
     expect(results[0].participantCount).toBe(1000)
+  })
+
+  test('returns empty array when response is HTML', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      new Response('<!doctype html><html><body>ImmPort</body></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }),
+    )
+    const response = await fetchImmPortData('COVID-19')
+    expect(response.data.studies).toEqual([])
   })
 
   test('returns empty array when API response is not ok', async () => {

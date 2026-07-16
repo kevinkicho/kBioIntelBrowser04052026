@@ -45,8 +45,13 @@ export interface UniProtSearchResponse {
 }
 
 export async function getUniprotEntriesByName(name: string): Promise<UniprotEntry[]> {
+  // Empty query = missing gene/accession (do not search free-text chemical names for gene APIs)
+  if (!name?.trim()) return []
   try {
-    const url = `${BASE_URL}?query=${encodeURIComponent(name)}&format=json&size=5`
+    // Accession-style queries (P12345) use id: filter when possible
+    const isAccession = /^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(name.trim())
+    const q = isAccession ? `accession:${name.trim()}` : name
+    const url = `${BASE_URL}?query=${encodeURIComponent(q)}&format=json&size=5`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()

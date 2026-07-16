@@ -128,6 +128,58 @@ export async function getMoleculeCidByName(name: string): Promise<number | null>
   }
 }
 
+export interface MoleculeCandidate {
+  cid: number
+  name: string
+  formula: string
+  molecularWeight: number
+  inchiKey: string
+  iupacName: string
+}
+
+/**
+ * Resolve a name to multiple PubChem candidates for disambiguation UI.
+ * Returns up to `limit` candidates with formula/MW/InChIKey for salt/parent splits.
+ */
+export async function getMoleculeCandidatesByName(
+  name: string,
+  limit: number = 8,
+): Promise<MoleculeCandidate[]> {
+  try {
+    const url = `${BASE_URL}/compound/name/${encodeURIComponent(name)}/cids/JSON`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return []
+    const data = await res.json()
+    const cids: number[] = (data.IdentifierList?.CID ?? []).slice(0, limit)
+    if (!cids.length) return []
+
+    const propUrl = `${BASE_URL}/compound/cid/${cids.join(',')}/property/Title,MolecularFormula,MolecularWeight,InChIKey,IUPACName/JSON`
+    const propRes = await fetch(propUrl, fetchOptions)
+    if (!propRes.ok) {
+      return cids.map((cid) => ({
+        cid,
+        name,
+        formula: '',
+        molecularWeight: 0,
+        inchiKey: '',
+        iupacName: '',
+      }))
+    }
+    const propData = await propRes.json()
+    const props = propData.PropertyTable?.Properties ?? []
+    return props.map((p: Record<string, unknown>) => ({
+      cid: Number(p.CID),
+      name: String(p.Title || name),
+      formula: String(p.MolecularFormula || ''),
+      molecularWeight: parseFloat(String(p.MolecularWeight || '0')) || 0,
+      inchiKey: String(p.InChIKey || ''),
+      iupacName: String(p.IUPACName || ''),
+    }))
+  } catch {
+    return []
+  }
+}
+
 /**
  * Get molecule with additional checks for large molecules
  */

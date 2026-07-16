@@ -1,17 +1,31 @@
 import type { OMIMEntry } from '../types'
 import { stripHtml } from '../utils'
+import { getApiKey } from './utils'
 
 const BASE_URL = 'https://api.omim.org/api'
-// OMIM requires API key - users can set via environment variable
-const OMIM_API_KEY = process.env.OMIM_API_KEY ?? ''
 const fetchOptions: RequestInit = { next: { revalidate: 604800 } } // 7 days
+
+let warnedMissingKey = false
+
+function getOmimApiKey(): string {
+  return getApiKey('OMIM_API_KEY') ?? ''
+}
+
+function warnMissingKeyOnce(): void {
+  if (warnedMissingKey) return
+  warnedMissingKey = true
+  console.warn(
+    'OMIM API key not configured. Set OMIM_API_KEY environment variable. (This message is logged once per process.)',
+  )
+}
 
 /**
  * Search OMIM for genetic disorders by name
  */
 export async function searchOMIM(query: string): Promise<OMIMEntry[]> {
+  const OMIM_API_KEY = getOmimApiKey()
   if (!OMIM_API_KEY) {
-    console.warn('OMIM API key not configured. Set OMIM_API_KEY environment variable.')
+    warnMissingKeyOnce()
     return []
   }
 
@@ -47,6 +61,7 @@ export async function searchOMIM(query: string): Promise<OMIMEntry[]> {
  * Get OMIM entry details by MIM number
  */
 export async function getOMIMEntry(mimNumber: number): Promise<OMIMEntry | null> {
+  const OMIM_API_KEY = getOmimApiKey()
   if (!OMIM_API_KEY) {
     return null
   }

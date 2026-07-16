@@ -1,5 +1,15 @@
 import { fetchAnvilData } from '@/lib/api/nhgri-anvil'
 
+function mockJsonFetch(body: unknown, ok = true) {
+  const text = JSON.stringify(body)
+  return {
+    ok,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    text: async () => text,
+    json: async () => body,
+  }
+}
+
 global.fetch = jest.fn()
 
 describe('NHGRI AnVIL API', () => {
@@ -8,9 +18,8 @@ describe('NHGRI AnVIL API', () => {
   })
 
   it('should fetch and parse NHGRI AnVIL data', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonFetch({
         datasets: [
           {
             dataset_id: '12345',
@@ -24,13 +33,13 @@ describe('NHGRI AnVIL API', () => {
           },
         ],
       }),
-    })
+    )
 
     const result = await fetchAnvilData('test')
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('service.anvil.gi.ucsc.edu'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) })
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     )
     expect(result.source).toBe('NHGRI AnVIL')
     expect(result.data.datasets).toHaveLength(1)
@@ -40,10 +49,7 @@ describe('NHGRI AnVIL API', () => {
   })
 
   it('should handle empty results gracefully', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonFetch({}))
 
     const result = await fetchAnvilData('nonexistent')
 

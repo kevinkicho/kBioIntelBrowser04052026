@@ -13,41 +13,73 @@ export interface SessionMoleculeSummary {
 
 export type PromptMode = 'auto_insight' | 'executive_brief' | 'gap_analysis' | 'safety_deep_dive' | 'mechanism_analysis' | 'therapeutic_hypothesis' | 'competitive_position' | 'repurposing_scan' | 'cross_molecule_compare' | 'free_qa' | 'followup' | 'gene_therapeutic' | 'gene_repurposing' | 'gene_mechanism' | 'gene_target_assessment' | 'prior_art_query' | 'differential_safety' | 'suggest_next' | 'hypothesis_seed'
 
-const SYSTEM_PROMPT = `You are BioIntel Copilot, a drug discovery researcher embedded in a bioinformatics explorer with data from 112+ scientific databases. Your job is to find NON-OBVIOUS connections that a researcher scanning the same data would miss.
+/** Minimum panels with real data before deep synthesis is allowed */
+export const AI_MIN_COMPLETENESS_RATIO = 0.12
+export const AI_MIN_PANELS_WITH_DATA = 4
 
-CRITICAL: You must NEVER produce secretary output. Secretary output is data recitation — restating what the data says without interpretation. You must ALWAYS produce researcher output — drawing conclusions the data supports but doesn't explicitly state.
+const SYSTEM_PROMPT = `You are BioIntel Copilot, a drug discovery researcher embedded in a bioinformatics explorer with free public scientific databases. Your job is to find NON-OBVIOUS connections that a researcher scanning the same data would miss — but ONLY when the retrieved evidence supports them.
+
+CRITICAL — EVIDENCE RULES:
+1. Every scientific claim MUST include an evidence bullet citing the panel/source (e.g. [chembl], [adverse-events], [clinical-trials], [opentargets]).
+2. If data is sparse or completeness is low, say so clearly and DO NOT invent mechanisms, gene links, or AE causality.
+3. Prefer "insufficient evidence for synthesis" over plausible fiction.
+4. Never treat empty/timeout panels as "no association exists" — only as "not retrieved".
+
+CRITICAL: You must NEVER produce secretary output. Secretary output is data recitation — restating what the data says without interpretation. When completeness is adequate, produce researcher output — drawing conclusions the data supports but doesn't explicitly state.
 
 BAD (secretary — NEVER do this):
 "This drug has 42 clinical trials, 3 known targets (COX-1, COX-2, COX-3), and 5 adverse events. The most common AE is nausea with 200 reports. It has a boxed warning."
-→ This just repeats counts and names from the data. Anyone can read the data themselves.
 
-GOOD (researcher — ALWAYS do this):
-"Cyclooxygenase inhibition explains both efficacy (anti-inflammatory via COX-2) and the dominant AE profile: the same enzyme family metabolizes gastric mucosal prostaglandins, so nausea/GI bleeding at 200 reports is mechanism-related, not idiosyncratic. The boxed warning likely ties to GI bleeding risk, which means this drug's therapeutic index is narrow — anyone prescribing it should test for CYP2C9 variants (pharmacogenomic gene listed) since slow metabolizers will get disproportionate COX-1 inhibition and worse GI outcomes. The real opportunity: COX-3 expression in CNS suggests a repurposing angle for neuropathic pain at lower doses that spare gastric COX-1."
-→ This connects mechanism to AEs, explains the boxed warning, identifies a pharmacogenomic interaction, and proposes a concrete repurposing hypothesis with biological rationale.
+GOOD (researcher — when evidence exists):
+"Cyclooxygenase inhibition [chembl-mechanisms] explains both efficacy and the dominant AE profile: nausea (200 reports) [adverse-events] is consistent with COX-1 gastric effects. Evidence gap: no CYP pharmacogenomics panel loaded [pharmgkb empty]."
 
 Your rules:
-1. SYNTHESIZE across domains. Connect targets to AEs, genes to diseases, pathways to indications. The value you add is the CONNECTION, not the data point.
-2. NAME SPECIFICS — cite exact values (COX-2 pChEMBL=7.8, not "strong binding"; "Nausea (200 reports)", not "many AEs").
-3. REASON about mechanism. When you see a target, a disease gene, and a pathway in the same data, explain the causal chain. Don't just list them.
-4. HIGHLIGHT CONTRADICTIONS and SURPRISES. Approved drug with no PDB structures? High-affinity target with no clinical trial for that indication? These are insights, not just observations.
-5. BE ACTIONABLE. Propose specific experiments (cell line + assay + endpoint), not vague "further research is needed."
-6. KNOW YOUR LIMITS. If data is missing, state what experiment or query would fill the gap and what it might reveal.
+1. SYNTHESIZE across domains only with cited panels. Connect targets to AEs, genes to diseases, pathways to indications.
+2. NAME SPECIFICS — cite exact values (COX-2 pChEMBL=7.8; "Nausea (200 reports)").
+3. HIGHLIGHT CONTRADICTIONS and SURPRISES when supported by data.
+4. BE ACTIONABLE when evidence is strong; otherwise list what to fetch next.
+5. KNOW YOUR LIMITS. If panelsWithData is low, refuse deep causal chains.
 
 You are concise — 2-4 sentences per insight unless elaborating on request. You use correct scientific terminology.`
+
+export function shouldRefuseDeepSynthesis(context: MoleculeContext): boolean {
+  const withData = context.dataCompleteness?.panelsWithData ?? 0
+  const total = context.dataCompleteness?.totalPanels ?? 0
+  if (withData < AI_MIN_PANELS_WITH_DATA) return true
+  if (total > 0 && withData / total < AI_MIN_COMPLETENESS_RATIO) return true
+  return false
+}
+
+export function buildLowCompletenessGuard(context: MoleculeContext): string {
+  const withData = context.dataCompleteness?.panelsWithData ?? 0
+  const total = context.dataCompleteness?.totalPanels ?? 0
+  return [
+    `DATA COMPLETENESS GATE: only ${withData}/${total || '?'} panels have real data.`,
+    'Do NOT invent mechanism–AE causal chains or gene–disease links.',
+    'Respond with: (1) what solid evidence exists with [panel] citations, (2) top data gaps, (3) what to load next.',
+    'If asked for deep synthesis, refuse and list missing panels.',
+  ].join('\n')
+}
 
 export function buildAutoInsightPrompt(context: MoleculeContext, snapshot: RetrievalSnapshot): { system: string; user: string } {
   const interesting = findInterestingSignals(context, snapshot)
 
   const userPrompts: string[] = []
-  userPrompts.push(`Analyze the molecule data below. Do NOT just list what data arrived — instead, identify 3-4 genuinely surprising scientific findings that connect across domains.`)
-  userPrompts.push(`For each finding:`)
-  userPrompts.push(`- State the SPECIFIC observation with exact data points (target names, pChEMBL values, AE counts, gene symbols)`)
-  userPrompts.push(`- Explain the biological or pharmacological SIGNIFICANCE — why does this matter?`)
-  userPrompts.push(`- Connect it to at least ONE other data domain (e.g., how a target profile explains an AE pattern, or how a gene association suggests a repurposing angle)`)
-  userPrompts.push('')
-  userPrompts.push(`BAD EXAMPLE: "This drug has 5 targets and 3 pathways. The top AE is nausea with 200 reports."`)
-  userPrompts.push(`GOOD EXAMPLE: "The polypharmacology across 5 targets (COX-1 pChEMBL 8.2, COX-2 7.5) explains both efficacy and the dominant AE: COX-1 inhibition in gastric mucosa directly causes nausea (200 reports), and the narrow selectivity window suggests dose-dependent GI bleeding risk — consistent with the boxed warning."`)
-  userPrompts.push('')
+  if (shouldRefuseDeepSynthesis(context)) {
+    userPrompts.push(buildLowCompletenessGuard(context))
+    userPrompts.push('')
+  } else {
+    userPrompts.push(`Analyze the molecule data below. Do NOT just list what data arrived — instead, identify 3-4 genuinely surprising scientific findings that connect across domains.`)
+    userPrompts.push(`For each finding:`)
+    userPrompts.push(`- State the SPECIFIC observation with exact data points (target names, pChEMBL values, AE counts, gene symbols)`)
+    userPrompts.push(`- Cite the panel key in brackets e.g. [chembl] [adverse-events]`)
+    userPrompts.push(`- Explain the biological or pharmacological SIGNIFICANCE — why does this matter?`)
+    userPrompts.push(`- Connect it to at least ONE other data domain when both sides have evidence`)
+    userPrompts.push('')
+    userPrompts.push(`BAD EXAMPLE: "This drug has 5 targets and 3 pathways. The top AE is nausea with 200 reports."`)
+    userPrompts.push(`GOOD EXAMPLE: "Polypharmacology across COX-1/COX-2 [chembl] explains nausea (200 reports) [adverse-events] via gastric COX-1; boxed warning [recalls] is consistent with that mechanism."`)
+    userPrompts.push('')
+  }
   userPrompts.push(contextToBulletSummary(context))
 
   if (interesting.length > 0) {
@@ -70,13 +102,14 @@ export function buildAutoInsightPrompt(context: MoleculeContext, snapshot: Retri
 }
 
 export function buildExecutiveBriefPrompt(context: MoleculeContext, snapshot: RetrievalSnapshot): { system: string; user: string } {
-  const user = `Write an executive intelligence brief for ${context.identity.name} (CID ${context.identity.cid}). This is for a scientist who needs to make a decision about this molecule. Structure it as:
+  const gate = shouldRefuseDeepSynthesis(context) ? `${buildLowCompletenessGuard(context)}\n\n` : ''
+  const user = `${gate}Write an executive intelligence brief for ${context.identity.name} (CID ${context.identity.cid}). This is for a scientist who needs to make a decision about this molecule. Cite panel keys [like-this] for every claim. Structure it as:
 
-1. CLASSIFICATION: What is this molecule really? (Don't just say "approved drug" — describe its pharmacological class, mechanism, and therapeutic niche based on the actual target/MoA data below)
-2. KEY ASSETS: Top 2-3 scientific strengths, citing specific evidence (e.g., "high-affinity binding to X target with pChEMBL 8.2, validated by 3 Phase 3 trials in Y condition")
-3. KEY RISKS: Top 2-3 concerns, citing specific evidence (e.g., "recalled for Z reason on [date], plus N serious AEs for [specific reaction]")
-4. UNMET OPPORTUNITY: What hypothesis should a researcher test next? Be specific — name the target, disease, or pathway.
-5. DATA CONFIDENCE: Based on ${context.dataCompleteness.panelsWithData}/${context.dataCompleteness.totalPanels} panels, what are we most uncertain about? What data would change our assessment?
+1. CLASSIFICATION: What is this molecule really? (based only on loaded MoA/target data)
+2. KEY ASSETS: Top 2-3 scientific strengths with [panel] citations
+3. KEY RISKS: Top 2-3 concerns with [panel] citations
+4. UNMET OPPORTUNITY: Only if evidence supports a hypothesis; otherwise list missing panels
+5. DATA CONFIDENCE: Based on ${context.dataCompleteness.panelsWithData}/${context.dataCompleteness.totalPanels} panels, what are we most uncertain about?
 
 Data:
 ${contextToBulletSummary(context)}

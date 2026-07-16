@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { getFreshnessStatus } from '@/lib/dataFreshness'
 import { getPanelSource } from '@/lib/panelSources'
+import type { DataLoadStatus } from '@/lib/dataStatus'
+import { emptyMessageForStatus } from '@/lib/dataStatus'
 
 type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
 
@@ -15,6 +17,9 @@ interface PanelProps {
   titleExtra?: React.ReactNode
   empty?: string
   sourceHealth?: SourceHealth
+  /** Scientific honesty: data vs empty vs timeout/error/disabled */
+  loadStatus?: DataLoadStatus
+  loadError?: string
 }
 
 const HEALTH_BADGE: Record<Exclude<SourceHealth, 'unknown' | 'healthy'>, { text: string; className: string }> = {
@@ -22,17 +27,35 @@ const HEALTH_BADGE: Record<Exclude<SourceHealth, 'unknown' | 'healthy'>, { text:
   errors: { text: 'errors', className: 'bg-red-900/40 text-red-300 border border-red-700/30' },
 }
 
-export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra, empty, sourceHealth }: PanelProps) {
+const LOAD_STATUS_BADGE: Partial<Record<DataLoadStatus, { text: string; className: string }>> = {
+  timeout: { text: 'timeout', className: 'bg-amber-900/40 text-amber-300 border border-amber-700/30' },
+  error: { text: 'error', className: 'bg-red-900/40 text-red-300 border border-red-700/30' },
+  disabled: { text: 'disabled', className: 'bg-slate-700/60 text-slate-400 border border-slate-600/40' },
+  empty: { text: 'no data', className: 'bg-slate-800/60 text-slate-500 border border-slate-700/40' },
+}
+
+export function Panel({ title, panelId, lastFetched, children, className = '', titleExtra, empty, sourceHealth, loadStatus, loadError }: PanelProps) {
   const [showSource, setShowSource] = useState(false)
   const freshness = panelId && lastFetched ? getFreshnessStatus(panelId, lastFetched) : null
   const sourceInfo = panelId ? getPanelSource(panelId) : null
+  const statusBadge = loadStatus ? LOAD_STATUS_BADGE[loadStatus] : undefined
+  const emptyText = empty
+    ? emptyMessageForStatus(loadStatus, empty)
+    : loadStatus && loadStatus !== 'loaded'
+      ? emptyMessageForStatus(loadStatus, 'No data for this molecule')
+      : null
 
   return (
     <div className={`bg-slate-800/50 border border-slate-700 rounded-xl p-5 ${className}`}>
       <div className="flex justify-between items-start mb-4">
-        <div className="flex items-baseline gap-2">
+        <div className="flex items-baseline gap-2 flex-wrap">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
           {titleExtra}
+          {statusBadge && (
+            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide ${statusBadge.className}`}>
+              {statusBadge.text}
+            </span>
+          )}
         </div>
         {freshness && (
           <span className={`text-xs ${freshness.colorClass}`}>
@@ -40,8 +63,13 @@ export function Panel({ title, panelId, lastFetched, children, className = '', t
           </span>
         )}
       </div>
-      {empty ? (
-        <p className="text-slate-500 text-sm">{empty}</p>
+      {emptyText ? (
+        <div>
+          <p className="text-slate-500 text-sm">{emptyText}</p>
+          {loadError && (
+            <p className="text-[10px] text-slate-600 mt-1 font-mono truncate" title={loadError}>{loadError}</p>
+          )}
+        </div>
       ) : (
         children
       )}

@@ -28,7 +28,17 @@ export async function fetchTranslatorData(query: string): Promise<ReturnType<typ
       return { data: { associations: [] }, source: 'NCATS Translator', timestamp: new Date().toISOString() }
     }
 
-    const data = await response.json()
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    if (contentType.includes('text/html')) {
+      return { data: { associations: [] }, source: 'NCATS Translator', timestamp: new Date().toISOString() }
+    }
+
+    const text = await response.text()
+    if (!text || text.trimStart().startsWith('<')) {
+      return { data: { associations: [] }, source: 'NCATS Translator', timestamp: new Date().toISOString() }
+    }
+
+    const data = JSON.parse(text)
     const entities = data?.entities ?? []
 
     const associations = entities.slice(0, 10).map((ent: Record<string, unknown>) => ({
@@ -42,8 +52,7 @@ export async function fetchTranslatorData(query: string): Promise<ReturnType<typ
 
     const parsedData = TranslatorResponseSchema.parse({ associations })
     return { data: parsedData, source: 'NCATS Translator', timestamp: new Date().toISOString() }
-  } catch (error) {
-    console.error('Error fetching NCATS Translator data:', error)
+  } catch {
     return { data: { associations: [] }, source: 'NCATS Translator', timestamp: new Date().toISOString() }
   }
 }

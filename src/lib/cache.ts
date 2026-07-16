@@ -1,3 +1,13 @@
+/**
+ * Process-local in-memory cache for aggregated category/pipeline responses.
+ *
+ * Caching policy:
+ * - Small/stable external GETs: prefer Next.js fetch `next: { revalidate: N }` in API clients.
+ * - Large/unpredictable responses (IUPHAR, MassBank, etc.): use `fetchJsonWithSizeLimit`
+ *   with `cache: 'no-store'` — Next Data Cache rejects items over 2MB.
+ * - Category/pipeline aggregates: this Map with explicit TTL (not shared across serverless instances).
+ */
+
 interface CacheEntry<T> {
   data: T
   expiresAt: number
@@ -22,9 +32,14 @@ function cleanupExpired(): void {
   keysToDelete.forEach(key => store.delete(key))
 }
 
-// Run periodic cleanup in browser/client environment
-if (typeof window !== 'undefined') {
-  setInterval(cleanupExpired, CLEANUP_INTERVAL)
+// Periodic cleanup on both client and server (Node long-running process / Next server).
+// getCached also drops expired entries on access.
+if (typeof setInterval !== 'undefined') {
+  const timer = setInterval(cleanupExpired, CLEANUP_INTERVAL)
+  // Allow Node to exit without waiting on the timer (server only)
+  if (typeof timer === 'object' && timer !== null && 'unref' in timer) {
+    ;(timer as NodeJS.Timeout).unref()
+  }
 }
 
 export function getCached<T>(key: string): T | undefined {

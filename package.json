@@ -5,12 +5,13 @@
   "scripts": {
     "dev": "node scripts/dev.js",
     "build": "next build",
-    "start": "next start -p ${PORT:-33424}",
+    "start": "node scripts/start.js",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
+    "test:live": "node scripts/test-live.js",
     "tune-timeouts": "node scripts/tune-timeouts.js"
   },
   "dependencies": {

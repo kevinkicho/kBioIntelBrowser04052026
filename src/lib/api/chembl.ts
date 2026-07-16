@@ -11,7 +11,11 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
  */
 export async function getChemblIdByName(name: string): Promise<string | null> {
   try {
-    const url = `${SEARCH_URL}?q=${encodeURIComponent(name)}&limit=1`
+    // InChIKey (preferred default) or free-text name
+    const isInchiKey = /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/i.test(name.trim())
+    const url = isInchiKey
+      ? `https://www.ebi.ac.uk/chembl/api/data/molecule.json?molecule_structures__standard_inchi_key=${encodeURIComponent(name.trim())}&limit=1`
+      : `${SEARCH_URL}?q=${encodeURIComponent(name)}&limit=1`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return null
     const data = await res.json()

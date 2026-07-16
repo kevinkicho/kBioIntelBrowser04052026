@@ -7,6 +7,7 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
  * Get gene-disease associations by gene symbol
  */
 export async function getDiseasesByGene(geneSymbol: string): Promise<DisGeNetAssociation[]> {
+  if (!geneSymbol?.trim()) return []
   try {
     const url = `${BASE_URL}/gda?gene_symbol=${encodeURIComponent(geneSymbol)}&limit=50`
     const res = await fetch(url, fetchOptions)

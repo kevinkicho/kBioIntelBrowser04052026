@@ -137,4 +137,25 @@ describe('getPharmacologyTargetsByName', () => {
     expect(results[0].type).toBe('')
     expect(results[0].affinity).toBeUndefined()
   })
+
+  test('returns empty when ligand response exceeds size limit (content-length)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonResponse([{ ligandId: 1 }], {
+        headers: { 'content-length': String(3 * 1024 * 1024) },
+      }),
+    )
+    const results = await getPharmacologyTargetsByName('huge')
+    expect(results).toEqual([])
+  })
+
+  test('returns empty when body is HTML', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      new Response('<!doctype html><html></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html' },
+      }),
+    )
+    const results = await getPharmacologyTargetsByName('html')
+    expect(results).toEqual([])
+  })
 })

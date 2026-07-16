@@ -1,10 +1,13 @@
 import type { PharmacologyTarget } from '../types'
 import { stripHtml } from '../utils'
+import { fetchJsonWithSizeLimit } from './fetchJsonWithSizeLimit'
 
 const LIGANDS_URL = 'https://www.guidetopharmacology.org/services/ligands'
 const INTERACTIONS_URL = 'https://www.guidetopharmacology.org/services/interactions'
-const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
-const jsonHeaders = { Accept: 'application/json' }
+
+// Guide to Pharmacology can return multi-MB ligand/interaction payloads that
+// exceed Next.js Data Cache (2MB). Always use size-capped no-store fetch.
+const MAX_IUPHAR_BYTES = 2 * 1024 * 1024
 
 interface LigandResult {
   ligandId: number
@@ -31,27 +34,22 @@ interface InteractionResult {
 export async function getPharmacologyTargetsByName(name: string): Promise<PharmacologyTarget[]> {
   try {
     const searchUrl = `${LIGANDS_URL}?search=${encodeURIComponent(name)}`
-    const searchRes = await fetch(searchUrl, { ...fetchOptions, headers: jsonHeaders })
-    if (!searchRes.ok) return []
-
-    const contentLength = searchRes.headers.get('content-length')
-    if (contentLength && parseInt(contentLength) > 2 * 1024 * 1024) return []
-
-    const searchData: LigandResult[] = await searchRes.json()
-    if (!searchData.length) return []
+    const searchData = await fetchJsonWithSizeLimit<LigandResult[]>(searchUrl, {
+      maxBytes: MAX_IUPHAR_BYTES,
+      timeoutMs: 12000,
+    })
+    if (!searchData || !Array.isArray(searchData) || !searchData.length) return []
 
     const ligand = searchData[0]
     const ligandId = ligand.ligandId
     if (!ligandId) return []
 
     const interactionsUrl = `${INTERACTIONS_URL}?ligandId=${ligandId}`
-    const interactionsRes = await fetch(interactionsUrl, { ...fetchOptions, headers: jsonHeaders })
-    if (!interactionsRes.ok) return []
-
-    const interactionContentLength = interactionsRes.headers.get('content-length')
-    if (interactionContentLength && parseInt(interactionContentLength) > 2 * 1024 * 1024) return []
-
-    const interactions: InteractionResult[] = await interactionsRes.json()
+    const interactions = await fetchJsonWithSizeLimit<InteractionResult[]>(interactionsUrl, {
+      maxBytes: MAX_IUPHAR_BYTES,
+      timeoutMs: 12000,
+    })
+    if (!interactions || !Array.isArray(interactions)) return []
 
     const ligandUrl = `https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=${ligandId}`
 

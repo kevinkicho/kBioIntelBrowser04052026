@@ -1,4 +1,4 @@
-import { validateOllamaUrl, normalizeOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
+import { validateOllamaUrl, normalizeOllamaUrl, OLLAMA_DEFAULT_PORT, isPrivateHostname } from '@/lib/ai/config'
 
 describe('validateOllamaUrl', () => {
   describe('valid local URLs', () => {
@@ -36,7 +36,7 @@ describe('validateOllamaUrl', () => {
     })
   })
 
-  describe('LAN hosts allowed with warning', () => {
+  describe('LAN hosts allowed with warning (client mode)', () => {
     it('allows 192.168.x.x with lan-warning', () => {
       const result = validateOllamaUrl('http://192.168.1.50:11434')
       expect(result.valid).toBe(true)
@@ -61,10 +61,44 @@ describe('validateOllamaUrl', () => {
       expect(result.warning).toBe('lan-warning')
     })
 
-    it('allows external domain with lan-warning', () => {
+    it('rejects external public domain in client mode', () => {
       const result = validateOllamaUrl('http://my-server.example.com:11434')
+      expect(result.valid).toBe(false)
+    })
+  })
+
+  describe('server mode SSRF policy', () => {
+    const original = process.env.OLLAMA_ALLOW_LAN
+
+    afterEach(() => {
+      if (original === undefined) delete process.env.OLLAMA_ALLOW_LAN
+      else process.env.OLLAMA_ALLOW_LAN = original
+    })
+
+    it('allows localhost on server without env flag', () => {
+      delete process.env.OLLAMA_ALLOW_LAN
+      const result = validateOllamaUrl('http://localhost:11434', { forServer: true })
+      expect(result.valid).toBe(true)
+    })
+
+    it('rejects LAN on server when OLLAMA_ALLOW_LAN is unset', () => {
+      delete process.env.OLLAMA_ALLOW_LAN
+      const result = validateOllamaUrl('http://192.168.1.50:11434', { forServer: true })
+      expect(result.valid).toBe(false)
+      expect(result.error).toMatch(/OLLAMA_ALLOW_LAN/)
+    })
+
+    it('allows LAN on server when OLLAMA_ALLOW_LAN=1', () => {
+      process.env.OLLAMA_ALLOW_LAN = '1'
+      const result = validateOllamaUrl('http://192.168.1.50:11434', { forServer: true })
       expect(result.valid).toBe(true)
       expect(result.warning).toBe('lan-warning')
+    })
+
+    it('rejects public hostnames on server even with LAN allowed', () => {
+      process.env.OLLAMA_ALLOW_LAN = '1'
+      const result = validateOllamaUrl('http://evil.example.com:11434', { forServer: true })
+      expect(result.valid).toBe(false)
     })
   })
 
@@ -162,6 +196,15 @@ describe('validateOllamaUrl', () => {
       expect(validateOllamaUrl('http://localhost:0').valid).toBe(false)
       expect(validateOllamaUrl('http://localhost:99999').valid).toBe(false)
     })
+  })
+})
+
+describe('isPrivateHostname', () => {
+  it('detects RFC1918 ranges', () => {
+    expect(isPrivateHostname('10.0.0.1')).toBe(true)
+    expect(isPrivateHostname('192.168.1.1')).toBe(true)
+    expect(isPrivateHostname('172.16.0.1')).toBe(true)
+    expect(isPrivateHostname('8.8.8.8')).toBe(false)
   })
 })
 

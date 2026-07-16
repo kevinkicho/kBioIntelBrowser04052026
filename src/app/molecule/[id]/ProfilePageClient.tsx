@@ -258,26 +258,38 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     return () => { cancelled = true }
   }, [snapshotId])
 
-  // Auto-load default category on mount (skipped in snapshot mode)
+  // Tier-1 first paint: pharma + clinical + bioactivity (ChEMBL) — trustworthy core
+  const TIER1: CategoryId[] = ['pharmaceutical', 'clinical-safety', 'bioactivity-targets']
+  // Tier-2: literature + molecular (PubChem props)
+  const TIER2: CategoryId[] = ['research-literature', 'molecular-chemical']
+  // Tier-3: speculative / gene-cascade heavy (load on demand or later)
+  const TIER3: CategoryId[] = [
+    'protein-structure',
+    'genomics-disease',
+    'interactions-pathways',
+    'nih-high-impact',
+  ]
+
+  // Auto-load Tier-1 on mount (skipped in snapshot mode)
   useEffect(() => {
     if (snapshotId) return
-    loadCategory('pharmaceutical')
-  }, [loadCategory, snapshotId])
+    for (const id of TIER1) loadCategory(id)
+  }, [loadCategory, snapshotId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const fromDiscover = searchParams.get('from') === 'discover'
 
-  // When arriving from discover, immediately load priority categories in parallel
+  // When arriving from discover, load Tier-1 + molecular immediately
   const discoverLoadedRef = useRef(false)
   useEffect(() => {
     if (!fromDiscover || discoverLoadedRef.current) return
     discoverLoadedRef.current = true
-    const priorityCategories: CategoryId[] = ['clinical-safety', 'bioactivity-targets', 'pharmaceutical', 'molecular-chemical']
+    const priorityCategories: CategoryId[] = [...TIER1, 'molecular-chemical']
     for (const catId of priorityCategories) {
       loadCategory(catId)
     }
-  }, [fromDiscover, loadCategory])
+  }, [fromDiscover, loadCategory]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When hideEmpty is toggled on, load all idle categories so we can evaluate them
+  // When hideEmpty is toggled on, load remaining idle categories so we can evaluate them
   useEffect(() => {
     if (!hideEmpty) return
     for (const id of ALL_CATEGORY_IDS) {
@@ -285,8 +297,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
   }, [hideEmpty, loadCategory])
 
-  // Background pre-fetch: once pharmaceutical loads, silently load remaining categories
+  // Background pre-fetch: after Tier-1, load Tier-2 then Tier-3
   const pharmaceuticalLoaded = categoryStatus['pharmaceutical'] === 'loaded'
+  const tier1Ready = TIER1.every(id => categoryStatus[id] === 'loaded' || categoryStatus[id] === 'error')
 
   useEffect(() => {
     if (pharmaceuticalLoaded) {
@@ -300,18 +313,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   }, [pharmaceuticalLoaded, categoryData, moleculeName])
 
   useEffect(() => {
-    if (!pharmaceuticalLoaded) return
+    if (!tier1Ready) return
 
-    const prefetchOrder: CategoryId[] = [
-      'clinical-safety',
-      'research-literature',
-      'bioactivity-targets',
-      'molecular-chemical',
-      'protein-structure',
-      'genomics-disease',
-      'interactions-pathways',
-    ]
-
+    const prefetchOrder: CategoryId[] = [...TIER2, ...TIER3]
     const PREFETCH_CONCURRENCY = 2
 
     let cancelled = false
@@ -330,7 +334,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
     const timer = setTimeout(prefetchWithConcurrency, 200)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [pharmaceuticalLoaded, loadCategory])
+  }, [tier1Ready, loadCategory])
 
   // Merge all loaded data into a single props-like object for summary/export/counts
   const mergedData = useMemo(() => {
@@ -593,8 +597,16 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
     // Loaded — render panels with freshness tracking
     const categoryFetchedAt = fetchedAt[catId]
+    const sourceStatusMap = (categoryData[catId] as Record<string, unknown> | undefined)?._sourceStatus as
+      | Record<string, { status?: string; error?: string }>
+      | undefined
+
     const visiblePanels = hideEmpty
       ? panels.filter(p => {
+          // Always show panels that failed/timed out/disabled — scientific honesty
+          const st = sourceStatusMap?.[p.id]?.status
+          if (st === 'timeout' || st === 'error' || st === 'disabled') return true
+
           const value = mergedData[p.propKey]
           if (value === null || value === undefined) return false
 
@@ -622,13 +634,33 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       ? visiblePanels.filter(p => isPanelAllowed(p.id))
       : visiblePanels
     if (allowedVisible.length === 0 && hideEmpty) return null
-    return allowedVisible.map(p => (
-      <div key={p.id}>
-        <ErrorBoundary>
-          {panelRegistry[p.id](p.id, categoryFetchedAt)}
-        </ErrorBoundary>
-      </div>
-    ))
+
+    // Category-level honesty: count timeouts/errors/disabled from server metrics
+    const statusEntries = sourceStatusMap ? Object.entries(sourceStatusMap) : []
+    const nTimeout = statusEntries.filter(([, v]) => v.status === 'timeout').length
+    const nError = statusEntries.filter(([, v]) => v.status === 'error').length
+    const nDisabled = statusEntries.filter(([, v]) => v.status === 'disabled').length
+
+    return (
+      <>
+        {(nTimeout > 0 || nError > 0 || nDisabled > 0) && (
+          <div className="col-span-2 text-[10px] text-slate-500 bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2 flex flex-wrap gap-3">
+            <span className="text-slate-400 font-medium">Source status:</span>
+            {nTimeout > 0 && <span className="text-amber-400/90">{nTimeout} timed out</span>}
+            {nError > 0 && <span className="text-red-400/90">{nError} errors</span>}
+            {nDisabled > 0 && <span className="text-slate-500">{nDisabled} disabled</span>}
+            <span className="text-slate-600">Empty ≠ absence of biology — only “not retrieved”</span>
+          </div>
+        )}
+        {allowedVisible.map(p => (
+          <div key={p.id}>
+            <ErrorBoundary>
+              {panelRegistry[p.id](p.id, categoryFetchedAt)}
+            </ErrorBoundary>
+          </div>
+        ))}
+      </>
+    )
   }
 
   return (

@@ -1,5 +1,6 @@
 import type { ChemSpiderCompound } from '../types'
 import { LIMITS } from '../api-limits'
+import { getApiKey } from './utils'
 
 const PUBCHEM_SEARCH_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -56,7 +57,7 @@ async function searchPubChemByName(query: string, limit: number): Promise<ChemSp
 
 export async function searchChemSpider(query: string, limit: number = LIMITS.CHEMSPIDER.initial): Promise<ChemSpiderCompound[]> {
   try {
-    const apiKey = process.env.CHEMSPIDER_API_KEY
+    const apiKey = getApiKey('CHEMSPIDER_API_KEY')
     if (apiKey) {
       const filterRes = await fetch('https://api.rsc.org/compounds/v1/filter/name', {
         ...fetchOptions,

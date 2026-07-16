@@ -1,5 +1,15 @@
 import { fetchNeuroMMSigData } from '@/lib/api/ninds-neurommsig'
 
+function mockJsonFetch(body: unknown, ok = true) {
+  const text = JSON.stringify(body)
+  return {
+    ok,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    text: async () => text,
+    json: async () => body,
+  }
+}
+
 global.fetch = jest.fn()
 
 describe('NINDS NeuroMMSig API', () => {
@@ -8,9 +18,8 @@ describe('NINDS NeuroMMSig API', () => {
   })
 
   it('should fetch and parse NINDS NeuroGenetics data', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonFetch({
         results: [
           {
             id: '12345',
@@ -21,13 +30,13 @@ describe('NINDS NeuroMMSig API', () => {
           },
         ],
       }),
-    })
+    )
 
     const result = await fetchNeuroMMSigData('test')
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('stemcells.nindsgenetics.org'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) })
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     )
     expect(result.source).toBe('NINDS NeuroGenetics')
     expect(result.data.signatures).toHaveLength(1)
@@ -35,10 +44,7 @@ describe('NINDS NeuroMMSig API', () => {
   })
 
   it('should handle empty results gracefully', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonFetch({}))
 
     const result = await fetchNeuroMMSigData('nonexistent')
 

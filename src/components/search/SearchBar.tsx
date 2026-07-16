@@ -12,6 +12,15 @@ interface SearchBarProps {
   apiParams?: Record<string, ApiParamValue>
 }
 
+interface MoleculeCandidate {
+  cid: number
+  name: string
+  formula: string
+  molecularWeight: number
+  inchiKey: string
+  iupacName: string
+}
+
 function buildSearchParams(searchType: SearchType, apiOverrides?: Record<string, ApiIdentifierType>, apiParams?: Record<string, ApiParamValue>): string {
   const params = new URLSearchParams()
   if (searchType !== 'name') params.set('searchType', searchType)
@@ -37,6 +46,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
+  const [candidates, setCandidates] = useState<MoleculeCandidate[] | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const containerRef = useRef<HTMLDivElement>(null)
   const router = useRouter()
@@ -81,7 +91,10 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
       }
     }
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === 'Escape') setIsOpen(false)
+      if (e.key === 'Escape') {
+        setIsOpen(false)
+        setCandidates(null)
+      }
     }
     document.addEventListener('mousedown', handleClickOutside)
     document.addEventListener('keydown', handleKeyDown)
@@ -91,12 +104,18 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     }
   }, [])
 
+  function goToCid(cid: number) {
+    setCandidates(null)
+    router.push(`/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+  }
+
   async function handleSelect(name: string) {
     if (isNavigating) return
     setIsNavigating(true)
     setIsOpen(false)
     setSuggestions([])
     setQuery(name)
+    setCandidates(null)
 
     if (searchType === 'disease') {
       router.push(`/disease?q=${encodeURIComponent(name)}`)
@@ -115,7 +134,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     if (searchType === 'cid' && /^\d+$/.test(name.replace('CID ', ''))) {
       const cid = parseInt(name.replace('CID ', ''), 10)
       if (cid > 0) {
-        router.push(`/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+        goToCid(cid)
         return
       }
     }
@@ -124,8 +143,22 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
       const res = await clientFetch(`/api/search/resolve?name=${encodeURIComponent(name)}&type=${encodeURIComponent(searchType)}`)
       if (res.ok) {
         const data = await res.json()
+
+        // Gene symbol without compound hit → gene explorer
+        if (data.gene && data.geneSymbol) {
+          router.push(`/gene?q=${encodeURIComponent(data.geneSymbol)}`)
+          return
+        }
+
+        // Multiple PubChem CIDs — show disambiguation (salt/parent/isomer)
+        if (data.needsDisambiguation && Array.isArray(data.candidates) && data.candidates.length > 1) {
+          setCandidates(data.candidates)
+          setIsNavigating(false)
+          return
+        }
+
         if (data.cid) {
-          router.push(`/molecule/${data.cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+          goToCid(data.cid)
           return
         }
       }
@@ -134,7 +167,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     if (searchType === 'cid') {
       const cid = parseInt(query, 10)
       if (cid > 0) {
-        router.push(`/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+        goToCid(cid)
         return
       }
     }
@@ -166,7 +199,12 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
         <input
           type="text"
           value={query}
-          onChange={e => { if (!isNavigating) setQuery(e.target.value) }}
+          onChange={e => {
+            if (!isNavigating) {
+              setQuery(e.target.value)
+              setCandidates(null)
+            }
+          }}
           onKeyDown={handleKeyDown}
           onFocus={() => { if (suggestions.length > 0 && !isNavigating) setIsOpen(true) }}
           placeholder={placeholders[searchType]}
@@ -180,7 +218,45 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
         )}
       </div>
 
-      {isOpen && suggestions.length > 0 && (
+      {candidates && candidates.length > 1 && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-indigo-500/40 rounded-xl overflow-hidden z-50 shadow-xl">
+          <div className="px-4 py-2 border-b border-slate-700 bg-slate-900/80">
+            <p className="text-xs font-medium text-indigo-300">Multiple PubChem matches — pick the correct structure</p>
+            <p className="text-[10px] text-slate-500 mt-0.5">Salts, hydrates, and stereoisomers can have different CIDs</p>
+          </div>
+          <ul className="max-h-72 overflow-y-auto">
+            {candidates.map((c) => (
+              <li key={c.cid}>
+                <button
+                  onClick={() => {
+                    setIsNavigating(true)
+                    goToCid(c.cid)
+                  }}
+                  className="w-full text-left px-4 py-3 text-slate-200 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-sm">{c.name}</span>
+                    <span className="font-mono text-[10px] text-cyan-400/80 shrink-0">CID {c.cid}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500 font-mono">
+                    {c.formula && <span>{c.formula}</span>}
+                    {c.molecularWeight > 0 && <span>{c.molecularWeight.toFixed(2)} g/mol</span>}
+                    {c.inchiKey && <span className="truncate max-w-[200px]" title={c.inchiKey}>{c.inchiKey}</span>}
+                  </div>
+                </button>
+              </li>
+            ))}
+          </ul>
+          <button
+            onClick={() => setCandidates(null)}
+            className="w-full text-center text-[10px] text-slate-500 py-2 hover:text-slate-300 border-t border-slate-700"
+          >
+            Cancel
+          </button>
+        </div>
+      )}
+
+      {isOpen && suggestions.length > 0 && !candidates && (
         <ul className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden z-50 shadow-xl">
           {suggestions.map(s => (
             <li key={s}>

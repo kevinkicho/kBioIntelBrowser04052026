@@ -31,10 +31,12 @@ async function resolveDrugCids(
   drugs: { name: string; reason: string }[],
 ): Promise<MoleculeMatch[]> {
   const out: MoleculeMatch[] = []
+  // Prefer InChIKey-looking names if DGIdb/ChEMBL ever return them; otherwise PubChem name
   for (let i = 0; i < drugs.length; i += CID_LOOKUP_CONCURRENCY) {
     const batch = drugs.slice(i, i + CID_LOOKUP_CONCURRENCY)
     const resolved = await Promise.all(
       batch.map(async d => {
+        // ChEMBL IDs sometimes appear in reasons/names — try PubChem synonym path
         const cid = await getMoleculeCidByName(d.name)
         if (!cid) return null
         return { cid, name: d.name, reason: d.reason }

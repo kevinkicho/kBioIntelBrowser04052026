@@ -34,7 +34,12 @@ export function useAI(): AIContextValue {
   return ctx
 }
 
-async function checkOllama(ollamaUrl: string): Promise<{ available: boolean; models: string[]; error?: string }> {
+async function checkOllama(ollamaUrl: string): Promise<{
+  available: boolean
+  models: string[]
+  error?: string
+  viaCloud?: boolean
+}> {
   try {
     const res = await fetch('/api/ai/health', {
       method: 'POST',
@@ -45,7 +50,12 @@ async function checkOllama(ollamaUrl: string): Promise<{ available: boolean; mod
       return { available: false, models: [], error: `Server returned ${res.status}` }
     }
     const data = await res.json()
-    return { available: data.available, models: data.models ?? [], error: data.error }
+    return {
+      available: data.available,
+      models: data.models ?? [],
+      error: data.error,
+      viaCloud: Boolean(data.viaCloud),
+    }
   } catch (err) {
     return { available: false, models: [], error: err instanceof Error ? err.message : 'Connection failed' }
   }
@@ -147,13 +157,16 @@ export function AIProvider({ children }: { children: ReactNode }) {
       const result = await checkOllama(config.ollamaUrl)
       if (result.available) {
         const model = config.model || pickFirstModel(result.models) || ''
-        console.log(`[ai] Connected to ${config.ollamaUrl} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
+        const via = result.viaCloud ? ' (via Ollama Cloud fallback)' : ''
+        console.log(`[ai] Connected to ${config.ollamaUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
         setConfig(prev => ({
           ...prev,
           status: model ? 'available' as AIStatus : 'unavailable' as AIStatus,
           availableModels: result.models,
           model: model || prev.model,
-          error: model ? undefined : 'No models found on this Ollama instance.',
+          error: model
+            ? (result.viaCloud ? 'Using Ollama Cloud (local Ollama unavailable)' : undefined)
+            : 'No models found on this Ollama instance.',
         }))
         if (model) {
           const info = await fetchModelInfo(config.ollamaUrl, model)
@@ -195,7 +208,8 @@ export function AIProvider({ children }: { children: ReactNode }) {
     const result = await checkOllama(normalized)
     if (result.available) {
       const model = pickFirstModel(result.models) || ''
-      console.log(`[ai] Connected to ${normalized} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
+      const via = result.viaCloud ? ' (via Ollama Cloud fallback)' : ''
+      console.log(`[ai] Connected to ${normalized}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
       setConfig(prev => ({
         ...prev,
         ollamaUrl: normalized,
@@ -203,7 +217,9 @@ export function AIProvider({ children }: { children: ReactNode }) {
         availableModels: result.models,
         model: model || prev.model,
         enabled: model ? true : prev.enabled,
-        error: model ? undefined : 'No models found on this Ollama instance.',
+        error: model
+          ? (result.viaCloud ? 'Using Ollama Cloud (local Ollama unavailable)' : undefined)
+          : 'No models found on this Ollama instance.',
       }))
       if (model) {
         const info = await fetchModelInfo(normalized, model)

@@ -47,10 +47,11 @@ export function clearAIConfig(): void {
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '::1'])
 
 function isLoopbackHostname(hostname: string): boolean {
-  return LOOPBACK_HOSTS.has(hostname)
+  return LOOPBACK_HOSTS.has(hostname.toLowerCase())
 }
 
-function isPrivateHostname(hostname: string): boolean {
+/** RFC1918 private LAN + .local mDNS hostnames */
+export function isPrivateHostname(hostname: string): boolean {
   const h = hostname.toLowerCase()
   if (/^10\./.test(h)) return true
   if (/^172\.(1[6-9]|2\d|3[0-1])\./.test(h)) return true
@@ -81,7 +82,28 @@ function isBlockedHostname(hostname: string): boolean {
 
 export type ValidationWarning = 'lan-warning'
 
-export function validateOllamaUrl(url: string): { valid: boolean; error?: string; normalized?: string; warning?: ValidationWarning } {
+export interface ValidateOllamaUrlOptions {
+  /**
+   * When true (server AI routes), only loopback is allowed by default.
+   * Private LAN hosts require OLLAMA_ALLOW_LAN=1 in the environment.
+   * Public hostnames are always rejected in server mode (SSRF / open proxy).
+   */
+  forServer?: boolean
+}
+
+/**
+ * Whether the server process allows private LAN Ollama hosts.
+ * Set OLLAMA_ALLOW_LAN=1 (or true) when Ollama runs on another machine on your network.
+ */
+export function isLanOllamaAllowed(): boolean {
+  const v = (process.env.OLLAMA_ALLOW_LAN || '').toLowerCase()
+  return v === '1' || v === 'true' || v === 'yes'
+}
+
+export function validateOllamaUrl(
+  url: string,
+  options: ValidateOllamaUrlOptions = {},
+): { valid: boolean; error?: string; normalized?: string; warning?: ValidationWarning } {
   let normalized = url.trim().replace(/\/+$/, '')
   if (!normalized) return { valid: false, error: 'No Ollama URL provided' }
   const originalLower = normalized.toLowerCase()
@@ -117,9 +139,44 @@ export function validateOllamaUrl(url: string): { valid: boolean; error?: string
   if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
     return { valid: false, error: 'Invalid port number (1-65535)' }
   }
-  const warning: ValidationWarning | undefined = !isLoopbackHostname(hostname)
-    ? 'lan-warning'
-    : undefined
+
+  const loopback = isLoopbackHostname(hostname)
+  const privateHost = isPrivateHostname(hostname)
+
+  if (options.forServer) {
+    if (loopback) {
+      return { valid: true, normalized: `${parsed.protocol}//${hostname}:${port}` }
+    }
+    if (privateHost) {
+      if (!isLanOllamaAllowed()) {
+        return {
+          valid: false,
+          error:
+            'LAN Ollama hosts are disabled on the server. Set OLLAMA_ALLOW_LAN=1 to allow private network addresses.',
+        }
+      }
+      return {
+        valid: true,
+        normalized: `${parsed.protocol}//${hostname}:${port}`,
+        warning: 'lan-warning',
+      }
+    }
+    // Public hostnames: never proxy from untrusted clients
+    return {
+      valid: false,
+      error: 'Only localhost (or LAN with OLLAMA_ALLOW_LAN=1) is allowed for server-side Ollama',
+    }
+  }
+
+  // Client mode: loopback + private LAN (with warning). Block public hostnames.
+  if (!loopback && !privateHost) {
+    return {
+      valid: false,
+      error: 'Only localhost or private LAN addresses (10.x, 172.16-31.x, 192.168.x, *.local) are allowed',
+    }
+  }
+
+  const warning: ValidationWarning | undefined = !loopback ? 'lan-warning' : undefined
   return { valid: true, normalized: `${parsed.protocol}//${hostname}:${port}`, warning }
 }
 

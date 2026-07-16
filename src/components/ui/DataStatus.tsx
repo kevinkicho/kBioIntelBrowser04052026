@@ -21,6 +21,16 @@ const STATUS_CONFIG: Record<DataLoadStatus, { icon: string; text: string; classN
     text: 'Unable to load data',
     className: 'text-amber-400 bg-amber-900/10 border-amber-800/30',
   },
+  timeout: {
+    icon: '⏱',
+    text: 'Source timed out',
+    className: 'text-amber-400 bg-amber-900/10 border-amber-800/30',
+  },
+  disabled: {
+    icon: '⊘',
+    text: 'Source disabled',
+    className: 'text-slate-500 bg-slate-800/30 border-slate-700/50',
+  },
 }
 
 export function DataStatus({ status, label, loading, count }: Props) {
@@ -35,18 +45,18 @@ export function DataStatus({ status, label, loading, count }: Props) {
 
   if (!status || status.status === 'loaded') return null
 
-  const config = STATUS_CONFIG[status.status]
+  const config = STATUS_CONFIG[status.status] ?? STATUS_CONFIG.empty
 
   return (
     <div className={`flex items-center gap-2 py-2 px-3 rounded-lg border ${config.className}`}>
       <span className="text-sm">{config.icon}</span>
       <div className="flex-1 min-w-0">
         <p className="text-xs font-medium">{config.text}</p>
-        {status.status === 'error' && status.error && (
+        {(status.status === 'error' || status.status === 'timeout' || status.status === 'disabled') && status.error && (
           <p className="text-[10px] mt-0.5 opacity-70 truncate">{status.error}</p>
         )}
         {status.status === 'empty' && count !== undefined && (
-          <p className="text-[10px] mt-0.5 opacity-70">0 {label} found for this gene</p>
+          <p className="text-[10px] mt-0.5 opacity-70">0 {label} found</p>
         )}
       </div>
     </div>

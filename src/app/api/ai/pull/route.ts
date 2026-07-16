@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const validation = validateOllamaUrl(ollamaUrl)
+  const validation = validateOllamaUrl(ollamaUrl, { forServer: true })
   if (!validation.valid) {
     return new Response(JSON.stringify({ status: 'error', error: validation.error }) + '\n', {
       headers: { 'Content-Type': 'text/plain; charset=utf-8' },

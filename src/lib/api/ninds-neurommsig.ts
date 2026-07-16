@@ -33,7 +33,17 @@ export async function fetchNeuroMMSigData(query: string): Promise<ReturnType<typ
       return { data: { signatures: [] }, source: 'NINDS NeuroGenetics', timestamp: new Date().toISOString() }
     }
 
-    const data = await response.json()
+    const contentType = (response.headers.get('content-type') || '').toLowerCase()
+    if (contentType.includes('text/html')) {
+      return { data: { signatures: [] }, source: 'NINDS NeuroGenetics', timestamp: new Date().toISOString() }
+    }
+
+    const text = await response.text()
+    if (!text || text.trimStart().startsWith('<')) {
+      return { data: { signatures: [] }, source: 'NINDS NeuroGenetics', timestamp: new Date().toISOString() }
+    }
+
+    const data = JSON.parse(text)
     const items = Array.isArray(data) ? data : (data.results ?? data.signatures ?? data.genes ?? data.data ?? [])
 
     const signatures = items.slice(0, 10).map((item: Record<string, unknown>, i: number) => ({
@@ -49,8 +59,7 @@ export async function fetchNeuroMMSigData(query: string): Promise<ReturnType<typ
 
     const parsedData = NeuroMMSigResponseSchema.parse({ signatures })
     return { data: parsedData, source: 'NINDS NeuroGenetics', timestamp: new Date().toISOString() }
-  } catch (error) {
-    console.error('Error fetching NINDS neurogenetics data:', error)
+  } catch {
     return { data: { signatures: [] }, source: 'NINDS NeuroGenetics', timestamp: new Date().toISOString() }
   }
 }

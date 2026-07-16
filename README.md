@@ -1,8 +1,10 @@
 # BioIntel Explorer
 
-A public open-science web portal that aggregates molecular, pharmaceutical, clinical, regulatory, and structural biology data from **110+ free public APIs** into a unified molecule profile page with **100+ data panels** across **9 categories**.
+A public open-science web portal that aggregates molecular, pharmaceutical, clinical, regulatory, and structural biology data from **~50 production-grade free public APIs** (plus experimental panels) into a unified molecule profile page across **9 categories**.
 
-Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI — with per-API identifier overrides and parameter controls — then browse by category, compare side-by-side, or explore relationships through an interactive network graph.
+Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI. When multiple PubChem CIDs match (salts, isomers), you pick the correct structure. Category fetches use structure-stable identifiers (InChIKey, CAS, CID, UniChem/ChEMBL crosswalk) by default — then browse by category, compare side-by-side, or explore relationships through an interactive network graph.
+
+> **Honesty note:** Panel count is large, but scientific trust depends on **A-tier sources** (PubChem, ChEMBL, openFDA, ClinicalTrials.gov, UniProt, literature). Some long-tail panels are experimental, rate-limited, or disabled (see NIH High-Impact). Empty panels may mean true absence, timeout, or a disabled source — check the status badge.
 
 ![BioIntel Explorer homepage](screenshots/homepage.png)
 
@@ -15,9 +17,17 @@ npm run dev
 
 App runs on **http://localhost:33424** by default (configurable via `PORT` env var).
 
+**Production start** (after `npm run build`):
+
+```bash
+npm start
+```
+
+Port defaults to `33424` via `scripts/start.js` (Windows-safe; set `PORT` to override).
+
 > **First load is slow** — Next.js dev compiles each page on first request, and this app has 100+ dynamic-import panels. Expect 30–90 seconds the first time you hit a route after `npm run dev`. Subsequent navigations and edits are fast.
 >
-> **If port 33424 is in use:** `PORT=3000 npm run dev` (or any free port).
+> **If port 33424 is in use:** `PORT=3000 npm run dev` (or any free port). On Windows PowerShell: `$env:PORT=3000; npm run dev`.
 >
 > **If you see `EACCES`** on a port: Windows reserves dynamic port ranges for Hyper-V/WSL/Docker. Pick a port outside the excluded ranges (`netsh interface ipv4 show excludedportrange protocol=tcp`).
 >
@@ -27,10 +37,14 @@ App runs on **http://localhost:33424** by default (configurable via `PORT` env v
 
 ```env
 OPENFDA_API_KEY=your_key_here          # Increases openFDA rate limits
-NCBI_EMAIL=your_email_here             # NCBI Entrez (required)
+NCBI_EMAIL=your_email_here             # NCBI Entrez (recommended)
 NCBI_API_KEY=your_key_here             # NCBI API key (increases rate limits)
 OMIM_API_KEY=your_key_here             # OMIM genetic disorder data
+OLLAMA_API_KEY=your_key_here           # Ollama Cloud fallback (https://ollama.com/settings/keys)
+OLLAMA_ALLOW_LAN=1                     # Allow private-LAN Ollama hosts on server AI routes
 ```
+
+Copy `.env.local.example` → `.env` and fill in secrets. **`.env` is gitignored** and must never be committed.
 
 ### AI Copilot (optional)
 
@@ -42,6 +56,11 @@ ollama pull gemma3:4b
 
 Everything runs on your machine — no data leaves your computer.
 
+**Ollama URL policy (SSRF):**
+- **Client UI:** localhost and private LAN (`10.x`, `172.16–31.x`, `192.168.x`, `*.local`) only. Public hostnames are rejected.
+- **Server AI routes** (`/api/ai/*`): localhost only by default. Set `OLLAMA_ALLOW_LAN=1` to allow private LAN hosts. Public hostnames are never proxied from the client.
+- **Ollama Cloud fallback:** when local Ollama is down and `OLLAMA_API_KEY` is set in `.env`, the server calls `https://ollama.com` with a Bearer token (key never sent to the browser).
+
 ![Molecule profile with AI Copilot](screenshots/molecule-profile.png)
 
 ## Built With Claude Code
@@ -50,14 +69,16 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 
 ## Data Sources (110+ Free Public APIs)
 
-### NIH High-Impact (5 APIs)
-| Source | What It Provides |
-|--------|-----------------|
-| NCI Cancer Data Standards (caDSR) | Cancer data standards, terminology, and metadata |
-| NCATS Translator | Biomedical knowledge graph for drug-disease-gene associations |
-| NHGRI AnVIL | Genomic and clinical data from large-scale studies |
-| NIAID ImmPort | Immunology data, clinical studies, and reagents |
-| NINDS NeuroMMSig | Neurological disease mechanisms and signatures |
+### NIH High-Impact (experimental / partial)
+| Source | Status |
+|--------|--------|
+| NCI caDSR | **Disabled** — host does not resolve |
+| NIAID ImmPort | **Disabled** — public URL returns HTML, not JSON |
+| NCATS Translator | Experimental entity search (not full KG edges) |
+| NHGRI AnVIL | Experimental |
+| NINDS NeuroMMSig | Experimental |
+
+Prefer ChEMBL, Open Targets, openFDA, and ClinicalTrials.gov for production use.
 
 ### Pharmaceutical (11 APIs)
 | Source | What It Provides |
@@ -201,13 +222,16 @@ This project was designed and engineered almost entirely by [Claude Code](https:
 - **Navigation Guard** — Page dims and blocks all clicks during navigation to prevent double-submits
 
 ### Core
-- **Molecule Profile Page** — 100+ panel dashboard aggregating data from 85+ APIs
+- **Molecule Profile Page** — multi-category dashboard with tiered load (pharma/clinical/bioactivity first)
+- **Identity disambiguation** — multi-CID picker for name collisions (salts/isomers)
+- **Structure-stable fan-out** — InChIKey/CAS/CID/UniChem defaults; gene APIs never query chemical names
+- **Source status honesty** — panels distinguish data / empty / timeout / error / disabled
 - **Horizontal Category Tab Bar** — Sticky top navigation with data availability indicators
 - **Full-Width Content** — No sidebar; content uses the entire viewport width
-- **Lazy Category Loading** — Categories load on-demand (pharmaceutical first, others pre-fetch in background)
+- **Lazy Category Loading** — Tier-1 first paint, Tier-2/3 background prefetch
 - **Virtual Scrolling** — Large datasets (>20 items) use virtual scrolling for smooth performance
 - **AI Research Summarizer** — Plain-English intelligence briefs from 60+ data points
-- **BioIntel Copilot** — AI sidebar with data retrieval monitor, auto insights, gap analysis, and free-form Q&A (100% local via Ollama)
+- **BioIntel Copilot** — AI sidebar with retrieval monitor, evidence-cited insights, completeness gate (refuses deep synthesis when data is sparse), local Ollama + optional Cloud fallback
 - **Shareable URLs** — Active tab, view mode, and per-API overrides synced to URL for deep linking
 - **Error Boundaries** — Individual panel isolation prevents cascading failures
 - **Request Deduplication** — In-flight API requests are shared across components
@@ -311,13 +335,13 @@ src/
 ### v0.5.0 (2026-04-15)
 
 **Security**
-- **SSRF Protection:** All AI routes (`/api/ai/chat`, `/api/ai/health`, `/api/ai/pull`, `/api/ai/show`) now validate `ollamaUrl` — blocks private IPs (10.x, 172.16-31.x, 192.168.x, 169.254.x, 100.64-127.x), restricts to `http:`/`https:` protocols, and rejects invalid URLs
+- **SSRF Protection:** All AI routes (`/api/ai/chat`, `/api/ai/health`, `/api/ai/pull`, `/api/ai/show`, `/api/ai-brief`) validate `ollamaUrl` with `forServer: true` — loopback always; private LAN only with `OLLAMA_ALLOW_LAN=1`; public hostnames never proxied. Blocks reserved ranges (169.254.x, 100.64–127.x, etc.). Client UI allows localhost + private LAN with a warning.
 - **XSS Protection:** AI copilot markdown rendering and ChEBI panel HTML now use a DOMParser-based sanitizer (`src/lib/sanitize.ts`) instead of raw `dangerouslySetInnerHTML`, preventing script injection from AI model responses or third-party API data
 - **Analytics Rate Limiting:** `POST /api/analytics` now enforces 120 req/min per-IP rate limiting, input string truncation (source 100 chars, endpoint 500, error 500), and numeric caps on duration/items_count
 
 **Architecture**
 - **Category Route Refactor:** Split the 603-line god handler (`api/molecule/[id]/category/[categoryId]/route.ts`) into 9 per-category modules under `src/lib/categoryFetchers/`. Route file reduced from 603 to ~100 lines; each category fetcher is independently testable and maintainable
-- **Request Timeouts:** `safe()` utility now wraps all promises with a 15-second timeout (previously no timeout). Category route has a top-level timeout guard. Input size limits added for overrides/params (max 200 each)
+- **Request Timeouts:** `safe()` wraps promises with an 8-second default API timeout; category routes use a 12s category cap (+3s headroom). Pipeline route uses per-source 8s + overall 15s timeouts.
 - **ErrorBoundary Fix:** "Try again" button now increments a `resetKey` to force React to remount child components, preventing stale error state
 
 **Performance**

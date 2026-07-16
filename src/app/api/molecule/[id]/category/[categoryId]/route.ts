@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeById } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
-import { flushApiMetrics } from '@/lib/api-tracker'
+import { flushApiMetrics, metricsToSourceStatus } from '@/lib/api-tracker'
 import { recordMetric } from '@/lib/analytics/db'
 
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
@@ -74,14 +74,18 @@ export async function GET(
     return NextResponse.json({ error: 'Too many overrides/params' }, { status: 400 })
   }
 
-  const hasOverrides = Object.keys(overrides).length > 0
-  const identifiers = hasOverrides ? await getMoleculeIdentifiers(cid) : null
+  // Always resolve structure + UniChem crosswalk so defaults can use InChIKey/CAS/CID/gene
+  const identifiers = await getMoleculeIdentifiers(cid)
   const queryFor = (source: string): string => {
-    if (identifiers) return resolveApiQuery(identifiers, source, overrides)
+    if (identifiers) {
+      const q = resolveApiQuery(identifiers, source, overrides)
+      // Empty gene/uniprot queries: callers treat '' as skip
+      return q
+    }
     return name
   }
 
-  const cacheKey = `category:${cid}:${categoryId}${Object.keys(overrides).length > 0 ? `:${request.nextUrl.searchParams.get('overrides')}` : ''}${Object.keys(apiParams).length > 0 ? `:${request.nextUrl.searchParams.get('params')}` : ''}`
+  const cacheKey = `category:${cid}:${categoryId}:v2${Object.keys(overrides).length > 0 ? `:${request.nextUrl.searchParams.get('overrides')}` : ''}${Object.keys(apiParams).length > 0 ? `:${request.nextUrl.searchParams.get('params')}` : ''}`
   const cached = getCached<Record<string, unknown>>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
@@ -90,6 +94,7 @@ export async function GET(
   const categoryTimeout = getCategoryTimeout(categoryId)
 
   let data: Record<string, unknown>
+  let sourceStatus: ReturnType<typeof metricsToSourceStatus> = {}
   try {
     const fetchPromise = (async () => {
       switch (categoryId) {
@@ -118,7 +123,9 @@ export async function GET(
 
     data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000)
 
-    for (const m of flushApiMetrics()) {
+    const metrics = flushApiMetrics()
+    sourceStatus = metricsToSourceStatus(metrics)
+    for (const m of metrics) {
       recordMetric({
         source: m.source,
         endpoint: '',
@@ -129,7 +136,9 @@ export async function GET(
       })
     }
   } catch (err) {
-    for (const m of flushApiMetrics()) {
+    const metrics = flushApiMetrics()
+    sourceStatus = metricsToSourceStatus(metrics)
+    for (const m of metrics) {
       recordMetric({
         source: m.source,
         endpoint: '',
@@ -144,9 +153,25 @@ export async function GET(
       error: 'Failed to fetch category data',
       category: categoryId,
       message: err instanceof Error ? err.message : 'Unknown error',
+      _sourceStatus: sourceStatus,
     }, { status: 500 })
   }
 
-  setCache(cacheKey, data)
-  return NextResponse.json(data)
+  // Attach per-source status for UI honesty (data vs empty vs timeout vs error vs disabled)
+  const payload = {
+    ...data,
+    _sourceStatus: sourceStatus,
+    _identifiers: identifiers
+      ? {
+          cid: identifiers.cid,
+          inchiKey: identifiers.inchiKey || undefined,
+          cas: identifiers.cas || undefined,
+          chemblId: identifiers.chemblId,
+          geneSymbols: identifiers.geneSymbols.slice(0, 10),
+        }
+      : undefined,
+  }
+
+  setCache(cacheKey, payload)
+  return NextResponse.json(payload)
 }

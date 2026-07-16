@@ -1,5 +1,15 @@
 import { fetchTranslatorData } from '@/lib/api/ncats-translator'
 
+function mockJsonFetch(body: unknown, ok = true) {
+  const text = JSON.stringify(body)
+  return {
+    ok,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    text: async () => text,
+    json: async () => body,
+  }
+}
+
 global.fetch = jest.fn()
 
 describe('NCATS Translator API', () => {
@@ -8,20 +18,19 @@ describe('NCATS Translator API', () => {
   })
 
   it('should fetch and parse NCATS Translator data', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      mockJsonFetch({
         entities: [
           { name: 'aspirin', id: 'CHEBI:15365', category: 'chemical' },
         ],
       }),
-    })
+    )
 
     const result = await fetchTranslatorData('aspirin')
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('arax.ncats.io'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) })
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     )
     expect(result.source).toBe('NCATS Translator')
     expect(result.data.associations.length).toBeGreaterThanOrEqual(1)
@@ -30,10 +39,7 @@ describe('NCATS Translator API', () => {
   })
 
   it('should handle empty results', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonFetch({}))
 
     const result = await fetchTranslatorData('unknown')
 
