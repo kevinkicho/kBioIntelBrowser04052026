@@ -1,7 +1,7 @@
 /**
  * Facade over `src/lib/discovery/*`.
  * Existing Discover UI / API imports stay on this module path.
- * Implementation lives in the discovery engine (PR3a extract + PR4 scoring).
+ * Implementation lives in the discovery engine (PR3a extract).
  */
 
 export type {
@@ -16,6 +16,8 @@ export { normalizeLog, matchIndication } from './discovery/normalize'
 export {
   rankCandidatesForDisease,
   moleculeNamesFromDiseaseResult,
+  diseaseResultToEntity,
+  UnknownDiseaseIdError,
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
-  type RankEngineOptions,
+  type RankCandidatesOptions,
 } from './discovery/engine'

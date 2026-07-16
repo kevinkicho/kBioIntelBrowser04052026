@@ -1,17 +1,17 @@
 'use client'
 
+import { useEffect, useRef } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
-import { useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { useDiscovery } from './hooks/useDiscovery'
 import { DiscoveryHero } from './components/DiscoveryHero'
+import { DiseasePicker } from './components/DiseasePicker'
 import { DiscoveryProgress, EmptyState, ErrorState } from './components/DiscoveryProgress'
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
-import { DiscoverySettingsDrawer } from '@/components/discovery/DiscoverySettingsDrawer'
-import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
 import type { DiseaseGene } from '@/lib/candidateRanker'
+import type { DiseaseEntity } from '@/lib/domain/entities'
 
 function GeneTable({ genes }: { genes: DiseaseGene[] }) {
   if (genes.length === 0) return null
@@ -45,56 +45,72 @@ function GeneTable({ genes }: { genes: DiseaseGene[] }) {
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const initialQuery = searchParams.get('q') ?? ''
-  const { state, search, updatePrefs, resetPrefs, harvestSafety } = useDiscovery()
-  const [settingsOpen, setSettingsOpen] = useState(false)
+  const initialDiseaseId = searchParams.get('diseaseId') ?? undefined
+  const { state, search, confirmDisease, reset } = useDiscovery()
+  const bootstrapped = useRef(false)
 
-  const scorePhase = state.result?.v2?.scorePhase ?? 'cheap'
-  const showLoadSafety =
-    state.status === 'success' &&
-    state.result &&
-    state.result.candidates.length > 0 &&
-    scorePhase !== 'full' &&
-    state.harvestStatus !== 'done'
+  // Deep link: /discover?q=...&diseaseId=... — diseaseId skips picker
+  useEffect(() => {
+    if (bootstrapped.current) return
+    if (!initialQuery && !initialDiseaseId) return
+    bootstrapped.current = true
+    void search(initialQuery || initialDiseaseId!, {
+      diseaseId: initialDiseaseId,
+    })
+  }, [initialQuery, initialDiseaseId, search])
+
+  function handleSearch(query: string) {
+    // Fresh text search clears any prior disease pin in the URL
+    const params = new URLSearchParams()
+    params.set('q', query)
+    router.replace(`/discover?${params.toString()}`, { scroll: false })
+    void search(query)
+  }
+
+  function handleDiseaseSelect(diseaseId: string, _disease: DiseaseEntity) {
+    const params = new URLSearchParams()
+    if (state.query) params.set('q', state.query)
+    params.set('diseaseId', diseaseId)
+    router.replace(`/discover?${params.toString()}`, { scroll: false })
+    void confirmDisease(diseaseId)
+  }
+
+  function handleCancelConfirm() {
+    router.replace('/discover', { scroll: false })
+    reset()
+  }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8">
       <div className="max-w-5xl mx-auto">
-        <div className="flex justify-end mb-2">
-          <button
-            type="button"
-            onClick={() => setSettingsOpen(true)}
-            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-slate-700/60 text-slate-400 hover:text-indigo-300 hover:border-indigo-600/50 transition-colors"
-            aria-label="Open discovery preferences"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"
-              />
-            </svg>
-            Preferences
-            <span className="text-[10px] text-slate-600 hidden sm:inline">
-              · {RUBRIC_PRESET_LABELS[state.prefs.rubricPreset]} ·{' '}
-              {state.prefs.harvestTiming === 'rank-time' ? 'rank-time harvest' : 'deferred harvest'}
-            </span>
-          </button>
-        </div>
-
         <DiscoveryHero
-          onSearch={search}
+          onSearch={handleSearch}
           isLoading={state.status === 'loading'}
           initialQuery={initialQuery}
         />
 
         <DiscoveryProgress state={state} />
 
+        {state.status === 'confirm_disease' && state.diseaseCandidates.length > 0 && (
+          <DiseasePicker
+            query={state.query}
+            candidates={state.diseaseCandidates}
+            onSelect={handleDiseaseSelect}
+            onCancel={handleCancelConfirm}
+            isLoading={false}
+          />
+        )}
+
         {state.status === 'error' && (
           <ErrorState
             error={state.error ?? 'An unknown error occurred'}
-            onRetry={() => search(state.query)}
+            onRetry={() =>
+              search(state.query, {
+                diseaseId: state.diseaseId ?? undefined,
+              })
+            }
           />
         )}
 
@@ -104,11 +120,16 @@ export default function DiscoverPage() {
               <EmptyState />
             ) : (
               <>
-                <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="mb-4 flex items-center justify-between">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-100">
                       {state.result.diseaseName}
                     </h2>
+                    {state.result.diseaseId && (
+                      <p className="text-[11px] font-mono text-slate-500 mt-0.5">
+                        {state.result.diseaseId}
+                      </p>
+                    )}
                     {state.result.therapeuticAreas.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-1">
                         {state.result.therapeuticAreas.map((area) => (
@@ -121,34 +142,8 @@ export default function DiscoverPage() {
                         ))}
                       </div>
                     )}
-                    <div className="flex flex-wrap gap-2 mt-2">
-                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/50">
-                        Score phase: {scorePhase}
-                      </span>
-                      {state.result.v2?.preferencesSnapshot && (
-                        <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-slate-400 border border-slate-700/50">
-                          {state.result.v2.preferencesSnapshot.rubricPreset} ·{' '}
-                          {state.result.v2.preferencesSnapshot.aeAggressiveness}
-                        </span>
-                      )}
-                    </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    {showLoadSafety && (
-                      <button
-                        type="button"
-                        onClick={() => harvestSafety()}
-                        disabled={state.harvestStatus === 'loading'}
-                        className="text-xs px-3 py-1.5 rounded-lg bg-amber-900/40 border border-amber-700/50 text-amber-200 hover:bg-amber-900/60 disabled:opacity-50 transition-colors"
-                      >
-                        {state.harvestStatus === 'loading'
-                          ? 'Loading safety…'
-                          : 'Load safety scores'}
-                      </button>
-                    )}
-                    {state.harvestStatus === 'error' && (
-                      <span className="text-[11px] text-rose-400">{state.harvestError}</span>
-                    )}
                     <span className="text-sm text-slate-500">
                       {state.result.candidates.length} candidate
                       {state.result.candidates.length !== 1 ? 's' : ''}
@@ -185,20 +180,12 @@ export default function DiscoverPage() {
           <div className="text-center py-12 text-slate-600">
             <p className="text-lg mb-2">Enter a disease to discover candidate molecules</p>
             <p className="text-sm">
-              Multi-axis ranking: efficacy, clinical stage, safety, novelty, and identity trust.
-              Safety harvest is deferred by default — open Preferences to change.
+              We rank candidates using clinical trial data, genetic evidence, and drug-target
+              interactions.
             </p>
           </div>
         )}
       </div>
-
-      <DiscoverySettingsDrawer
-        open={settingsOpen}
-        onClose={() => setSettingsOpen(false)}
-        prefs={state.prefs}
-        onChange={updatePrefs}
-        onReset={resetPrefs}
-      />
     </main>
   )
 }

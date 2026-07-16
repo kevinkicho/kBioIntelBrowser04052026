@@ -125,7 +125,7 @@ function mapLegacyScores(
 
 /**
  * Best-effort RankResult → DiscoveryResult (v2).
- * Does not invent disease confirmation UX state beyond single primary disease.
+ * Single primary disease mapping only; multi-hit confirmation is owned by the engine (PR6b).
  */
 export function mapRankResultToDiscoveryResult(
   rank: RankResult,
