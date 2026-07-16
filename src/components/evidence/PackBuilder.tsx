@@ -37,6 +37,8 @@ export interface PackBuilderProps {
   defaultTitle?: string
   preferencesSnapshot?: DiscoveryPreferencesSnapshot
   className?: string
+  /** When true and panels empty, show loading hint (board auto-fetch parent-owned). */
+  panelsLoading?: boolean
   /** Called after a successful download + index register */
   onExported?: (pack: EvidencePack, format: 'json' | 'md') => void
 }
@@ -59,6 +61,7 @@ export function PackBuilder({
   defaultTitle,
   preferencesSnapshot: prefsProp,
   className = '',
+  panelsLoading = false,
   onExported,
 }: PackBuilderProps) {
   const [title, setTitle] = useState(
@@ -222,6 +225,7 @@ export function PackBuilder({
           <p className="mt-0.5 text-[11px] text-slate-500">
             Download-primary export · max {MAX_PACK_CLAIMS} claims · content-hashed for cite. Full
             packs are not stored in the browser — index metadata only.
+            {panelsLoading && ' · Fetching Core panels for claim density…'}
           </p>
         </div>
       </div>

@@ -7,6 +7,7 @@ import type { BoardStatus, Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import {
   addCandidateAndSave,
+  buildBoardPackClaims,
   candidateNeedsHarvest,
   exportProjectToJson,
   getProject,
@@ -20,6 +21,7 @@ import {
   seedResearchHypothesisFromPack,
   setBoardStatusAndSave,
 } from '@/lib/project'
+import type { CorePanelEvidenceInput } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { SignalBadges } from '@/components/projects/SignalBadges'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
@@ -47,9 +49,12 @@ export default function ProjectBoardPage() {
   const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([])
   const [harvestingIds, setHarvestingIds] = useState<string[]>([])
   const [harvestBusy, setHarvestBusy] = useState(false)
+  const [boardPanels, setBoardPanels] = useState<CorePanelEvidenceInput>({})
+  const [panelsLoading, setPanelsLoading] = useState(false)
   const signalsLoadedFor = useRef<string | null>(null)
   const harvestGen = useRef(0)
   const harvestAbort = useRef<AbortController | null>(null)
+  const packFetchKey = useRef<string | null>(null)
 
   const refresh = useCallback(() => {
     if (!id) {
@@ -64,6 +69,38 @@ export default function ProjectBoardPage() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // Claim-rich packs: fetch Core panels for promoted CIDs (V2-04)
+  useEffect(() => {
+    if (!project || project.candidates.length === 0) {
+      setBoardPanels({})
+      return
+    }
+    const key = `${project.id}:${project.candidates
+      .map((c) => `${c.candidateId}:${c.boardStatus}`)
+      .join('|')}`
+    if (packFetchKey.current === key) return
+    packFetchKey.current = key
+    let cancelled = false
+    setPanelsLoading(true)
+    buildBoardPackClaims(project, { maxCandidates: 5 })
+      .then((res) => {
+        if (cancelled) return
+        setBoardPanels(res.panels)
+        if (res.warnings.length && res.claims.length === 0) {
+          // non-blocking; user can still download empty pack
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setBoardPanels({})
+      })
+      .finally(() => {
+        if (!cancelled) setPanelsLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [project])
 
   // Project-aware count diffs with panel deep-link badges (PR14)
   useEffect(() => {
@@ -586,7 +623,7 @@ export default function ProjectBoardPage() {
                         projectId: project.id,
                         packId: entry.id,
                         packTitle: entry.title,
-                        claimIds: [],
+                        claimIds: entry.claimIds ?? [],
                         candidateIds: project.candidates.map((c) => c.candidateId),
                         diseaseId: project.disease?.id,
                       })
@@ -596,7 +633,13 @@ export default function ProjectBoardPage() {
                         return
                       }
                       refresh()
-                      showBanner('ok', `Seeded research hypothesis “${hyp.title}”`)
+                      showBanner(
+                        'ok',
+                        `Seeded research hypothesis “${hyp.title}”` +
+                          (entry.claimIds?.length
+                            ? ` (${entry.claimIds.length} claims)`
+                            : ' (no claim ids on index — re-export pack)'),
+                      )
                     }}
                   >
                     Seed research hypothesis
@@ -606,17 +649,33 @@ export default function ProjectBoardPage() {
             </ul>
           )}
           <PackBuilder
+            panels={boardPanels}
+            panelsLoading={panelsLoading}
             candidates={project.candidates}
             disease={project.disease ?? null}
             projectId={project.id}
             defaultTitle={`${project.name} evidence pack`}
+            preferencesSnapshot={
+              project.preferencesSnapshot?.rubricPreset
+                ? {
+                    rubricPreset: project.preferencesSnapshot.rubricPreset as
+                      | 'balanced'
+                      | 'repurposing'
+                      | 'novel-bioactive'
+                      | 'safety-first',
+                    aeAggressiveness:
+                      project.preferencesSnapshot.aeAggressiveness ?? 'soft-flag',
+                    harvestTiming:
+                      project.preferencesSnapshot.harvestTiming ?? 'board-promote',
+                  }
+                : undefined
+            }
             onExported={() => refresh()}
           />
           <p className="text-[11px] text-slate-600">
-            For claim-rich packs, open a molecule from the board (with project deep-link) and use{' '}
-            <strong className="font-medium text-slate-500">Export → Download evidence pack</strong> —
-            Core panel extractors fill claims (≤200). Enable “Share links when available” in Discover
-            preferences to use Share pack.
+            Board packs auto-fetch Core panels (mechanisms, activities, trials, AE, Open Targets) for
+            promoted CIDs. Download fills claims (≤200). Enable “Share links when available” in Discover
+            preferences for Share pack.
           </p>
         </section>
 

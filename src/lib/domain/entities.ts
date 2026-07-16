@@ -160,6 +160,10 @@ export interface ProjectPackIndexEntry {
   title: string
   createdAt: string
   candidateCount?: number
+  /** Up to 50 claim ids for RH seed (v2) */
+  claimIds?: string[]
+  claimCount?: number
+  contentHash?: string
 }
 
 /**

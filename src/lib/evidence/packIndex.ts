@@ -91,6 +91,9 @@ export function toProjectPackIndexEntry(pack: EvidencePack): ProjectPackIndexEnt
     title: pack.title,
     createdAt: pack.createdAt,
     candidateCount: pack.candidates.length,
+    claimCount: pack.claimCount,
+    contentHash: pack.contentHash,
+    claimIds: pack.claims.map((c) => c.id).slice(0, 50),
   }
 }
 
