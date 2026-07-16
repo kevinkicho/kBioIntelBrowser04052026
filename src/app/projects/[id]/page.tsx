@@ -1,11 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import type { BoardStatus, Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
-import { PackBuilder } from '@/components/evidence/PackBuilder'
 import {
   exportProjectToJson,
   getProject,
@@ -14,13 +13,27 @@ import {
   saveProject,
   setBoardStatusAndSave,
 } from '@/lib/project'
-import { BoardTable, BOARD_STATUSES, STATUS_STYLES } from '@/components/projects/BoardTable'
+import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
+import { SignalBadges } from '@/components/projects/SignalBadges'
+
+const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
+
+const STATUS_STYLES: Record<BoardStatus, string> = {
+  untriaged: 'bg-slate-800 text-slate-300 border-slate-600',
+  promote: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/50',
+  hold: 'bg-amber-900/40 text-amber-300 border-amber-700/50',
+  kill: 'bg-red-900/40 text-red-300 border-red-700/50',
+  watching: 'bg-cyan-900/40 text-cyan-300 border-cyan-700/50',
+}
 
 export default function ProjectBoardPage() {
   const params = useParams()
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : ''
   const [project, setProject] = useState<Project | null | undefined>(undefined)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
+  const [signalRows, setSignalRows] = useState<CandidateSignalRow[] | null>(null)
+  const [signalsLoading, setSignalsLoading] = useState(false)
+  const signalsLoadedFor = useRef<string | null>(null)
 
   const refresh = useCallback(() => {
     if (!id) {
@@ -33,6 +46,35 @@ export default function ProjectBoardPage() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // Project-aware count diffs with panel deep-link badges (PR14)
+  useEffect(() => {
+    if (!project) {
+      setSignalRows(null)
+      return
+    }
+    const key = `${project.id}:${project.updatedAt}:${project.candidates.map((c) => c.candidateId).join(',')}`
+    if (signalsLoadedFor.current === key) return
+
+    let cancelled = false
+    setSignalsLoading(true)
+    loadProjectSignals(project, { concurrency: 3 })
+      .then((rows) => {
+        if (cancelled) return
+        signalsLoadedFor.current = key
+        setSignalRows(rows)
+      })
+      .catch(() => {
+        if (!cancelled) setSignalRows([])
+      })
+      .finally(() => {
+        if (!cancelled) setSignalsLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [project])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })
@@ -104,6 +146,11 @@ export default function ProjectBoardPage() {
     {} as Record<BoardStatus, number>,
   )
 
+  const signalByCandidate = new Map(
+    (signalRows ?? []).map((r) => [r.candidateId, r] as const),
+  )
+  const totalSignals = (signalRows ?? []).reduce((n, r) => n + r.signals.length, 0)
+
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
       <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
@@ -131,6 +178,14 @@ export default function ProjectBoardPage() {
               <span>
                 Updated {new Date(project.updatedAt).toLocaleString()}
               </span>
+              {signalsLoading && (
+                <span className="text-cyan-500/80 animate-pulse">Checking signals…</span>
+              )}
+              {!signalsLoading && totalSignals > 0 && (
+                <span className="rounded-full border border-amber-700/40 bg-amber-900/20 px-2 py-0.5 text-amber-300">
+                  {totalSignals} signal{totalSignals === 1 ? '' : 's'}
+                </span>
+              )}
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {BOARD_STATUSES.map((s) => (
@@ -142,6 +197,11 @@ export default function ProjectBoardPage() {
                 </span>
               ))}
             </div>
+            {!signalsLoading && totalSignals > 0 && (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Signal badges deep-link to the changed data panel on the molecule profile — not badge-only.
+              </p>
+            )}
           </div>
           <div className="flex flex-wrap gap-2">
             <button
@@ -187,51 +247,136 @@ export default function ProjectBoardPage() {
             </Link>
           </div>
         ) : (
-          <BoardTable
-            project={project}
-            onStatusChange={handleStatus}
-            onRemove={handleRemove}
-          />
+          <div className="overflow-x-auto rounded-xl border border-slate-800">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-700 bg-slate-900/60">
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Candidate
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Identity
+                  </th>
+                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Score
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Status
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Signals
+                  </th>
+                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+                    Origins
+                  </th>
+                  <th className="w-12 px-3 py-3" />
+                </tr>
+              </thead>
+              <tbody>
+                {project.candidates.map((c, i) => {
+                  const cid = c.identity.pubchemCid
+                  const status = c.boardStatus ?? 'untriaged'
+                  const score = c.scores?.composite
+                  const sigRow = signalByCandidate.get(c.candidateId)
+                  return (
+                    <tr
+                      key={c.candidateId}
+                      className={`border-b border-slate-800 ${i % 2 === 0 ? 'bg-slate-900/30' : ''}`}
+                    >
+                      <td className="px-3 py-3">
+                        {cid != null ? (
+                          <Link
+                            href={`/molecule/${cid}?project=${project.id}`}
+                            className="font-medium text-slate-100 hover:text-emerald-300"
+                          >
+                            {c.identity.name}
+                          </Link>
+                        ) : (
+                          <span className="font-medium text-slate-100">{c.identity.name}</span>
+                        )}
+                        <div className="text-[10px] text-slate-600 font-mono">{c.candidateId}</div>
+                      </td>
+                      <td className="px-3 py-3 text-xs text-slate-400">
+                        {cid != null && <div>CID {cid}</div>}
+                        {c.identity.chemblId && <div>{c.identity.chemblId}</div>}
+                        <div className="text-[10px] text-slate-600">
+                          trust: {c.identity.identityTrust}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-center tabular-nums text-slate-300">
+                        {score != null ? score.toFixed(2) : '—'}
+                      </td>
+                      <td className="px-3 py-3">
+                        <select
+                          value={status}
+                          onChange={(e) =>
+                            handleStatus(c.candidateId, e.target.value as BoardStatus)
+                          }
+                          className={`rounded border px-2 py-1 text-xs capitalize ${STATUS_STYLES[status]}`}
+                          aria-label={`Board status for ${c.identity.name}`}
+                        >
+                          {BOARD_STATUSES.map((s) => (
+                            <option key={s} value={s}>
+                              {s}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
+                      <td className="px-3 py-3 min-w-[8rem]">
+                        {signalsLoading && !sigRow ? (
+                          <span className="text-[10px] text-slate-600 animate-pulse">…</span>
+                        ) : sigRow && sigRow.signals.length > 0 ? (
+                          <SignalBadges signals={sigRow.signals} compact />
+                        ) : sigRow?.status === 'baseline' ? (
+                          <span className="text-[10px] text-slate-600" title="Baseline snapshot saved">
+                            —
+                          </span>
+                        ) : sigRow?.status === 'no_cid' ? (
+                          <span className="text-[10px] text-slate-600" title="No PubChem CID">
+                            n/a
+                          </span>
+                        ) : sigRow?.status === 'error' ? (
+                          <span className="text-[10px] text-red-500/70" title={sigRow.error}>
+                            err
+                          </span>
+                        ) : (
+                          <span className="text-[10px] text-slate-600">—</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-3">
+                        <div className="flex flex-wrap gap-1">
+                          {(c.evidenceBreadthSources.length
+                            ? c.evidenceBreadthSources
+                            : c.origins
+                          )
+                            .slice(0, 4)
+                            .map((s) => (
+                              <span
+                                key={s}
+                                className="rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[9px] text-slate-400"
+                              >
+                                {s}
+                              </span>
+                            ))}
+                        </div>
+                      </td>
+                      <td className="px-3 py-3 text-center">
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(c.candidateId)}
+                          className="p-1 text-slate-600 hover:text-red-400"
+                          title="Remove from board"
+                        >
+                          ✕
+                        </button>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
         )}
-
-        {/* Evidence packs — download-primary; board carries packIndex breadcrumbs only */}
-        <section className="mt-8 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-100">Evidence packs</h2>
-          {project.packIndex.length > 0 && (
-            <ul className="space-y-2">
-              {project.packIndex.map((entry) => (
-                <li
-                  key={entry.id}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm"
-                >
-                  <div>
-                    <div className="font-medium text-slate-200">{entry.title}</div>
-                    <div className="text-[11px] text-slate-500">
-                      {entry.candidateCount ?? 0} candidates ·{' '}
-                      {new Date(entry.createdAt).toLocaleString()} ·{' '}
-                      <span className="font-mono">{entry.id}</span>
-                    </div>
-                  </div>
-                  <span className="text-[10px] text-slate-600">
-                    File export only — full claims not stored
-                  </span>
-                </li>
-              ))}
-            </ul>
-          )}
-          <PackBuilder
-            candidates={project.candidates}
-            disease={project.disease ?? null}
-            projectId={project.id}
-            defaultTitle={`${project.name} evidence pack`}
-            onExported={() => refresh()}
-          />
-          <p className="text-[11px] text-slate-600">
-            For claim-rich packs, open a molecule from the board (with project deep-link) and use{' '}
-            <strong className="font-medium text-slate-500">Export → Download evidence pack</strong> —
-            Core panel extractors fill claims (≤200).
-          </p>
-        </section>
       </div>
     </main>
   )

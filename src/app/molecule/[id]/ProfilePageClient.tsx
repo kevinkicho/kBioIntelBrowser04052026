@@ -4,8 +4,6 @@ import { useState, useEffect, useMemo, useCallback, useRef, Suspense } from 'rea
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { ViewToggle } from '@/components/profile/ViewToggle'
-import { ProfileModeToggle } from '@/components/profile/ProfileModeToggle'
-import { DecisionStrip } from '@/components/profile/DecisionStrip'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { CategorySection } from '@/components/profile/CategorySection'
@@ -28,6 +26,7 @@ import { ChangeAlerts } from '@/components/profile/ChangeAlerts'
 import { GeneTargetStrip } from '@/components/profile/GeneTargetStrip'
 import { ResearchBrief } from '@/components/profile/ResearchBrief'
 import { detectChanges, saveSnapshot, type ChangeItem } from '@/lib/changeDetection'
+import { panelIdFromHash } from '@/lib/signals'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
 import { AICopilot } from '@/components/ai/AICopilot'
@@ -36,21 +35,6 @@ import { PipelinePanel } from '@/components/profile/PipelinePanel'
 import { VendorsPanel } from '@/components/profile/VendorsPanel'
 import { sessionHistory } from '@/lib/sessionHistory'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
-import type { ScoreVector } from '@/lib/domain'
-import {
-  type ProfileMode,
-  DECISION_CATEGORY_IDS,
-  DECISION_PANEL_ID_SET,
-  defaultProfileMode,
-  decisionCategoriesLoading,
-  decisionCategoriesReady,
-  extractDecisionStripClaims,
-  loadStoredProfileMode,
-  lookupProjectCandidateScores,
-  parseProfileMode,
-  saveStoredProfileMode,
-  scoreVectorFromSearchParams,
-} from '@/lib/profileMode'
 
 export interface EmbedMode {
   /**
@@ -142,10 +126,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const router = useRouter()
   const initialTab = searchParams.get('tab')
   const initialView = searchParams.get('view')
-  const fromDiscover = searchParams.get('from') === 'discover'
-  const diseaseParam = searchParams.get('disease')
-  const projectParam = searchParams.get('project')
-  const rankParam = parseInt(searchParams.get('rank') ?? '0', 10) || 0
   const pendingRef = useRef<Set<CategoryId>>(new Set())
 
   const apiOverrides = useMemo<Record<string, ApiIdentifierType>>(() => {
@@ -165,28 +145,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [view, setView] = useState<'panels' | 'graph'>(
     initialView === 'graph' ? 'graph' : 'panels'
   )
-  // Decision profile mode (PR11) — independent of ViewToggle panels/graph
-  const [profileMode, setProfileMode] = useState<ProfileMode>(() => {
-    const fromUrl = parseProfileMode(searchParams.get('mode'))
-    if (fromUrl) return fromUrl
-    return defaultProfileMode({
-      fromDiscover: searchParams.get('from') === 'discover',
-      hasProject: !!searchParams.get('project'),
-      hasDisease: !!searchParams.get('disease'),
-    })
-  })
-  const isDecisionMode = profileMode === 'decision'
-
   const [activeCategory, setActiveCategory] = useState<'all' | CategoryId>(() => {
-    const preferDecision =
-      parseProfileMode(searchParams.get('mode')) === 'decision' ||
-      searchParams.get('from') === 'discover' ||
-      !!searchParams.get('project') ||
-      !!searchParams.get('disease')
-    if (!initialTab) return preferDecision ? 'clinical-safety' : 'pharmaceutical'
+    if (!initialTab) return 'pharmaceutical'
     if (initialTab === 'all') return 'all'
     if (ALL_CATEGORY_IDS.includes(initialTab as CategoryId)) return initialTab as CategoryId
-    return preferDecision ? 'clinical-safety' : 'pharmaceutical'
+    return 'pharmaceutical'
   })
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryData, setCategoryData] = useState<CategoriesData>({})
@@ -196,11 +159,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [quickViewPanel, setQuickViewPanel] = useState<{ categoryId: CategoryId, panelId: string } | null>(null)
   const [fetchedAt, setFetchedAt] = useState<Partial<Record<CategoryId, Date>>>({})
   const [hideEmpty, setHideEmpty] = useState(true)
-  const [projectMeta, setProjectMeta] = useState<{
-    projectName?: string
-    scores: ScoreVector | null
-    boardStatus?: string
-  } | null>(null)
 
   const snapshotId = searchParams.get('snapshot')
   const [snapshotMeta, setSnapshotMeta] = useState<{ createdAt: string } | null>(null)
@@ -230,56 +188,20 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     return map
   }, [categoryStatus, fetchedAt])
 
-  // Resolve sticky mode once on mount if URL did not pin it
-  useEffect(() => {
-    if (parseProfileMode(searchParams.get('mode'))) return
-    const stored = loadStoredProfileMode()
-    if (stored) setProfileMode(stored)
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
-
-  // Optional project board scores (localStorage, PR5 key) when ?project=
-  useEffect(() => {
-    if (!projectParam) {
-      setProjectMeta(null)
-      return
-    }
-    setProjectMeta(lookupProjectCandidateScores(projectParam, cid))
-  }, [projectParam, cid])
-
-  const handleProfileModeChange = useCallback((mode: ProfileMode) => {
-    setProfileMode(mode)
-    saveStoredProfileMode(mode)
-    if (mode === 'decision' && view === 'graph') setView('panels')
-  }, [view])
-
-  const scoreParam = searchParams.get('score')
-  const scoresParam = searchParams.get('scores')
-
   useEffect(() => {
     if (isEmbed) return // embed iframes shouldn't churn the host URL
     const params = new URLSearchParams()
-    // Preserve discovery / project deep-link context
-    if (fromDiscover) params.set('from', 'discover')
-    if (diseaseParam) params.set('disease', diseaseParam)
-    if (projectParam) params.set('project', projectParam)
-    if (rankParam > 0) params.set('rank', String(rankParam))
-    if (scoreParam) params.set('score', scoreParam)
-    if (scoresParam) params.set('scores', scoresParam)
-
-    const defaultTab = isDecisionMode ? 'clinical-safety' : 'pharmaceutical'
-    if (activeCategory !== defaultTab) params.set('tab', activeCategory)
+    if (activeCategory !== 'pharmaceutical') params.set('tab', activeCategory)
     if (view !== 'panels') params.set('view', view)
-    if (profileMode !== 'full') params.set('mode', profileMode)
     const search = params.toString()
     router.replace(search ? `?${search}` : '?', { scroll: false })
-  }, [activeCategory, view, profileMode, router, isEmbed, isDecisionMode, fromDiscover, diseaseParam, projectParam, rankParam, scoreParam, scoresParam])
+  }, [activeCategory, view, router, isEmbed])
 
 
 
-  const loadCategory = useCallback(async (catId: CategoryId, opts?: { force?: boolean }) => {
+  const loadCategory = useCallback(async (catId: CategoryId) => {
     if (pendingRef.current.has(catId)) return
-    const cur = categoryStatusRef.current[catId]
-    if (!opts?.force && (cur === 'loaded' || cur === 'loading')) return
+    if (categoryStatusRef.current[catId] === 'loaded' || categoryStatusRef.current[catId] === 'loading') return
     pendingRef.current.add(catId)
     setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
     try {
@@ -307,6 +229,56 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
     })
   }, [loadCategory])
+
+  /** Scroll to a panel anchor (hash deep-link from board signal badges). */
+  const scrollToPanel = useCallback((panelId: string) => {
+    const cat = CATEGORIES.find((c) => c.panels.some((p) => p.id === panelId))
+    if (cat && cat.id !== 'gene') {
+      setActiveCategory(cat.id as CategoryId)
+      if (categoryStatusRef.current[cat.id as CategoryId] === 'idle') {
+        loadCategory(cat.id as CategoryId)
+      }
+    }
+    // Retry scroll until the panel node exists (category may still be loading)
+    let attempts = 0
+    const tryScroll = () => {
+      const el = document.getElementById(panelId)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        el.classList.add('ring-2', 'ring-amber-400/60', 'ring-offset-2', 'ring-offset-[#0f1117]')
+        window.setTimeout(() => {
+          el.classList.remove('ring-2', 'ring-amber-400/60', 'ring-offset-2', 'ring-offset-[#0f1117]')
+        }, 2200)
+        return
+      }
+      if (attempts++ < 40) {
+        window.setTimeout(tryScroll, 150)
+      }
+    }
+    requestAnimationFrame(tryScroll)
+  }, [loadCategory])
+
+  // Deep-link: /molecule/{cid}#panel-id (and ?project=) from board signal badges
+  useEffect(() => {
+    if (typeof window === 'undefined' || isEmbed) return
+    const panelId = panelIdFromHash(window.location.hash)
+    if (!panelId) return
+    scrollToPanel(panelId)
+  }, [scrollToPanel, isEmbed])
+
+  // Re-attempt scroll when categories finish loading (hash still present)
+  useEffect(() => {
+    if (typeof window === 'undefined' || isEmbed) return
+    const panelId = panelIdFromHash(window.location.hash)
+    if (!panelId) return
+    const cat = CATEGORIES.find((c) => c.panels.some((p) => p.id === panelId))
+    if (!cat || cat.id === 'gene') return
+    if (categoryStatus[cat.id as CategoryId] === 'loaded') {
+      requestAnimationFrame(() => {
+        document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      })
+    }
+  }, [categoryStatus, isEmbed])
 
   // Auto-load the active category when it changes
   useEffect(() => {
@@ -337,7 +309,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     return () => { cancelled = true }
   }, [snapshotId])
 
-  // Tier-1 first paint (full mode): pharma + clinical + bioactivity
+  // Tier-1 first paint: pharma + clinical + bioactivity (ChEMBL) — trustworthy core
   const TIER1: CategoryId[] = ['pharmaceutical', 'clinical-safety', 'bioactivity-targets']
   // Tier-2: literature + molecular (PubChem props)
   const TIER2: CategoryId[] = ['research-literature', 'molecular-chemical']
@@ -349,44 +321,36 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     'nih-high-impact',
   ]
 
-  // Decision mode: prefer Core six panels' categories first (design §4.3)
-  // Full mode: legacy Tier-1 (pharma-first)
+  // Auto-load Tier-1 on mount (skipped in snapshot mode)
   useEffect(() => {
     if (snapshotId) return
-    const firstPaint: CategoryId[] = isDecisionMode
-      ? [...DECISION_CATEGORY_IDS]
-      : [...TIER1]
-    for (const id of firstPaint) loadCategory(id)
-  }, [loadCategory, snapshotId, isDecisionMode]) // eslint-disable-line react-hooks/exhaustive-deps
+    for (const id of TIER1) loadCategory(id)
+  }, [loadCategory, snapshotId]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // When arriving from discover (any mode), ensure decision categories are in flight
+  const fromDiscover = searchParams.get('from') === 'discover'
+
+  // When arriving from discover, load Tier-1 + molecular immediately
   const discoverLoadedRef = useRef(false)
   useEffect(() => {
     if (!fromDiscover || discoverLoadedRef.current) return
     discoverLoadedRef.current = true
-    const priorityCategories: CategoryId[] = [
-      ...DECISION_CATEGORY_IDS,
-      ...TIER1.filter(id => !DECISION_CATEGORY_IDS.includes(id)),
-    ]
+    const priorityCategories: CategoryId[] = [...TIER1, 'molecular-chemical']
     for (const catId of priorityCategories) {
       loadCategory(catId)
     }
   }, [fromDiscover, loadCategory]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When hideEmpty is toggled on, load remaining idle categories so we can evaluate them
-  // In decision mode only evaluate decision categories until user switches to full
   useEffect(() => {
     if (!hideEmpty) return
-    const ids = isDecisionMode ? DECISION_CATEGORY_IDS : ALL_CATEGORY_IDS
-    for (const id of ids) {
+    for (const id of ALL_CATEGORY_IDS) {
       if (categoryStatusRef.current[id] === 'idle') loadCategory(id)
     }
-  }, [hideEmpty, loadCategory, isDecisionMode])
+  }, [hideEmpty, loadCategory])
 
-  // Background pre-fetch after first-paint tiers ready
+  // Background pre-fetch: after Tier-1, load Tier-2 then Tier-3
   const pharmaceuticalLoaded = categoryStatus['pharmaceutical'] === 'loaded'
   const tier1Ready = TIER1.every(id => categoryStatus[id] === 'loaded' || categoryStatus[id] === 'error')
-  const decisionReady = decisionCategoriesReady(categoryStatus)
 
   useEffect(() => {
     if (pharmaceuticalLoaded) {
@@ -400,12 +364,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   }, [pharmaceuticalLoaded, categoryData, moleculeName])
 
   useEffect(() => {
-    // Full mode: prefetch after Tier-1. Decision mode: wait for Core six categories, then soft-prefetch rest only in full.
-    if (isDecisionMode) {
-      if (!decisionReady) return
-      // Stay focused: only ensure molecular is loaded (properties) — already in DECISION_CATEGORY_IDS
-      return
-    }
     if (!tier1Ready) return
 
     const prefetchOrder: CategoryId[] = [...TIER2, ...TIER3]
@@ -427,7 +385,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
     const timer = setTimeout(prefetchWithConcurrency, 200)
     return () => { cancelled = true; clearTimeout(timer) }
-  }, [tier1Ready, decisionReady, isDecisionMode, loadCategory])
+  }, [tier1Ready, loadCategory])
 
   // Merge all loaded data into a single props-like object for summary/export/counts
   const mergedData = useMemo(() => {
@@ -441,41 +399,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
   const dataCounts = useMemo(() => getCategoryDataCounts(mergedData), [mergedData])
   const summaryData = useMemo(() => computeMoleculeSummary(mergedData), [mergedData])
-
-  // Decision strip: scores (project > scores JSON > score composite) + claims from Core extractors
-  const urlScores = useMemo(
-    () =>
-      scoreVectorFromSearchParams({
-        score: searchParams.get('score'),
-        scores: searchParams.get('scores'),
-      }),
-    [searchParams],
-  )
-  const stripScores: ScoreVector | null = projectMeta?.scores ?? urlScores
-  const stripClaims = useMemo(() => {
-    if (!decisionReady) return []
-    const latestFetch = DECISION_CATEGORY_IDS.reduce<Date | null>((acc, id) => {
-      const d = fetchedAt[id]
-      if (!d) return acc
-      if (!acc || d > acc) return d
-      return acc
-    }, null)
-    return extractDecisionStripClaims(mergedData, {
-      retrievedAt: (latestFetch ?? new Date()).toISOString(),
-      moleculeName,
-      subjectCandidateId: `cid:${cid}`,
-      totalCap: 12,
-    })
-  }, [decisionReady, mergedData, moleculeName, cid, fetchedAt])
-  const stripClaimsLoading = decisionCategoriesLoading(categoryStatus) || (!decisionReady && isDecisionMode)
-
-  const loadDecisionCategories = useCallback(() => {
-    for (const id of DECISION_CATEGORY_IDS) {
-      const st = categoryStatusRef.current[id]
-      if (st === 'idle') void loadCategory(id)
-      else if (st === 'error' || st === 'loaded') void loadCategory(id, { force: true })
-    }
-  }, [loadCategory])
 
   // Change detection state (effect runs after allLoaded is defined below)
   const [detectedChanges, setDetectedChanges] = useState<ChangeItem[]>([])
@@ -729,13 +652,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       | Record<string, { status?: string; error?: string }>
       | undefined
 
-    // Decision mode: only the Core six decision panels (design §4.3)
-    const modePanels = isDecisionMode
-      ? panels.filter(p => DECISION_PANEL_ID_SET.has(p.id))
-      : panels
-
     const visiblePanels = hideEmpty
-      ? modePanels.filter(p => {
+      ? panels.filter(p => {
           // Always show panels that failed/timed out/disabled — scientific honesty
           const st = sourceStatusMap?.[p.id]?.status
           if (st === 'timeout' || st === 'error' || st === 'disabled') return true
@@ -762,11 +680,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           }
           return Array.isArray(value) ? value.length > 0 : hasRealData(value)
         })
-      : modePanels
+      : panels
     const allowedVisible = allowedPanelSet
       ? visiblePanels.filter(p => isPanelAllowed(p.id))
       : visiblePanels
-    if (allowedVisible.length === 0 && (hideEmpty || isDecisionMode)) return null
+    if (allowedVisible.length === 0 && hideEmpty) return null
 
     // Category-level honesty: count timeouts/errors/disabled from server metrics
     const statusEntries = sourceStatusMap ? Object.entries(sourceStatusMap) : []
@@ -786,9 +704,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           </div>
         )}
         {allowedVisible.map(p => (
-          <div key={p.id}>
+          <div
+            key={p.id}
+            id={p.id}
+            data-panel-id={p.id}
+            className="scroll-mt-28 rounded-xl"
+          >
             <ErrorBoundary>
-              {panelRegistry[p.id](p.id, categoryFetchedAt)}
+              {panelRegistry[p.id]?.(p.id, categoryFetchedAt) ?? null}
             </ErrorBoundary>
           </div>
         ))}
@@ -811,21 +734,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             {inchiKey && <><span className="text-slate-700">|</span><span className="text-emerald-300/60" title="InChIKey">{inchiKey}</span></>}
             {iupacName && <><span className="text-slate-700">|</span><span className="text-slate-400 truncate max-w-[200px]" title={iupacName}>{iupacName}</span></>}
             <div className="ml-auto flex items-center gap-2">
-              <ProfileModeToggle
-                active={profileMode}
-                onChange={handleProfileModeChange}
-                disabled={isBusy}
-              />
-              <ViewToggle active={view} onChange={setView} disabled={isBusy || isDecisionMode} />
+              <ViewToggle active={view} onChange={setView} disabled={isBusy} />
               <CiteButton data={mergedData} entityName={moleculeName} entityType="molecule" entityId={cid} />
               <ShareButton entityType="molecule" entityId={cid} entityName={moleculeName} data={mergedData} />
-              <ExportButton
-                data={mergedData}
-                moleculeName={moleculeName}
-                cid={cid}
-                inchiKey={inchiKey}
-                projectId={searchParams.get('project')}
-              />
+              <ExportButton data={mergedData} moleculeName={moleculeName} cid={cid} />
             </div>
           </div>
           <CategoryTabBar
@@ -835,12 +747,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             freshness={freshnessMap}
             disabled={isBusy}
           />
-          {isDecisionMode && (
-            <div className="text-[10px] text-indigo-400/70 mt-1 flex items-center gap-1.5" data-testid="decision-mode-hint">
-              <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400" />
-              Decision mode — Core six panels (mechanisms, activity, trials, AE, indications, properties)
-            </div>
-          )}
           {fromDiscover && (
             <AutoLoadIndicator categoryStatus={categoryStatus} />
           )}
@@ -879,51 +785,33 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
       {!isEmbed && (
         <>
-          {/* DecisionStrip: always when decision mode OR project deep-link (anti-cosmetic DoD) */}
-          {(isDecisionMode || !!projectParam) && (
-            <ErrorBoundary>
-              <DecisionStrip
-                moleculeName={moleculeName}
-                cid={cid}
-                disease={diseaseParam}
-                projectId={projectParam}
-                projectName={projectMeta?.projectName}
-                rank={rankParam || null}
-                boardStatus={projectMeta?.boardStatus}
-                scores={stripScores}
-                claims={stripClaims}
-                claimsLoading={stripClaimsLoading}
-                coreReady={decisionReady}
-                onLoadCorePanels={loadDecisionCategories}
-              />
-            </ErrorBoundary>
-          )}
+          <ErrorBoundary><DiscoverBreadcrumb disease={searchParams.get('disease') ?? ''} rank={parseInt(searchParams.get('rank') ?? '0', 10) || 0} score={parseFloat(searchParams.get('score') ?? '0') || 0} /></ErrorBoundary>
 
-          <ErrorBoundary><DiscoverBreadcrumb disease={diseaseParam ?? ''} rank={rankParam} score={parseFloat(searchParams.get('score') ?? '0') || 0} /></ErrorBoundary>
+          <ErrorBoundary><NextStepsPanel moleculeName={moleculeName} data={mergedData} /></ErrorBoundary>
 
-          {!isDecisionMode && (
-            <>
-              <ErrorBoundary><NextStepsPanel moleculeName={moleculeName} data={mergedData} /></ErrorBoundary>
+          <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
 
-              <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><VendorsPanel cid={cid} /></ErrorBoundary>
 
-              <ErrorBoundary><VendorsPanel cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
 
-              <ErrorBoundary><GeneTargetStrip interactions={(mergedData.drugGeneInteractions ?? []) as Array<{ geneSymbol: string; geneName: string; interactionType: string; score: number }>} /></ErrorBoundary>
+          <ErrorBoundary>
+            <ChangeAlerts
+              changes={detectedChanges}
+              cid={cid}
+              projectId={searchParams.get('project')}
+            />
+          </ErrorBoundary>
 
-              <ErrorBoundary><ChangeAlerts changes={detectedChanges} cid={cid} /></ErrorBoundary>
+          <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
 
-              <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
+          <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
 
-              <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
-
-              <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
-            </>
-          )}
+          <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
         </>
       )}
 
-        {view === 'panels' || isDecisionMode ? (
+        {view === 'panels' ? (
           <div>
             {!isEmbed && (
               <div className="mb-4 flex items-center gap-3">
@@ -939,52 +827,25 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
                 >
                   {hideEmpty ? 'Show all' : 'Hide empty'}
                 </button>
-                {isDecisionMode && (
-                  <button
-                    type="button"
-                    onClick={() => handleProfileModeChange('full')}
-                    className="px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-600 text-slate-400 hover:text-slate-200 hover:border-slate-500 transition-colors shrink-0"
-                    data-testid="decision-expand-full"
-                  >
-                    Expand full profile
-                  </button>
-                )}
               </div>
             )}
             <div className="space-y-6">
-              {(isDecisionMode
-                ? [
-                    // Decision categories first, then any remaining that still host a decision panel
-                    ...CATEGORIES.filter(c => DECISION_CATEGORY_IDS.includes(c.id)),
-                    ...CATEGORIES.filter(c => !DECISION_CATEGORY_IDS.includes(c.id)),
-                  ]
-                : CATEGORIES
-              ).map(cat => {
+              {CATEGORIES.map(cat => {
                 const matchingPanels = cat.panels.filter(p =>
                   (!searchQuery || p.title.toLowerCase().includes(searchLower)) &&
-                  isPanelAllowed(p.id) &&
-                  (!isDecisionMode || DECISION_PANEL_ID_SET.has(p.id))
+                  isPanelAllowed(p.id)
                 )
                 if (matchingPanels.length === 0) return null
                 const count = dataCounts[cat.id]
-                const decisionWithData = isDecisionMode
-                  ? matchingPanels.filter(p => {
-                      const value = mergedData[p.propKey]
-                      if (value == null) return false
-                      if (Array.isArray(value)) return value.length > 0
-                      return true
-                    }).length
-                  : count.withData
-                const decisionTotal = isDecisionMode ? matchingPanels.length : count.total
 
-                if (hideEmpty && decisionWithData === 0 && categoryStatus[cat.id] === 'loaded') return null
+                if (hideEmpty && count.withData === 0 && categoryStatus[cat.id] === 'loaded') return null
 
                  return (<div key={cat.id} id={cat.id}>
                   <CategorySection
                     icon={cat.icon}
                     label={cat.label}
-                    withData={decisionWithData}
-                    total={decisionTotal}
+                    withData={count.withData}
+                    total={count.total}
                   >
                     {renderCategoryContent(cat.id, matchingPanels)}
                   </CategorySection>
