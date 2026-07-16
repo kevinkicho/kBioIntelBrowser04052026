@@ -30,6 +30,8 @@ export {
 export { makeSourceStatus, withSourceStatus } from './sourceStatus'
 export {
   gatherDiseaseGenes,
+  geneSymbolsForDgidb,
+  MAX_DGIDB_GENES,
   gatherTargetMolecules,
   gatherTrialDrugs,
   gatherChemblIndications,

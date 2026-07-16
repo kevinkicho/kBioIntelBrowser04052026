@@ -1,4 +1,8 @@
-export { gatherDiseaseGenes, gatherGeneSymbolsForTargets } from './genes'
+export {
+  gatherDiseaseGenes,
+  geneSymbolsForDgidb,
+  MAX_DGIDB_GENES,
+} from './genes'
 export { gatherTargetMolecules } from './dgidb'
 export { gatherTrialDrugs } from './trials'
 export { gatherChemblIndications } from './indications'

@@ -1,5 +1,6 @@
 /**
  * Disease → gene/target gather (Open Targets + DisGeNET supporting).
+ * Single shared fetch per rank: reuse genes for scoring + DGIdb symbols.
  */
 
 import { getTargetsForDisease } from '../../api/opentargets'
@@ -8,14 +9,17 @@ import type { SourceFetchStatus } from '../../dataStatus'
 import type { DiseaseGene } from '../types'
 import { hasDataArray, withSourceStatus } from '../sourceStatus'
 
+export const MAX_DGIDB_GENES = 8
+
 export interface GatherGenesResult {
   genes: DiseaseGene[]
   statuses: SourceFetchStatus[]
 }
 
 /**
- * Merge OT + DisGeNET disease-gene associations.
+ * Merge OT + DisGeNET disease-gene associations (once per rank).
  * OT is core; DisGeNET is supporting (never blocks).
+ * Callers derive DGIdb symbols via `geneSymbolsForDgidb` — do not re-fetch.
  */
 export async function gatherDiseaseGenes(
   diseaseId: string | null,
@@ -80,44 +84,36 @@ export async function gatherDiseaseGenes(
 }
 
 /**
- * Collect top gene symbols for DGIdb ligand lookup (max 8).
+ * Pure: top gene symbols for DGIdb from an already-gathered DiseaseGene list.
+ * Prefer OT-sourced genes first (core), then fill from supporting sources by score order.
  */
-export async function gatherGeneSymbolsForTargets(
-  diseaseId: string | null,
-  diseaseName: string,
-): Promise<{ genes: string[]; statuses: SourceFetchStatus[] }> {
-  const genes: string[] = []
-  const statuses: SourceFetchStatus[] = []
+export function geneSymbolsForDgidb(
+  genes: DiseaseGene[],
+  max: number = MAX_DGIDB_GENES,
+): string[] {
+  if (genes.length === 0 || max <= 0) return []
 
-  if (diseaseId) {
-    const ot = await withSourceStatus(
-      'Open Targets (target→genes)',
-      () => getTargetsForDisease(diseaseId),
-      { fallback: [], hasData: hasDataArray },
-    )
-    statuses.push(ot.status)
-    for (const t of ot.value.slice(0, 8)) {
-      const symbol = t.name.split(' ')[0]
-      if (symbol && !genes.includes(symbol)) genes.push(symbol)
-    }
-  } else {
-    statuses.push({
-      source: 'Open Targets (target→genes)',
-      status: 'empty',
-      has_data: false,
-      error: 'No disease id',
-    })
+  const symbols: string[] = []
+  const seen = new Set<string>()
+
+  // Prefer Open Targets (core) while preserving score order within that set
+  for (const g of genes) {
+    if (!g.source.startsWith('Open Targets')) continue
+    const sym = g.symbol
+    if (!sym || seen.has(sym.toUpperCase())) continue
+    seen.add(sym.toUpperCase())
+    symbols.push(sym)
+    if (symbols.length >= max) return symbols
   }
 
-  const dg = await withSourceStatus(
-    'DisGeNET (target→genes)',
-    () => getGenesByDisease(diseaseName),
-    { fallback: [], hasData: hasDataArray },
-  )
-  statuses.push(dg.status)
-  for (const g of dg.value.slice(0, 8)) {
-    if (g.geneSymbol && !genes.includes(g.geneSymbol)) genes.push(g.geneSymbol)
+  // Fill remaining slots from supporting sources (already score-sorted overall)
+  for (const g of genes) {
+    const sym = g.symbol
+    if (!sym || seen.has(sym.toUpperCase())) continue
+    seen.add(sym.toUpperCase())
+    symbols.push(sym)
+    if (symbols.length >= max) break
   }
 
-  return { genes: genes.slice(0, 8), statuses }
+  return symbols
 }

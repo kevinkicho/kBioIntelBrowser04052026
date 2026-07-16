@@ -110,17 +110,19 @@ export async function rankCandidatesForDisease(
     )
   }
 
-  const [geneGather, targetGather, trialGather] = await Promise.all([
-    gatherDiseaseGenes(diseaseId, diseaseName),
-    gatherTargetMolecules(diseaseId, diseaseName),
+  // Single OT + DisGeNET gene walk for scoring and DGIdb (no double-fetch).
+  const geneGather = await gatherDiseaseGenes(diseaseId, diseaseName)
+  sourceStatuses.push(...geneGather.statuses)
+  const genes: DiseaseGene[] = geneGather.genes
+
+  const [targetGather, trialGather] = await Promise.all([
+    gatherTargetMolecules(genes),
     gatherTrialDrugs(diseaseName),
   ])
 
-  sourceStatuses.push(...geneGather.statuses)
   sourceStatuses.push(...targetGather.statuses)
   sourceStatuses.push(trialGather.status)
 
-  const genes: DiseaseGene[] = geneGather.genes
   const moleculesFromTargets = targetGather.molecules
   const moleculesFromTrials = trialGather.drugCounts
 

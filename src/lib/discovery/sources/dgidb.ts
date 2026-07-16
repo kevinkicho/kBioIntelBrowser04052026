@@ -1,5 +1,6 @@
 /**
  * Gene → drug gather via DGIdb (core).
+ * Expects gene symbols from shared `gatherDiseaseGenes` (no OT/DisGeNET re-fetch).
  */
 
 import {
@@ -8,31 +9,31 @@ import {
 } from '../../api/dgidb'
 import type { SourceFetchStatus } from '../../dataStatus'
 import { hasDataArray, withSourceStatus } from '../sourceStatus'
-import { gatherGeneSymbolsForTargets } from './genes'
+import { geneSymbolsForDgidb, MAX_DGIDB_GENES } from './genes'
+import type { DiseaseGene } from '../types'
 
 export interface GatherTargetMoleculesResult {
   molecules: TargetRelatedMolecule[]
   statuses: SourceFetchStatus[]
+  /** Symbols actually sent to DGIdb (for tests / telemetry). */
+  geneSymbolsUsed: string[]
 }
 
 /**
- * Resolve disease genes → DGIdb interacting drugs.
- * Does **not** use Open Targets getDrugsForDisease (returns target names — PR3b).
+ * Resolve pre-gathered disease genes → DGIdb interacting drugs.
+ * Does **not** re-fetch OT/DisGeNET and does **not** use getDrugsForDisease (PR3b).
  */
 export async function gatherTargetMolecules(
-  diseaseId: string | null,
-  diseaseName: string,
+  genes: DiseaseGene[],
+  opts?: { maxGenes?: number },
 ): Promise<GatherTargetMoleculesResult> {
-  const { genes, statuses: geneStatuses } = await gatherGeneSymbolsForTargets(
-    diseaseId,
-    diseaseName,
-  )
+  const geneSymbols = geneSymbolsForDgidb(genes, opts?.maxGenes ?? MAX_DGIDB_GENES)
 
-  if (genes.length === 0) {
+  if (geneSymbols.length === 0) {
     return {
       molecules: [],
+      geneSymbolsUsed: [],
       statuses: [
-        ...geneStatuses,
         {
           source: 'DGIdb',
           status: 'empty',
@@ -45,12 +46,13 @@ export async function gatherTargetMolecules(
 
   const dgidb = await withSourceStatus(
     'DGIdb',
-    () => getTargetRelatedMolecules(genes, ''),
+    () => getTargetRelatedMolecules(geneSymbols, ''),
     { fallback: [], hasData: hasDataArray },
   )
 
   return {
     molecules: dgidb.value,
-    statuses: [...geneStatuses, dgidb.status],
+    geneSymbolsUsed: geneSymbols,
+    statuses: [dgidb.status],
   }
 }

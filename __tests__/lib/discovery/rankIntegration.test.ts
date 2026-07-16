@@ -88,6 +88,26 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     expect(result.diseaseName).toBe('Alzheimer disease')
     expect(result.genes.some((g) => g.symbol === 'APP')).toBe(true)
 
+    // Shared gene gather: OT + DisGeNET each called once (not again inside DGIdb path)
+    expect(getTargetsForDisease).toHaveBeenCalledTimes(1)
+    expect(getGenesByDisease).toHaveBeenCalledTimes(1)
+    expect(getTargetRelatedMolecules).toHaveBeenCalledTimes(1)
+    expect(getTargetRelatedMolecules).toHaveBeenCalledWith(
+      expect.arrayContaining(['APP', 'PSEN1']),
+      '',
+    )
+
+    // No dual stage labels for gene sources
+    expect(
+      result.sourceStatuses!.some((s) => s.source.includes('target→genes')),
+    ).toBe(false)
+    expect(
+      result.sourceStatuses!.filter((s) => s.source === 'Open Targets (targets)'),
+    ).toHaveLength(1)
+    expect(
+      result.sourceStatuses!.filter((s) => s.source === 'DisGeNET (genes)'),
+    ).toHaveLength(1)
+
     // Must not invent APP protein as a candidate from OT molecules
     expect(result.candidates.some((c) => /amyloid/i.test(c.name))).toBe(false)
     expect(result.candidates.some((c) => c.name === 'Donepezil')).toBe(true)
