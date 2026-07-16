@@ -18,6 +18,8 @@ export type ProductEventName =
   | 'similarity_expand'
   | 'pack_share'
   | 'source_status_shown' // M6 — SourceStatusStrip
+  | 'research_hypothesis_opened'
+  | 'ai_response'
 
 export interface ProductEvent {
   name: ProductEventName

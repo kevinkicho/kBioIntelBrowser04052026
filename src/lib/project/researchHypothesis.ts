@@ -176,3 +176,41 @@ export function seedResearchHypothesisFromPack(input: {
     packId: input.packId,
   })
 }
+
+/** Update thesis/title/experiments and bump version. */
+export function updateResearchHypothesis(
+  hyp: ResearchHypothesis,
+  patch: Partial<
+    Pick<ResearchHypothesis, 'title' | 'thesis' | 'claimIds' | 'candidateIds' | 'nextExperiments'>
+  >,
+): ResearchHypothesis {
+  return {
+    ...hyp,
+    title: patch.title !== undefined ? (patch.title.trim() || hyp.title).slice(0, 200) : hyp.title,
+    thesis:
+      patch.thesis !== undefined
+        ? (patch.thesis || '').slice(0, MAX_THESIS_CHARS)
+        : hyp.thesis,
+    claimIds: patch.claimIds ?? hyp.claimIds,
+    candidateIds: patch.candidateIds ?? hyp.candidateIds,
+    nextExperiments: patch.nextExperiments ?? hyp.nextExperiments,
+    version: hyp.version + 1,
+    updatedAt: nowIso(),
+  }
+}
+
+export function appendNextExperiment(
+  hyp: ResearchHypothesis,
+  experiment: Omit<NextExperiment, 'id'> & { id?: string },
+): ResearchHypothesis {
+  const exp: NextExperiment = {
+    id: experiment.id ?? `ne_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+    description: experiment.description.slice(0, 2000),
+    rationale: experiment.rationale,
+    priority: experiment.priority,
+    relatedClaimIds: experiment.relatedClaimIds,
+  }
+  return updateResearchHypothesis(hyp, {
+    nextExperiments: [...(hyp.nextExperiments ?? []), exp],
+  })
+}

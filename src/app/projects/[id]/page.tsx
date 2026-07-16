@@ -695,7 +695,15 @@ export default function ProjectBoardPage() {
                   key={h.id}
                   className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
                 >
-                  <div className="text-sm font-medium text-slate-200">{h.title}</div>
+                  <div className="flex flex-wrap items-start justify-between gap-2">
+                    <div className="text-sm font-medium text-slate-200">{h.title}</div>
+                    <Link
+                      href={`/projects/${project.id}/hypothesis/${h.id}`}
+                      className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                    >
+                      Edit →
+                    </Link>
+                  </div>
                   <p className="mt-1 line-clamp-3 text-xs text-slate-400">{h.thesis}</p>
                   <div className="mt-1 text-[10px] text-slate-600">
                     {h.claimIds.length} claims · {h.candidateIds.length} candidates · updated{' '}

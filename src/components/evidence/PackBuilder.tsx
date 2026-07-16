@@ -21,6 +21,7 @@ import {
 import { addPackIndexEntryAndSave } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { PackView } from './PackView'
+import { PackAiPanel } from './PackAiPanel'
 
 export interface PackBuilderProps {
   /** Profile merged-data bag or already-shaped Core panels. */
@@ -312,6 +313,10 @@ export function PackBuilder({
         <p className="mt-2 text-[10px] font-mono text-slate-600">
           Last export: {lastPack.id} · {lastPack.contentHash.slice(0, 16)}…
         </p>
+      )}
+
+      {(lastPack || previewPack) && (
+        <PackAiPanel pack={lastPack ?? previewPack} />
       )}
     </div>
   )

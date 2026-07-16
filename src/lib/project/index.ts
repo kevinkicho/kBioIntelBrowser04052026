@@ -55,6 +55,8 @@ export {
   getResearchHypothesis,
   listResearchHypothesesForProject,
   seedResearchHypothesisFromPack,
+  updateResearchHypothesis,
+  appendNextExperiment,
 } from './researchHypothesis'
 
 export {
