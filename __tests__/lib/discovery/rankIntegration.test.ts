@@ -1,5 +1,5 @@
 /**
- * Mocked end-to-end rankCandidatesForDisease — verifies dual schema + statuses.
+ * Mocked end-to-end rankCandidatesForDisease — dual schema + PR3b gather.
  */
 
 jest.mock('@/lib/diseaseSearch', () => ({
@@ -8,6 +8,8 @@ jest.mock('@/lib/diseaseSearch', () => ({
 }))
 jest.mock('@/lib/api/opentargets', () => ({
   getTargetsForDisease: jest.fn(),
+  getKnownDrugsForDisease: jest.fn(),
+  getDrugsForDisease: jest.fn(),
 }))
 jest.mock('@/lib/api/disgenet', () => ({
   getGenesByDisease: jest.fn(),
@@ -22,9 +24,13 @@ jest.mock('@/lib/api/clinicaltrials', () => ({
 jest.mock('@/lib/api/chembl-indications', () => ({
   getChemblIndicationsByName: jest.fn(),
 }))
+jest.mock('@/lib/api/chembl', () => ({
+  searchTargetsByName: jest.fn(),
+  getRelatedCompoundsByTarget: jest.fn(),
+}))
 
 import { searchDiseases, resolveMoleculesFromNames } from '@/lib/diseaseSearch'
-import { getTargetsForDisease } from '@/lib/api/opentargets'
+import { getTargetsForDisease, getKnownDrugsForDisease } from '@/lib/api/opentargets'
 import { getGenesByDisease } from '@/lib/api/disgenet'
 import { getTargetRelatedMolecules } from '@/lib/api/dgidb'
 import {
@@ -33,9 +39,10 @@ import {
 } from '@/lib/api/clinicaltrials'
 import { getChemblIndicationsByName } from '@/lib/api/chembl-indications'
 import {
-  rankCandidatesForDisease,
-  OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
-} from '@/lib/discovery'
+  searchTargetsByName,
+  getRelatedCompoundsByTarget,
+} from '@/lib/api/chembl'
+import { rankCandidatesForDisease } from '@/lib/discovery'
 import { isDiscoveryResult } from '@/lib/domain/discoveryResult'
 
 describe('rankCandidatesForDisease (mocked integration)', () => {
@@ -47,7 +54,7 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
         name: 'Alzheimer disease',
         therapeuticAreas: ['nervous system disease'],
         source: 'Open Targets',
-        // Contaminated payload must be ignored
+        // Contaminated payload must still be ignored by moleculeNamesFromDiseaseResult
         molecules: [{ name: 'Amyloid-beta precursor protein', cid: null }],
       },
     ])
@@ -56,6 +63,14 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
       { id: 'ENSG2', name: 'PSEN1 presenilin', overallScore: 0.8 },
     ])
     ;(getGenesByDisease as jest.Mock).mockResolvedValue([])
+    ;(getKnownDrugsForDisease as jest.Mock).mockResolvedValue([
+      {
+        name: 'Memantine',
+        chemblId: 'CHEMBL807',
+        maxClinicalStage: 'APPROVAL',
+        maxPhase: 4,
+      },
+    ])
     ;(getTargetRelatedMolecules as jest.Mock).mockResolvedValue([
       {
         name: 'Donepezil',
@@ -68,9 +83,34 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     ;(extractDrugInterventions as jest.Mock).mockReturnValue([
       { name: 'Donepezil', trialCount: 12 },
     ])
-    ;(resolveMoleculesFromNames as jest.Mock).mockResolvedValue([
-      { name: 'Donepezil', cid: 3152 },
+    ;(searchTargetsByName as jest.Mock).mockResolvedValue([
+      {
+        targetChemblId: 'CHEMBL2487',
+        targetName: 'Amyloid-beta A4 protein',
+        targetType: 'SINGLE PROTEIN',
+        organism: 'Homo sapiens',
+      },
     ])
+    ;(getRelatedCompoundsByTarget as jest.Mock).mockResolvedValue([
+      {
+        compoundId: 'CHEMBL941',
+        compoundName: 'Semagacestat',
+        name: 'Semagacestat',
+        chemblId: 'CHEMBL941',
+        maxPhase: 3,
+        activityValue: 10,
+        activityType: 'IC50',
+        similarity: 100,
+        relationship: 'Related',
+      },
+    ])
+    ;(resolveMoleculesFromNames as jest.Mock).mockImplementation(
+      async (names: string[]) =>
+        names.map((name) => ({
+          name,
+          cid: name === 'Donepezil' ? 3152 : null,
+        })),
+    )
     ;(getChemblIndicationsByName as jest.Mock).mockResolvedValue([
       {
         meshHeading: 'Alzheimer Disease',
@@ -80,7 +120,7 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     ])
   })
 
-  it('returns dual-schema RankResult with sourceStatuses and skips OT target-as-drug', async () => {
+  it('returns dual-schema RankResult with OT knownDrugs + ChEMBL-by-target (PR3b)', async () => {
     const result = await rankCandidatesForDisease('alzheimer', 15)
 
     expect(result.query).toBe('alzheimer')
@@ -88,16 +128,14 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     expect(result.diseaseName).toBe('Alzheimer disease')
     expect(result.genes.some((g) => g.symbol === 'APP')).toBe(true)
 
-    // Shared gene gather: OT + DisGeNET each called once (not again inside DGIdb path)
+    // Shared gene gather: OT + DisGeNET each called once
     expect(getTargetsForDisease).toHaveBeenCalledTimes(1)
     expect(getGenesByDisease).toHaveBeenCalledTimes(1)
     expect(getTargetRelatedMolecules).toHaveBeenCalledTimes(1)
-    expect(getTargetRelatedMolecules).toHaveBeenCalledWith(
-      expect.arrayContaining(['APP', 'PSEN1']),
-      '',
-    )
+    expect(getKnownDrugsForDisease).toHaveBeenCalledWith('EFO_0000249', 40)
+    expect(searchTargetsByName).toHaveBeenCalled()
+    expect(getRelatedCompoundsByTarget).toHaveBeenCalled()
 
-    // No dual stage labels for gene sources
     expect(
       result.sourceStatuses!.some((s) => s.source.includes('target→genes')),
     ).toBe(false)
@@ -108,26 +146,42 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
       result.sourceStatuses!.filter((s) => s.source === 'DisGeNET (genes)'),
     ).toHaveLength(1)
 
-    // Must not invent APP protein as a candidate from OT molecules
+    // Must not invent APP protein as a candidate from contaminated disease.molecules
     expect(result.candidates.some((c) => /amyloid/i.test(c.name))).toBe(false)
     expect(result.candidates.some((c) => c.name === 'Donepezil')).toBe(true)
+    // OT known drug
+    expect(result.candidates.some((c) => c.name === 'Memantine')).toBe(true)
+    // ChEMBL-by-target compound
+    expect(result.candidates.some((c) => c.name === 'Semagacestat')).toBe(true)
 
     expect(result.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(result.sourceStatuses).toBeDefined()
     expect(result.sourceStatuses!.length).toBeGreaterThan(0)
     expect(result.sourceStatuses!.some((s) => s.source === 'DGIdb')).toBe(true)
+    // knownDrugs is enabled/loaded, not disabled
+    expect(
+      result.sourceStatuses!.some(
+        (s) => s.source === 'Open Targets (knownDrugs)' && s.status === 'loaded',
+      ),
+    ).toBe(true)
+    expect(
+      result.sourceStatuses!.some(
+        (s) => s.source === 'ChEMBL (by-target)' && s.status === 'loaded',
+      ),
+    ).toBe(true)
     expect(
       result.sourceStatuses!.some(
         (s) => s.source === 'Open Targets (knownDrugs)' && s.status === 'disabled',
       ),
-    ).toBe(true)
-    expect(result.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
+    ).toBe(false)
+
+    const memantine = result.candidates.find((c) => c.name === 'Memantine')
+    expect(memantine?.sources).toContain('Open Targets')
 
     expect(result.v2).toBeDefined()
     expect(isDiscoveryResult(result.v2)).toBe(true)
     expect(result.v2!.schemaVersion).toBe(2)
     expect(result.v2!.sourceStatuses.length).toBeGreaterThan(0)
-    expect(result.v2!.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
     expect(result.v2!.candidates.length).toBe(result.candidates.length)
   })
 

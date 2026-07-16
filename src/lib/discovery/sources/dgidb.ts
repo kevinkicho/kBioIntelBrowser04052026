@@ -21,7 +21,7 @@ export interface GatherTargetMoleculesResult {
 
 /**
  * Resolve pre-gathered disease genes → DGIdb interacting drugs.
- * Does **not** re-fetch OT/DisGeNET and does **not** use getDrugsForDisease (PR3b).
+ * Does **not** re-fetch OT/DisGeNET. OT known drugs are gathered separately (PR3b).
  */
 export async function gatherTargetMolecules(
   genes: DiseaseGene[],
