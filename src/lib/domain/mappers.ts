@@ -155,14 +155,15 @@ function mapLegacyScores(
 
 /**
  * Best-effort RankResult → DiscoveryResult (v2).
- * Does not invent disease confirmation UX state beyond single primary disease.
+ * Single primary disease mapping only; multi-hit confirmation is owned by the engine (PR6b).
  */
 export function mapRankResultToDiscoveryResult(
   rank: RankResult,
   options?: { rubric?: ScoreRubric; generatedAt?: string },
 ): DiscoveryResult {
   const rubric = options?.rubric ?? createDefaultScoreRubric('balanced')
-  const generatedAt = options?.generatedAt ?? new Date().toISOString()
+  const generatedAt =
+    options?.generatedAt ?? rank.generatedAt ?? new Date().toISOString()
 
   const disease: DiseaseEntity | null = rank.diseaseName
     ? {
@@ -199,9 +200,10 @@ export function mapRankResultToDiscoveryResult(
     }),
   )
 
-  const warnings: string[] = []
+  const warnings: string[] = [...(rank.warnings ?? [])]
   if (!rank.diseaseId) {
-    warnings.push('Disease id missing — ranked from name only (legacy path).')
+    const msg = 'Disease id missing — ranked from name only (legacy path).'
+    if (!warnings.includes(msg)) warnings.push(msg)
   }
 
   return {
@@ -212,7 +214,7 @@ export function mapRankResultToDiscoveryResult(
     needsDiseaseConfirmation: false,
     targets,
     candidates,
-    sourceStatuses: [],
+    sourceStatuses: rank.sourceStatuses ? [...rank.sourceStatuses] : [],
     rubric,
     generatedAt,
     warnings,

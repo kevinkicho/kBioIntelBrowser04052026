@@ -1,3 +1,7 @@
+/**
+ * Facade contract tests — pure helpers re-exported from discovery modules.
+ * Full golden RankResult / decontamination fixtures live in discovery/*.test.ts.
+ */
 import { normalizeLog, matchIndication, type CandidateMolecule, type RankResult, type ConfidenceLevel } from '@/lib/candidateRanker'
 
 describe('candidateRanker', () => {
