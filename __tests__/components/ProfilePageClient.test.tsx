@@ -293,4 +293,98 @@ describe('ProfilePageClient', () => {
       expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'pharmaceutical', expect.anything(), expect.anything())
     })
   })
+
+  it('renders ProfileModeToggle and defaults to full without discovery context', async () => {
+    await act(async () => {
+      render(<ProfilePageClient {...defaultProps} />)
+    })
+    expect(screen.getByTestId('profile-mode-toggle')).toBeInTheDocument()
+    expect(screen.getByTestId('profile-mode-full')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByTestId('decision-strip')).not.toBeInTheDocument()
+  })
+
+  it('enters decision mode from discover deep-link with DecisionStrip', async () => {
+    mockUseSearchParams.mockReturnValue(
+      new URLSearchParams('from=discover&disease=diabetes&rank=2&score=0.72'),
+    )
+    mockFetchCategoryData.mockImplementation((_cid: number, catId: string) => {
+      if (catId === 'clinical-safety') {
+        return Promise.resolve({
+          ...emptyClinicalSafety(),
+          clinicalTrials: [
+            { nctId: 'NCT001', title: 'Trial 1', phase: 'Phase 2', status: 'Recruiting', sponsor: 'X', startDate: '2025-01', conditions: [] },
+          ],
+          adverseEvents: [{ term: 'Nausea', count: 10, percentage: 1 }],
+        })
+      }
+      if (catId === 'bioactivity-targets') {
+        return Promise.resolve({
+          chemblActivities: [],
+          chemblMechanisms: [
+            { mechanismOfAction: 'COX inhibitor', targetName: 'PTGS1', actionType: 'INHIBITOR', targetChemblId: 'CHEMBL1', targetComponents: [] },
+          ],
+          bioAssays: [],
+          pharmacologyTargets: [],
+          bindingAffinities: [],
+          pharosTargets: [],
+          drugGeneInteractions: [],
+          diseaseAssociations: [],
+        })
+      }
+      if (catId === 'molecular-chemical') {
+        return Promise.resolve({ computedProperties: { xlogp: 1.2 }, ghsHazards: null })
+      }
+      if (catId === 'pharmaceutical') return Promise.resolve(emptyPharmaceutical())
+      return Promise.resolve(emptyCategory())
+    })
+
+    await act(async () => {
+      render(<ProfilePageClient {...defaultProps} />)
+    })
+
+    expect(screen.getByTestId('profile-mode-decision')).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.getByTestId('decision-strip')).toBeInTheDocument()
+    expect(screen.getByTestId('decision-mode-hint')).toBeInTheDocument()
+
+    // Prefer decision categories on first load
+    await waitFor(() => {
+      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'clinical-safety', expect.anything(), expect.anything())
+      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'bioactivity-targets', expect.anything(), expect.anything())
+      expect(mockFetchCategoryData).toHaveBeenCalledWith(2244, 'molecular-chemical', expect.anything(), expect.anything())
+    })
+
+    // Scores from deep-link composite
+    await waitFor(() => {
+      expect(screen.getByTestId('decision-strip-composite')).toHaveTextContent('72')
+    })
+
+    // Claims appear after Core data loads
+    await waitFor(() => {
+      expect(screen.getAllByTestId('decision-strip-claim').length).toBeGreaterThan(0)
+    })
+  })
+
+  it('shows DecisionStrip empty CTAs when project context has no scores/claims', async () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('project=prj_test&mode=decision'))
+    await act(async () => {
+      render(<ProfilePageClient {...defaultProps} />)
+    })
+    expect(screen.getByTestId('decision-strip')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByTestId('decision-strip-scores-empty')).toBeInTheDocument()
+      expect(screen.getByTestId('decision-strip-scores-cta')).toBeInTheDocument()
+    })
+  })
+
+  it('switches from decision to full via Expand full profile', async () => {
+    mockUseSearchParams.mockReturnValue(new URLSearchParams('mode=decision'))
+    await act(async () => {
+      render(<ProfilePageClient {...defaultProps} />)
+    })
+    expect(screen.getByTestId('profile-mode-decision')).toHaveAttribute('aria-pressed', 'true')
+    await act(async () => {
+      fireEvent.click(screen.getByTestId('decision-expand-full'))
+    })
+    expect(screen.getByTestId('profile-mode-full')).toHaveAttribute('aria-pressed', 'true')
+  })
 })
