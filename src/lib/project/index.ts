@@ -41,3 +41,23 @@ export {
   importProjectsFromJson,
   projectExportFilename,
 } from './exportImport'
+
+export {
+  RESEARCH_HYPOTHESIS_KEY_PREFIX,
+  MAX_THESIS_CHARS,
+  MAX_HYPOTHESES_PER_PROJECT,
+  type CreateResearchHypothesisInput,
+  createResearchHypothesis,
+  isResearchHypothesis,
+  saveResearchHypothesis,
+  getResearchHypothesis,
+  listResearchHypothesesForProject,
+  seedResearchHypothesisFromPack,
+} from './researchHypothesis'
+
+export {
+  intersectMatchToCandidate,
+  sendIntersectMatchesToBoard,
+  type SendIntersectToBoardInput,
+  type SendIntersectToBoardResult,
+} from './bridgeFromIntersect'

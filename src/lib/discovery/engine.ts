@@ -1,20 +1,39 @@
 /**
- * Discovery rank engine — gather + legacy score + dual-schema RankResult.
- * Ranking formulas intentionally unchanged (multi-axis = PR4).
- * ChEMBL-by-target / OT knownDrugs = PR3b.
- * PR6b: multi-hit disease confirmation + diseaseId hard pin.
+ * Discovery rank engine — gather + multi-axis cheap score + optional safety harvest.
+ * Dual-schema RankResult (legacy + v2 DiscoveryResult).
  */
 
 import { searchDiseases, resolveMoleculesFromNames, type DiseaseResult } from '../diseaseSearch'
 import type { SourceFetchStatus } from '../dataStatus'
-import type { DiseaseEntity } from '../domain/entities'
 import { mapRankResultToDiscoveryResult } from '../domain/mappers'
+import {
+  createDefaultScoreRubric,
+  type ScoreRubric,
+  type ScoreVector,
+} from '../domain/score'
+import { assessIdentityTrust } from '../domain/identity'
+import type { DiscoveryPreferencesSnapshot } from './preferences'
 import { scoreLegacyCandidate, sortCandidates } from './legacyScore'
+import { buildScoreVector } from './scoreAxes'
+import {
+  harvestCandidateAxes,
+  HARVEST_K_DEFAULT,
+} from './harvest'
+import {
+  applyResolvedIdentities,
+  DEFAULT_IDENTITY_TOP_N,
+  identityFallbackFromInputs,
+  resolveIdentitiesBatch,
+  type IdentityResolveInput,
+} from './identityResolve'
+import type { DiseaseEntity } from '../domain/entities'
 import {
   gatherDiseaseGenes,
   gatherTargetMolecules,
   gatherTrialDrugs,
   gatherChemblIndications,
+  gatherOpenTargetsKnownDrugs,
+  gatherChemblByTarget,
 } from './sources'
 import type { CandidateMolecule, DiseaseGene, RankResult } from './types'
 import { withSourceStatus } from './sourceStatus'
@@ -26,10 +45,9 @@ export const OT_KNOWN_DRUGS_DECONTAMINATION_WARNING =
 const MAX_MOLECULE_NAMES = 50
 const MAX_CID_RESOLVE = 50
 
-/** Thrown when a hard diseaseId pin is not found among search hits (no fuzzy substitute). */
+/** Thrown when a hard diseaseId pin is not found among search hits. */
 export class UnknownDiseaseIdError extends Error {
   readonly diseaseId: string
-
   constructor(diseaseId: string) {
     super(
       `Unknown diseaseId "${diseaseId}"; no fuzzy substitute applied. Provide a valid registry id from disease search.`,
@@ -39,9 +57,56 @@ export class UnknownDiseaseIdError extends Error {
   }
 }
 
-export interface RankCandidatesOptions {
+export interface RankEngineOptions {
+  limit?: number
+  rubric?: ScoreRubric
+  preferencesSnapshot?: DiscoveryPreferencesSnapshot
   /** Hard pin: skip multi-hit confirmation and rank this disease only. */
   diseaseId?: string
+  /** Gene symbols pinned via deep-link targets=. */
+  targets?: string[]
+  /** If true, harvest safety for top-K after cheap score. */
+  runSafetyHarvest?: boolean
+  /** If true, harvest novelty for top-K after cheap score. */
+  runNoveltyHarvest?: boolean
+  harvestK?: number
+}
+
+/** Alias for facade re-exports (PR6b name). */
+export type RankCandidatesOptions = RankEngineOptions
+
+export function diseaseResultToEntity(d: DiseaseResult): DiseaseEntity {
+  const id = d.id || d.name
+  return {
+    id,
+    idNamespace: d.id ? 'ot' : 'name',
+    name: d.name,
+    synonyms: [],
+    description: d.description,
+    therapeuticAreas: d.therapeuticAreas ?? [],
+    xrefs: d.id ? [{ system: d.source, id: d.id }] : [],
+    identityTrust: d.id ? 'medium' : 'unresolved',
+  }
+}
+
+function findPinnedDisease(hits: DiseaseResult[], diseaseId: string): DiseaseResult | undefined {
+  const pin = diseaseId.trim()
+  if (!pin) return undefined
+  const lower = pin.toLowerCase()
+  return hits.find((d) => d.id && d.id.toLowerCase() === lower)
+}
+
+function mergePinnedGenes(genes: DiseaseGene[], pins: string[]): DiseaseGene[] {
+  if (pins.length === 0) return genes
+  const have = new Set(genes.map((g) => g.symbol.toUpperCase()))
+  const out = [...genes]
+  for (const symbol of pins) {
+    const s = symbol.trim().toUpperCase()
+    if (!s || have.has(s)) continue
+    have.add(s)
+    out.unshift({ symbol: s, score: 1, source: 'pinned-target' } as DiseaseGene)
+  }
+  return out
 }
 
 /**
@@ -60,21 +125,6 @@ export function moleculeNamesFromDiseaseResult(disease: DiseaseResult): {
   return { names, skippedOtTargetNames: false }
 }
 
-/** Map a disease search hit to domain DiseaseEntity for disambiguation UI / v2. */
-export function diseaseResultToEntity(d: DiseaseResult): DiseaseEntity {
-  const id = d.id || d.name
-  return {
-    id,
-    idNamespace: d.id ? 'ot' : 'name',
-    name: d.name,
-    synonyms: [],
-    description: d.description,
-    therapeuticAreas: d.therapeuticAreas ?? [],
-    xrefs: d.id ? [{ system: d.source, id: d.id }] : [],
-    identityTrust: d.id ? 'medium' : 'unresolved',
-  }
-}
-
 function emptyRankResult(
   query: string,
   opts?: {
@@ -82,6 +132,8 @@ function emptyRankResult(
     warnings?: string[]
     sourceStatuses?: SourceFetchStatus[]
     generatedAt?: string
+    rubric?: ScoreRubric
+    preferencesSnapshot?: DiscoveryPreferencesSnapshot
   },
 ): RankResult {
   const generatedAt = opts?.generatedAt ?? new Date().toISOString()
@@ -96,7 +148,13 @@ function emptyRankResult(
     generatedAt,
     warnings: opts?.warnings ?? [],
   }
-  base.v2 = mapRankResultToDiscoveryResult(base, { generatedAt })
+  base.v2 = mapRankResultToDiscoveryResult(base, {
+    generatedAt,
+    rubric: opts?.rubric,
+  })
+  if (opts?.preferencesSnapshot) {
+    base.v2.preferencesSnapshot = opts.preferencesSnapshot
+  }
   if (base.sourceStatuses) {
     base.v2.sourceStatuses = base.sourceStatuses
   }
@@ -109,66 +167,61 @@ function emptyRankResult(
   return base
 }
 
-/**
- * Multi-hit confirm payload: no silent results[0]; empty candidates until user pins diseaseId.
- */
-function multiHitConfirmResult(
-  query: string,
-  hits: DiseaseResult[],
-  sourceStatuses: SourceFetchStatus[],
-  generatedAt: string,
-  timingStart: number,
-): RankResult {
-  const diseaseCandidates = hits.map(diseaseResultToEntity)
-  const warning = `Multiple disease matches (${hits.length}); confirm which disease to rank.`
-  const base: RankResult = {
-    query,
-    diseaseId: null,
-    diseaseName: query,
-    therapeuticAreas: [],
-    genes: [],
-    candidates: [],
-    sourceStatuses,
-    generatedAt,
-    warnings: [warning],
-  }
-  const v2 = mapRankResultToDiscoveryResult(base, { generatedAt })
-  v2.disease = null
-  v2.diseaseCandidates = diseaseCandidates
-  v2.needsDiseaseConfirmation = true
-  v2.sourceStatuses = sourceStatuses
-  v2.warnings = [warning]
-  v2.timingMs = { total: Date.now() - timingStart, disease: Date.now() - timingStart }
-  base.v2 = v2
-  return base
-}
-
-function findPinnedDisease(hits: DiseaseResult[], diseaseId: string): DiseaseResult | undefined {
-  const pin = diseaseId.trim()
-  if (!pin) return undefined
-  const lower = pin.toLowerCase()
-  return hits.find((d) => d.id && d.id.toLowerCase() === lower)
+function cheapScoreVector(
+  c: CandidateMolecule,
+  rubric: ScoreRubric,
+): ScoreVector {
+  const trust = assessIdentityTrust({ cid: c.cid, name: c.name })
+  return buildScoreVector({
+    rubric,
+    scorePhase: 'cheap',
+    cheap: {
+      geneAssociationScore: c.geneAssociationScore,
+      sharedTargetRatio: c.sharedTargetRatio,
+      maxPhase: c.clinicalPhaseRaw,
+      trialNorm: c.trialCountNorm,
+      identityTrust: trust.axisValue,
+      sources: c.sources,
+    },
+  })
 }
 
 /**
  * Rank candidate molecules for a disease query.
  * Returns legacy RankResult fields + additive sourceStatuses/generatedAt/warnings/v2.
- *
- * PR6b:
- * - Multiple hits without `options.diseaseId` → early return, needsDiseaseConfirmation
- * - `options.diseaseId` hard pin → exact id match only; unknown id throws UnknownDiseaseIdError
  */
 export async function rankCandidatesForDisease(
   query: string,
-  limit: number = 15,
-  options?: RankCandidatesOptions,
+  limitOrOptions: number | RankEngineOptions = 15,
+  maybeOptions?: RankEngineOptions,
 ): Promise<RankResult> {
+  const options: RankEngineOptions =
+    typeof limitOrOptions === 'number'
+      ? { ...(maybeOptions ?? {}), limit: limitOrOptions }
+      : limitOrOptions ?? {}
+  const limit = Math.min(Math.max(options.limit ?? 15, 1), 25)
+  const rubric = options.rubric ?? createDefaultScoreRubric('balanced')
+  const runSafetyHarvest = options.runSafetyHarvest === true
+  const runNoveltyHarvest = options.runNoveltyHarvest === true
+  const harvestK = Math.min(options.harvestK ?? HARVEST_K_DEFAULT, limit)
+  const pinnedId = options.diseaseId?.trim() || undefined
+  const pinnedTargets = (options.targets ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 10)
+
   const generatedAt = new Date().toISOString()
   const sourceStatuses: SourceFetchStatus[] = []
   const warnings: string[] = []
   const timingStart = Date.now()
-  const pinnedId = options?.diseaseId?.trim() || undefined
+  const timing: {
+    disease?: number
+    targets?: number
+    gather?: number
+    cheapScore?: number
+    safetyHarvest?: number
+    identity?: number
+    total?: number
+  } = {}
 
+  const diseaseStart = Date.now()
   const diseaseLookup = await withSourceStatus(
     'Disease search',
     () => searchDiseases(query, 5),
@@ -178,32 +231,50 @@ export async function rankCandidatesForDisease(
     },
   )
   sourceStatuses.push(diseaseLookup.status)
+  timing.disease = Date.now() - diseaseStart
 
   if (diseaseLookup.value.length === 0) {
-    if (pinnedId) {
-      throw new UnknownDiseaseIdError(pinnedId)
-    }
+    if (pinnedId) throw new UnknownDiseaseIdError(pinnedId)
     warnings.push('No disease matches for query.')
-    return emptyRankResult(query, { warnings, sourceStatuses, generatedAt })
+    return emptyRankResult(query, {
+      warnings,
+      sourceStatuses,
+      generatedAt,
+      rubric,
+      preferencesSnapshot: options.preferencesSnapshot,
+    })
   }
 
   let primaryDisease: DiseaseResult
-
   if (pinnedId) {
     const pinned = findPinnedDisease(diseaseLookup.value, pinnedId)
-    if (!pinned) {
-      throw new UnknownDiseaseIdError(pinnedId)
-    }
+    if (!pinned) throw new UnknownDiseaseIdError(pinnedId)
     primaryDisease = pinned
   } else if (diseaseLookup.value.length > 1) {
-    // Never silent results[0] when multi-hit without hard pin
-    return multiHitConfirmResult(
+    // Early multi-hit confirm — no silent results[0]
+    const diseaseCandidates = diseaseLookup.value.map(diseaseResultToEntity)
+    const warning = `Multiple disease matches (${diseaseLookup.value.length}); confirm which disease to rank.`
+    const base: RankResult = {
       query,
-      diseaseLookup.value,
+      diseaseId: null,
+      diseaseName: query,
+      therapeuticAreas: [],
+      genes: [],
+      candidates: [],
       sourceStatuses,
       generatedAt,
-      timingStart,
-    )
+      warnings: [warning],
+    }
+    const v2 = mapRankResultToDiscoveryResult(base, { generatedAt, rubric })
+    v2.disease = null
+    v2.diseaseCandidates = diseaseCandidates
+    v2.needsDiseaseConfirmation = true
+    v2.sourceStatuses = sourceStatuses
+    v2.warnings = [warning]
+    v2.timingMs = { total: Date.now() - timingStart, disease: timing.disease }
+    if (options.preferencesSnapshot) v2.preferencesSnapshot = options.preferencesSnapshot
+    base.v2 = v2
+    return base
   } else {
     primaryDisease = diseaseLookup.value[0]
   }
@@ -212,39 +283,38 @@ export async function rankCandidatesForDisease(
   const diseaseName = primaryDisease.name
   const therapeuticAreas = primaryDisease.therapeuticAreas ?? []
 
-  // Single OT + DisGeNET gene walk for scoring and DGIdb (no double-fetch).
+  const targetsStart = Date.now()
   const geneGather = await gatherDiseaseGenes(diseaseId, diseaseName)
   sourceStatuses.push(...geneGather.statuses)
-  const genes: DiseaseGene[] = geneGather.genes
+  const genes: DiseaseGene[] = mergePinnedGenes(geneGather.genes, pinnedTargets)
+  timing.targets = Date.now() - targetsStart
 
-  const [targetGather, trialGather] = await Promise.all([
+  const gatherStart = Date.now()
+  const [targetGather, trialGather, knownDrugsGather, chemblByTargetGather] = await Promise.all([
     gatherTargetMolecules(genes),
     gatherTrialDrugs(diseaseName),
+    gatherOpenTargetsKnownDrugs(diseaseId),
+    gatherChemblByTarget(genes),
   ])
 
   sourceStatuses.push(...targetGather.statuses)
   sourceStatuses.push(trialGather.status)
+  sourceStatuses.push(knownDrugsGather.status)
+  sourceStatuses.push(chemblByTargetGather.status)
 
   const moleculesFromTargets = targetGather.molecules
   const moleculesFromTrials = trialGather.drugCounts
+  const knownDrugNames = knownDrugsGather.names
+  const chemblByTargetNames = chemblByTargetGather.names
 
-  const { names: moleculeNamesFromDisease, skippedOtTargetNames } =
-    moleculeNamesFromDiseaseResult(primaryDisease)
-
-  if (skippedOtTargetNames) {
-    warnings.push(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
-    sourceStatuses.push({
-      source: 'Open Targets (knownDrugs)',
-      status: 'disabled',
-      has_data: false,
-      error: 'Decontaminated: getDrugsForDisease returns target names (PR3b)',
-    })
-  }
+  const { names: moleculeNamesFromDisease } = moleculeNamesFromDiseaseResult(primaryDisease)
 
   const allMoleculeNames = new Set<string>()
   for (const m of moleculesFromTargets) allMoleculeNames.add(m.name)
   moleculesFromTrials.forEach((_, name) => allMoleculeNames.add(name))
   for (const name of moleculeNamesFromDisease) allMoleculeNames.add(name)
+  for (const name of knownDrugNames) allMoleculeNames.add(name)
+  for (const name of chemblByTargetNames) allMoleculeNames.add(name)
 
   const moleculeArray = Array.from(allMoleculeNames).slice(0, MAX_MOLECULE_NAMES)
   const topTargetCount = Math.max(genes.length, 1)
@@ -266,8 +336,12 @@ export async function rankCandidatesForDisease(
   const { indicationMap, status: indicationStatus } =
     await gatherChemblIndications(moleculeArray)
   sourceStatuses.push(indicationStatus)
+  timing.gather = Date.now() - gatherStart
 
+  const cheapStart = Date.now()
   const candidates: CandidateMolecule[] = []
+  /** name → multi-axis ScoreVector (cheap, then optionally full) */
+  const scoreByName = new Map<string, ScoreVector>()
 
   for (const name of moleculeArray) {
     const lowerName = name.toLowerCase()
@@ -283,25 +357,91 @@ export async function rankCandidatesForDisease(
     if (moleculeNamesFromDisease.some((n) => n.toLowerCase() === lowerName)) {
       sources.push(primaryDisease.source)
     }
-    if (indications.length > 0) sources.push('ChEMBL')
+    if (knownDrugNames.some((n) => n.toLowerCase() === lowerName)) {
+      sources.push('Open Targets knownDrugs')
+    }
+    if (chemblByTargetNames.some((n) => n.toLowerCase() === lowerName) || indications.length > 0) {
+      sources.push('ChEMBL')
+    }
 
-    candidates.push(
-      scoreLegacyCandidate({
-        name,
-        cid,
-        diseaseName,
-        targetMol,
-        trialCount,
-        maxTrialCount,
-        genes,
-        topTargetCount,
-        indications,
-        sources,
-      }),
-    )
+    const legacy = scoreLegacyCandidate({
+      name,
+      cid,
+      diseaseName,
+      targetMol,
+      trialCount,
+      maxTrialCount,
+      genes,
+      topTargetCount,
+      indications,
+      sources,
+    })
+
+    const multi = cheapScoreVector(legacy, rubric)
+    scoreByName.set(lowerName, multi)
+
+    candidates.push({
+      ...legacy,
+      compositeScore: multi.composite,
+    })
   }
 
-  const sorted = sortCandidates(candidates).slice(0, limit)
+  let sorted = sortCandidates(candidates).slice(0, limit)
+  timing.cheapScore = Date.now() - cheapStart
+
+  let scorePhase: 'cheap' | 'full' = 'cheap'
+
+  if ((runSafetyHarvest || runNoveltyHarvest) && sorted.length > 0) {
+    const harvestStart = Date.now()
+    const top = sorted.slice(0, harvestK)
+    const harvest = await harvestCandidateAxes(
+      top.map((c) => ({
+        name: c.name,
+        scores: scoreByName.get(c.name.toLowerCase()) ?? cheapScoreVector(c, rubric),
+        phaseNorm: c.clinicalPhase,
+        clinicalStage:
+          scoreByName.get(c.name.toLowerCase())?.axes.clinicalStage ?? c.clinicalPhase,
+      })),
+      {
+        runSafety: runSafetyHarvest,
+        runNovelty: runNoveltyHarvest,
+        rubric,
+      },
+    )
+    sourceStatuses.push(...harvest.sourceStatuses)
+    warnings.push(...harvest.warnings)
+    timing.safetyHarvest = Date.now() - harvestStart
+    scorePhase = 'full'
+
+    for (const h of harvest.candidates) {
+      scoreByName.set(h.name.toLowerCase(), h.scores)
+    }
+
+    sorted = sorted.map((c) => {
+      const s = scoreByName.get(c.name.toLowerCase())
+      if (!s) return c
+      return { ...c, compositeScore: s.composite }
+    })
+    sorted = sortCandidates(sorted)
+  }
+
+  // Stage 3 — batch identity (InChIKey + IdentityTrust) for top-N shortlist
+  const identityInputs: IdentityResolveInput[] = sorted.map((c) => ({
+    name: c.name,
+    cid: c.cid,
+  }))
+  const identityLookup = await withSourceStatus(
+    'PubChem (identity/InChIKey)',
+    () =>
+      resolveIdentitiesBatch(identityInputs, {
+        topN: Math.min(DEFAULT_IDENTITY_TOP_N, sorted.length),
+      }),
+    {
+      fallback: identityFallbackFromInputs(identityInputs),
+      hasData: (v) => v.highTrustCount > 0 || v.fetchedCount > 0,
+    },
+  )
+  sourceStatuses.push(identityLookup.status)
 
   const rank: RankResult = {
     query,
@@ -315,14 +455,28 @@ export async function rankCandidatesForDisease(
     warnings,
   }
 
-  const v2 = mapRankResultToDiscoveryResult(rank, { generatedAt })
+  const v2 = mapRankResultToDiscoveryResult(rank, { generatedAt, rubric })
   v2.sourceStatuses = sourceStatuses
+  v2.scorePhase = scorePhase
+  if (options.preferencesSnapshot) {
+    v2.preferencesSnapshot = options.preferencesSnapshot
+  }
+
+  // Prefer multi-axis ScoreVectors, then attach resolved identity
+  for (const mc of v2.candidates) {
+    const s = scoreByName.get(mc.identity.name.toLowerCase())
+    if (s) mc.scores = s
+  }
+  v2.candidates = applyResolvedIdentities(v2.candidates, identityLookup.value.resolved)
+
   const warningSet = new Set([...v2.warnings, ...warnings])
   v2.warnings = Array.from(warningSet)
+  timing.total = Date.now() - timingStart
   v2.timingMs = {
-    total: Date.now() - timingStart,
+    ...timing,
+    identity: identityLookup.status.duration_ms ?? identityLookup.value.durationMs,
   }
-  // Confirmed / single / pinned — no multi-hit confirmation needed
+
   v2.needsDiseaseConfirmation = false
   if (v2.disease) {
     v2.diseaseCandidates = [v2.disease]

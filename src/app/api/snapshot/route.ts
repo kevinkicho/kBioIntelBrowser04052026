@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { saveSnapshot, type SnapshotEntity } from '@/lib/snapshot/store'
 
-const VALID_TYPES = new Set(['molecule', 'gene', 'disease'])
+const VALID_TYPES = new Set(['molecule', 'gene', 'disease', 'evidence-pack'])
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -17,7 +17,10 @@ export async function POST(request: NextRequest) {
   const { entity, data } = body as { entity?: SnapshotEntity; data?: Record<string, unknown> }
 
   if (!entity || !VALID_TYPES.has(entity.type)) {
-    return NextResponse.json({ error: 'entity.type must be molecule, gene, or disease' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'entity.type must be molecule, gene, disease, or evidence-pack' },
+      { status: 400 },
+    )
   }
   if (entity.id === undefined || entity.id === null) {
     return NextResponse.json({ error: 'entity.id is required' }, { status: 400 })

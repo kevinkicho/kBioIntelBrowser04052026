@@ -1,7 +1,12 @@
 'use client'
 
 import { useEffect } from 'react'
-import type { DiscoveryPreferences, HarvestTimingPref } from '@/lib/discovery/preferences'
+import type {
+  CollaborationModePref,
+  DiscoveryPreferences,
+  HarvestTimingPref,
+  TourExampleSetPref,
+} from '@/lib/discovery/preferences'
 import { PREFERENCE_TOOLTIPS } from '@/lib/discovery/preferences'
 import type { RubricPresetId, ScoreAxisWeights } from '@/lib/domain/score'
 import type { AeAggressivenessPref } from '@/lib/discovery/preferences'
@@ -148,10 +153,74 @@ export function DiscoverySettingsDrawer({
             </label>
           </div>
 
-          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-[11px] text-slate-500 leading-relaxed">
+          <div>
+            <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
+              Collaboration
+              <Tooltip
+                text={
+                  PREFERENCE_TOOLTIPS.collaborationMode?.[prefs.collaborationMode] ??
+                  'Solo export always works. Share links require enabling this mode (PR18).'
+                }
+              />
+            </div>
+            <div className="flex flex-col gap-2">
+              {(
+                [
+                  ['solo-export', 'Solo + file export (default)'],
+                  ['share-links-when-available', 'Share links when available'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() =>
+                    onChange({ collaborationMode: id as CollaborationModePref })
+                  }
+                  className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                    prefs.collaborationMode === id
+                      ? 'border-indigo-500/60 bg-indigo-900/40 text-indigo-100'
+                      : 'border-slate-700/50 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
+              Guided tour examples
+            </div>
+            <div className="flex flex-col gap-2">
+              {(
+                [
+                  ['mixed', 'Mixed (default)'],
+                  ['common-only', 'Common diseases only'],
+                  ['rare-only', 'Rare / long-tail only'],
+                ] as const
+              ).map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => onChange({ tourExampleSet: id as TourExampleSetPref })}
+                  className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                    prefs.tourExampleSet === id
+                      ? 'border-indigo-500/60 bg-indigo-900/40 text-indigo-100'
+                      : 'border-slate-700/50 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-[11px] leading-relaxed text-slate-500">
             Empty AE data is never scored as “safe.” Soft-flag mode clamps safety for high
             clinical-stage drugs and surfaces FAERS as badges. Rank-time harvest adds ~8–12s for
-            top-15 safety + novelty.
+            top-15 safety + novelty. Share pack uses content-hashed 30-day snapshots when
+            collaboration mode allows.
           </div>
         </div>
 

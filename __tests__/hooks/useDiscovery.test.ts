@@ -134,7 +134,13 @@ function rankedPayload(diseaseId: string, diseaseName: string) {
   }
 }
 
-describe('useDiscovery (PR6b)', () => {
+function parsePostBody(call: unknown[]): Record<string, unknown> {
+  const init = call[1] as { body?: string; method?: string }
+  expect(init?.method).toBe('POST')
+  return JSON.parse(init.body ?? '{}') as Record<string, unknown>
+}
+
+describe('useDiscovery (PR6b + PR4 prefs POST)', () => {
   beforeEach(() => {
     jest.clearAllMocks()
   })
@@ -158,10 +164,12 @@ describe('useDiscovery (PR6b)', () => {
     expect(result.current.state.diseaseCandidates).toHaveLength(2)
     expect(result.current.state.diseaseCandidates[0].id).toBe('EFO_0000249')
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/discover/rank?'),
+      '/api/discover/rank',
+      expect.objectContaining({ method: 'POST' }),
     )
-    expect(mockFetch.mock.calls[0][0]).toContain('q=alzheimer')
-    expect(mockFetch.mock.calls[0][0]).not.toContain('diseaseId=')
+    const body = parsePostBody(mockFetch.mock.calls[0])
+    expect(body.q).toBe('alzheimer')
+    expect(body.diseaseId).toBeUndefined()
   })
 
   it('passes diseaseId on confirm and reaches success', async () => {
@@ -191,8 +199,8 @@ describe('useDiscovery (PR6b)', () => {
 
     expect(result.current.state.result?.diseaseId).toBe('EFO_0006792')
     expect(result.current.state.diseaseCandidates).toEqual([])
-    const confirmUrl = mockFetch.mock.calls[1][0] as string
-    expect(confirmUrl).toContain('diseaseId=EFO_0006792')
+    const confirmBody = parsePostBody(mockFetch.mock.calls[1])
+    expect(confirmBody.diseaseId).toBe('EFO_0006792')
   })
 
   it('skips confirmation when diseaseId is provided up front', async () => {
@@ -209,8 +217,8 @@ describe('useDiscovery (PR6b)', () => {
 
     await waitFor(() => expect(result.current.state.status).toBe('success'))
 
-    const url = mockFetch.mock.calls[0][0] as string
-    expect(url).toContain('diseaseId=EFO_0000249')
+    const body = parsePostBody(mockFetch.mock.calls[0])
+    expect(body.diseaseId).toBe('EFO_0000249')
     expect(result.current.state.status).not.toBe('confirm_disease')
   })
 })

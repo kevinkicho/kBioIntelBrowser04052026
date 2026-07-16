@@ -13,6 +13,9 @@ import type { Filter, FilterAxis, Hypothesis, IntersectedMatch } from '@/lib/hyp
 import { FilterSlot } from '@/components/hypothesis/FilterSlot'
 import { ResultCard } from '@/components/hypothesis/ResultCard'
 import { SavedHypotheses } from '@/components/hypothesis/SavedHypotheses'
+import { listProjects, sendIntersectMatchesToBoard } from '@/lib/project'
+import { emitProductEvent } from '@/lib/productEvents'
+import Link from 'next/link'
 
 const VALID_AXES: FilterAxis[] = ['targets-gene', 'indicated-for', 'trial-phase', 'atc-class']
 
@@ -69,6 +72,8 @@ export function HypothesisClient() {
   const [saved, setSaved] = useState<Hypothesis[]>([])
   const [saveName, setSaveName] = useState('')
   const [saveOpen, setSaveOpen] = useState(false)
+  const [boardMsg, setBoardMsg] = useState<string | null>(null)
+  const [boardBusy, setBoardBusy] = useState(false)
 
   useEffect(() => {
     setSaved(listSavedHypotheses())
@@ -134,6 +139,36 @@ export function HypothesisClient() {
     const stamp = new Date().toISOString().slice(0, 10)
     downloadFile(csv, `hypothesis-${stamp}.csv`, 'text/csv')
   }, [status])
+
+  const handleSendToBoard = useCallback(() => {
+    if (status.kind !== 'success' || status.data.matches.length === 0) return
+    setBoardBusy(true)
+    setBoardMsg(null)
+    try {
+      const projects = listProjects()
+      const res = sendIntersectMatchesToBoard({
+        matches: status.data.matches,
+        projectId: projects[0]?.id,
+        newProjectName: projects[0]
+          ? undefined
+          : `Hypothesis ${filters.map((f) => f.value).filter(Boolean).join(' ∩ ').slice(0, 40)}`,
+      })
+      if (!res.ok) {
+        setBoardMsg(res.message)
+        return
+      }
+      emitProductEvent('hypothesis_send_to_board', {
+        count: res.value.added,
+        projectId: res.value.project.id,
+      })
+      setBoardMsg(
+        `Added ${res.value.added} candidate${res.value.added === 1 ? '' : 's'} to “${res.value.project.name}”` +
+          (res.value.skipped ? ` (${res.value.skipped} skipped)` : ''),
+      )
+    } finally {
+      setBoardBusy(false)
+    }
+  }, [status, filters])
 
   const isLoading = status.kind === 'loading'
   const matches = status.kind === 'success' ? status.data.matches : []
@@ -225,17 +260,37 @@ export function HypothesisClient() {
                   Save hypothesis
                 </button>
                 {matches.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={handleExport}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700/40 text-xs font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                    CSV
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={handleSendToBoard}
+                      disabled={boardBusy}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-900/40 border border-emerald-800/50 text-xs font-medium text-emerald-300 hover:bg-emerald-900/60 disabled:opacity-50 transition-colors"
+                      title="Add intersect matches to a project triage board (does not change set-ops hypothesis types)"
+                    >
+                      Send to project board
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleExport}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700/40 text-xs font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                      CSV
+                    </button>
+                  </>
                 )}
               </div>
             </div>
+
+            {boardMsg && (
+              <div className="mb-4 rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-200">
+                {boardMsg}{' '}
+                <Link href="/projects" className="underline hover:text-emerald-100">
+                  Open Projects
+                </Link>
+              </div>
+            )}
 
             {saveOpen && (
               <form

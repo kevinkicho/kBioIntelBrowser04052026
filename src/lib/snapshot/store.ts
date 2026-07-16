@@ -7,7 +7,7 @@ const STORE_DIR = path.join(process.cwd(), 'data', 'snapshots')
 export const SNAPSHOT_TTL_MS = 30 * 86_400_000 // 30 days
 
 export interface SnapshotEntity {
-  type: 'molecule' | 'gene' | 'disease'
+  type: 'molecule' | 'gene' | 'disease' | 'evidence-pack'
   id: string | number
   name: string
 }

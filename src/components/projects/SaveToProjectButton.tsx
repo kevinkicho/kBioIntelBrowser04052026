@@ -8,6 +8,7 @@ import {
   listProjects,
   type StoreResult,
 } from '@/lib/project'
+import { emitProductEvent } from '@/lib/productEvents'
 
 interface Props {
   candidate: MoleculeCandidate
@@ -67,6 +68,12 @@ export function SaveToProjectButton({
   const saveTo = useCallback(
     (projectId: string) => {
       const result = addCandidateAndSave(projectId, candidate)
+      if (result.ok) {
+        emitProductEvent('project_add_candidate', {
+          projectId,
+          candidateId: candidate.candidateId,
+        })
+      }
       handleResult(result, 'Saved to project board')
     },
     [candidate, handleResult],
@@ -80,6 +87,13 @@ export function SaveToProjectButton({
       name,
       candidates: [{ ...candidate, boardStatus: candidate.boardStatus ?? 'untriaged' }],
     })
+    if (created.ok) {
+      emitProductEvent('project_create', { projectId: created.value.id })
+      emitProductEvent('project_add_candidate', {
+        projectId: created.value.id,
+        candidateId: candidate.candidateId,
+      })
+    }
     handleResult(created, 'Created project and saved candidate')
   }, [candidate, defaultProjectName, handleResult])
 

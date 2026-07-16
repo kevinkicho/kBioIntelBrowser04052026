@@ -12,6 +12,7 @@ import {
   listProjects,
   projectExportFilename,
 } from '@/lib/project'
+import { emitProductEvent } from '@/lib/productEvents'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -38,6 +39,7 @@ export default function ProjectsPage() {
       showBanner('err', result.message)
       return
     }
+    emitProductEvent('project_create', { projectId: result.value.id })
     setName('')
     refresh()
     showBanner('ok', `Created “${result.value.name}”`)

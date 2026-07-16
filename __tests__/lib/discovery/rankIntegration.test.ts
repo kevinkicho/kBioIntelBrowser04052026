@@ -149,12 +149,11 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     expect(result.sourceStatuses).toBeDefined()
     expect(result.sourceStatuses!.length).toBeGreaterThan(0)
     expect(result.sourceStatuses!.some((s) => s.source === 'DGIdb')).toBe(true)
+    // PR3b: knownDrugs path is active (no longer disabled decontamination)
     expect(
-      result.sourceStatuses!.some(
-        (s) => s.source === 'Open Targets (knownDrugs)' && s.status === 'disabled',
-      ),
+      result.sourceStatuses!.some((s) => s.source === 'Open Targets (knownDrugs)'),
     ).toBe(true)
-    expect(result.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
+    expect(result.warnings ?? []).not.toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
 
     // PR3c identity stage status
     expect(
@@ -165,7 +164,6 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     expect(isDiscoveryResult(result.v2)).toBe(true)
     expect(result.v2!.schemaVersion).toBe(2)
     expect(result.v2!.sourceStatuses.length).toBeGreaterThan(0)
-    expect(result.v2!.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
     expect(result.v2!.candidates.length).toBe(result.candidates.length)
 
     // IdentityTrust + InChIKey on DiscoveryResult / RankResult.v2 candidates

@@ -6,15 +6,22 @@ import { useParams } from 'next/navigation'
 import type { BoardStatus, Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import {
+  addCandidateAndSave,
   exportProjectToJson,
   getProject,
+  listResearchHypothesesForProject,
   projectExportFilename,
   removeCandidateFromProject,
   saveProject,
+  saveResearchHypothesis,
+  seedResearchHypothesisFromPack,
   setBoardStatusAndSave,
 } from '@/lib/project'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { SignalBadges } from '@/components/projects/SignalBadges'
+import { PackBuilder } from '@/components/evidence/PackBuilder'
+import { emitProductEvent } from '@/lib/productEvents'
+import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
 
@@ -33,14 +40,18 @@ export default function ProjectBoardPage() {
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [signalRows, setSignalRows] = useState<CandidateSignalRow[] | null>(null)
   const [signalsLoading, setSignalsLoading] = useState(false)
+  const [expandBusy, setExpandBusy] = useState<string | null>(null)
+  const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([])
   const signalsLoadedFor = useRef<string | null>(null)
 
   const refresh = useCallback(() => {
     if (!id) {
       setProject(null)
+      setHypotheses([])
       return
     }
     setProject(getProject(id))
+    setHypotheses(listResearchHypothesesForProject(id))
   }, [id])
 
   useEffect(() => {
@@ -114,6 +125,48 @@ export default function ProjectBoardPage() {
       'application/json',
     )
     showBanner('ok', 'Project exported')
+  }
+
+  const handleExpandSimilar = async (c: MoleculeCandidate) => {
+    const cid = c.identity.pubchemCid
+    if (!id || cid == null) {
+      showBanner('err', 'Need a PubChem CID to expand similarity')
+      return
+    }
+    setExpandBusy(c.candidateId)
+    try {
+      const res = await fetch('/api/discover/similarity', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ seedCid: cid, max: 5 }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error ?? `Expand failed (${res.status})`)
+      }
+      const data = (await res.json()) as { neighbors: MoleculeCandidate[] }
+      let added = 0
+      let latest = project
+      for (const n of data.neighbors ?? []) {
+        const r = addCandidateAndSave(id, n)
+        if (r.ok) {
+          added++
+          latest = r.value
+        }
+      }
+      if (latest) setProject(latest)
+      emitProductEvent('similarity_expand', { seedCid: cid, count: added })
+      showBanner(
+        'ok',
+        added > 0
+          ? `Added ${added} similar neighbor${added === 1 ? '' : 's'} from PubChem`
+          : 'No new similar candidates (or board full)',
+      )
+    } catch (err) {
+      showBanner('err', err instanceof Error ? err.message : 'Similarity expand failed')
+    } finally {
+      setExpandBusy(null)
+    }
   }
 
   if (project === undefined) {
@@ -361,14 +414,28 @@ export default function ProjectBoardPage() {
                         </div>
                       </td>
                       <td className="px-3 py-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleRemove(c.candidateId)}
-                          className="p-1 text-slate-600 hover:text-red-400"
-                          title="Remove from board"
-                        >
-                          ✕
-                        </button>
+                        <div className="flex items-center justify-center gap-1">
+                          {(status === 'promote' || status === 'watching') &&
+                            c.identity.pubchemCid != null && (
+                              <button
+                                type="button"
+                                onClick={() => void handleExpandSimilar(c)}
+                                disabled={expandBusy === c.candidateId}
+                                className="rounded border border-violet-800/40 px-1.5 py-0.5 text-[9px] text-violet-300 hover:bg-violet-900/30 disabled:opacity-50"
+                                title="Add PubChem 2D-similar neighbors to this board"
+                              >
+                                {expandBusy === c.candidateId ? '…' : '≈ similar'}
+                              </button>
+                            )}
+                          <button
+                            type="button"
+                            onClick={() => handleRemove(c.candidateId)}
+                            className="p-1 text-slate-600 hover:text-red-400"
+                            title="Remove from board"
+                          >
+                            ✕
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -377,6 +444,94 @@ export default function ProjectBoardPage() {
             </table>
           </div>
         )}
+
+        {/* Evidence packs — download-primary; board carries packIndex breadcrumbs only */}
+        <section className="mt-8 space-y-4">
+          <h2 className="text-lg font-semibold text-slate-100">Evidence packs</h2>
+          {project.packIndex && project.packIndex.length > 0 && (
+            <ul className="space-y-2">
+              {project.packIndex.map((entry) => (
+                <li
+                  key={entry.id}
+                  className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm"
+                >
+                  <div>
+                    <div className="font-medium text-slate-200">{entry.title}</div>
+                    <div className="text-[11px] text-slate-500">
+                      {entry.candidateCount ?? 0} candidates ·{' '}
+                      {new Date(entry.createdAt).toLocaleString()} ·{' '}
+                      <span className="font-mono">{entry.id}</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="rounded border border-indigo-800/40 px-2 py-1 text-[10px] text-indigo-300 hover:bg-indigo-900/30"
+                    onClick={() => {
+                      const hyp = seedResearchHypothesisFromPack({
+                        projectId: project.id,
+                        packId: entry.id,
+                        packTitle: entry.title,
+                        claimIds: [],
+                        candidateIds: project.candidates.map((c) => c.candidateId),
+                        diseaseId: project.disease?.id,
+                      })
+                      const saved = saveResearchHypothesis(hyp)
+                      if (!saved.ok) {
+                        showBanner('err', saved.message)
+                        return
+                      }
+                      refresh()
+                      showBanner('ok', `Seeded research hypothesis “${hyp.title}”`)
+                    }}
+                  >
+                    Seed research hypothesis
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <PackBuilder
+            candidates={project.candidates}
+            disease={project.disease ?? null}
+            projectId={project.id}
+            defaultTitle={`${project.name} evidence pack`}
+            onExported={() => refresh()}
+          />
+          <p className="text-[11px] text-slate-600">
+            For claim-rich packs, open a molecule from the board (with project deep-link) and use{' '}
+            <strong className="font-medium text-slate-500">Export → Download evidence pack</strong> —
+            Core panel extractors fill claims (≤200). Enable “Share links when available” in Discover
+            preferences to use Share pack.
+          </p>
+        </section>
+
+        {/* Research hypotheses — narrative theses, distinct from set-ops /hypothesis */}
+        <section className="mt-8 space-y-3">
+          <h2 className="text-lg font-semibold text-slate-100">Research hypotheses</h2>
+          <p className="text-[11px] text-slate-500">
+            Project-scoped narrative theses (not set-ops filter intersections). Seed from an evidence
+            pack index entry above.
+          </p>
+          {hypotheses.length === 0 ? (
+            <p className="text-sm text-slate-600">No research hypotheses yet.</p>
+          ) : (
+            <ul className="space-y-2">
+              {hypotheses.map((h) => (
+                <li
+                  key={h.id}
+                  className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
+                >
+                  <div className="text-sm font-medium text-slate-200">{h.title}</div>
+                  <p className="mt-1 line-clamp-3 text-xs text-slate-400">{h.thesis}</p>
+                  <div className="mt-1 text-[10px] text-slate-600">
+                    {h.claimIds.length} claims · {h.candidateIds.length} candidates · updated{' '}
+                    {new Date(h.updatedAt).toLocaleString()}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
       </div>
     </main>
   )

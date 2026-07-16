@@ -20,4 +20,5 @@ export {
   UnknownDiseaseIdError,
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
   type RankCandidatesOptions,
+  type RankEngineOptions,
 } from './discovery/engine'
