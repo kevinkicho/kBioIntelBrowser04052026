@@ -136,22 +136,25 @@ describe('searchDiseases integration', () => {
     expect(results[0].source).toBe('DisGeNET')
   })
 
-  test('resolves molecules from drug names for Open Targets', async () => {
+  test('does not attach Open Targets getDrugsForDisease target names as molecules (PR3a decontamination)', async () => {
     const { searchDiseases } = await import('@/lib/diseaseSearch')
     ;(opentargets.searchDiseases as jest.Mock).mockResolvedValue([
       { diseaseId: 'EFO_0000311', diseaseName: 'Type 2 diabetes', therapeuticAreas: [] },
     ])
-    ;(opentargets.getDrugsForDisease as jest.Mock).mockResolvedValue(['Metformin', 'Insulin'])
-    ;(pubchem.getMoleculeCidByName as jest.Mock)
-      .mockResolvedValueOnce(4048)
-      .mockResolvedValueOnce(null)
+    // getDrugsForDisease historically returned linked target/protein names — must not be used.
+    if (typeof opentargets.getDrugsForDisease === 'function') {
+      ;(opentargets.getDrugsForDisease as jest.Mock).mockResolvedValue(['APP', 'PSEN1'])
+    }
     ;(orphanet.searchOrphanetDiseases as jest.Mock).mockResolvedValue([])
     ;(disgenet.getGenesByDisease as jest.Mock).mockResolvedValue([])
 
     const results = await searchDiseases('diabetes', 10)
-    expect(results[0].molecules).toHaveLength(2)
-    expect(results[0].molecules![0]).toEqual({ name: 'Metformin', cid: 4048 })
-    expect(results[0].molecules![1]).toEqual({ name: 'Insulin', cid: null })
+    expect(results[0].name).toBe('Type 2 diabetes')
+    expect(results[0].source).toBe('Open Targets')
+    expect(results[0].molecules).toBeUndefined()
+    if (typeof opentargets.getDrugsForDisease === 'function') {
+      expect(opentargets.getDrugsForDisease).not.toHaveBeenCalled()
+    }
   })
 
   test('respects limit parameter', async () => {
@@ -239,23 +242,19 @@ describe('searchDiseases integration', () => {
     expect(results).toHaveLength(25)
   })
 
-  test('resolves molecules even when enrichment fails for one result', async () => {
+  test('returns OT disease hits without molecules when enrichment path is decontaminated', async () => {
     const { searchDiseases } = await import('@/lib/diseaseSearch')
     ;(opentargets.searchDiseases as jest.Mock).mockResolvedValue([
       { diseaseId: 'EFO_1', diseaseName: 'Working Disease', therapeuticAreas: [] },
       { diseaseId: 'EFO_2', diseaseName: 'Broken Disease', therapeuticAreas: [] },
     ])
-    ;(opentargets.getDrugsForDisease as jest.Mock)
-      .mockResolvedValueOnce(['Metformin'])
-      .mockRejectedValueOnce(new Error('API error'))
-    ;(pubchem.getMoleculeCidByName as jest.Mock).mockResolvedValue(4048)
     ;(orphanet.searchOrphanetDiseases as jest.Mock).mockResolvedValue([])
     ;(disgenet.getGenesByDisease as jest.Mock).mockResolvedValue([])
 
     const results = await searchDiseases('disease', 10)
     expect(results).toHaveLength(2)
     expect(results[0].name).toBe('Working Disease')
-    expect(results[0].molecules).toBeDefined()
+    expect(results[0].molecules).toBeUndefined()
     expect(results[1].name).toBe('Broken Disease')
     expect(results[1].molecules).toBeUndefined()
   })
