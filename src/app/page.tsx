@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { SearchBar } from '@/components/search/SearchBar'
 import { AdvancedSearchPanel } from '@/components/search/AdvancedSearchPanel'
 import { API_IDENTIFIER_CONFIGS, API_PARAMETERS, type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
@@ -8,16 +8,22 @@ import { FavoritesBar } from '@/components/home/FavoritesBar'
 import { GuidedTour } from '@/components/home/GuidedTour'
 import { AIBanner } from '@/components/ai/AIBanner'
 import { AIStatusIndicator } from '@/components/ai/AIStatusIndicator'
+import {
+  loadDiscoveryPreferences,
+  type TourExampleSetPref,
+} from '@/lib/discovery/preferences'
+import { examplesForTourSet } from '@/lib/discovery/tourExamples'
 
 const EXAMPLE_SEARCHES: Record<string, string[]> = {
   name: ['insulin', 'aspirin', 'metformin', 'caffeine', 'penicillin', 'amylase', 'doxorubicin', 'glucose'],
-  disease: ['diabetes', 'hypertension', 'melanoma', 'Alzheimer', 'asthma', 'rheumatoid arthritis'],
+  // disease chips are driven by tourExampleSet preference (see HomePageContent)
   gene: ['BRCA1', 'TP53', 'EGFR', 'IL6', 'ACE2', 'APOE', 'CFTR', 'MYC'],
 }
 
+/** Disease-first mode order (homepage IA default: discovery) */
 const ENTITY_MODES: { value: SearchType; label: string; icon: string }[] = [
-  { value: 'name', label: 'Molecule', icon: '🧬' },
   { value: 'disease', label: 'Disease', icon: '🦠' },
+  { value: 'name', label: 'Molecule', icon: '🧬' },
   { value: 'gene', label: 'Gene', icon: '🔬' },
 ]
 
@@ -67,10 +73,37 @@ export default function HomePage() {
 
 function HomePageContent() {
   const [isNavigating, setIsNavigating] = useState(false)
-  const [searchType, setSearchType] = useState<SearchType>('name')
+  // Disease-default search mode (PR8 IA)
+  const [searchType, setSearchType] = useState<SearchType>('disease')
   const [apiOverrides, setApiOverrides] = useState<Record<string, ApiIdentifierType>>({})
   const [apiParams, setApiParams] = useState<Record<string, ApiParamValue>>({})
+  const [tourExampleSet, setTourExampleSet] = useState<TourExampleSetPref>('mixed')
   const handleNavigating = useCallback((navigating: boolean) => setIsNavigating(navigating), [])
+
+  useEffect(() => {
+    setTourExampleSet(loadDiscoveryPreferences().tourExampleSet)
+    // Re-read when user changes tour set via GuidedTour gear (storage event is same-tab silent)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === 'biointel-discovery-prefs-v1' || e.key === null) {
+        setTourExampleSet(loadDiscoveryPreferences().tourExampleSet)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    // Poll lightly when focus returns so gear changes update chips in same tab
+    const onFocus = () => setTourExampleSet(loadDiscoveryPreferences().tourExampleSet)
+    window.addEventListener('focus', onFocus)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', onFocus)
+    }
+  }, [])
+
+  // Same-tab gear updates: listen for custom event from GuidedTour
+  useEffect(() => {
+    const onPrefs = () => setTourExampleSet(loadDiscoveryPreferences().tourExampleSet)
+    window.addEventListener('biointel-prefs-changed', onPrefs)
+    return () => window.removeEventListener('biointel-prefs-changed', onPrefs)
+  }, [])
 
   function handleApiOverride(panelId: string, idType: ApiIdentifierType) {
     setApiOverrides(prev => {
@@ -105,6 +138,21 @@ function HomePageContent() {
     setApiParams({})
   }
 
+  const diseaseExamples = examplesForTourSet(tourExampleSet)
+  const exampleChips: { label: string; href: string }[] =
+    searchType === 'disease'
+      ? diseaseExamples.map((e) => ({
+          label: e.name,
+          href: `/disease?q=${encodeURIComponent(e.query)}`,
+        }))
+      : (EXAMPLE_SEARCHES[searchType] ?? EXAMPLE_SEARCHES.name).map((s) => ({
+          label: s,
+          href:
+            searchType === 'gene'
+              ? `/gene?q=${encodeURIComponent(s)}`
+              : `/molecule/name/${encodeURIComponent(s)}`,
+        }))
+
   return (
     <main className={`min-h-screen flex flex-col items-center justify-center px-4 py-16 transition-opacity ${isNavigating ? 'opacity-60 pointer-events-none' : ''}`}>
       <div className="text-center mb-12 max-w-3xl">
@@ -112,11 +160,12 @@ function HomePageContent() {
           BioIntel Explorer
           <AIStatusIndicator />
         </h1>
+        {/* Conservative hero copy until evidence packs (PR8 / PR10) */}
         <p className="text-xl text-slate-400 mb-2">
-          The commercial and scientific landscape of biological molecules.
+          Explore diseases, targets, and molecules from free public databases.
         </p>
         <p className="text-slate-500">
-          Search molecules, diseases, and genes — explore relationships, therapeutic data, and the scientific landscape.
+          Start with a disease to browse related genes, candidates, and evidence. Public data only — not for clinical use.
         </p>
       </div>
 
@@ -160,15 +209,11 @@ function HomePageContent() {
       <div className="mt-8 text-center">
         <p className="text-xs text-slate-600 uppercase tracking-wider mb-3">Try searching for</p>
         <div className="flex flex-wrap justify-center gap-2">
-          {(EXAMPLE_SEARCHES[searchType] ?? EXAMPLE_SEARCHES.name).map(s => (
+          {exampleChips.map((chip) => (
             <ChipLink
-              key={s}
-              href={
-                searchType === 'disease' ? `/disease?q=${encodeURIComponent(s)}` :
-                searchType === 'gene' ? `/gene?q=${encodeURIComponent(s)}` :
-                `/molecule/name/${encodeURIComponent(s)}`
-              }
-              label={s}
+              key={chip.label}
+              href={chip.href}
+              label={chip.label}
               disabled={isNavigating}
             />
           ))}

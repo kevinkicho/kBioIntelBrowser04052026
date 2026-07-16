@@ -237,6 +237,12 @@ export const RUBRIC_PRESET_LABELS: Record<RubricPresetId, string> = {
   'safety-first': 'Safety-first',
 }
 
+export const TOUR_EXAMPLE_SET_LABELS: Record<TourExampleSetPref, string> = {
+  mixed: 'Mixed rare + common',
+  'common-only': 'Common-only',
+  'rare-only': 'Rare-only',
+}
+
 // ── localStorage I/O (browser only) ──────────────────────────────────────────
 
 export function loadDiscoveryPreferences(): DiscoveryPreferences {

@@ -1,101 +1,131 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import {
+  loadDiscoveryPreferences,
+  updateDiscoveryPreferences,
+  PREFERENCE_TOOLTIPS,
+  TOUR_EXAMPLE_SET_LABELS,
+  type TourExampleSetPref,
+} from '@/lib/discovery/preferences'
+import { examplesForTourSet } from '@/lib/discovery/tourExamples'
 
 const STORAGE_KEY = 'guided-tour-dismissed'
 
-interface FeaturedMolecule {
-  cid: number
-  name: string
-  hook: string
-}
+const TOUR_SET_OPTIONS: TourExampleSetPref[] = ['mixed', 'common-only', 'rare-only']
 
-const FEATURED: FeaturedMolecule[] = [
-  {
-    cid: 2244,
-    name: 'Aspirin',
-    hook: '70+ years of clinical history; ongoing trials in cancer prevention.',
-  },
-  {
-    cid: 4091,
-    name: 'Metformin',
-    hook: 'First-line for type 2 diabetes; under study for aging and longevity.',
-  },
-  {
-    cid: 3672,
-    name: 'Ibuprofen',
-    hook: 'NSAID with deep safety data and pediatric dosing references.',
-  },
-  {
-    cid: 5291,
-    name: 'Imatinib',
-    hook: 'First targeted kinase inhibitor; paradigm for precision oncology.',
-  },
-]
-
-const CATEGORIES_INLINE = [
-  { icon: '💊', label: 'Pharma' },
-  { icon: '🏥', label: 'Clinical' },
-  { icon: '🧪', label: 'Molecular' },
-  { icon: '🎯', label: 'Bioactivity' },
-  { icon: '🧬', label: 'Structure' },
-  { icon: '🧫', label: 'Genomics' },
-  { icon: '🔗', label: 'Pathways' },
-  { icon: '📚', label: 'Literature' },
-]
-
+/**
+ * Homepage first-run tour: disease examples from tourExampleSet preference.
+ * Visible when search mode is Disease (homepage default). Gear saves preference.
+ */
 export function GuidedTour({ searchType }: { searchType: string }) {
   const [mounted, setMounted] = useState(false)
   const [dismissed, setDismissed] = useState(false)
+  const [tourSet, setTourSet] = useState<TourExampleSetPref>('mixed')
+  const [gearOpen, setGearOpen] = useState(false)
 
   useEffect(() => {
     setMounted(true)
     setDismissed(localStorage.getItem(STORAGE_KEY) === '1')
+    setTourSet(loadDiscoveryPreferences().tourExampleSet)
   }, [])
 
-  function handleDismiss() {
+  const handleDismiss = useCallback(() => {
     setDismissed(true)
     localStorage.setItem(STORAGE_KEY, '1')
-  }
+  }, [])
 
-  if (!mounted || dismissed || searchType !== 'name') return null
+  const handleTourSetChange = useCallback((next: TourExampleSetPref) => {
+    setTourSet(next)
+    updateDiscoveryPreferences({ tourExampleSet: next })
+    // Notify homepage chips (same-tab; storage events do not fire for same document)
+    window.dispatchEvent(new Event('biointel-prefs-changed'))
+    setGearOpen(false)
+  }, [])
+
+  if (!mounted || dismissed || searchType !== 'disease') return null
+
+  const examples = examplesForTourSet(tourSet)
 
   return (
     <div className="w-full max-w-2xl mt-6 bg-slate-800/40 border border-slate-700 rounded-xl px-4 py-3">
-      <div className="flex items-baseline justify-between mb-2">
+      <div className="flex items-baseline justify-between gap-2 mb-2">
         <p className="text-xs text-slate-400 uppercase tracking-wider">
-          New here? Start with a curated example
+          New here? Try a disease example
         </p>
-        <button
-          onClick={handleDismiss}
-          aria-label="Dismiss tour"
-          className="text-slate-600 hover:text-slate-400 text-sm leading-none px-1"
-        >
-          ×
-        </button>
+        <div className="flex items-center gap-1">
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => setGearOpen((o) => !o)}
+              aria-label="Example set settings"
+              aria-expanded={gearOpen}
+              title={PREFERENCE_TOOLTIPS.tourExampleSet[tourSet]}
+              className="text-slate-500 hover:text-slate-300 text-sm leading-none px-1.5 py-0.5 rounded"
+            >
+              ⚙
+            </button>
+            {gearOpen && (
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-1 z-20 w-56 rounded-lg border border-slate-600 bg-slate-900 shadow-xl py-1"
+              >
+                <p className="px-3 py-1.5 text-[10px] uppercase tracking-wider text-slate-500">
+                  Example set
+                </p>
+                {TOUR_SET_OPTIONS.map((opt) => (
+                  <button
+                    key={opt}
+                    type="button"
+                    role="menuitemradio"
+                    aria-checked={tourSet === opt}
+                    title={PREFERENCE_TOOLTIPS.tourExampleSet[opt]}
+                    onClick={() => handleTourSetChange(opt)}
+                    className={`w-full text-left px-3 py-2 text-sm transition-colors ${
+                      tourSet === opt
+                        ? 'bg-indigo-900/40 text-indigo-200'
+                        : 'text-slate-300 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="font-medium">{TOUR_EXAMPLE_SET_LABELS[opt]}</span>
+                    {opt === 'mixed' && (
+                      <span className="ml-1 text-[10px] text-slate-500">(default)</span>
+                    )}
+                    <span className="block text-[11px] text-slate-500 mt-0.5 leading-snug">
+                      {PREFERENCE_TOOLTIPS.tourExampleSet[opt]}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={handleDismiss}
+            aria-label="Dismiss tour"
+            className="text-slate-600 hover:text-slate-400 text-sm leading-none px-1"
+          >
+            ×
+          </button>
+        </div>
       </div>
 
       <p className="text-[11px] text-slate-500 mb-3 leading-relaxed">
-        Each profile pulls from 110+ public APIs across nine categories:{' '}
-        {CATEGORIES_INLINE.map((c, i) => (
-          <span key={c.label} className="whitespace-nowrap">
-            <span aria-hidden>{c.icon}</span> <span className="text-slate-400">{c.label}</span>
-            {i < CATEGORIES_INLINE.length - 1 && <span className="text-slate-700"> · </span>}
-          </span>
-        ))}
+        Public data only — start from a disease to browse related targets and candidates.
+        Rankings and packs are triage aids, not clinical advice.
       </p>
 
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {FEATURED.map(m => (
+        {examples.map((ex) => (
           <a
-            key={m.cid}
-            href={`/molecule/${m.cid}`}
+            key={`${tourSet}-${ex.query}`}
+            href={`/disease?q=${encodeURIComponent(ex.query)}`}
             className="group block bg-slate-900/40 border border-slate-700/60 hover:border-indigo-700/60 hover:bg-slate-900/60 rounded-lg px-3 py-2 transition-colors"
           >
             <p className="text-sm font-semibold text-slate-200 group-hover:text-indigo-300 transition-colors">
-              {m.name}
+              {ex.name}
             </p>
-            <p className="text-[11px] text-slate-500 leading-snug mt-1">{m.hook}</p>
+            <p className="text-[11px] text-slate-500 leading-snug mt-1">{ex.hook}</p>
           </a>
         ))}
       </div>

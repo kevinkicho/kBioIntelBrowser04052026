@@ -48,12 +48,24 @@ export {
   type CollaborationModePref,
   type DiscoveryPreferencesSnapshot,
   DEFAULT_DISCOVERY_PREFERENCES,
+  DISCOVERY_PREFS_STORAGE_KEY,
   snapshotDiscoveryPreferences,
+  parseDiscoveryPreferences,
+  mergeDiscoveryPreferences,
+  scoreRubricFromPreferences,
+  harvestFlagsFromPreferences,
+  loadDiscoveryPreferences,
+  saveDiscoveryPreferences,
+  resetDiscoveryPreferences,
+  updateDiscoveryPreferences,
+  PREFERENCE_TOOLTIPS,
+  TOUR_EXAMPLE_SET_LABELS,
+  RUBRIC_PRESET_LABELS,
 } from './preferences'
 
 export {
-  buildDiscoverHref,
-  parseTargetsParam,
-  MAX_DISCOVER_TARGETS,
-  type DiscoverDeepLinkParams,
-} from './discoverUrl'
+  type TourDiseaseExample,
+  TOUR_EXAMPLE_SETS,
+  examplesForTourSet,
+  diseaseChipLabels,
+} from './tourExamples'
