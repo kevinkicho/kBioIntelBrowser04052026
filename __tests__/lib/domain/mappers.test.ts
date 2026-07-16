@@ -33,7 +33,8 @@ describe('mappers', () => {
     expect(m.origins).toEqual(
       expect.arrayContaining(['dgidb', 'clinicaltrials-intervention', 'chembl-indication']),
     )
-    expect(m.scores?.axes.clinicalStage).toBeCloseTo(0.75, 5)
+    // clinicalStage = 0.7*(maxPhase/4) + 0.3*trialNorm = 0.7*0.75 + 0.3*0.4 = 0.645
+    expect(m.scores?.axes.clinicalStage).toBeCloseTo(0.645, 5)
     expect(m.scores?.axes.efficacy).toBeCloseTo(0.8, 5)
     expect(m.scores?.axes.safety).toBeNull()
     expect(m.scores?.axisStatus.safety).toBe('not-retrieved')
