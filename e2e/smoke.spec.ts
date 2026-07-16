@@ -5,8 +5,8 @@ test.describe('BioIntel smoke', () => {
     await page.goto('/')
     await expect(page.getByRole('heading', { name: /BioIntel Explorer/i })).toBeVisible()
     await expect(page.getByPlaceholder(/Search/i).first()).toBeVisible()
-    // Example chips for molecule mode
-    await expect(page.getByRole('link', { name: /aspirin/i }).first()).toBeVisible()
+    // Disease-default homepage: example chips from mixed tour set
+    await expect(page.getByRole('link', { name: /ATTR amyloidosis|Type 2 diabetes|diabetes/i }).first()).toBeVisible()
   })
 
   test('molecule profile loads (aspirin CID 2244) and shows AI copilot fab', async ({ page }) => {

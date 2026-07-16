@@ -48,5 +48,24 @@ export {
   type CollaborationModePref,
   type DiscoveryPreferencesSnapshot,
   DEFAULT_DISCOVERY_PREFERENCES,
+  DISCOVERY_PREFS_STORAGE_KEY,
   snapshotDiscoveryPreferences,
+  parseDiscoveryPreferences,
+  mergeDiscoveryPreferences,
+  scoreRubricFromPreferences,
+  harvestFlagsFromPreferences,
+  loadDiscoveryPreferences,
+  saveDiscoveryPreferences,
+  resetDiscoveryPreferences,
+  updateDiscoveryPreferences,
+  PREFERENCE_TOOLTIPS,
+  TOUR_EXAMPLE_SET_LABELS,
+  RUBRIC_PRESET_LABELS,
 } from './preferences'
+
+export {
+  type TourDiseaseExample,
+  TOUR_EXAMPLE_SETS,
+  examplesForTourSet,
+  diseaseChipLabels,
+} from './tourExamples'
