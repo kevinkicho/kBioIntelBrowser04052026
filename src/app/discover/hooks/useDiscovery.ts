@@ -25,6 +25,8 @@ export interface DiscoveryState {
   query: string
   /** Hard-pinned disease id when set (URL or picker selection). */
   diseaseId: string | null
+  /** Gene symbols pinned via `targets=` deep-link (disease/gene CTAs). */
+  targets: string[]
   status: DiscoveryStatus
   progress: number
   progressLabel: string
@@ -36,6 +38,8 @@ export interface DiscoveryState {
 
 export interface SearchOptions {
   diseaseId?: string
+  /** Gene symbols pinned from disease/gene CTAs (URL `targets=`). */
+  targets?: string[]
 }
 
 function extractDiseaseCandidates(data: RankResult): DiseaseEntity[] {
@@ -50,6 +54,7 @@ export function useDiscovery() {
   const [state, setState] = useState<DiscoveryState>({
     query: '',
     diseaseId: null,
+    targets: [],
     status: 'idle',
     progress: 0,
     progressLabel: '',
@@ -86,8 +91,29 @@ export function useDiscovery() {
     async (query: string, options?: SearchOptions) => {
       const trimmed = query.trim()
       const diseaseId = options?.diseaseId?.trim() || undefined
+      const targets = (options?.targets ?? [])
+        .map((t) => t.trim())
+        .filter(Boolean)
+        .slice(0, 10)
 
-      if ((!trimmed || trimmed.length < 2) && !diseaseId) return
+      // Targets-only deep-link: park pins in state and wait for a disease query
+      if ((!trimmed || trimmed.length < 2) && !diseaseId) {
+        if (targets.length > 0) {
+          setState((prev) => ({
+            ...prev,
+            query: '',
+            diseaseId: null,
+            targets,
+            status: 'idle',
+            progress: 0,
+            progressLabel: '',
+            result: null,
+            diseaseCandidates: [],
+            error: null,
+          }))
+        }
+        return
+      }
 
       const effectiveQuery = trimmed.length >= 2 ? trimmed : diseaseId!
 
@@ -97,6 +123,7 @@ export function useDiscovery() {
       setState({
         query: effectiveQuery,
         diseaseId: diseaseId ?? null,
+        targets,
         status: 'loading',
         progress: 0,
         progressLabel: PROGRESS_STAGES[0].label,
@@ -113,6 +140,7 @@ export function useDiscovery() {
         else if (diseaseId) params.set('q', diseaseId)
         params.set('limit', '15')
         if (diseaseId) params.set('diseaseId', diseaseId)
+        if (targets.length > 0) params.set('targets', targets.join(','))
 
         const res = await clientFetch(`/api/discover/rank?${params.toString()}`)
         if (!res.ok) {
@@ -133,6 +161,7 @@ export function useDiscovery() {
             result: data,
             diseaseCandidates: candidates,
             diseaseId: null,
+            targets,
             error: null,
           }))
           return
@@ -146,6 +175,7 @@ export function useDiscovery() {
           result: data,
           diseaseCandidates: [],
           diseaseId: data.diseaseId ?? diseaseId ?? null,
+          targets,
           error: null,
         }))
       } catch (err) {
@@ -159,6 +189,7 @@ export function useDiscovery() {
           progressLabel: '',
           result: null,
           diseaseCandidates: [],
+          targets,
           error: err instanceof Error ? err.message : 'Search failed',
         }))
       }
@@ -169,9 +200,9 @@ export function useDiscovery() {
   const confirmDisease = useCallback(
     (diseaseId: string) => {
       if (!state.query) return
-      return search(state.query, { diseaseId })
+      return search(state.query, { diseaseId, targets: state.targets })
     },
-    [search, state.query],
+    [search, state.query, state.targets],
   )
 
   const reset = useCallback(() => {
@@ -180,6 +211,7 @@ export function useDiscovery() {
     setState({
       query: '',
       diseaseId: null,
+      targets: [],
       status: 'idle',
       progress: 0,
       progressLabel: '',

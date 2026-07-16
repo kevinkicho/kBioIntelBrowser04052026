@@ -50,3 +50,10 @@ export {
   DEFAULT_DISCOVERY_PREFERENCES,
   snapshotDiscoveryPreferences,
 } from './preferences'
+
+export {
+  buildDiscoverHref,
+  parseTargetsParam,
+  MAX_DISCOVER_TARGETS,
+  type DiscoverDeepLinkParams,
+} from './discoverUrl'

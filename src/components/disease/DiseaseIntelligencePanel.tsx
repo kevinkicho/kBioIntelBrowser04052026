@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import {
   type DiseaseDetailContext,
@@ -9,6 +10,7 @@ import {
   buildDiseaseTherapeuticGapPrompt,
   buildDiseaseConnectionMapPrompt,
 } from '@/lib/ai/diseasePrompts'
+import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { renderSimpleMarkdown } from '@/lib/sanitize'
 
 interface AnalysisCard {
@@ -48,6 +50,17 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
 
   const aiAvailable = ai.enabled && ai.status === 'available'
   const hasSomeData = context.genes.length > 0 || context.drugInterventions.length > 0 || context.molecules.length > 0
+
+  const topTargets = context.genes
+    .slice(0, 5)
+    .map((g) => g.geneSymbol)
+    .filter(Boolean)
+
+  const discoverHref = buildDiscoverHref({
+    q: context.diseaseName,
+    diseaseId: context.diseaseId,
+    targets: topTargets.length > 0 ? topTargets : undefined,
+  })
 
   useEffect(() => {
     mountedRef.current = true
@@ -136,11 +149,19 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
 
   return (
     <section className="mb-8">
-      <div className="flex items-center gap-3 mb-1">
+      <div className="flex flex-wrap items-center gap-3 mb-1">
         <h2 className="text-xl font-semibold text-slate-100">Disease Intelligence</h2>
         {aiAvailable && (
           <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800/50">AI-Powered</span>
         )}
+        <Link
+          href={discoverHref}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-300 transition-colors hover:border-emerald-500 hover:bg-emerald-900/50 hover:text-emerald-200"
+          data-testid="disease-intelligence-discover-cta"
+        >
+          Rank candidates in Discover
+          <span aria-hidden>→</span>
+        </Link>
       </div>
       <p className="text-sm text-slate-400 mb-4">AI-synthesized insights connecting genes, drugs, and therapeutic opportunities</p>
 

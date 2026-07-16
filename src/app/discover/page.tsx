@@ -12,6 +12,7 @@ import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
 import type { DiseaseGene } from '@/lib/candidateRanker'
 import type { DiseaseEntity } from '@/lib/domain/entities'
+import { parseTargetsParam } from '@/lib/discovery/discoverUrl'
 
 function GeneTable({ genes }: { genes: DiseaseGene[] }) {
   if (genes.length === 0) return null
@@ -48,31 +49,35 @@ export default function DiscoverPage() {
   const router = useRouter()
   const initialQuery = searchParams.get('q') ?? ''
   const initialDiseaseId = searchParams.get('diseaseId') ?? undefined
+  const initialTargets = parseTargetsParam(searchParams.get('targets'))
   const { state, search, confirmDisease, reset } = useDiscovery()
   const bootstrapped = useRef(false)
 
-  // Deep link: /discover?q=...&diseaseId=... — diseaseId skips picker
+  // Deep link: /discover?q=&diseaseId=&targets= — diseaseId skips picker; targets pin genes
   useEffect(() => {
     if (bootstrapped.current) return
-    if (!initialQuery && !initialDiseaseId) return
+    if (!initialQuery && !initialDiseaseId && initialTargets.length === 0) return
     bootstrapped.current = true
-    void search(initialQuery || initialDiseaseId!, {
+    void search(initialQuery || initialDiseaseId || '', {
       diseaseId: initialDiseaseId,
+      targets: initialTargets,
     })
-  }, [initialQuery, initialDiseaseId, search])
+  }, [initialQuery, initialDiseaseId, initialTargets, search])
 
   function handleSearch(query: string) {
-    // Fresh text search clears any prior disease pin in the URL
+    // Fresh text search clears any prior disease pin; keep target pins from deep-link
     const params = new URLSearchParams()
     params.set('q', query)
+    if (state.targets.length > 0) params.set('targets', state.targets.join(','))
     router.replace(`/discover?${params.toString()}`, { scroll: false })
-    void search(query)
+    void search(query, { targets: state.targets })
   }
 
   function handleDiseaseSelect(diseaseId: string, _disease: DiseaseEntity) {
     const params = new URLSearchParams()
     if (state.query) params.set('q', state.query)
     params.set('diseaseId', diseaseId)
+    if (state.targets.length > 0) params.set('targets', state.targets.join(','))
     router.replace(`/discover?${params.toString()}`, { scroll: false })
     void confirmDisease(diseaseId)
   }
@@ -90,6 +95,29 @@ export default function DiscoverPage() {
           isLoading={state.status === 'loading'}
           initialQuery={initialQuery}
         />
+
+        {state.targets.length > 0 && (
+          <div
+            className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-emerald-800/40 bg-emerald-950/30 px-4 py-2.5"
+            data-testid="discover-pinned-targets"
+          >
+            <span className="text-xs text-slate-400">Pinned targets</span>
+            {state.targets.map((symbol) => (
+              <Link
+                key={symbol}
+                href={`/gene?q=${encodeURIComponent(symbol)}`}
+                className="text-xs font-mono font-semibold px-2 py-0.5 rounded-md bg-emerald-900/40 text-emerald-300 border border-emerald-800/50 hover:border-emerald-500 transition-colors"
+              >
+                {symbol}
+              </Link>
+            ))}
+            {state.status === 'idle' && !state.query && (
+              <span className="text-xs text-slate-500 ml-1">
+                Enter a disease above to rank candidates for these targets
+              </span>
+            )}
+          </div>
+        )}
 
         <DiscoveryProgress state={state} />
 
@@ -109,6 +137,7 @@ export default function DiscoverPage() {
             onRetry={() =>
               search(state.query, {
                 diseaseId: state.diseaseId ?? undefined,
+                targets: state.targets,
               })
             }
           />

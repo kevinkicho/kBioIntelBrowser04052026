@@ -8,6 +8,7 @@ import { AICopilot } from '@/components/ai/AICopilot'
 import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
 import { EmptySection, ErrorSection } from '@/components/ui/DataStatus'
 import type { SectionStatus } from '@/lib/dataStatus'
+import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -72,7 +73,15 @@ function GeneOverview({ overview }: { overview: GeneOverviewType | null }) {
   )
 }
 
-function GeneDiseasesPanel({ data, status }: { data: Record<string, unknown> | null; status?: SectionStatus }) {
+function GeneDiseasesPanel({
+  data,
+  status,
+  geneSymbol,
+}: {
+  data: Record<string, unknown> | null
+  status?: SectionStatus
+  geneSymbol?: string
+}) {
   const diseases = (data?.geneDiseases as Record<string, unknown>)?.disgenetAssociations as Array<{ diseaseName: string; score: number; diseaseId: string; source: string; geneSymbol?: string }> | undefined
   if (status?.status === 'error') return <ErrorSection label="disease associations" error={status.error} />
   if (!diseases || diseases.length === 0) return <EmptySection label="disease associations" hint="DisGeNET may not have associations for this gene" />
@@ -80,12 +89,27 @@ function GeneDiseasesPanel({ data, status }: { data: Record<string, unknown> | n
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-3">Associated Diseases ({diseases.length})</h3>
       <div className="space-y-2 max-h-96 overflow-y-auto">
-        {diseases.slice(0, 30).map((d, i) => (
-          <div key={`${d.diseaseId}-${i}`} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
-            <Link href={`/disease?q=${encodeURIComponent(d.diseaseName)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2">{d.diseaseName}</Link>
-            <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 shrink-0">{d.score.toFixed(2)}</span>
-          </div>
-        ))}
+        {diseases.slice(0, 30).map((d, i) => {
+          const discoverHref = buildDiscoverHref({
+            q: d.diseaseName,
+            targets: geneSymbol ? [geneSymbol] : undefined,
+          })
+          return (
+            <div key={`${d.diseaseId}-${i}`} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
+              <Link href={`/disease?q=${encodeURIComponent(d.diseaseName)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2 min-w-0">{d.diseaseName}</Link>
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  href={discoverHref}
+                  className="text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/30 text-emerald-300 hover:border-emerald-500 hover:text-emerald-200 transition-colors"
+                  title={`Rank candidates for ${d.diseaseName}${geneSymbol ? ` with target ${geneSymbol}` : ''}`}
+                >
+                  Discover
+                </Link>
+                <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">{d.score.toFixed(2)}</span>
+              </div>
+            </div>
+          )
+        })}
       </div>
     </div>
   )
@@ -345,14 +369,24 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
               <h1 className="text-3xl font-bold text-slate-100">{displaySymbol}</h1>
               <p className="text-base text-slate-400">{displayName}</p>
             </div>
-            <a
-              href={displayUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500 transition-colors shrink-0"
-            >
-              NCBI Gene ↗
-            </a>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Link
+                href={buildDiscoverHref({ targets: displaySymbol })}
+                className="text-xs px-3 py-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/40 text-emerald-300 hover:border-emerald-500 hover:bg-emerald-900/60 hover:text-emerald-200 transition-colors"
+                data-testid="gene-page-discover-cta"
+                title={`Pin ${displaySymbol} as a discover target`}
+              >
+                Discover with target →
+              </Link>
+              <a
+                href={displayUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500 transition-colors"
+              >
+                NCBI Gene ↗
+              </a>
+            </div>
           </div>
 
           <div className="flex flex-wrap gap-1.5 mt-2">
@@ -420,7 +454,9 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
           <div>
             {activePanel === 'gene-overview' && <GeneOverview overview={overview} />}
             {activePanel === 'gene_drugs' && <TargetedDrugsPanel data={categoryData} />}
-            {activePanel === 'gene-diseases' && <GeneDiseasesPanel data={categoryData} />}
+            {activePanel === 'gene-diseases' && (
+              <GeneDiseasesPanel data={categoryData} status={sectionStatus.diseases} geneSymbol={displaySymbol} />
+            )}
             {activePanel === 'gene-variants' && <GeneVariantsPanel data={categoryData} />}
             {activePanel === 'gene-expression' && <GeneExpressionPanel data={categoryData} />}
             {activePanel === 'gene-pathways' && <GenePathwaysPanel data={categoryData} />}

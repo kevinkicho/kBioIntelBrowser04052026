@@ -1,6 +1,7 @@
 import { searchDiseases, getDiseaseGeneAssociations, deduplicateMolecules } from '@/lib/diseaseSearch'
 import { searchClinicalTrialsByCondition, sortTrials, extractDrugInterventions } from '@/lib/api/clinicaltrials'
 import { DiseaseIntelligencePanel } from '@/components/disease/DiseaseIntelligencePanel'
+import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import Link from 'next/link'
 
 interface DiseasePageProps {
@@ -48,8 +49,20 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
     }, {}),
   }
 
+  const topTargetSymbols = genes
+    .slice(0, 5)
+    .map((g) => g.geneSymbol)
+    .filter(Boolean)
+
+  const discoverHref = buildDiscoverHref({
+    q: diseaseName,
+    diseaseId: id,
+    targets: topTargetSymbols.length > 0 ? topTargetSymbols : undefined,
+  })
+
   const intelligenceContext = {
     diseaseName,
+    diseaseId: id,
     description,
     therapeuticAreas,
     genes,
@@ -68,13 +81,23 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
         </nav>
 
         <div className="bg-slate-900/80 border border-slate-700/60 rounded-2xl p-8 mb-8">
-          <div className="flex items-start gap-4 mb-4">
-            <h1 className="text-3xl font-bold text-slate-100 flex-1">{diseaseName}</h1>
-            {source && (
-              <span className="text-xs px-3 py-1.5 rounded-full bg-slate-700/80 text-slate-300 border border-slate-600/50 whitespace-nowrap self-start mt-1">
-                {source}
-              </span>
-            )}
+          <div className="flex flex-wrap items-start gap-4 mb-4">
+            <h1 className="text-3xl font-bold text-slate-100 flex-1 min-w-0">{diseaseName}</h1>
+            <div className="flex flex-wrap items-center gap-2 shrink-0 self-start mt-1">
+              {source && (
+                <span className="text-xs px-3 py-1.5 rounded-full bg-slate-700/80 text-slate-300 border border-slate-600/50 whitespace-nowrap">
+                  {source}
+                </span>
+              )}
+              <Link
+                href={discoverHref}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/40 px-3.5 py-1.5 text-xs font-semibold text-emerald-300 transition-colors hover:border-emerald-500 hover:bg-emerald-900/60 hover:text-emerald-200"
+                data-testid="disease-page-discover-cta"
+              >
+                Discover candidates
+                <span aria-hidden>→</span>
+              </Link>
+            </div>
           </div>
 
           {description && (

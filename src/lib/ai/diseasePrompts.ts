@@ -2,6 +2,8 @@ import type { GeneAssociation } from '../diseaseSearch'
 
 export interface DiseaseDetailContext {
   diseaseName: string
+  /** Registry id when known (OT EFO, etc.) — used for Discover deep-links */
+  diseaseId?: string
   description?: string
   therapeuticAreas: string[]
   genes: GeneAssociation[]
