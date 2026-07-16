@@ -66,13 +66,56 @@ export const AXIS_LABELS: Record<ScoreAxisKey, string> = {
   identityTrust: 'Identity trust',
 }
 
+/** Shared axis display order (clinical precedence first). Single source of truth. */
 export const AXIS_ORDER: ScoreAxisKey[] = [
-  'efficacy',
   'clinicalStage',
+  'efficacy',
   'safety',
   'novelty',
   'identityTrust',
 ]
+
+/** Max encoded length for optional full `scores` query on molecule deep-links. */
+export const MOLECULE_LINK_SCORES_MAX_ENCODED = 1500
+
+export interface BuildMoleculeLinkUrlInput {
+  cid: number
+  rank: number
+  diseaseName: string
+  /** Composite 0–1 (always attached as `score=` for backward compatibility). */
+  score: number
+  /** Optional full ScoreVector; attached only when encoded JSON ≤ ~1500 chars. */
+  scores?: ScoreVector | null
+  projectId?: string | null
+}
+
+/**
+ * Build molecule profile deep-link from Discover (or board).
+ * Always includes composite `score=`. Optionally attaches compact `scores` JSON
+ * when length-safe; prefer `project=` when the candidate is already on a board.
+ */
+export function buildMoleculeLinkUrl(input: BuildMoleculeLinkUrlInput): string {
+  const params = new URLSearchParams({
+    from: 'discover',
+    disease: input.diseaseName,
+    rank: String(input.rank),
+    score: input.score.toFixed(2),
+  })
+  if (input.projectId) {
+    params.set('project', input.projectId)
+  }
+  if (input.scores) {
+    try {
+      const encoded = encodeURIComponent(JSON.stringify(input.scores))
+      if (encoded.length <= MOLECULE_LINK_SCORES_MAX_ENCODED) {
+        params.set('scores', JSON.stringify(input.scores))
+      }
+    } catch {
+      // omit scores on serialization failure
+    }
+  }
+  return `/molecule/${input.cid}?${params.toString()}`
+}
 
 export function isProfileMode(value: unknown): value is ProfileMode {
   return value === 'decision' || value === 'full'

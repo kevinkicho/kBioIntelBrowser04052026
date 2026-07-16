@@ -28,6 +28,8 @@ export {
   addPackIndexEntryAndSave,
 } from './store'
 
+export { mergeMoleculeCandidate } from '@/lib/domain'
+
 export {
   PROJECT_EXPORT_SCHEMA_VERSION,
   type ProjectExportBundle,

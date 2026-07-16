@@ -100,6 +100,9 @@ export {
   mapRankResultToDiscoveryResult,
 } from './mappers'
 
+// Candidate merge (board save)
+export { mergeMoleculeCandidate } from './mergeCandidate'
+
 // Discovery preferences (types + defaults + pure helpers; re-export for domain entrypoint)
 export {
   type DiscoveryPreferences,

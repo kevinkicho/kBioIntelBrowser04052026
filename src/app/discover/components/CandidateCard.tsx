@@ -1,17 +1,22 @@
 'use client'
 
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import Link from 'next/link'
-import { useAI } from '@/lib/ai/useAI'
-import { buildDiscoverRationalePrompt } from '@/lib/ai/promptTemplates'
 import type { CandidateMolecule } from '@/lib/candidateRanker'
 import {
   mapLegacyCandidateToMoleculeCandidate,
   type MoleculeCandidate,
+  type ScoreRubric,
+  type ScoreVector,
+  createDefaultScoreRubric,
 } from '@/lib/domain'
 import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
 import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
+import { buildMoleculeLinkUrl, AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import { ConfidenceBadge } from './DiscoveryProgress'
+import { ScoreAxisBars } from './ScoreAxisBars'
+
+export { buildMoleculeLinkUrl }
 
 interface Props {
   candidate: CandidateMolecule
@@ -20,15 +25,12 @@ interface Props {
   topCandidates: CandidateMolecule[]
   diseaseGenes?: { symbol: string; score: number }[]
   /**
-   * Resolved domain candidate from RankResult.v2 (InChIKey + IdentityTrust).
+   * Resolved domain candidate from RankResult.v2 (InChIKey + ScoreVector).
    * Falls back to mapping the legacy DTO when omitted.
    */
   domainCandidate?: MoleculeCandidate
-}
-
-function buildMoleculeLinkUrl(cid: number, rank: number, diseaseName: string, score: number): string {
-  const params = new URLSearchParams({ from: 'discover', disease: diseaseName, rank: String(rank), score: score.toFixed(2) })
-  return `/molecule/${cid}?${params.toString()}`
+  /** Live scoring rubric (weights for explainer). */
+  rubric?: ScoreRubric
 }
 
 const PHASE_LABELS: Record<number, string> = {
@@ -82,32 +84,69 @@ function SourcePill({ source, query, cid }: { source: string; query?: string; ci
   )
 }
 
-function ScoreExplainer() {
+/** Weight-aware composite explainer from live rubric (five axes). */
+function ScoreExplainer({
+  rubric,
+  scores,
+}: {
+  rubric?: ScoreRubric
+  scores?: ScoreVector
+}) {
   const [open, setOpen] = useState(false)
+  const weights = rubric?.weights ?? scores?.weights ?? createDefaultScoreRubric('balanced').weights
+  const preset = rubric?.preset ?? scores?.rubricId ?? 'balanced'
+
   return (
     <div className="relative inline-block">
       <button
-        onClick={() => setOpen(v => !v)}
+        onClick={() => setOpen((v) => !v)}
         className="text-slate-500 hover:text-slate-300 transition-colors"
         aria-label="How is this score calculated?"
         type="button"
+        data-testid="score-explainer-toggle"
       >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            strokeWidth={2}
+            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+          />
+        </svg>
       </button>
       {open && (
-        <div className="absolute z-50 left-0 top-5 w-72 bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl text-xs text-slate-300 leading-relaxed">
+        <div
+          className="absolute z-50 left-0 top-5 w-72 bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl text-xs text-slate-300 leading-relaxed"
+          data-testid="score-explainer-panel"
+        >
           <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">Composite Score Methodology</span>
-            <button onClick={() => setOpen(false)} className="text-slate-500 hover:text-slate-300" type="button">&times;</button>
+            <span className="font-semibold text-slate-200">Multi-axis composite</span>
+            <button
+              onClick={() => setOpen(false)}
+              className="text-slate-500 hover:text-slate-300"
+              type="button"
+            >
+              &times;
+            </button>
           </div>
-          <p className="mb-2">The composite score is a weighted sum of four normalized components:</p>
+          <p className="mb-2">
+            Weighted sum over five axes (preset: <span className="text-slate-200">{String(preset)}</span>
+            ). Missing axes are renormalized or penalized per rubric — never invented by AI.
+          </p>
           <div className="space-y-1 mb-2">
-            <div className="flex justify-between"><span className="text-indigo-400">Clinical Phase</span><span className="text-slate-400">35%</span></div>
-            <div className="flex justify-between"><span className="text-indigo-400">Gene Association</span><span className="text-slate-400">25%</span></div>
-            <div className="flex justify-between"><span className="text-emerald-400">Target Match</span><span className="text-slate-400">20%</span></div>
-            <div className="flex justify-between"><span className="text-amber-400">Trial Volume</span><span className="text-slate-400">20%</span></div>
+            {AXIS_ORDER.map((key) => (
+              <div key={key} className="flex justify-between">
+                <span className="text-indigo-400">{AXIS_LABELS[key]}</span>
+                <span className="text-slate-400 tabular-nums">
+                  {Math.round(weights[key] * 100)}%
+                </span>
+              </div>
+            ))}
           </div>
-          <p className="text-[10px] text-slate-500">Clinical Phase uses the max ChEMBL indication phase for this disease. Gene Association reflects DisGeNET gene-disease overlap. Target Match is the fraction of disease-associated targets this molecule modulates. Trial Volume is log-normalized clinical trial count for this condition.</p>
+          <p className="text-[10px] text-slate-500">
+            Safety / novelty fill after harvest. Null axes show status chips (not zero). Soft AE
+            flags appear as badges and do not hard-penalize unless configured.
+          </p>
         </div>
       )}
     </div>
@@ -123,12 +162,16 @@ function CompositeScoreRing({ score }: { score: number }) {
   const strokeColor = pct >= 70 ? '#34d399' : pct >= 40 ? '#fbbf24' : '#94a3b8'
 
   return (
-    <div className="flex-shrink-0 relative w-16 h-16">
+    <div className="flex-shrink-0 relative w-16 h-16" data-testid="composite-score-ring">
       <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
         <circle cx="32" cy="32" r={radius} fill="none" stroke="#1e293b" strokeWidth="4" />
         <circle
-          cx="32" cy="32" r={radius} fill="none"
-          stroke={strokeColor} strokeWidth="4"
+          cx="32"
+          cy="32"
+          r={radius}
+          fill="none"
+          stroke={strokeColor}
+          strokeWidth="4"
           strokeDasharray={circumference}
           strokeDashoffset={offset}
           strokeLinecap="round"
@@ -142,87 +185,29 @@ function CompositeScoreRing({ score }: { score: number }) {
   )
 }
 
-function WhyRationalePanel({ diseaseName, candidate, topCandidates, diseaseGenes }: { diseaseName: string; candidate: CandidateMolecule; topCandidates: CandidateMolecule[]; diseaseGenes?: { symbol: string; score: number }[] }) {
-  const ai = useAI()
-  const [rationale, setRationale] = useState<string | null>(null)
-  const [isLoading, setIsLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  const handleAskWhy = useCallback(async () => {
-    if (rationale) {
-      setRationale(null)
-      return
-    }
-
-    if (!ai.enabled || ai.status !== 'available') {
-      setError('Connect Ollama to get AI-powered insights. Click the AI button in the bottom-right to configure.')
-      return
-    }
-
-    setIsLoading(true)
-    setError(null)
-    setRationale('')
-
-    try {
-      const { system, user } = buildDiscoverRationalePrompt(diseaseName, candidate, topCandidates, diseaseGenes)
-      const messages = [
-        { role: 'system' as const, content: system },
-        { role: 'user' as const, content: user },
-      ]
-
-      let fullText = ''
-      for await (const token of ai.askAI(messages)) {
-        fullText += token
-        setRationale(fullText)
-      }
-    } catch (err) {
-      if (err instanceof DOMException && err.name === 'AbortError') return
-      setError(err instanceof Error ? err.message : 'Failed to get AI response')
-      setRationale(null)
-    } finally {
-      setIsLoading(false)
-    }
-  }, [ai, diseaseName, candidate, topCandidates, diseaseGenes, rationale])
-
-  return (
-    <div className="mt-3 border-t border-slate-700/40 pt-3">
-      <button
-        onClick={handleAskWhy}
-        disabled={isLoading}
-        className="inline-flex items-center gap-1.5 text-xs font-medium text-indigo-400 hover:text-indigo-300 transition-colors disabled:opacity-50"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" /></svg>
-        {isLoading ? 'Analyzing...' : rationale ? 'Hide explanation' : `Why ranked #${topCandidates.findIndex(c => c.name === candidate.name) + 1}?`}
-      </button>
-      {error && (
-        <p className="text-[10px] text-amber-400 mt-1.5">{error}</p>
-      )}
-      {rationale && (
-        <div className="mt-2 text-xs text-slate-300 leading-relaxed bg-slate-800/40 rounded-lg p-3 border border-slate-700/30">
-          {rationale}
-        </div>
-      )}
-    </div>
-  )
-}
-
 export function CandidateCard({
   candidate,
   rank,
   diseaseName,
-  topCandidates,
-  diseaseGenes,
   domainCandidate: domainCandidateProp,
+  rubric,
 }: Props) {
-  const phaseLabel = PHASE_LABELS[candidate.clinicalPhaseRaw] ?? (candidate.clinicalPhaseRaw > 0 ? `Phase ${candidate.clinicalPhaseRaw}` : 'Preclinical')
+  const phaseLabel =
+    PHASE_LABELS[candidate.clinicalPhaseRaw] ??
+    (candidate.clinicalPhaseRaw > 0 ? `Phase ${candidate.clinicalPhaseRaw}` : 'Preclinical')
   const hasCid = candidate.cid !== null && candidate.cid !== undefined
 
   const domainCandidate = useMemo(
-    () => domainCandidateProp ?? mapLegacyCandidateToMoleculeCandidate(candidate),
-    [domainCandidateProp, candidate],
+    () =>
+      domainCandidateProp ??
+      mapLegacyCandidateToMoleculeCandidate(candidate, rubric ? { rubric } : undefined),
+    [domainCandidateProp, candidate, rubric],
   )
 
   const identity = domainCandidate.identity
+  const scores = domainCandidate.scores
+  const compositeScore = scores?.composite ?? candidate.compositeScore
+
   const identityKeys = useMemo(
     () => ({
       inchiKey: identity.inchiKey,
@@ -237,10 +222,20 @@ export function CandidateCard({
     [identity],
   )
 
+  const profileHref = hasCid
+    ? buildMoleculeLinkUrl({
+        cid: candidate.cid!,
+        rank,
+        diseaseName,
+        score: compositeScore,
+        scores: scores ?? null,
+      })
+    : null
+
   const cardContent = (
     <>
       <div className="flex items-start gap-3">
-        <CompositeScoreRing score={candidate.compositeScore} />
+        <CompositeScoreRing score={compositeScore} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-xs font-mono text-slate-500">#{rank}</span>
@@ -257,10 +252,7 @@ export function CandidateCard({
             </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
-            <IdentityTrustBadge
-              level={identity.identityTrust}
-              keys={identityKeys}
-            />
+            <IdentityTrustBadge level={identity.identityTrust} keys={identityKeys} />
             <ConfidenceBadge confidence={candidate.confidence} />
             {candidate.clinicalPhaseRaw > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-900/30 text-indigo-300 border border-indigo-700/50 font-medium">
@@ -283,33 +275,17 @@ export function CandidateCard({
           />
           <div className="flex items-center gap-1.5 mb-1">
             <span className="text-[10px] font-medium text-slate-400">Score breakdown</span>
-            <ScoreExplainer />
+            <ScoreExplainer rubric={rubric} scores={scores} />
           </div>
-          <div className="space-y-1.5 mb-2">
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-500 w-24 shrink-0">Gene Score</span>
-              <div className="flex-1 bg-slate-700/50 rounded-full h-1.5">
-                <div className="h-1.5 rounded-full bg-indigo-500 transition-all duration-500" style={{ width: `${Math.round(candidate.geneAssociationScore * 100)}%` }} />
-              </div>
-              <span className="text-[10px] text-slate-400 w-8 text-right">{Math.round(candidate.geneAssociationScore * 100)}%</span>
+          {scores ? (
+            <div className="mb-2">
+              <ScoreAxisBars scores={scores} rubric={rubric} />
             </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-500 w-24 shrink-0">Target Match</span>
-              <div className="flex-1 bg-slate-700/50 rounded-full h-1.5">
-                <div className="h-1.5 rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${Math.round(candidate.sharedTargetRatio * 100)}%` }} />
-              </div>
-              <span className="text-[10px] text-slate-400 w-8 text-right">{Math.round(candidate.sharedTargetRatio * 100)}%</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-slate-500 w-24 shrink-0">Trial Volume</span>
-              <div className="flex-1 bg-slate-700/50 rounded-full h-1.5">
-                <div className="h-1.5 rounded-full bg-amber-500 transition-all duration-500" style={{ width: `${Math.round(candidate.trialCountNorm * 100)}%` }} />
-              </div>
-              <span className="text-[10px] text-slate-400 w-8 text-right">{Math.round(candidate.trialCountNorm * 100)}%</span>
-            </div>
-          </div>
+          ) : (
+            <p className="text-[10px] text-slate-600 mb-2">No multi-axis scores available.</p>
+          )}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {candidate.sources.map(s => (
+            {candidate.sources.map((s) => (
               <SourcePill key={s} source={s} query={diseaseName} cid={candidate.cid} />
             ))}
             {candidate.trialCountRaw > 0 && (
@@ -319,13 +295,13 @@ export function CandidateCard({
             )}
             {candidate.sharedTargetCountRaw > 0 && (
               <span className="text-[10px] text-slate-500">
-                {candidate.sharedTargetCountRaw} target{candidate.sharedTargetCountRaw !== 1 ? 's' : ''}
+                {candidate.sharedTargetCountRaw} target
+                {candidate.sharedTargetCountRaw !== 1 ? 's' : ''}
               </span>
             )}
           </div>
         </div>
       </div>
-      <WhyRationalePanel diseaseName={diseaseName} candidate={candidate} topCandidates={topCandidates} diseaseGenes={diseaseGenes} />
     </>
   )
 
@@ -334,15 +310,18 @@ export function CandidateCard({
       className={`bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 transition-colors ${
         hasCid ? 'hover:border-indigo-600/50' : 'opacity-80'
       }`}
+      data-testid="candidate-card"
     >
       {cardContent}
-      {hasCid ? (
+      {profileHref ? (
         <Link
-          href={buildMoleculeLinkUrl(candidate.cid!, rank, diseaseName, candidate.compositeScore)}
+          href={profileHref}
           className="mt-3 text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
         >
           View full profile
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+          </svg>
         </Link>
       ) : (
         <p className="mt-2 text-[10px] text-slate-600">No PubChem CID — limited data available</p>

@@ -8,6 +8,7 @@
 import type { BoardStatus, MoleculeCandidate, Project, ProjectPackIndexEntry } from '@/lib/domain'
 import type { DiseaseEntity } from '@/lib/domain'
 import type { ScoreRubric } from '@/lib/domain'
+import { mergeMoleculeCandidate } from '@/lib/domain'
 
 export const PROJECT_KEY_PREFIX = 'biointel-project-v1-'
 export const PROJECT_INDEX_KEY = 'biointel-project-index-v1'
@@ -116,10 +117,7 @@ export function addCandidateToProject(
   if (existingIdx >= 0) {
     nextCandidates = project.candidates.map((c, i) =>
       i === existingIdx
-        ? {
-            ...candidate,
-            boardStatus: candidate.boardStatus ?? c.boardStatus ?? 'untriaged',
-          }
+        ? mergeMoleculeCandidate(c, candidate, project.rubric)
         : c,
     )
   } else {
