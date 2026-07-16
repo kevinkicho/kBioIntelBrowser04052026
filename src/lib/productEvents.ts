@@ -16,6 +16,7 @@ export type ProductEventName =
   | 'hypothesis_send_to_board' // M8
   | 'similarity_expand'
   | 'pack_share'
+  | 'source_status_shown' // M6 — SourceStatusStrip (PR-V2-07)
 
 export interface ProductEvent {
   name: ProductEventName
