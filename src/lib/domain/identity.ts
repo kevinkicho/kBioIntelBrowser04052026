@@ -51,13 +51,17 @@ export function isValidInchiKey(raw: string | undefined | null): boolean {
   return !!v && INCHIKEY_RE.test(v)
 }
 
+/**
+ * Accept only CHEMBL + digits (or bare numeric → CHEMBL{n}).
+ * Garbage strings return undefined so candidateId falls through to CID/name.
+ */
 export function normalizeChemblId(raw: string | undefined | null): string | undefined {
   if (!raw) return undefined
   const t = raw.trim().toUpperCase()
   if (!t) return undefined
-  if (t.startsWith('CHEMBL')) return t
+  if (/^CHEMBL\d+$/.test(t)) return t
   if (/^\d+$/.test(t)) return `CHEMBL${t}`
-  return t
+  return undefined
 }
 
 export function normalizeCid(raw: number | string | null | undefined): number | null {

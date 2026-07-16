@@ -5,15 +5,11 @@
 
 import type { SourceFetchStatus } from '../dataStatus'
 import type { CandidateMolecule, DiseaseGene, RankResult } from '../candidateRanker'
+import type { DiscoveryPreferencesSnapshot } from '../discovery/preferences'
 import type { DiseaseEntity, MoleculeCandidate, TargetEntity } from './entities'
-import { createDefaultScoreRubric, type RubricPresetId, type ScorePhase, type ScoreRubric } from './score'
+import { createDefaultScoreRubric, type ScorePhase, type ScoreRubric } from './score'
 
-/** Preference fields snapshotted onto a discovery run (subset of full prefs). */
-export interface DiscoveryPreferencesSnapshot {
-  rubricPreset: RubricPresetId
-  aeAggressiveness: 'soft-flag' | 'hard-penalty'
-  harvestTiming: 'board-promote' | 'rank-time'
-}
+export type { DiscoveryPreferencesSnapshot }
 
 export type DiscoveryTimingStage =
   | 'disease'
@@ -36,10 +32,9 @@ export interface DiscoveryResult {
   /**
    * Multi-hit disease options (disambiguation).
    * When length > 1 and no hard diseaseId pin → needsDiseaseConfirmation should be true.
+   * Single writer field — do not invent a parallel `diseases` array.
    */
   diseaseCandidates?: DiseaseEntity[]
-  /** @deprecated Prefer diseaseCandidates — kept for wire docs that say diseases */
-  diseases?: DiseaseEntity[]
   needsDiseaseConfirmation: boolean
   targets: TargetEntity[]
   candidates: MoleculeCandidate[]

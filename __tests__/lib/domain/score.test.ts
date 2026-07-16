@@ -111,5 +111,43 @@ describe('score defaults', () => {
       expect(c).toBeCloseTo(expected, 5)
       expect(c).toBeLessThan(1)
     })
+
+    it('all-null axes under renormalize yield 0', () => {
+      const c = computeComposite(
+        {
+          efficacy: null,
+          clinicalStage: null,
+          safety: null,
+          novelty: null,
+          identityTrust: null,
+        },
+        balanced,
+      )
+      expect(c).toBe(0)
+    })
+
+    it('zero weights yield 0', () => {
+      const c = computeComposite(
+        {
+          efficacy: 1,
+          clinicalStage: 1,
+          safety: 1,
+          novelty: 1,
+          identityTrust: 1,
+        },
+        {
+          weights: {
+            efficacy: 0,
+            clinicalStage: 0,
+            safety: 0,
+            novelty: 0,
+            identityTrust: 0,
+          },
+          missingAxisPolicy: 'renormalize',
+        },
+      )
+      expect(c).toBe(0)
+    })
   })
 })
+

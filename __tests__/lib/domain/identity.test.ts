@@ -19,10 +19,14 @@ describe('identity trust', () => {
       expect(isValidInchiKey('bad')).toBe(false)
     })
 
-    it('normalizes ChEMBL ids', () => {
+    it('normalizes ChEMBL ids and rejects garbage', () => {
       expect(normalizeChemblId('25')).toBe('CHEMBL25')
       expect(normalizeChemblId('chembl25')).toBe('CHEMBL25')
+      expect(normalizeChemblId('CHEMBL25')).toBe('CHEMBL25')
       expect(normalizeChemblId('')).toBeUndefined()
+      expect(normalizeChemblId('CHEMBL')).toBeUndefined()
+      expect(normalizeChemblId('not-chembl')).toBeUndefined()
+      expect(normalizeChemblId('FOO')).toBeUndefined()
     })
 
     it('normalizes CID', () => {
@@ -71,6 +75,12 @@ describe('identity trust', () => {
     it('unresolved when empty', () => {
       const a = assessIdentityTrust({})
       expect(a.level).toBe('unresolved')
+    })
+
+    it('low for name + alternate CIDs only', () => {
+      const a = assessIdentityTrust({ name: 'Foo', alternateCids: [10, 20] })
+      expect(a.level).toBe('low')
+      expect(a.axisValue).toBe(0.33)
     })
   })
 

@@ -5,7 +5,9 @@ import {
   parseCandidateId,
   preferCandidateId,
   candidateIdsEqual,
+  canonicalizeCandidateId,
 } from '@/lib/domain/candidateId'
+import { sha256Hex } from '@/lib/domain/sha256'
 
 describe('candidateId', () => {
   describe('normalizeCandidateName', () => {
@@ -13,6 +15,17 @@ describe('candidateId', () => {
       expect(normalizeCandidateName('  Aspirin   Acid  ')).toBe('aspirin acid')
       // fullwidth digits → ascii via NFKC
       expect(normalizeCandidateName('\uFF11\uFF12\uFF13 drug')).toBe('123 drug')
+    })
+  })
+
+  describe('sha256Hex (isomorphic)', () => {
+    it('matches known SHA-256 of empty string and "abc"', () => {
+      expect(sha256Hex('')).toBe(
+        'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855',
+      )
+      expect(sha256Hex('abc')).toBe(
+        'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+      )
     })
   })
 
@@ -28,11 +41,6 @@ describe('candidateId', () => {
     })
 
     it('normalizes InChIKey to uppercase', () => {
-      const id = computeCandidateId({
-        inchiKey: 'bsynrymutxb xsq-UHFFFAOYSA-n'.replace(' ', ''),
-        name: 'x',
-      })
-      // lower-case input still uppercased by normalize
       const id2 = computeCandidateId({
         inchiKey: 'bsynrymutxbxsq-UHFFFAOYSA-n',
         name: 'x',
@@ -73,6 +81,34 @@ describe('candidateId', () => {
       })
       expect(id).toBe('cid:100')
     })
+
+    it('ignores garbage chemblId and falls through to CID', () => {
+      const id = computeCandidateId({
+        chemblId: 'not-chembl',
+        pubchemCid: 2244,
+        name: 'Aspirin',
+      })
+      expect(id).toBe('cid:2244')
+    })
+
+    it('ignores bare CHEMBL without digits', () => {
+      const id = computeCandidateId({
+        chemblId: 'CHEMBL',
+        pubchemCid: 99,
+        name: 'X',
+      })
+      expect(id).toBe('cid:99')
+    })
+
+    it('origins never enter the id (only identity keys matter)', () => {
+      // Even if a caller tried to stuff origin-like strings into name, id is pure hash of name
+      const a = computeCandidateId({ name: 'aspirin' })
+      const b = computeCandidateId({ name: 'aspirin' })
+      expect(a).toBe(b)
+      expect(a.startsWith('nm:')).toBe(true)
+      expect(a).not.toContain('dgidb')
+      expect(a).not.toContain('origin')
+    })
   })
 
   describe('parseCandidateId', () => {
@@ -83,17 +119,21 @@ describe('candidateId', () => {
         raw: 'ik:BSYNRYMUTXBXSQ-UHFFFAOYSA-N',
       })
       expect(parseCandidateId('ch:CHEMBL25')?.kind).toBe('ch')
+      expect(parseCandidateId('ch:25')?.value).toBe('CHEMBL25')
       expect(parseCandidateId('cid:2244')?.value).toBe('2244')
       const nm = computeCandidateId({ name: 'x' })
       expect(parseCandidateId(nm)?.kind).toBe('nm')
     })
 
-    it('rejects malformed ids', () => {
+    it('rejects malformed ids including garbage ch:', () => {
       expect(parseCandidateId('')).toBeNull()
       expect(parseCandidateId('nope')).toBeNull()
       expect(parseCandidateId('cid:abc')).toBeNull()
       expect(parseCandidateId('ik:BAD')).toBeNull()
       expect(parseCandidateId('xx:1')).toBeNull()
+      expect(parseCandidateId('ch:FOO')).toBeNull()
+      expect(parseCandidateId('ch:CHEMBL')).toBeNull()
+      expect(parseCandidateId('ch:not-chembl')).toBeNull()
     })
   })
 
@@ -108,9 +148,17 @@ describe('candidateId', () => {
       expect(preferCandidateId(nm, cid)).toBe(cid)
     })
 
-    it('candidateIdsEqual is strict string equality', () => {
+    it('preferCandidateId keeps first on equal rank; prefers valid over malformed', () => {
+      expect(preferCandidateId('cid:1', 'cid:2')).toBe('cid:1')
+      expect(preferCandidateId('cid:1', 'not-an-id')).toBe('cid:1')
+      expect(preferCandidateId('garbage', 'cid:5')).toBe('cid:5')
+    })
+
+    it('candidateIdsEqual compares strict and canonical forms', () => {
       expect(candidateIdsEqual('cid:1', 'cid:1')).toBe(true)
       expect(candidateIdsEqual('cid:1', 'cid:2')).toBe(false)
+      expect(candidateIdsEqual('ch:25', 'ch:CHEMBL25')).toBe(true)
+      expect(canonicalizeCandidateId('ch:25')).toBe('ch:CHEMBL25')
     })
   })
 })

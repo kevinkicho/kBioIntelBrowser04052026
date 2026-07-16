@@ -138,15 +138,9 @@ function mapLegacyScores(
     identityTrust: 'computed',
   }
 
-  // Prefer recomputed composite from mapped axes; fall back to legacy compositeScore
-  let composite = computeComposite(axes, rubric)
-  if (
-    composite === 0 &&
-    typeof legacy.compositeScore === 'number' &&
-    !Number.isNaN(legacy.compositeScore)
-  ) {
-    composite = Math.min(1, Math.max(0, legacy.compositeScore))
-  }
+  // Always recompute from mapped axes — never overwrite a legitimate 0 composite
+  // with legacy.compositeScore (axes-all-zero is a valid cheap score).
+  const composite = computeComposite(axes, rubric)
 
   return {
     ...base,
@@ -178,7 +172,8 @@ export function mapRankResultToDiscoveryResult(
         synonyms: [],
         therapeuticAreas: rank.therapeuticAreas ?? [],
         xrefs: rank.diseaseId ? [{ system: 'ot', id: rank.diseaseId }] : [],
-        identityTrust: rank.diseaseId ? 'medium' : 'low',
+        // Name-only disease (no registry id) → unresolved, consistent with molecule name-only
+        identityTrust: rank.diseaseId ? 'medium' : 'unresolved',
       }
     : null
 

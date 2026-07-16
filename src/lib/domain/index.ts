@@ -51,6 +51,7 @@ export {
   hashNormalizedName,
   computeCandidateId,
   parseCandidateId,
+  canonicalizeCandidateId,
   candidateIdsEqual,
   preferCandidateId,
 } from './candidateId'
@@ -98,3 +99,14 @@ export {
   mapLegacyCandidateToMoleculeCandidate,
   mapRankResultToDiscoveryResult,
 } from './mappers'
+
+// Discovery preferences (types + defaults; re-export for a single domain entrypoint)
+export {
+  type DiscoveryPreferences,
+  type HarvestTimingPref,
+  type AeAggressivenessPref,
+  type TourExampleSetPref,
+  type CollaborationModePref,
+  DEFAULT_DISCOVERY_PREFERENCES,
+  snapshotDiscoveryPreferences,
+} from '../discovery/preferences'
