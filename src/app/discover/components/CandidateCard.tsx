@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import { buildDiscoverRationalePrompt } from '@/lib/ai/promptTemplates'
 import type { CandidateMolecule } from '@/lib/candidateRanker'
+import { mapLegacyCandidateToMoleculeCandidate } from '@/lib/domain'
+import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
 import { ConfidenceBadge } from './DiscoveryProgress'
 
 interface Props {
@@ -199,17 +201,29 @@ export function CandidateCard({ candidate, rank, diseaseName, topCandidates, dis
   const phaseLabel = PHASE_LABELS[candidate.clinicalPhaseRaw] ?? (candidate.clinicalPhaseRaw > 0 ? `Phase ${candidate.clinicalPhaseRaw}` : 'Preclinical')
   const hasCid = candidate.cid !== null && candidate.cid !== undefined
 
+  const domainCandidate = useMemo(
+    () => mapLegacyCandidateToMoleculeCandidate(candidate),
+    [candidate],
+  )
+
   const cardContent = (
     <>
       <div className="flex items-start gap-3">
         <CompositeScoreRing score={candidate.compositeScore} />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-xs font-mono text-slate-500">#{rank}</span>
             <h3 className="text-base font-semibold text-slate-100 truncate">{candidate.name}</h3>
             {hasCid && (
               <span className="text-[10px] text-slate-500 shrink-0">CID {candidate.cid}</span>
             )}
+            <div className="ml-auto shrink-0">
+              <SaveToProjectButton
+                candidate={domainCandidate}
+                defaultProjectName={diseaseName ? `${diseaseName} board` : undefined}
+                compact
+              />
+            </div>
           </div>
           <div className="flex items-center gap-2 flex-wrap mb-2">
             <ConfidenceBadge confidence={candidate.confidence} />
@@ -267,22 +281,24 @@ export function CandidateCard({ candidate, rank, diseaseName, topCandidates, dis
     </>
   )
 
-  if (hasCid) {
-    return (
-      <Link href={buildMoleculeLinkUrl(candidate.cid!, rank, diseaseName, candidate.compositeScore)} className="block bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 hover:border-indigo-600/50 transition-colors group">
-        {cardContent}
-        <div className="mt-3 text-xs text-indigo-400 group-hover:text-indigo-300 transition-colors flex items-center gap-1">
+  return (
+    <div
+      className={`bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 transition-colors ${
+        hasCid ? 'hover:border-indigo-600/50' : 'opacity-80'
+      }`}
+    >
+      {cardContent}
+      {hasCid ? (
+        <Link
+          href={buildMoleculeLinkUrl(candidate.cid!, rank, diseaseName, candidate.compositeScore)}
+          className="mt-3 text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+        >
           View full profile
           <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
-        </div>
-      </Link>
-    )
-  }
-
-  return (
-    <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 opacity-80">
-      {cardContent}
-      <p className="mt-2 text-[10px] text-slate-600">No PubChem CID — limited data available</p>
+        </Link>
+      ) : (
+        <p className="mt-2 text-[10px] text-slate-600">No PubChem CID — limited data available</p>
+      )}
     </div>
   )
 }
