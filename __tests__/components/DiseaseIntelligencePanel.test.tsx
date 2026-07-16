@@ -125,4 +125,19 @@ describe('DiseaseIntelligencePanel', () => {
     expect(container).toBeTruthy()
     expect(screen.getByText('Disease Intelligence')).toBeInTheDocument()
   })
+
+  it('links to Discover with diseaseId and top gene targets', () => {
+    makeAiUnavailable()
+    render(
+      <DiseaseIntelligencePanel
+        context={{ ...baseContext, diseaseId: 'EFO_0000249' }}
+      />,
+    )
+    const cta = screen.getByTestId('disease-intelligence-discover-cta')
+    expect(cta).toHaveAttribute(
+      'href',
+      '/discover?q=Alzheimer%27s+Disease&diseaseId=EFO_0000249&targets=APOE',
+    )
+    expect(cta).toHaveTextContent(/Rank candidates in Discover/)
+  })
 })
