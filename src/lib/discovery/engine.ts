@@ -2,10 +2,12 @@
  * Discovery rank engine — gather + legacy score + dual-schema RankResult.
  * Ranking formulas intentionally unchanged (multi-axis = PR4).
  * ChEMBL-by-target / OT knownDrugs = PR3b.
+ * PR6b: multi-hit disease confirmation + diseaseId hard pin.
  */
 
 import { searchDiseases, resolveMoleculesFromNames, type DiseaseResult } from '../diseaseSearch'
 import type { SourceFetchStatus } from '../dataStatus'
+import type { DiseaseEntity } from '../domain/entities'
 import { mapRankResultToDiscoveryResult } from '../domain/mappers'
 import { scoreLegacyCandidate, sortCandidates } from './legacyScore'
 import {
@@ -24,6 +26,24 @@ export const OT_KNOWN_DRUGS_DECONTAMINATION_WARNING =
 const MAX_MOLECULE_NAMES = 50
 const MAX_CID_RESOLVE = 50
 
+/** Thrown when a hard diseaseId pin is not found among search hits (no fuzzy substitute). */
+export class UnknownDiseaseIdError extends Error {
+  readonly diseaseId: string
+
+  constructor(diseaseId: string) {
+    super(
+      `Unknown diseaseId "${diseaseId}"; no fuzzy substitute applied. Provide a valid registry id from disease search.`,
+    )
+    this.name = 'UnknownDiseaseIdError'
+    this.diseaseId = diseaseId
+  }
+}
+
+export interface RankCandidatesOptions {
+  /** Hard pin: skip multi-hit confirmation and rank this disease only. */
+  diseaseId?: string
+}
+
 /**
  * Safe disease-side molecule names for candidate gather.
  * Open Targets enrichment historically called getDrugsForDisease, which returns
@@ -38,6 +58,21 @@ export function moleculeNamesFromDiseaseResult(disease: DiseaseResult): {
   }
   const names = (disease.molecules ?? []).map((m) => m.name).filter(Boolean)
   return { names, skippedOtTargetNames: false }
+}
+
+/** Map a disease search hit to domain DiseaseEntity for disambiguation UI / v2. */
+export function diseaseResultToEntity(d: DiseaseResult): DiseaseEntity {
+  const id = d.id || d.name
+  return {
+    id,
+    idNamespace: d.id ? 'ot' : 'name',
+    name: d.name,
+    synonyms: [],
+    description: d.description,
+    therapeuticAreas: d.therapeuticAreas ?? [],
+    xrefs: d.id ? [{ system: d.source, id: d.id }] : [],
+    identityTrust: d.id ? 'medium' : 'unresolved',
+  }
 }
 
 function emptyRankResult(
@@ -66,23 +101,73 @@ function emptyRankResult(
     base.v2.sourceStatuses = base.sourceStatuses
   }
   if (base.warnings?.length) {
-    base.v2.warnings = [...base.v2.warnings, ...base.warnings.filter((w) => !base.v2!.warnings.includes(w))]
+    base.v2.warnings = [
+      ...base.v2.warnings,
+      ...base.warnings.filter((w) => !base.v2!.warnings.includes(w)),
+    ]
   }
   return base
 }
 
 /**
+ * Multi-hit confirm payload: no silent results[0]; empty candidates until user pins diseaseId.
+ */
+function multiHitConfirmResult(
+  query: string,
+  hits: DiseaseResult[],
+  sourceStatuses: SourceFetchStatus[],
+  generatedAt: string,
+  timingStart: number,
+): RankResult {
+  const diseaseCandidates = hits.map(diseaseResultToEntity)
+  const warning = `Multiple disease matches (${hits.length}); confirm which disease to rank.`
+  const base: RankResult = {
+    query,
+    diseaseId: null,
+    diseaseName: query,
+    therapeuticAreas: [],
+    genes: [],
+    candidates: [],
+    sourceStatuses,
+    generatedAt,
+    warnings: [warning],
+  }
+  const v2 = mapRankResultToDiscoveryResult(base, { generatedAt })
+  v2.disease = null
+  v2.diseaseCandidates = diseaseCandidates
+  v2.needsDiseaseConfirmation = true
+  v2.sourceStatuses = sourceStatuses
+  v2.warnings = [warning]
+  v2.timingMs = { total: Date.now() - timingStart, disease: Date.now() - timingStart }
+  base.v2 = v2
+  return base
+}
+
+function findPinnedDisease(hits: DiseaseResult[], diseaseId: string): DiseaseResult | undefined {
+  const pin = diseaseId.trim()
+  if (!pin) return undefined
+  const lower = pin.toLowerCase()
+  return hits.find((d) => d.id && d.id.toLowerCase() === lower)
+}
+
+/**
  * Rank candidate molecules for a disease query.
  * Returns legacy RankResult fields + additive sourceStatuses/generatedAt/warnings/v2.
+ *
+ * PR6b:
+ * - Multiple hits without `options.diseaseId` → early return, needsDiseaseConfirmation
+ * - `options.diseaseId` hard pin → exact id match only; unknown id throws UnknownDiseaseIdError
  */
 export async function rankCandidatesForDisease(
   query: string,
   limit: number = 15,
+  options?: RankCandidatesOptions,
 ): Promise<RankResult> {
   const generatedAt = new Date().toISOString()
   const sourceStatuses: SourceFetchStatus[] = []
   const warnings: string[] = []
   const timingStart = Date.now()
+  const pinnedId = options?.diseaseId?.trim() || undefined
 
   const diseaseLookup = await withSourceStatus(
     'Disease search',
@@ -95,20 +180,37 @@ export async function rankCandidatesForDisease(
   sourceStatuses.push(diseaseLookup.status)
 
   if (diseaseLookup.value.length === 0) {
+    if (pinnedId) {
+      throw new UnknownDiseaseIdError(pinnedId)
+    }
     warnings.push('No disease matches for query.')
     return emptyRankResult(query, { warnings, sourceStatuses, generatedAt })
   }
 
-  const primaryDisease = diseaseLookup.value[0]
+  let primaryDisease: DiseaseResult
+
+  if (pinnedId) {
+    const pinned = findPinnedDisease(diseaseLookup.value, pinnedId)
+    if (!pinned) {
+      throw new UnknownDiseaseIdError(pinnedId)
+    }
+    primaryDisease = pinned
+  } else if (diseaseLookup.value.length > 1) {
+    // Never silent results[0] when multi-hit without hard pin
+    return multiHitConfirmResult(
+      query,
+      diseaseLookup.value,
+      sourceStatuses,
+      generatedAt,
+      timingStart,
+    )
+  } else {
+    primaryDisease = diseaseLookup.value[0]
+  }
+
   const diseaseId = primaryDisease.id ?? null
   const diseaseName = primaryDisease.name
   const therapeuticAreas = primaryDisease.therapeuticAreas ?? []
-
-  if (diseaseLookup.value.length > 1) {
-    warnings.push(
-      `Multiple disease matches (${diseaseLookup.value.length}); using first hit "${diseaseName}" without confirmation (PR6b will add disambiguation).`,
-    )
-  }
 
   // Single OT + DisGeNET gene walk for scoring and DGIdb (no double-fetch).
   const geneGather = await gatherDiseaseGenes(diseaseId, diseaseName)
@@ -215,25 +317,15 @@ export async function rankCandidatesForDisease(
 
   const v2 = mapRankResultToDiscoveryResult(rank, { generatedAt })
   v2.sourceStatuses = sourceStatuses
-  // Merge engine warnings with mapper warnings (dedupe)
   const warningSet = new Set([...v2.warnings, ...warnings])
   v2.warnings = Array.from(warningSet)
   v2.timingMs = {
     total: Date.now() - timingStart,
   }
-  // Multi-hit flag for future PR6b clients reading v2
-  if (diseaseLookup.value.length > 1) {
-    v2.needsDiseaseConfirmation = true
-    v2.diseaseCandidates = diseaseLookup.value.map((d) => ({
-      id: d.id || d.name,
-      idNamespace: d.id ? ('ot' as const) : ('name' as const),
-      name: d.name,
-      synonyms: [],
-      description: d.description,
-      therapeuticAreas: d.therapeuticAreas ?? [],
-      xrefs: d.id ? [{ system: d.source, id: d.id }] : [],
-      identityTrust: d.id ? ('medium' as const) : ('unresolved' as const),
-    }))
+  // Confirmed / single / pinned — no multi-hit confirmation needed
+  v2.needsDiseaseConfirmation = false
+  if (v2.disease) {
+    v2.diseaseCandidates = [v2.disease]
   }
 
   rank.v2 = v2

@@ -25,7 +25,10 @@ export {
 export {
   rankCandidatesForDisease,
   moleculeNamesFromDiseaseResult,
+  diseaseResultToEntity,
+  UnknownDiseaseIdError,
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
+  type RankCandidatesOptions,
 } from './engine'
 export { makeSourceStatus, withSourceStatus } from './sourceStatus'
 export {

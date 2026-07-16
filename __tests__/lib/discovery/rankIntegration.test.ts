@@ -34,6 +34,7 @@ import {
 import { getChemblIndicationsByName } from '@/lib/api/chembl-indications'
 import {
   rankCandidatesForDisease,
+  UnknownDiseaseIdError,
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
 } from '@/lib/discovery'
 import { isDiscoveryResult } from '@/lib/domain/discoveryResult'
@@ -139,5 +140,95 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     expect(result.v2).toBeDefined()
     expect(isDiscoveryResult(result.v2)).toBe(true)
     expect(result.warnings?.some((w) => /No disease/i.test(w))).toBe(true)
+  })
+
+  describe('PR6b multi-hit confirmation + diseaseId hard pin', () => {
+    const multiHits = [
+      {
+        id: 'EFO_0000249',
+        name: 'Alzheimer disease',
+        therapeuticAreas: ['nervous system disease'],
+        source: 'Open Targets',
+        description: 'Neurodegenerative disease',
+      },
+      {
+        id: 'EFO_0006792',
+        name: 'late-onset Alzheimer disease',
+        therapeuticAreas: ['nervous system disease'],
+        source: 'Open Targets',
+      },
+      {
+        id: 'EFO_1001870',
+        name: 'familial Alzheimer disease',
+        therapeuticAreas: [],
+        source: 'Open Targets',
+      },
+    ]
+
+    it('early-returns needsDiseaseConfirmation without ranking when multi-hit and no diseaseId', async () => {
+      ;(searchDiseases as jest.Mock).mockResolvedValue(multiHits)
+
+      const result = await rankCandidatesForDisease('alzheimer', 15)
+
+      expect(result.candidates).toEqual([])
+      expect(result.diseaseId).toBeNull()
+      expect(result.genes).toEqual([])
+      expect(result.v2).toBeDefined()
+      expect(result.v2!.needsDiseaseConfirmation).toBe(true)
+      expect(result.v2!.disease).toBeNull()
+      expect(result.v2!.diseaseCandidates).toHaveLength(3)
+      expect(result.v2!.diseaseCandidates!.map((d) => d.id)).toEqual([
+        'EFO_0000249',
+        'EFO_0006792',
+        'EFO_1001870',
+      ])
+      expect(result.warnings?.some((w) => /Multiple disease matches/i.test(w))).toBe(true)
+
+      // Must not gather genes/targets when confirmation is required
+      expect(getTargetsForDisease).not.toHaveBeenCalled()
+      expect(getGenesByDisease).not.toHaveBeenCalled()
+      expect(getTargetRelatedMolecules).not.toHaveBeenCalled()
+    })
+
+    it('hard-pins diseaseId and ranks that disease only (skips picker path)', async () => {
+      ;(searchDiseases as jest.Mock).mockResolvedValue(multiHits)
+
+      const result = await rankCandidatesForDisease('alzheimer', 15, {
+        diseaseId: 'EFO_0006792',
+      })
+
+      expect(result.diseaseId).toBe('EFO_0006792')
+      expect(result.diseaseName).toBe('late-onset Alzheimer disease')
+      expect(result.v2!.needsDiseaseConfirmation).toBe(false)
+      expect(result.v2!.disease?.id).toBe('EFO_0006792')
+      expect(result.candidates.length).toBeGreaterThan(0)
+      expect(getTargetsForDisease).toHaveBeenCalled()
+    })
+
+    it('throws UnknownDiseaseIdError when diseaseId not in hits (no fuzzy substitute)', async () => {
+      ;(searchDiseases as jest.Mock).mockResolvedValue(multiHits)
+
+      await expect(
+        rankCandidatesForDisease('alzheimer', 15, { diseaseId: 'EFO_DOES_NOT_EXIST' }),
+      ).rejects.toBeInstanceOf(UnknownDiseaseIdError)
+
+      expect(getTargetsForDisease).not.toHaveBeenCalled()
+    })
+
+    it('throws UnknownDiseaseIdError when diseaseId pin with empty search hits', async () => {
+      ;(searchDiseases as jest.Mock).mockResolvedValue([])
+
+      await expect(
+        rankCandidatesForDisease('zzzz', 15, { diseaseId: 'EFO_0000249' }),
+      ).rejects.toBeInstanceOf(UnknownDiseaseIdError)
+    })
+
+    it('single hit proceeds without confirmation', async () => {
+      // default mock is single hit
+      const result = await rankCandidatesForDisease('alzheimer', 15)
+      expect(result.v2!.needsDiseaseConfirmation).toBe(false)
+      expect(result.diseaseId).toBe('EFO_0000249')
+      expect(result.candidates.length).toBeGreaterThan(0)
+    })
   })
 })

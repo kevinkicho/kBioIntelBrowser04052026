@@ -16,5 +16,8 @@ export { normalizeLog, matchIndication } from './discovery/normalize'
 export {
   rankCandidatesForDisease,
   moleculeNamesFromDiseaseResult,
+  diseaseResultToEntity,
+  UnknownDiseaseIdError,
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
+  type RankCandidatesOptions,
 } from './discovery/engine'
