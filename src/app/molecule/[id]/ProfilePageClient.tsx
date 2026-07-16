@@ -670,7 +670,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       )}
 
       {!isEmbed && (
-        <div className="sticky top-0 z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4">
+        <div className="sticky top-[var(--app-header-height)] z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4">
           <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-mono text-slate-500">
             <Link href="/" className="text-slate-500 hover:text-slate-300 shrink-0">Home</Link>
             <span className="text-slate-700">/</span>

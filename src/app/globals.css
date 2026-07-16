@@ -5,6 +5,8 @@
 :root {
   --background: #0f1117;
   --foreground: #e2e8f0;
+  /* AppHeader outer height (h-12). Secondary stickies use top-[var(--app-header-height)]. */
+  --app-header-height: 3rem;
 }
 
 html {
