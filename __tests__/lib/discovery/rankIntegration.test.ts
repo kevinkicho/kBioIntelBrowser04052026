@@ -1,5 +1,5 @@
 /**
- * Mocked end-to-end rankCandidatesForDisease — verifies dual schema + statuses.
+ * Mocked end-to-end rankCandidatesForDisease — verifies dual schema + statuses + identity.
  */
 
 jest.mock('@/lib/diseaseSearch', () => ({
@@ -38,9 +38,37 @@ import {
 } from '@/lib/discovery'
 import { isDiscoveryResult } from '@/lib/domain/discoveryResult'
 
+const DONEPEZIL_IK = 'ADEBPBSSDYVVLD-UHFFFAOYSA-N'
+
 describe('rankCandidatesForDisease (mocked integration)', () => {
+  const originalFetch = global.fetch
+
   beforeEach(() => {
     jest.clearAllMocks()
+    // PubChem identity stage (PR3c) uses global fetch for InChIKey properties
+    global.fetch = jest.fn().mockImplementation(async (url: string | URL) => {
+      const u = String(url)
+      if (u.includes('pubchem.ncbi.nlm.nih.gov') && u.includes('/property/')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            PropertyTable: {
+              Properties: [
+                {
+                  CID: 3152,
+                  InChIKey: DONEPEZIL_IK,
+                  IsomericSMILES: 'COc1cc2CC(CC(=O)c2c(OC)c1)C(=O)N',
+                  Title: 'Donepezil',
+                },
+              ],
+            },
+          }),
+        } as Response
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response
+    }) as unknown as typeof fetch
+
     ;(searchDiseases as jest.Mock).mockResolvedValue([
       {
         id: 'EFO_0000249',
@@ -78,6 +106,10 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
         maxPhaseForIndication: 4,
       },
     ])
+  })
+
+  afterEach(() => {
+    global.fetch = originalFetch
   })
 
   it('returns dual-schema RankResult with sourceStatuses and skips OT target-as-drug', async () => {
@@ -123,12 +155,26 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     ).toBe(true)
     expect(result.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
 
+    // PR3c identity stage status
+    expect(
+      result.sourceStatuses!.some((s) => s.source === 'PubChem (identity/InChIKey)'),
+    ).toBe(true)
+
     expect(result.v2).toBeDefined()
     expect(isDiscoveryResult(result.v2)).toBe(true)
     expect(result.v2!.schemaVersion).toBe(2)
     expect(result.v2!.sourceStatuses.length).toBeGreaterThan(0)
     expect(result.v2!.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
     expect(result.v2!.candidates.length).toBe(result.candidates.length)
+
+    // IdentityTrust + InChIKey on DiscoveryResult / RankResult.v2 candidates
+    const donepezil = result.v2!.candidates.find((c) => c.identity.name === 'Donepezil')
+    expect(donepezil).toBeDefined()
+    expect(donepezil!.identity.inchiKey).toBe(DONEPEZIL_IK)
+    expect(donepezil!.identity.identityTrust).toBe('high')
+    expect(donepezil!.candidateId).toBe(`ik:${DONEPEZIL_IK}`)
+    expect(donepezil!.scores?.axes.identityTrust).toBe(1)
+    expect(result.v2!.timingMs?.identity).toBeDefined()
   })
 
   it('returns empty dual-schema payload when no disease matches', async () => {
