@@ -41,6 +41,23 @@ export {
   MAX_CHEMBL_TARGETS,
   MAX_COMPOUNDS_PER_TARGET,
 } from './sources'
+export {
+  DEFAULT_IDENTITY_TOP_N,
+  DEFAULT_IDENTITY_CONCURRENCY,
+  PUBCHEM_CID_BATCH_SIZE,
+  mapPool,
+  fetchPubChemIdentityByCid,
+  fetchPubChemIdentityByCids,
+  resolveIdentitiesBatch,
+  applyResolvedIdentities,
+  toMoleculeIdentity,
+  identityFallbackFromInputs,
+  type IdentityResolveInput,
+  type PubChemPropertyHit,
+  type ResolvedMoleculeIdentity,
+  type BatchIdentityResolveResult,
+  type ResolveIdentitiesOptions,
+} from './identityResolve'
 
 export {
   type DiscoveryPreferences,

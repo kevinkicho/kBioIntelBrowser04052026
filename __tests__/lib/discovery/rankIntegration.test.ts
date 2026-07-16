@@ -1,5 +1,5 @@
 /**
- * Mocked end-to-end rankCandidatesForDisease — dual schema + PR3b gather.
+ * Mocked end-to-end rankCandidatesForDisease — verifies dual schema + statuses + identity.
  */
 
 jest.mock('@/lib/diseaseSearch', () => ({
@@ -8,8 +8,6 @@ jest.mock('@/lib/diseaseSearch', () => ({
 }))
 jest.mock('@/lib/api/opentargets', () => ({
   getTargetsForDisease: jest.fn(),
-  getKnownDrugsForDisease: jest.fn(),
-  getDrugsForDisease: jest.fn(),
 }))
 jest.mock('@/lib/api/disgenet', () => ({
   getGenesByDisease: jest.fn(),
@@ -24,13 +22,9 @@ jest.mock('@/lib/api/clinicaltrials', () => ({
 jest.mock('@/lib/api/chembl-indications', () => ({
   getChemblIndicationsByName: jest.fn(),
 }))
-jest.mock('@/lib/api/chembl', () => ({
-  searchTargetsByName: jest.fn(),
-  getRelatedCompoundsByTarget: jest.fn(),
-}))
 
 import { searchDiseases, resolveMoleculesFromNames } from '@/lib/diseaseSearch'
-import { getTargetsForDisease, getKnownDrugsForDisease } from '@/lib/api/opentargets'
+import { getTargetsForDisease } from '@/lib/api/opentargets'
 import { getGenesByDisease } from '@/lib/api/disgenet'
 import { getTargetRelatedMolecules } from '@/lib/api/dgidb'
 import {
@@ -39,22 +33,49 @@ import {
 } from '@/lib/api/clinicaltrials'
 import { getChemblIndicationsByName } from '@/lib/api/chembl-indications'
 import {
-  searchTargetsByName,
-  getRelatedCompoundsByTarget,
-} from '@/lib/api/chembl'
-import { rankCandidatesForDisease } from '@/lib/discovery'
+  rankCandidatesForDisease,
+  OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
+} from '@/lib/discovery'
 import { isDiscoveryResult } from '@/lib/domain/discoveryResult'
 
+const DONEPEZIL_IK = 'ADEBPBSSDYVVLD-UHFFFAOYSA-N'
+
 describe('rankCandidatesForDisease (mocked integration)', () => {
+  const originalFetch = global.fetch
+
   beforeEach(() => {
     jest.clearAllMocks()
+    // PubChem identity stage (PR3c) uses global fetch for InChIKey properties
+    global.fetch = jest.fn().mockImplementation(async (url: string | URL) => {
+      const u = String(url)
+      if (u.includes('pubchem.ncbi.nlm.nih.gov') && u.includes('/property/')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            PropertyTable: {
+              Properties: [
+                {
+                  CID: 3152,
+                  InChIKey: DONEPEZIL_IK,
+                  IsomericSMILES: 'COc1cc2CC(CC(=O)c2c(OC)c1)C(=O)N',
+                  Title: 'Donepezil',
+                },
+              ],
+            },
+          }),
+        } as Response
+      }
+      return { ok: false, status: 404, json: async () => ({}) } as Response
+    }) as unknown as typeof fetch
+
     ;(searchDiseases as jest.Mock).mockResolvedValue([
       {
         id: 'EFO_0000249',
         name: 'Alzheimer disease',
         therapeuticAreas: ['nervous system disease'],
         source: 'Open Targets',
-        // Contaminated payload must still be ignored by moleculeNamesFromDiseaseResult
+        // Contaminated payload must be ignored
         molecules: [{ name: 'Amyloid-beta precursor protein', cid: null }],
       },
     ])
@@ -63,14 +84,6 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
       { id: 'ENSG2', name: 'PSEN1 presenilin', overallScore: 0.8 },
     ])
     ;(getGenesByDisease as jest.Mock).mockResolvedValue([])
-    ;(getKnownDrugsForDisease as jest.Mock).mockResolvedValue([
-      {
-        name: 'Memantine',
-        chemblId: 'CHEMBL807',
-        maxClinicalStage: 'APPROVAL',
-        maxPhase: 4,
-      },
-    ])
     ;(getTargetRelatedMolecules as jest.Mock).mockResolvedValue([
       {
         name: 'Donepezil',
@@ -83,34 +96,9 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     ;(extractDrugInterventions as jest.Mock).mockReturnValue([
       { name: 'Donepezil', trialCount: 12 },
     ])
-    ;(searchTargetsByName as jest.Mock).mockResolvedValue([
-      {
-        targetChemblId: 'CHEMBL2487',
-        targetName: 'Amyloid-beta A4 protein',
-        targetType: 'SINGLE PROTEIN',
-        organism: 'Homo sapiens',
-      },
+    ;(resolveMoleculesFromNames as jest.Mock).mockResolvedValue([
+      { name: 'Donepezil', cid: 3152 },
     ])
-    ;(getRelatedCompoundsByTarget as jest.Mock).mockResolvedValue([
-      {
-        compoundId: 'CHEMBL941',
-        compoundName: 'Semagacestat',
-        name: 'Semagacestat',
-        chemblId: 'CHEMBL941',
-        maxPhase: 3,
-        activityValue: 10,
-        activityType: 'IC50',
-        similarity: 100,
-        relationship: 'Related',
-      },
-    ])
-    ;(resolveMoleculesFromNames as jest.Mock).mockImplementation(
-      async (names: string[]) =>
-        names.map((name) => ({
-          name,
-          cid: name === 'Donepezil' ? 3152 : null,
-        })),
-    )
     ;(getChemblIndicationsByName as jest.Mock).mockResolvedValue([
       {
         meshHeading: 'Alzheimer Disease',
@@ -120,7 +108,11 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     ])
   })
 
-  it('returns dual-schema RankResult with OT knownDrugs + ChEMBL-by-target (PR3b)', async () => {
+  afterEach(() => {
+    global.fetch = originalFetch
+  })
+
+  it('returns dual-schema RankResult with sourceStatuses and skips OT target-as-drug', async () => {
     const result = await rankCandidatesForDisease('alzheimer', 15)
 
     expect(result.query).toBe('alzheimer')
@@ -128,14 +120,16 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
     expect(result.diseaseName).toBe('Alzheimer disease')
     expect(result.genes.some((g) => g.symbol === 'APP')).toBe(true)
 
-    // Shared gene gather: OT + DisGeNET each called once
+    // Shared gene gather: OT + DisGeNET each called once (not again inside DGIdb path)
     expect(getTargetsForDisease).toHaveBeenCalledTimes(1)
     expect(getGenesByDisease).toHaveBeenCalledTimes(1)
     expect(getTargetRelatedMolecules).toHaveBeenCalledTimes(1)
-    expect(getKnownDrugsForDisease).toHaveBeenCalledWith('EFO_0000249', 40)
-    expect(searchTargetsByName).toHaveBeenCalled()
-    expect(getRelatedCompoundsByTarget).toHaveBeenCalled()
+    expect(getTargetRelatedMolecules).toHaveBeenCalledWith(
+      expect.arrayContaining(['APP', 'PSEN1']),
+      '',
+    )
 
+    // No dual stage labels for gene sources
     expect(
       result.sourceStatuses!.some((s) => s.source.includes('target→genes')),
     ).toBe(false)
@@ -146,43 +140,41 @@ describe('rankCandidatesForDisease (mocked integration)', () => {
       result.sourceStatuses!.filter((s) => s.source === 'DisGeNET (genes)'),
     ).toHaveLength(1)
 
-    // Must not invent APP protein as a candidate from contaminated disease.molecules
+    // Must not invent APP protein as a candidate from OT molecules
     expect(result.candidates.some((c) => /amyloid/i.test(c.name))).toBe(false)
     expect(result.candidates.some((c) => c.name === 'Donepezil')).toBe(true)
-    // OT known drug
-    expect(result.candidates.some((c) => c.name === 'Memantine')).toBe(true)
-    // ChEMBL-by-target compound
-    expect(result.candidates.some((c) => c.name === 'Semagacestat')).toBe(true)
 
     expect(result.generatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/)
     expect(result.sourceStatuses).toBeDefined()
     expect(result.sourceStatuses!.length).toBeGreaterThan(0)
     expect(result.sourceStatuses!.some((s) => s.source === 'DGIdb')).toBe(true)
-    // knownDrugs is enabled/loaded, not disabled
-    expect(
-      result.sourceStatuses!.some(
-        (s) => s.source === 'Open Targets (knownDrugs)' && s.status === 'loaded',
-      ),
-    ).toBe(true)
-    expect(
-      result.sourceStatuses!.some(
-        (s) => s.source === 'ChEMBL (by-target)' && s.status === 'loaded',
-      ),
-    ).toBe(true)
     expect(
       result.sourceStatuses!.some(
         (s) => s.source === 'Open Targets (knownDrugs)' && s.status === 'disabled',
       ),
-    ).toBe(false)
+    ).toBe(true)
+    expect(result.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
 
-    const memantine = result.candidates.find((c) => c.name === 'Memantine')
-    expect(memantine?.sources).toContain('Open Targets')
+    // PR3c identity stage status
+    expect(
+      result.sourceStatuses!.some((s) => s.source === 'PubChem (identity/InChIKey)'),
+    ).toBe(true)
 
     expect(result.v2).toBeDefined()
     expect(isDiscoveryResult(result.v2)).toBe(true)
     expect(result.v2!.schemaVersion).toBe(2)
     expect(result.v2!.sourceStatuses.length).toBeGreaterThan(0)
+    expect(result.v2!.warnings).toContain(OT_KNOWN_DRUGS_DECONTAMINATION_WARNING)
     expect(result.v2!.candidates.length).toBe(result.candidates.length)
+
+    // IdentityTrust + InChIKey on DiscoveryResult / RankResult.v2 candidates
+    const donepezil = result.v2!.candidates.find((c) => c.identity.name === 'Donepezil')
+    expect(donepezil).toBeDefined()
+    expect(donepezil!.identity.inchiKey).toBe(DONEPEZIL_IK)
+    expect(donepezil!.identity.identityTrust).toBe('high')
+    expect(donepezil!.candidateId).toBe(`ik:${DONEPEZIL_IK}`)
+    expect(donepezil!.scores?.axes.identityTrust).toBe(1)
+    expect(result.v2!.timingMs?.identity).toBeDefined()
   })
 
   it('returns empty dual-schema payload when no disease matches', async () => {

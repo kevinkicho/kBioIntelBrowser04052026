@@ -7,6 +7,13 @@
 import { searchDiseases, resolveMoleculesFromNames, type DiseaseResult } from '../diseaseSearch'
 import type { SourceFetchStatus } from '../dataStatus'
 import { mapRankResultToDiscoveryResult } from '../domain/mappers'
+import {
+  applyResolvedIdentities,
+  DEFAULT_IDENTITY_TOP_N,
+  identityFallbackFromInputs,
+  resolveIdentitiesBatch,
+  type IdentityResolveInput,
+} from './identityResolve'
 import { scoreLegacyCandidate, sortCandidates } from './legacyScore'
 import {
   gatherDiseaseGenes,
@@ -240,6 +247,24 @@ export async function rankCandidatesForDisease(
 
   const sorted = sortCandidates(candidates).slice(0, limit)
 
+  // Stage 3 — batch identity (InChIKey + IdentityTrust) for top-N shortlist
+  const identityInputs: IdentityResolveInput[] = sorted.map((c) => ({
+    name: c.name,
+    cid: c.cid,
+  }))
+  const identityLookup = await withSourceStatus(
+    'PubChem (identity/InChIKey)',
+    () =>
+      resolveIdentitiesBatch(identityInputs, {
+        topN: Math.min(DEFAULT_IDENTITY_TOP_N, sorted.length),
+      }),
+    {
+      fallback: identityFallbackFromInputs(identityInputs),
+      hasData: (v) => v.highTrustCount > 0 || v.fetchedCount > 0,
+    },
+  )
+  sourceStatuses.push(identityLookup.status)
+
   const rank: RankResult = {
     query,
     diseaseId,
@@ -253,11 +278,14 @@ export async function rankCandidatesForDisease(
   }
 
   const v2 = mapRankResultToDiscoveryResult(rank, { generatedAt })
+  // Attach resolved InChIKey / IdentityTrust / ik: candidateIds on DiscoveryResult candidates
+  v2.candidates = applyResolvedIdentities(v2.candidates, identityLookup.value.resolved)
   v2.sourceStatuses = sourceStatuses
   // Merge engine warnings with mapper warnings (dedupe)
   const warningSet = new Set([...v2.warnings, ...warnings])
   v2.warnings = Array.from(warningSet)
   v2.timingMs = {
+    identity: identityLookup.status.duration_ms ?? identityLookup.value.durationMs,
     total: Date.now() - timingStart,
   }
   // Multi-hit flag for future PR6b clients reading v2
