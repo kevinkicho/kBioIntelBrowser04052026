@@ -23,7 +23,7 @@ import {
 } from '@/lib/project'
 import type { CorePanelEvidenceInput } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
-import { SignalBadges } from '@/components/projects/SignalBadges'
+import { BoardTable } from '@/components/projects/BoardTable'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
 import { emitProductEvent } from '@/lib/productEvents'
 import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
@@ -69,6 +69,10 @@ export default function ProjectBoardPage() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  useEffect(() => {
+    if (id) emitProductEvent('project_opened', { projectId: id })
+  }, [id])
 
   // Claim-rich packs: fetch Core panels for promoted CIDs (V2-04)
   useEffect(() => {
@@ -161,6 +165,15 @@ export default function ProjectBoardPage() {
           return
         }
         setProject(saved.value)
+        emitProductEvent('harvest_safety_done', {
+          count: candidateIds.length,
+          projectId: proj.id,
+        })
+        emitProductEvent('discover_stage', {
+          stage: 'safetyHarvest',
+          source: 'board_harvest',
+          count: candidateIds.length,
+        })
         showBanner(
           'ok',
           res.warnings.length
@@ -313,9 +326,6 @@ export default function ProjectBoardPage() {
     {} as Record<BoardStatus, number>,
   )
 
-  const signalByCandidate = new Map(
-    (signalRows ?? []).map((r) => [r.candidateId, r] as const),
-  )
   const totalSignals = (signalRows ?? []).reduce((n, r) => n + r.signals.length, 0)
 
   return (
@@ -447,154 +457,16 @@ export default function ProjectBoardPage() {
             </Link>
           </div>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-800">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b border-slate-700 bg-slate-900/60">
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Candidate
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Identity
-                  </th>
-                  <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Score
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Status
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Signals
-                  </th>
-                  <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
-                    Origins
-                  </th>
-                  <th className="w-12 px-3 py-3" />
-                </tr>
-              </thead>
-              <tbody>
-                {project.candidates.map((c, i) => {
-                  const cid = c.identity.pubchemCid
-                  const status = c.boardStatus ?? 'untriaged'
-                  const score = c.scores?.composite
-                  const sigRow = signalByCandidate.get(c.candidateId)
-                  return (
-                    <tr
-                      key={c.candidateId}
-                      className={`border-b border-slate-800 ${i % 2 === 0 ? 'bg-slate-900/30' : ''}`}
-                    >
-                      <td className="px-3 py-3">
-                        {cid != null ? (
-                          <Link
-                            href={`/molecule/${cid}?project=${project.id}`}
-                            className="font-medium text-slate-100 hover:text-emerald-300"
-                          >
-                            {c.identity.name}
-                          </Link>
-                        ) : (
-                          <span className="font-medium text-slate-100">{c.identity.name}</span>
-                        )}
-                        <div className="text-[10px] text-slate-600 font-mono">{c.candidateId}</div>
-                      </td>
-                      <td className="px-3 py-3 text-xs text-slate-400">
-                        {cid != null && <div>CID {cid}</div>}
-                        {c.identity.chemblId && <div>{c.identity.chemblId}</div>}
-                        <div className="text-[10px] text-slate-600">
-                          trust: {c.identity.identityTrust}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-center tabular-nums text-slate-300">
-                        {score != null ? score.toFixed(2) : '—'}
-                      </td>
-                      <td className="px-3 py-3">
-                        <select
-                          value={status}
-                          onChange={(e) =>
-                            handleStatus(c.candidateId, e.target.value as BoardStatus)
-                          }
-                          className={`rounded border px-2 py-1 text-xs capitalize ${STATUS_STYLES[status]}`}
-                          aria-label={`Board status for ${c.identity.name}`}
-                        >
-                          {BOARD_STATUSES.map((s) => (
-                            <option key={s} value={s}>
-                              {s}
-                            </option>
-                          ))}
-                        </select>
-                      </td>
-                      <td className="px-3 py-3 min-w-[8rem]">
-                        {signalsLoading && !sigRow ? (
-                          <span className="text-[10px] text-slate-600 animate-pulse">…</span>
-                        ) : sigRow && sigRow.signals.length > 0 ? (
-                          <SignalBadges signals={sigRow.signals} compact />
-                        ) : sigRow?.status === 'baseline' ? (
-                          <span className="text-[10px] text-slate-600" title="Baseline snapshot saved">
-                            —
-                          </span>
-                        ) : sigRow?.status === 'no_cid' ? (
-                          <span className="text-[10px] text-slate-600" title="No PubChem CID">
-                            n/a
-                          </span>
-                        ) : sigRow?.status === 'error' ? (
-                          <span className="text-[10px] text-red-500/70" title={sigRow.error}>
-                            err
-                          </span>
-                        ) : (
-                          <span className="text-[10px] text-slate-600">—</span>
-                        )}
-                      </td>
-                      <td className="px-3 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {(c.evidenceBreadthSources.length
-                            ? c.evidenceBreadthSources
-                            : c.origins
-                          )
-                            .slice(0, 4)
-                            .map((s) => (
-                              <span
-                                key={s}
-                                className="rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[9px] text-slate-400"
-                              >
-                                {s}
-                              </span>
-                            ))}
-                        </div>
-                      </td>
-                      <td className="px-3 py-3 text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          {harvestingIds.includes(c.candidateId) && (
-                            <span className="text-[9px] text-amber-400 animate-pulse" title="Harvesting safety…">
-                              harvest…
-                            </span>
-                          )}
-                          {(status === 'promote' || status === 'watching') &&
-                            c.identity.pubchemCid != null && (
-                              <button
-                                type="button"
-                                onClick={() => void handleExpandSimilar(c)}
-                                disabled={expandBusy === c.candidateId}
-                                className="rounded border border-violet-800/40 px-1.5 py-0.5 text-[9px] text-violet-300 hover:bg-violet-900/30 disabled:opacity-50"
-                                title="Add PubChem 2D-similar neighbors to this board"
-                              >
-                                {expandBusy === c.candidateId ? '…' : '≈ similar'}
-                              </button>
-                            )}
-                          <button
-                            type="button"
-                            onClick={() => handleRemove(c.candidateId)}
-                            className="p-1 text-slate-600 hover:text-red-400"
-                            title="Remove from board"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
+          <BoardTable
+            project={project}
+            onStatusChange={handleStatus}
+            onRemove={handleRemove}
+            signalRows={signalRows}
+            signalsLoading={signalsLoading}
+            harvestingIds={harvestingIds}
+            onExpandSimilar={(c) => void handleExpandSimilar(c)}
+            expandBusyId={expandBusy}
+          />
         )}
 
         {/* Evidence packs — download-primary; board carries packIndex breadcrumbs only */}

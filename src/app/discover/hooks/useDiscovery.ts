@@ -16,7 +16,10 @@ import {
   snapshotDiscoveryPreferences,
 } from '@/lib/discovery/preferences'
 import type { ScoreVector } from '@/lib/domain/score'
-import { emitProductEvent } from '@/lib/productEvents'
+import {
+  emitDiscoverStagesFromTimingMs,
+  emitProductEvent,
+} from '@/lib/productEvents'
 
 /** Progressive stages aligned with design §5.1.2 (cheap shortlist + optional harvest). */
 const PROGRESS_STAGES_CHEAP = [
@@ -109,6 +112,7 @@ export function useDiscovery() {
     }
   }, [])
 
+  /** UX-only progress animation — never emits product analytics (V2-09a). */
   const advanceProgress = useCallback(
     (stages: typeof PROGRESS_STAGES_CHEAP, stageIndex: number) => {
       if (stageIndex >= stages.length) return
@@ -118,7 +122,6 @@ export function useDiscovery() {
         progress: stage.progress,
         progressLabel: stage.label,
       }))
-      emitProductEvent('discover_stage', { stage: stage.label, index: stageIndex })
       const delay = 1200 + Math.random() * 1200
       progressRef.current = setTimeout(() => advanceProgress(stages, stageIndex + 1), delay)
     },
@@ -274,6 +277,8 @@ export function useDiscovery() {
           diseaseId: data.diseaseId ?? diseaseId ?? null,
           scorePhase: data.v2?.scorePhase ?? 'cheap',
         })
+        // Post-hoc stages from real engine timingMs only (never fake timer labels)
+        emitDiscoverStagesFromTimingMs(data.v2?.timingMs)
         setState((prev) => ({
           ...prev,
           status: 'success',

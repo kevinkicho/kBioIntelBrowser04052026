@@ -3,6 +3,9 @@
 import Link from 'next/link'
 import type { BoardStatus, MoleculeCandidate, Project } from '@/lib/domain'
 import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
+import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
+import { SignalBadges } from '@/components/projects/SignalBadges'
+import type { CandidateSignalRow } from '@/lib/signals'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
 
@@ -18,6 +21,13 @@ export interface BoardTableProps {
   project: Project
   onStatusChange: (candidateId: string, status: BoardStatus) => void
   onRemove: (candidateId: string) => void
+  /** Signal rows from loadProjectSignals */
+  signalRows?: CandidateSignalRow[] | null
+  signalsLoading?: boolean
+  /** Per-row harvest spinner */
+  harvestingIds?: string[]
+  onExpandSimilar?: (candidate: MoleculeCandidate) => void
+  expandBusyId?: string | null
 }
 
 function identityKeysFromCandidate(c: MoleculeCandidate) {
@@ -34,9 +44,23 @@ function identityKeysFromCandidate(c: MoleculeCandidate) {
 }
 
 /**
- * Project board candidate table with IdentityTrust badges and alternate CIDs.
+ * Project board table with IdentityTrust, multi-axis scores, signals, similar expand.
+ * Parity checklist V2-09b.
  */
-export function BoardTable({ project, onStatusChange, onRemove }: BoardTableProps) {
+export function BoardTable({
+  project,
+  onStatusChange,
+  onRemove,
+  signalRows = null,
+  signalsLoading = false,
+  harvestingIds = [],
+  onExpandSimilar,
+  expandBusyId = null,
+}: BoardTableProps) {
+  const signalByCandidate = new Map(
+    (signalRows ?? []).map((r) => [r.candidateId, r] as const),
+  )
+
   return (
     <div className="overflow-x-auto rounded-xl border border-slate-800" data-testid="board-table">
       <table className="w-full text-sm">
@@ -48,16 +72,19 @@ export function BoardTable({ project, onStatusChange, onRemove }: BoardTableProp
             <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
               Identity
             </th>
-            <th className="px-3 py-3 text-center text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
               Score
             </th>
             <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
               Status
             </th>
             <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
+              Signals
+            </th>
+            <th className="px-3 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-400">
               Origins
             </th>
-            <th className="w-12 px-3 py-3" />
+            <th className="w-24 px-3 py-3" />
           </tr>
         </thead>
         <tbody>
@@ -65,6 +92,8 @@ export function BoardTable({ project, onStatusChange, onRemove }: BoardTableProp
             const cid = c.identity.pubchemCid
             const status = c.boardStatus ?? 'untriaged'
             const score = c.scores?.composite
+            const sigRow = signalByCandidate.get(c.candidateId)
+            const harvesting = harvestingIds.includes(c.candidateId)
             return (
               <tr
                 key={c.candidateId}
@@ -110,8 +139,17 @@ export function BoardTable({ project, onStatusChange, onRemove }: BoardTableProp
                     className="mt-1"
                   />
                 </td>
-                <td className="px-3 py-3 text-center tabular-nums text-slate-300">
-                  {score != null ? score.toFixed(2) : '—'}
+                <td className="px-3 py-3 min-w-[10rem]">
+                  {score != null && (
+                    <div className="mb-1 text-center tabular-nums text-slate-300">
+                      {score.toFixed(2)}
+                    </div>
+                  )}
+                  {c.scores ? (
+                    <ScoreAxisBars scores={c.scores} compact />
+                  ) : (
+                    <div className="text-center text-slate-600">—</div>
+                  )}
                 </td>
                 <td className="px-3 py-3">
                   <select
@@ -129,12 +167,30 @@ export function BoardTable({ project, onStatusChange, onRemove }: BoardTableProp
                     ))}
                   </select>
                 </td>
+                <td className="px-3 py-3 min-w-[8rem]">
+                  {signalsLoading && !sigRow ? (
+                    <span className="text-[10px] text-slate-600 animate-pulse">…</span>
+                  ) : sigRow && sigRow.signals.length > 0 ? (
+                    <SignalBadges signals={sigRow.signals} compact />
+                  ) : sigRow?.status === 'baseline' ? (
+                    <span className="text-[10px] text-slate-600" title="Baseline snapshot saved">
+                      —
+                    </span>
+                  ) : sigRow?.status === 'no_cid' ? (
+                    <span className="text-[10px] text-slate-600" title="No PubChem CID">
+                      n/a
+                    </span>
+                  ) : sigRow?.status === 'error' ? (
+                    <span className="text-[10px] text-red-500/70" title={sigRow.error}>
+                      err
+                    </span>
+                  ) : (
+                    <span className="text-[10px] text-slate-600">—</span>
+                  )}
+                </td>
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {(c.evidenceBreadthSources.length
-                      ? c.evidenceBreadthSources
-                      : c.origins
-                    )
+                    {(c.evidenceBreadthSources.length ? c.evidenceBreadthSources : c.origins)
                       .slice(0, 4)
                       .map((s) => (
                         <span
@@ -147,14 +203,37 @@ export function BoardTable({ project, onStatusChange, onRemove }: BoardTableProp
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center">
-                  <button
-                    type="button"
-                    onClick={() => onRemove(c.candidateId)}
-                    className="p-1 text-slate-600 hover:text-red-400"
-                    title="Remove from board"
-                  >
-                    ✕
-                  </button>
+                  <div className="flex items-center justify-center gap-1">
+                    {harvesting && (
+                      <span
+                        className="text-[9px] text-amber-400 animate-pulse"
+                        title="Harvesting safety…"
+                      >
+                        harvest…
+                      </span>
+                    )}
+                    {(status === 'promote' || status === 'watching') &&
+                      c.identity.pubchemCid != null &&
+                      onExpandSimilar && (
+                        <button
+                          type="button"
+                          onClick={() => onExpandSimilar(c)}
+                          disabled={expandBusyId === c.candidateId}
+                          className="rounded border border-violet-800/40 px-1.5 py-0.5 text-[9px] text-violet-300 hover:bg-violet-900/30 disabled:opacity-50"
+                          title="Add PubChem 2D-similar neighbors"
+                        >
+                          {expandBusyId === c.candidateId ? '…' : '≈ similar'}
+                        </button>
+                      )}
+                    <button
+                      type="button"
+                      onClick={() => onRemove(c.candidateId)}
+                      className="p-1 text-slate-600 hover:text-red-400"
+                      title="Remove from board"
+                    >
+                      ✕
+                    </button>
+                  </div>
                 </td>
               </tr>
             )
