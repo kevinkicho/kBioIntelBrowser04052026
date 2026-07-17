@@ -46,6 +46,35 @@ FIREBASE_ADMIN_CREDENTIALS_JSON={"type":"service_account",...}
 
 Admin key JSON is **gitignored** (`*-firebase-adminsdk-*.json`).
 
+## App Hosting environment variables
+
+**Important:** The Firebase **Admin SDK cannot set App Hosting env vars**. App Hosting config is applied via:
+
+1. **`apphosting.yaml`** (repo) — public `NEXT_PUBLIC_FIREBASE_*` as plain `value`s  
+2. **Cloud Secret Manager** — sensitive server secrets referenced as `secret:`  
+3. **Firebase Console** → App Hosting → Settings → Environment (overrides yaml)
+
+### What we deploy
+
+| Variable | Source | Availability |
+|----------|--------|--------------|
+| `NEXT_PUBLIC_FIREBASE_*` (7 keys) | `apphosting.yaml` plain values | BUILD + RUNTIME |
+| `FIREBASE_ADMIN_CREDENTIALS_JSON` | Secret Manager (from Admin SDK JSON file) | RUNTIME only |
+| `FIREBASE_CONFIG` / `FIREBASE_WEBAPP_CONFIG` | Auto-injected by App Hosting | system |
+
+### Deploy / rotate Admin secret
+
+```powershell
+# Uses local gitignored *-firebase-adminsdk-*.json
+npm run firebase:apphosting:admin-secret
+
+# Or explicit path:
+node scripts/deploy-apphosting-admin-secret.js .\your-adminsdk.json
+```
+
+This runs `firebase apphosting:secrets:set` + `grantaccess` for backend `biointel`.  
+Then push / create a rollout so the new secret version is bound.
+
 ## Code map
 
 | File | Role |

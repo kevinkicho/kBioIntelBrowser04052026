@@ -47,10 +47,10 @@ env:
       - BUILD
       - RUNTIME
 
-  # Optional server Admin SDK — create with:
-  #   firebase apphosting:secrets:set FIREBASE_ADMIN_CREDENTIALS_JSON
-  # then uncomment:
-  # - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
-  #   secret: FIREBASE_ADMIN_CREDENTIALS_JSON
-  #   availability:
-  #     - RUNTIME
+  # Server Admin SDK service-account JSON (Secret Manager — not committed).
+  # Set/rotate: npm run firebase:apphosting:admin-secret
+  # Or: firebase apphosting:secrets:set FIREBASE_ADMIN_CREDENTIALS_JSON --data-file <adminsdk.json> --force
+  - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
+    secret: FIREBASE_ADMIN_CREDENTIALS_JSON
+    availability:
+      - RUNTIME

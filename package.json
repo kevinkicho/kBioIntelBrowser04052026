@@ -24,7 +24,8 @@
     "test:live": "node scripts/test-live.js",
     "tune-timeouts": "node scripts/tune-timeouts.js",
     "firebase:deploy:rules": "firebase deploy --only firestore:rules,storage,database",
-    "firebase:deploy:functions": "npm --prefix functions run build && firebase deploy --only functions"
+    "firebase:deploy:functions": "npm --prefix functions run build && firebase deploy --only functions",
+    "firebase:apphosting:admin-secret": "node scripts/deploy-apphosting-admin-secret.js"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.23",
