@@ -14,6 +14,7 @@ import { countUserProjects } from '@/lib/firebase/userProfile'
 import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { getLastMigrateAt } from '@/lib/firebase/migrate'
 import { backupProjectsJsonToCloud } from '@/lib/firebase/storageSync'
+import { deleteAllUserData } from '@/lib/firebase/deleteUserData'
 import { exportProjectsToJson, listProjects } from '@/lib/project'
 
 function initialsFromUser(name: string | null | undefined, email: string | null | undefined): string {
@@ -51,6 +52,8 @@ export function UserMenu() {
   const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [projectCount, setProjectCount] = useState<number | null>(null)
   const [countTick, setCountTick] = useState(0)
+  const [confirmDelete, setConfirmDelete] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
 
   const configured = auth.configured || isFirebaseConfigured()
@@ -68,12 +71,18 @@ export function UserMenu() {
   }, [])
 
   useEffect(() => {
-    if (!open) return
+    if (!open) {
+      setConfirmDelete(false)
+      return
+    }
     const onDoc = (e: MouseEvent) => {
       if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false)
+      if (e.key === 'Escape') {
+        if (confirmDelete) setConfirmDelete(false)
+        else setOpen(false)
+      }
     }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
@@ -81,7 +90,7 @@ export function UserMenu() {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
     }
-  }, [open])
+  }, [open, confirmDelete])
 
   useEffect(() => {
     if (!user?.uid || !open) {
@@ -145,9 +154,32 @@ export function UserMenu() {
     try {
       await auth.signOut()
       setOpen(false)
+      setConfirmDelete(false)
       router.push('/')
     } finally {
       setBusy(false)
+    }
+  }
+
+  const onDeleteAllData = async () => {
+    if (!user?.uid) return
+    setDeleting(true)
+    setStatusMsg(null)
+    try {
+      const report = await deleteAllUserData(user.uid)
+      setStatusMsg(report.message)
+      refreshProjectCount()
+      setConfirmDelete(false)
+      if (report.ok) {
+        // Soft reload so AI provider re-reads cleared local config
+        window.setTimeout(() => {
+          window.location.reload()
+        }, 600)
+      }
+    } catch (err) {
+      setStatusMsg(err instanceof Error ? err.message : 'Delete failed')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -377,11 +409,57 @@ export function UserMenu() {
                 </a>
               </div>
 
+              <div className="border-b border-slate-800 py-1">
+                {!confirmDelete ? (
+                  <button
+                    type="button"
+                    role="menuitem"
+                    disabled={syncing || deleting}
+                    onClick={() => setConfirmDelete(true)}
+                    className="flex w-full flex-col px-3 py-2 text-left hover:bg-red-950/30 disabled:opacity-50"
+                    data-testid="user-menu-delete-data"
+                  >
+                    <span className="text-xs text-red-300">Delete all cloud data…</span>
+                    <span className="text-[10px] text-slate-600">
+                      Projects, packs, prefs, AI outputs, Storage backups
+                    </span>
+                  </button>
+                ) : (
+                  <div className="px-3 py-2" data-testid="user-menu-delete-confirm">
+                    <p className="text-[11px] leading-relaxed text-slate-300">
+                      Delete <strong className="text-red-300">all</strong> cloud data for this account?
+                      This cannot be undone. Local browser projects are not wiped unless you clear site
+                      data separately.
+                    </p>
+                    <div className="mt-2 flex gap-2">
+                      <button
+                        type="button"
+                        disabled={deleting}
+                        onClick={() => void onDeleteAllData()}
+                        className="flex-1 rounded-lg bg-red-700 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-red-600 disabled:opacity-50"
+                        data-testid="user-menu-delete-yes"
+                      >
+                        {deleting ? 'Deleting…' : 'Yes, delete'}
+                      </button>
+                      <button
+                        type="button"
+                        disabled={deleting}
+                        onClick={() => setConfirmDelete(false)}
+                        className="flex-1 rounded-lg border border-slate-600 bg-slate-800 px-2 py-1.5 text-[11px] font-medium text-slate-200 hover:bg-slate-700 disabled:opacity-50"
+                        data-testid="user-menu-delete-no"
+                      >
+                        No
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+
               <div className="p-1.5">
                 <button
                   type="button"
                   role="menuitem"
-                  disabled={syncing}
+                  disabled={syncing || deleting}
                   onClick={() => void onSignOut()}
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-red-300 hover:bg-red-950/40 disabled:opacity-50"
                   data-testid="user-menu-logout"

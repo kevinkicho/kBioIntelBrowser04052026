@@ -3,12 +3,26 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientFetch } from '@/lib/clientFetch'
-import { type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
+import {
+  type SearchType,
+  type ApiIdentifierType,
+  type ApiParamValue,
+} from '@/lib/apiIdentifiers'
 import { recordSearch } from '@/lib/searchHistory'
+
+export type UnifiedSearchHit = {
+  kind: 'disease' | 'molecule' | 'gene'
+  label: string
+  geneKey?: string
+}
 
 interface SearchBarProps {
   onNavigating?: (navigating: boolean) => void
-  searchType?: SearchType
+  /**
+   * `all` (default) — fan-out disease + molecule + gene.
+   * Other types keep advanced chemical/disease/gene-only behavior.
+   */
+  searchType?: SearchType | 'all'
   apiOverrides?: Record<string, ApiIdentifierType>
   apiParams?: Record<string, ApiParamValue>
 }
@@ -22,13 +36,20 @@ interface MoleculeCandidate {
   iupacName: string
 }
 
-function buildSearchParams(searchType: SearchType, apiOverrides?: Record<string, ApiIdentifierType>, apiParams?: Record<string, ApiParamValue>): string {
+function buildSearchParams(
+  searchType: SearchType | 'all',
+  apiOverrides?: Record<string, ApiIdentifierType>,
+  apiParams?: Record<string, ApiParamValue>,
+): string {
   const params = new URLSearchParams()
-  if (searchType !== 'name') params.set('searchType', searchType)
+  if (searchType !== 'name' && searchType !== 'all') params.set('searchType', searchType)
   if (apiOverrides && Object.keys(apiOverrides).length > 0) {
     params.set('overrides', JSON.stringify(apiOverrides))
   }
-  if (apiParams && Object.keys(apiParams).filter(k => Object.keys(apiParams[k]).length > 0).length > 0) {
+  if (
+    apiParams &&
+    Object.keys(apiParams).filter((k) => Object.keys(apiParams[k]).length > 0).length > 0
+  ) {
     const filtered: Record<string, ApiParamValue> = {}
     for (const [k, v] of Object.entries(apiParams)) {
       if (Object.keys(v).length > 0) filtered[k] = v
@@ -39,11 +60,32 @@ function buildSearchParams(searchType: SearchType, apiOverrides?: Record<string,
   return s ? `?${s}` : ''
 }
 
-export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, apiParams }: SearchBarProps) {
+const KIND_BADGE: Record<
+  UnifiedSearchHit['kind'],
+  { label: string; className: string }
+> = {
+  disease: {
+    label: 'DISEASE',
+    className: 'bg-rose-900/60 text-rose-300 border-rose-700/50',
+  },
+  molecule: {
+    label: 'MOLECULE',
+    className: 'bg-cyan-900/60 text-cyan-300 border-cyan-700/50',
+  },
+  gene: {
+    label: 'GENE',
+    className: 'bg-violet-900/60 text-violet-300 border-violet-700/50',
+  },
+}
+
+export function SearchBar({
+  onNavigating,
+  searchType = 'all',
+  apiOverrides,
+  apiParams,
+}: SearchBarProps) {
   const [query, setQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<string[]>([])
-  const [suggestionsAreDiseases, setSuggestionsAreDiseases] = useState(false)
-  const [suggestionsAreGenes, setSuggestionsAreGenes] = useState(false)
+  const [hits, setHits] = useState<UnifiedSearchHit[]>([])
   const [isOpen, setIsOpen] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
   const [isNavigating, setIsNavigating] = useState(false)
@@ -58,9 +100,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
 
   useEffect(() => {
     if (query.length < 2) {
-      setSuggestions([])
-      setSuggestionsAreDiseases(false)
-      setSuggestionsAreGenes(false)
+      setHits([])
       setIsOpen(false)
       return
     }
@@ -69,12 +109,31 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     debounceRef.current = setTimeout(async () => {
       setIsLoading(true)
       try {
-        const res = await clientFetch(`/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(searchType)}`)
+        const type = searchType === 'all' ? 'all' : searchType
+        const res = await clientFetch(
+          `/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`,
+        )
         if (res.ok) {
           const data = await res.json()
-          setSuggestions(data.suggestions ?? [])
-          setSuggestionsAreDiseases(data.searchType === 'disease')
-          setSuggestionsAreGenes(data.searchType === 'gene')
+          if (Array.isArray(data.results) && data.results.length > 0) {
+            setHits(data.results as UnifiedSearchHit[])
+          } else {
+            // Legacy flat suggestions → treat as molecules (or gene/disease from searchType)
+            const kind: UnifiedSearchHit['kind'] =
+              data.searchType === 'disease'
+                ? 'disease'
+                : data.searchType === 'gene'
+                  ? 'gene'
+                  : 'molecule'
+            const labels: string[] = data.suggestions ?? []
+            setHits(
+              labels.map((label) => ({
+                kind,
+                label,
+                geneKey: kind === 'gene' ? label : undefined,
+              })),
+            )
+          }
           setIsOpen(true)
         }
       } finally {
@@ -107,7 +166,8 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
 
   function goToCid(cid: number, title?: string) {
     setCandidates(null)
-    const href = `/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`
+    const molType = searchType === 'all' ? 'name' : searchType
+    const href = `/molecule/${cid}${buildSearchParams(molType, apiOverrides, apiParams)}`
     recordSearch({
       kind: 'molecule',
       query: title || String(cid),
@@ -118,31 +178,37 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     router.push(href)
   }
 
-  async function handleSelect(name: string) {
+  async function handleSelectHit(hit: UnifiedSearchHit) {
     if (isNavigating) return
     setIsNavigating(true)
     setIsOpen(false)
-    setSuggestions([])
-    setQuery(name)
+    setHits([])
+    setQuery(hit.label)
     setCandidates(null)
 
-    if (searchType === 'disease') {
-      const href = `/disease?q=${encodeURIComponent(name)}`
-      recordSearch({ kind: 'disease', query: name, title: name, href })
+    if (hit.kind === 'disease') {
+      const href = `/disease?q=${encodeURIComponent(hit.label)}`
+      recordSearch({ kind: 'disease', query: hit.label, title: hit.label, href })
       router.push(href)
       return
     }
 
-    if (searchType === 'gene') {
+    if (hit.kind === 'gene') {
+      const key = hit.geneKey || hit.label
       const href =
-        name.includes('-') && /^\d+-/.test(name)
-          ? `/gene/${encodeURIComponent(name)}`
-          : `/gene?q=${encodeURIComponent(name)}`
-      recordSearch({ kind: 'gene', query: name, title: name, href })
+        key.includes('-') && /^\d+-/.test(key)
+          ? `/gene/${encodeURIComponent(key)}`
+          : `/gene?q=${encodeURIComponent(hit.label)}`
+      recordSearch({ kind: 'gene', query: hit.label, title: hit.label, href })
       router.push(href)
       return
     }
 
+    // Molecule (or free-text Enter)
+    await resolveMolecule(hit.label)
+  }
+
+  async function resolveMolecule(name: string) {
     if (searchType === 'cid' && /^\d+$/.test(name.replace('CID ', ''))) {
       const cid = parseInt(name.replace('CID ', ''), 10)
       if (cid > 0) {
@@ -151,12 +217,18 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
       }
     }
 
+    const resolveType =
+      searchType === 'all' || searchType === 'disease' || searchType === 'gene'
+        ? 'name'
+        : searchType
+
     try {
-      const res = await clientFetch(`/api/search/resolve?name=${encodeURIComponent(name)}&type=${encodeURIComponent(searchType)}`)
+      const res = await clientFetch(
+        `/api/search/resolve?name=${encodeURIComponent(name)}&type=${encodeURIComponent(resolveType)}`,
+      )
       if (res.ok) {
         const data = await res.json()
 
-        // Gene symbol without compound hit → gene explorer
         if (data.gene && data.geneSymbol) {
           const href = `/gene?q=${encodeURIComponent(data.geneSymbol)}`
           recordSearch({
@@ -169,7 +241,6 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
           return
         }
 
-        // Multiple PubChem CIDs — show disambiguation (salt/parent/isomer)
         if (data.needsDisambiguation && Array.isArray(data.candidates) && data.candidates.length > 1) {
           setCandidates(data.candidates)
           setIsNavigating(false)
@@ -181,7 +252,9 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
           return
         }
       }
-    } catch {}
+    } catch {
+      /* fall through */
+    }
 
     if (searchType === 'cid') {
       const cid = parseInt(query, 10)
@@ -191,28 +264,35 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
       }
     }
 
-    const href = `/molecule/name/${encodeURIComponent(name)}${buildSearchParams(searchType, apiOverrides, apiParams)}`
+    const molType = searchType === 'all' ? 'name' : searchType
+    const href = `/molecule/name/${encodeURIComponent(name)}${buildSearchParams(molType, apiOverrides, apiParams)}`
     recordSearch({ kind: 'molecule', query: name, title: name, href })
     router.push(href)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {
     if (e.key === 'Enter' && query.trim().length >= 2) {
-      handleSelect(query.trim())
+      // Prefer first hit if dropdown is open; else free-text resolve as molecule
+      if (isOpen && hits.length > 0) {
+        void handleSelectHit(hits[0]!)
+      } else {
+        void handleSelectHit({ kind: 'molecule', label: query.trim() })
+      }
     }
   }
 
-  const placeholders: Record<SearchType, string> = {
-    name: 'Search a molecule, drug, enzyme, or gene...',
-    cid: 'Enter a PubChem CID number...',
-    cas: 'Enter a CAS Registry Number (e.g. 50-78-2)...',
-    smiles: 'Enter a SMILES string...',
-    inchikey: 'Enter an InChIKey (e.g. RYXSWKPIZGBOPP-UHFFFAOYSA-N)...',
-    inchi: 'Enter an InChI string...',
-    formula: 'Enter a molecular formula (e.g. C9H8O4)...',
-    disease: 'Search a disease or condition (e.g. diabetes)...',
-    gene: 'Search a gene symbol or name (e.g. BRCA1, TP53)...',
-  }
+  const placeholder =
+    searchType === 'all'
+      ? 'Search disease, molecule, or gene…'
+      : searchType === 'disease'
+        ? 'Search a disease or condition…'
+        : searchType === 'gene'
+          ? 'Search a gene symbol…'
+          : searchType === 'cid'
+            ? 'Enter a PubChem CID…'
+            : searchType === 'cas'
+              ? 'Enter a CAS number…'
+              : 'Search a molecule, drug, or formula…'
 
   return (
     <div className="relative w-full" ref={containerRef}>
@@ -220,17 +300,20 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
         <input
           type="text"
           value={query}
-          onChange={e => {
+          onChange={(e) => {
             if (!isNavigating) {
               setQuery(e.target.value)
               setCandidates(null)
             }
           }}
           onKeyDown={handleKeyDown}
-          onFocus={() => { if (suggestions.length > 0 && !isNavigating) setIsOpen(true) }}
-          placeholder={placeholders[searchType]}
+          onFocus={() => {
+            if (hits.length > 0 && !isNavigating) setIsOpen(true)
+          }}
+          placeholder={placeholder}
           disabled={isNavigating}
           className="w-full bg-slate-800 border border-slate-600 rounded-xl px-5 py-4 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+          data-testid="unified-search-input"
         />
         {(isLoading || isNavigating) && (
           <div className="absolute right-4 top-1/2 -translate-y-1/2">
@@ -242,8 +325,12 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
       {candidates && candidates.length > 1 && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-indigo-500/40 rounded-xl overflow-hidden z-50 shadow-xl">
           <div className="px-4 py-2 border-b border-slate-700 bg-slate-900/80">
-            <p className="text-xs font-medium text-indigo-300">Multiple PubChem matches — pick the correct structure</p>
-            <p className="text-[10px] text-slate-500 mt-0.5">Salts, hydrates, and stereoisomers can have different CIDs</p>
+            <p className="text-xs font-medium text-indigo-300">
+              Multiple PubChem matches — pick the correct structure
+            </p>
+            <p className="text-[10px] text-slate-500 mt-0.5">
+              Salts, hydrates, and stereoisomers can have different CIDs
+            </p>
           </div>
           <ul className="max-h-72 overflow-y-auto">
             {candidates.map((c) => (
@@ -257,12 +344,20 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span className="font-medium text-sm">{c.name}</span>
-                    <span className="font-mono text-[10px] text-cyan-400/80 shrink-0">CID {c.cid}</span>
+                    <span className="font-mono text-[10px] text-cyan-400/80 shrink-0">
+                      CID {c.cid}
+                    </span>
                   </div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500 font-mono">
                     {c.formula && <span>{c.formula}</span>}
-                    {c.molecularWeight > 0 && <span>{c.molecularWeight.toFixed(2)} g/mol</span>}
-                    {c.inchiKey && <span className="truncate max-w-[200px]" title={c.inchiKey}>{c.inchiKey}</span>}
+                    {c.molecularWeight > 0 && (
+                      <span>{c.molecularWeight.toFixed(2)} g/mol</span>
+                    )}
+                    {c.inchiKey && (
+                      <span className="truncate max-w-[200px]" title={c.inchiKey}>
+                        {c.inchiKey}
+                      </span>
+                    )}
                   </div>
                 </button>
               </li>
@@ -277,25 +372,30 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
         </div>
       )}
 
-      {isOpen && suggestions.length > 0 && !candidates && (
-        <ul className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden z-50 shadow-xl">
-          {suggestions.map(s => (
-            <li key={s}>
-              <button
-                onClick={() => handleSelect(s)}
-                disabled={isNavigating}
-                className="w-full text-left px-5 py-3 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-              >
-                {suggestionsAreDiseases && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-rose-900/60 text-rose-300 border border-rose-700/50 shrink-0">DISEASE</span>
-                )}
-                {suggestionsAreGenes && (
-                  <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-violet-900/60 text-violet-300 border border-violet-700/50 shrink-0">GENE</span>
-                )}
-                <span>{s}</span>
-              </button>
-            </li>
-          ))}
+      {isOpen && hits.length > 0 && !candidates && (
+        <ul
+          className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden z-50 shadow-xl max-h-80 overflow-y-auto"
+          data-testid="unified-search-results"
+        >
+          {hits.map((hit, i) => {
+            const badge = KIND_BADGE[hit.kind]
+            return (
+              <li key={`${hit.kind}:${hit.geneKey || hit.label}:${i}`}>
+                <button
+                  onClick={() => void handleSelectHit(hit)}
+                  disabled={isNavigating}
+                  className="w-full text-left px-5 py-3 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                >
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 ${badge.className}`}
+                  >
+                    {badge.label}
+                  </span>
+                  <span>{hit.label}</span>
+                </button>
+              </li>
+            )
+          })}
         </ul>
       )}
     </div>

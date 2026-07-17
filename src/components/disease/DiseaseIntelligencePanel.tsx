@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
+import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
 import {
   type DiseaseDetailContext,
   buildDiseaseQuickSummaryPrompt,
@@ -71,6 +72,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
     buildPrompt: (ctx: DiseaseDetailContext) => { system: string; user: string },
     onToken: (token: string) => void,
     onDone: () => void,
+    mode: string,
   ) => {
     const prompts = buildPrompt(context)
     let full = ''
@@ -87,6 +89,19 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
       full += '\n[Error: Analysis interrupted]'
       onToken(full)
     }
+    if (full.trim()) {
+      void saveAiGeneratedData({
+        kind: 'disease',
+        mode,
+        content: full,
+        context: {
+          name: context.diseaseName,
+          diseaseId: context.diseaseId,
+        },
+        model: ai.model,
+        ollamaUrl: ai.ollamaUrl,
+      })
+    }
     onDone()
   }, [ai, context])
 
@@ -102,6 +117,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
       buildDiseaseQuickSummaryPrompt,
       (content) => { if (mountedRef.current) setSummary(content) },
       () => { if (mountedRef.current) setSummaryStreaming(false) },
+      'disease_quick_summary',
     )
   }, [aiAvailable, summaryTriggered, hasSomeData, streamAnalysis])
 
@@ -138,6 +154,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
           }))
         }
       },
+      `disease_${mode}`,
     )
   }, [cards, streamAnalysis])
 
@@ -171,7 +188,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
             <svg className="w-5 h-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>
             <span className="text-sm text-slate-400">Connect Ollama to enable AI-powered disease analysis</span>
           </div>
-          <p className="text-xs text-slate-500">Start a local Ollama instance and connect via the AI Copilot button (bottom-left) to unlock intelligence features.</p>
+          <p className="text-xs text-slate-500">Connect Ollama or Cloud via the AI button in the top bar to unlock intelligence features.</p>
         </div>
       )}
 

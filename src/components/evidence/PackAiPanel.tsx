@@ -6,6 +6,7 @@ import type { PackAiMode, StructuredInsight } from '@/lib/ai/contracts'
 import { minClaimsForPackMode } from '@/lib/ai/contracts'
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
+import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
 
 const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_executive_brief', label: 'Executive brief' },
@@ -72,10 +73,32 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       })
       if (data.refused || !data.insight) {
         setError(data.refuseReason ?? data.error ?? 'Refused or empty response')
+        void saveAiGeneratedData({
+          kind: 'pack',
+          mode,
+          content: data.refuseReason ?? data.error ?? 'refused',
+          context: { packId: pack.id, name: pack.title },
+          model: ai.model,
+          ollamaUrl: ai.ollamaUrl,
+          error: data.refuseReason ?? data.error,
+        })
         return
       }
       setInsight(data.insight)
       onInsight?.(mode, data.insight)
+      void saveAiGeneratedData({
+        kind: 'pack',
+        mode,
+        content: JSON.stringify(data.insight),
+        context: {
+          packId: pack.id,
+          name: pack.title,
+          diseaseId: pack.disease?.id,
+        },
+        model: ai.model,
+        ollamaUrl: ai.ollamaUrl,
+        task: data.insight,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pack AI failed')
     } finally {

@@ -11,6 +11,8 @@ export const FIRESTORE_COLLECTIONS = {
   settings: 'settings',
   /** users/{uid}/packs/{packId} metadata (not full pack blobs) */
   packs: 'packs',
+  /** users/{uid}/ai/{entryId} — AI-generated outputs (owner-only privacy) */
+  ai: 'ai',
 } as const
 
 export function userDocPath(uid: string): string {

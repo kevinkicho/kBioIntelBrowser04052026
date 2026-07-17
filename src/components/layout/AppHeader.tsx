@@ -56,9 +56,7 @@ export function AppHeader() {
         </div>
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
-          <div className="hidden md:block">
-            <AIStatusIndicator />
-          </div>
+          <AIStatusIndicator />
           <Link
             href="/?focus=search"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200"

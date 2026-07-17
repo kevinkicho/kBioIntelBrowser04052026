@@ -16,16 +16,15 @@ interface AdvancedSearchPanelProps {
   onResetParams: () => void
 }
 
+/** Chemical-structure ID modes only — disease/gene are in unified homepage search. */
 const SEARCH_TYPES: { value: SearchType; label: string; placeholder: string; description: string }[] = [
-  { value: 'name', label: 'Name', placeholder: 'e.g. aspirin, metformin, caffeine', description: 'Common name, IUPAC name, or synonym' },
+  { value: 'name', label: 'Name (unified)', placeholder: 'disease, molecule, or gene…', description: 'Unified search (homepage default)' },
   { value: 'cid', label: 'CID', placeholder: 'e.g. 2244', description: 'PubChem Compound ID number' },
   { value: 'cas', label: 'CAS', placeholder: 'e.g. 50-78-2', description: 'CAS Registry Number' },
   { value: 'smiles', label: 'SMILES', placeholder: 'e.g. CC(=O)OC1=CC=CC=C1C(=O)O', description: 'Simplified Molecular Input Line Entry System' },
   { value: 'inchikey', label: 'InChIKey', placeholder: 'e.g. RYXSWKPIZGBOPP-UHFFFAOYSA-N', description: 'IUPAC International Chemical Identifier Key' },
   { value: 'inchi', label: 'InChI', placeholder: 'e.g. InChI=1S/C9H8O4/c1-6...', description: 'IUPAC International Chemical Identifier' },
   { value: 'formula', label: 'Formula', placeholder: 'e.g. C9H8O4', description: 'Molecular formula' },
-  { value: 'disease', label: 'Disease', placeholder: 'e.g. diabetes, hypertension, melanoma', description: 'Disease or condition name' },
-  { value: 'gene', label: 'Gene', placeholder: 'e.g. BRCA1, TP53, EGFR', description: 'Gene symbol or name' },
 ]
 
 const PANEL_FIELDS: Record<string, string[]> = {

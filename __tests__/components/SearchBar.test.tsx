@@ -10,32 +10,46 @@ beforeEach(() => {
   jest.resetAllMocks()
 })
 
-describe('SearchBar', () => {
-  test('renders input with placeholder', () => {
+describe('SearchBar (unified)', () => {
+  test('renders unified placeholder', () => {
     render(<SearchBar />)
-    expect(screen.getByPlaceholderText(/search.*molecule/i)).toBeInTheDocument()
+    expect(screen.getByPlaceholderText(/disease, molecule, or gene/i)).toBeInTheDocument()
   })
 
-  test('shows suggestions after typing 2+ characters', async () => {
+  test('shows typed hits with kind badges', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ suggestions: ['insulin', 'Insulin Glargine'] }),
+      json: async () => ({
+        searchType: 'all',
+        results: [
+          { kind: 'disease', label: 'diabetes' },
+          { kind: 'molecule', label: 'aspirin' },
+          { kind: 'gene', label: 'BRCA1', geneKey: '672-BRCA1' },
+        ],
+        suggestions: ['diabetes', 'aspirin', 'BRCA1'],
+      }),
     })
 
     render(<SearchBar />)
     const input = screen.getByRole('textbox')
-    await userEvent.type(input, 'in')
+    await userEvent.type(input, 'as')
 
     await waitFor(() => {
-      expect(screen.getByText('insulin')).toBeInTheDocument()
+      expect(screen.getByText('aspirin')).toBeInTheDocument()
+      expect(screen.getByText('DISEASE')).toBeInTheDocument()
+      expect(screen.getByText('MOLECULE')).toBeInTheDocument()
+      expect(screen.getByText('GENE')).toBeInTheDocument()
     })
   })
 
-  test('navigates to molecule page when suggestion clicked', async () => {
+  test('navigates to molecule when molecule hit clicked', async () => {
     ;(fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: true,
-        json: async () => ({ suggestions: ['insulin'] }),
+        json: async () => ({
+          results: [{ kind: 'molecule', label: 'insulin' }],
+          suggestions: ['insulin'],
+        }),
       })
       .mockResolvedValueOnce({
         ok: true,
@@ -51,6 +65,27 @@ describe('SearchBar', () => {
 
     await waitFor(() => {
       expect(mockRouter.push).toHaveBeenCalled()
+    })
+  })
+
+  test('navigates to disease page when disease hit clicked', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        results: [{ kind: 'disease', label: 'cancer' }],
+        suggestions: ['cancer'],
+      }),
+    })
+
+    render(<SearchBar />)
+    await userEvent.type(screen.getByRole('textbox'), 'ca')
+    await waitFor(() => screen.getByText('cancer'))
+    fireEvent.click(screen.getByText('cancer'))
+
+    await waitFor(() => {
+      expect(mockRouter.push).toHaveBeenCalledWith(
+        expect.stringContaining('/disease?q=cancer'),
+      )
     })
   })
 })

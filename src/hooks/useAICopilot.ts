@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
+import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
 import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
 import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, buildPriorArtQueryPrompt, buildDifferentialSafetyPrompt, buildSuggestNextPrompt, buildHypothesisSeedPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
@@ -398,9 +399,29 @@ export function useAICopilot(
       } : m))
     }
 
+    const storedContent = finalContent || fullContent
+    if (storedContent.trim() || taskPayload) {
+      void saveAiGeneratedData({
+        kind: 'copilot',
+        mode,
+        content: validationError
+          ? `${storedContent}\n\n[validation: ${validationError}]`
+          : storedContent,
+        context: {
+          name: identity.name,
+          cid: identity.cid || undefined,
+          geneSymbol: identity.geneSymbol,
+        },
+        model: ai.model,
+        ollamaUrl: ai.ollamaUrl,
+        task: taskPayload,
+        error: msgError || undefined,
+      })
+    }
+
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
+  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, identity.cid, identity.geneSymbol, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
 
   const askQuestion = useCallback(async (question: string) => {
     if (!aiAvailable) {
@@ -479,9 +500,26 @@ export function useAICopilot(
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent || fullContent, ...(msgError ? { error: msgError } : {}) } : m))
     }
 
+    const qaContent = finalContent || fullContent
+    if (qaContent.trim()) {
+      void saveAiGeneratedData({
+        kind: 'copilot',
+        mode: 'free_qa',
+        content: qaContent,
+        context: {
+          name: identity.name,
+          cid: identity.cid || undefined,
+          geneSymbol: identity.geneSymbol,
+        },
+        model: ai.model,
+        ollamaUrl: ai.ollamaUrl,
+        error: msgError || undefined,
+      })
+    }
+
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, addMessage, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
+  }, [ai, aiAvailable, context, addMessage, identity.name, identity.cid, identity.geneSymbol, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()
