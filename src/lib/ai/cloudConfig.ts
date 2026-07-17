@@ -1,15 +1,35 @@
 /**
  * Server-only Ollama Cloud configuration.
- * API key is read from process.env (never expose to the client via next.config env).
+ * API key is read from process.env at call time (never expose to the client).
+ *
+ * IMPORTANT: Use dynamic env lookup so Next.js does not bake `undefined` into
+ * the server bundle when OLLAMA_API_KEY is only available at App Hosting RUNTIME.
  */
 
-export const OLLAMA_CLOUD_BASE = (
-  process.env.OLLAMA_CLOUD_BASE_URL || 'https://ollama.com'
-).replace(/\/+$/, '')
+function envGet(name: string): string | undefined {
+  // Bracket access + runtime read — avoids static inlining of missing BUILD secrets
+  try {
+    const v = (process.env as Record<string, string | undefined>)[name]
+    if (typeof v !== 'string') return undefined
+    const t = v.trim()
+    return t.length > 0 ? t : undefined
+  } catch {
+    return undefined
+  }
+}
+
+export function getOllamaCloudBase(): string {
+  return (envGet('OLLAMA_CLOUD_BASE_URL') || 'https://ollama.com').replace(
+    /\/+$/,
+    '',
+  )
+}
+
+/** @deprecated use getOllamaCloudBase() — kept for import compatibility */
+export const OLLAMA_CLOUD_BASE = 'https://ollama.com'
 
 export function getOllamaApiKey(): string | undefined {
-  const key = process.env.OLLAMA_API_KEY?.trim()
-  return key || undefined
+  return envGet('OLLAMA_API_KEY')
 }
 
 /** True when a cloud API key is configured for fallback. */

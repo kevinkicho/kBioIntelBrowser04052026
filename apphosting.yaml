@@ -1,42 +1,37 @@
 # Firebase App Hosting — backend id: biointel
+# Generated/updated by scripts/deploy-apphosting-env.js
 # https://firebase.google.com/docs/app-hosting/configure
 #
-# Client Firebase web config is public-by-design (ends up in browser JS).
-# Still: do NOT put the Google API key as a plain `value` in git — GitHub
-# secret scanning flags AIza… patterns. Store it in Secret Manager instead.
-# Admin SDK private keys: Secret Manager only, RUNTIME only.
+# Client Firebase web config is public-by-design (browser).
+# Sensitive values use Cloud Secret Manager (secret:).
 
 runConfig:
   minInstances: 0
-  # Molecule/discover fan-out is memory-hungry on cold starts
   memoryMiB: 1024
-  # maxInstances: 20
 
 env:
-  # Web API key via Secret Manager (still injected as NEXT_PUBLIC_* at build).
-  # Rotate/set: firebase apphosting:secrets:set NEXT_PUBLIC_FIREBASE_API_KEY --data-file - --force
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: NEXT_PUBLIC_FIREBASE_API_KEY
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: kbiointelbrowser04052026.firebaseapp.com
+    value: "kbiointelbrowser04052026.firebaseapp.com"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-    value: https://kbiointelbrowser04052026-default-rtdb.firebaseio.com
+    value: "https://kbiointelbrowser04052026-default-rtdb.firebaseio.com"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: kbiointelbrowser04052026
+    value: "kbiointelbrowser04052026"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: kbiointelbrowser04052026.firebasestorage.app
+    value: "kbiointelbrowser04052026.firebasestorage.app"
     availability:
       - BUILD
       - RUNTIME
@@ -46,28 +41,26 @@ env:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: 1:888935385467:web:24d1b4fde75682ad5415de
+    value: "1:888935385467:web:24d1b4fde75682ad5415de"
     availability:
       - BUILD
       - RUNTIME
-
-  # Server Admin SDK service-account JSON (Secret Manager — not committed).
-  # Set/rotate: npm run firebase:apphosting:admin-secret
+  - variable: NCBI_EMAIL
+    value: "kevinkicho@gmail.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: OLLAMA_CLOUD_BASE_URL
+    value: "https://ollama.com"
+    availability:
+      - BUILD
+      - RUNTIME
   - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
     secret: FIREBASE_ADMIN_CREDENTIALS_JSON
     availability:
       - RUNTIME
-
-  # Ollama Cloud fallback for AI brief / chat when localhost:11434 is absent.
-  # Set: firebase apphosting:secrets:set OLLAMA_API_KEY --data-file - --force
   - variable: OLLAMA_API_KEY
     secret: OLLAMA_API_KEY
-    availability:
-      - RUNTIME
-
-  # NCBI etiquette for PubChem/eutils from cloud egress
-  - variable: NCBI_EMAIL
-    value: kevinkicho@gmail.com
     availability:
       - BUILD
       - RUNTIME

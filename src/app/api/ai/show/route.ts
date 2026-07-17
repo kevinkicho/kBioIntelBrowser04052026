@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateOllamaUrl } from '@/lib/ai/config'
 import {
-  OLLAMA_CLOUD_BASE,
+  getOllamaCloudBase,
   hasOllamaCloudFallback,
   isOllamaCloudUrl,
   ollamaRequestHeaders,
@@ -16,7 +16,7 @@ async function showModel(url: string, name: string): Promise<Response> {
       headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ name }),
       signal: controller.signal,
-      redirect: 'error',
+      redirect: isOllamaCloudUrl(url) ? 'follow' : 'error',
     })
   } finally {
     clearTimeout(timeout)
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       let res = await showModel(validatedUrl, name)
       if ((!res.ok) && !isOllamaCloudUrl(validatedUrl) && hasOllamaCloudFallback()) {
         console.log('[ai/show] Falling back to Ollama Cloud')
-        res = await showModel(OLLAMA_CLOUD_BASE, name)
+        res = await showModel(getOllamaCloudBase(), name)
       }
       if (!res.ok) {
         return NextResponse.json({ available: false })
@@ -59,7 +59,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Cloud-only path
-    const res = await showModel(OLLAMA_CLOUD_BASE, name)
+    const res = await showModel(getOllamaCloudBase(), name)
     if (!res.ok) return NextResponse.json({ available: false })
     const data = await res.json()
     return NextResponse.json(data)
@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
     if (validatedUrl && !isOllamaCloudUrl(validatedUrl) && hasOllamaCloudFallback()) {
       try {
         console.log('[ai/show] Exception; falling back to Ollama Cloud')
-        const res = await showModel(OLLAMA_CLOUD_BASE, name)
+        const res = await showModel(getOllamaCloudBase(), name)
         if (!res.ok) return NextResponse.json({ available: false })
         return NextResponse.json(await res.json())
       } catch {

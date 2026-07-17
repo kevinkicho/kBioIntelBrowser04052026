@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateOllamaUrl } from '@/lib/ai/config'
 import { generateOnce } from '@/lib/ai/ollama'
-import { hasOllamaCloudFallback, OLLAMA_CLOUD_BASE } from '@/lib/ai/cloudConfig'
+import { hasOllamaCloudFallback, getOllamaCloudBase } from '@/lib/ai/cloudConfig'
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,7 +33,7 @@ export async function POST(request: NextRequest) {
       if (!hasOllamaCloudFallback()) {
         return NextResponse.json({ error: 'No Ollama URL provided' }, { status: 400 })
       }
-      targetUrl = OLLAMA_CLOUD_BASE
+      targetUrl = getOllamaCloudBase()
     }
 
     try {
