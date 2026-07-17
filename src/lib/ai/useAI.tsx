@@ -372,6 +372,17 @@ export function AIProvider({ children }: { children: ReactNode }) {
         console.log(`[ai] Connected to ${effectiveUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
         setTransport(result.transport)
         transportRef.current = result.transport
+        const successNote = model
+          ? result.viaCloud
+            ? result.usingUserKey
+              ? 'Using Ollama Cloud with your API key'
+              : 'Using Ollama Cloud'
+            : result.transport === 'browser'
+              ? isLocalOrLanOllamaUrl(effectiveUrl)
+                ? 'Connected to Ollama on this computer (port 11434)'
+                : 'Connected to your Ollama endpoint in the browser'
+              : undefined
+          : undefined
         setConfig(prev => ({
           ...prev,
           ollamaUrl: effectiveUrl,
@@ -379,14 +390,9 @@ export function AIProvider({ children }: { children: ReactNode }) {
           availableModels: result.models,
           model: model || prev.model,
           error: model
-            ? (result.viaCloud
-              ? (result.usingUserKey
-                ? 'Using Ollama Cloud with your API key'
-                : 'Using Ollama Cloud')
-              : result.transport === 'browser'
-                ? 'Connected to Ollama on this computer (browser)'
-                : undefined)
+            ? undefined
             : 'No models found on this Ollama instance. Run: ollama pull <model>',
+          statusNote: successNote,
         }))
         if (model) {
           const info = await fetchModelInfo(
@@ -409,6 +415,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
           status: 'unavailable' as AIStatus,
           availableModels: [],
           error: result.error || 'Cannot connect to Ollama',
+          statusNote: undefined,
         }))
         setModelInfo(null)
       }
@@ -418,6 +425,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
         ...prev,
         status: 'error' as AIStatus,
         error: err instanceof Error ? err.message : 'Failed to check Ollama',
+        statusNote: undefined,
       }))
       setModelInfo(null)
     } finally {
@@ -430,7 +438,13 @@ export function AIProvider({ children }: { children: ReactNode }) {
     if (!normalized) return
     console.log('[ai] Connecting to', normalized)
     retryCountRef.current = 0
-    setConfig(prev => ({ ...prev, ollamaUrl: normalized, status: 'checking' as AIStatus }))
+    setConfig(prev => ({
+      ...prev,
+      ollamaUrl: normalized,
+      status: 'checking' as AIStatus,
+      error: undefined,
+      statusNote: undefined,
+    }))
 
     const result = await checkOllama(normalized, apiKeyRef.current || undefined)
     if (result.available) {
@@ -441,11 +455,22 @@ export function AIProvider({ children }: { children: ReactNode }) {
       const via = result.viaCloud
         ? ' (via Ollama Cloud)'
         : result.transport === 'browser'
-          ? ' (browser → your PC)'
+          ? ' (browser → your Ollama)'
           : ''
       console.log(`[ai] Connected to ${effectiveUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
       setTransport(result.transport)
       transportRef.current = result.transport
+      const successNote = model
+        ? result.viaCloud
+          ? result.usingUserKey
+            ? 'Using Ollama Cloud with your API key'
+            : 'Using Ollama Cloud'
+          : result.transport === 'browser'
+            ? isLocalOrLanOllamaUrl(effectiveUrl)
+              ? 'Connected to Ollama on this computer (port 11434)'
+              : 'Connected to your Ollama endpoint in the browser'
+            : undefined
+        : undefined
       setConfig(prev => ({
         ...prev,
         ollamaUrl: effectiveUrl,
@@ -454,14 +479,9 @@ export function AIProvider({ children }: { children: ReactNode }) {
         model: model || prev.model,
         enabled: model ? true : prev.enabled,
         error: model
-          ? (result.viaCloud
-              ? (result.usingUserKey
-                ? 'Using Ollama Cloud with your API key'
-                : 'Using Ollama Cloud')
-              : result.transport === 'browser'
-                ? 'Connected to Ollama on this computer (browser)'
-                : undefined)
+          ? undefined
           : 'No models found on this Ollama instance. Run: ollama pull <model>',
+        statusNote: successNote,
       }))
       if (model) {
         const info = await fetchModelInfo(
@@ -484,6 +504,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
         status: 'unavailable' as AIStatus,
         availableModels: [],
         error: result.error || 'Cannot connect to Ollama',
+        statusNote: undefined,
       }))
       setModelInfo(null)
     }
@@ -499,7 +520,14 @@ export function AIProvider({ children }: { children: ReactNode }) {
     }
     setTransport('server')
     transportRef.current = 'server'
-    setConfig(prev => ({ ...prev, enabled: false, status: 'unknown' as AIStatus, availableModels: [], error: undefined }))
+    setConfig(prev => ({
+      ...prev,
+      enabled: false,
+      status: 'unknown' as AIStatus,
+      availableModels: [],
+      error: undefined,
+      statusNote: undefined,
+    }))
     setModelInfo(null)
   }, [])
 

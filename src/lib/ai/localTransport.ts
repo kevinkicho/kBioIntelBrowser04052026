@@ -2,8 +2,10 @@
  * Decide whether Ollama should be reached from the browser (user's machine)
  * vs the Next.js server (App Hosting / SSR proxy).
  *
- * Hosted HTTPS cannot open http://127.0.0.1 or http://localhost (mixed content —
- * both are treated the same by browsers). Local npm run dev on http:// can.
+ * Hosted HTTPS pages cannot fetch http://127.0.0.1 (mixed content). Workarounds:
+ * - Browser → local Ollama when the *page* is HTTP (e.g. local dev)
+ * - Browser → https:// tunnel pointing at the user's :11434 (works on hosted site)
+ * - Ollama Cloud via server proxy + user API key
  */
 
 import { isPrivateHostname, normalizeOllamaUrl } from './config'
@@ -28,39 +30,52 @@ export function isLocalOrLanOllamaUrl(url: string): boolean {
   }
 }
 
+/** Custom https endpoint (user tunnel) that is not ollama.com cloud. */
+export function isBrowserTunnelOllamaUrl(url: string): boolean {
+  if (!url?.trim() || isOllamaCloudUrl(url)) return false
+  try {
+    const raw = url.includes('://') ? url : `https://${url}`
+    const u = new URL(raw)
+    if (u.protocol !== 'https:') return false
+    const h = u.hostname.toLowerCase()
+    return !isLoopbackHostname(h) && !isPrivateHostname(h)
+  } catch {
+    return false
+  }
+}
+
 /** True when this browser page may call http://loopback without mixed-content block. */
 export function canBrowserCallLocalHttp(): boolean {
   if (typeof window === 'undefined') return false
-  // http://localhost:3000 → http://127.0.0.1:11434 is fine
+  // Only plain HTTP pages can call http://127.0.0.1:11434
   if (window.location.protocol === 'http:') return true
-  // https://… → http://127.0.0.1 or http://localhost are both mixed content (blocked)
   return false
 }
 
 /**
- * Use browser → Ollama for loopback/LAN so traffic hits the user's PC, not App Hosting.
- * Cloud always stays on the server (API key never exposed to third parties except ollama.com via our proxy).
+ * Reach Ollama from the browser (not App Hosting) for:
+ * - loopback / LAN
+ * - user HTTPS tunnels to their machine
  */
 export function shouldUseBrowserOllama(url: string): boolean {
   if (typeof window === 'undefined') return false
-  if (!isLocalOrLanOllamaUrl(url)) return false
-  // Even on HTTPS we still *attempt* browser path so we can surface a precise error;
-  // canBrowserCallLocalHttp is used for messaging. Mixed content fails at fetch.
-  return true
+  if (isOllamaCloudUrl(url)) return false
+  return isLocalOrLanOllamaUrl(url) || isBrowserTunnelOllamaUrl(url)
 }
 
 export function localOllamaMixedContentHint(): string {
   return (
-    'This page is HTTPS, so the browser blocks all http:// loopback addresses — ' +
-    'including 127.0.0.1:11434 and localhost:11434 (same mixed-content rule; the name does not matter). ' +
-    'To use Ollama on your PC: run npm run dev, open http://localhost:3000 (HTTP, not this HTTPS site), ' +
-    'then click “Use my Ollama (11434)”. On this hosted site, use Ollama Cloud with your API key instead.'
+    'This site is HTTPS, so the browser blocks http://127.0.0.1:11434 and http://localhost:11434 ' +
+    '(mixed content — 127.0.0.1 is not a special case). ' +
+    'To use models on your PC from this site: either (1) Use Cloud with your Ollama API key, or ' +
+    '(2) expose Ollama with an HTTPS tunnel to port 11434 (e.g. cloudflared) and paste that https:// URL as host. ' +
+    'Set OLLAMA_ORIGINS=* so the browser is allowed to call it.'
   )
 }
 
 export function localOllamaCorsHint(): string {
   return (
-    'Browser could not reach Ollama (CORS or network). On your PC set OLLAMA_ORIGINS=* and restart Ollama, e.g. ' +
-    'PowerShell: $env:OLLAMA_ORIGINS="*"; ollama serve'
+    'Browser could not reach Ollama (CORS or network). On the machine running Ollama: ' +
+    '$env:OLLAMA_ORIGINS="*"; ollama serve  (or export OLLAMA_ORIGINS=*)'
   )
 }

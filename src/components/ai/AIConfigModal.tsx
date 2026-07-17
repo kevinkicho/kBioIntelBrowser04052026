@@ -73,15 +73,21 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   }, [isOpen, onClose])
 
   const handleConnect = async () => {
-    // Empty / invalid port → Ollama default 11434
-    const trimmedPort = portInput.trim()
-    const portNum = trimmedPort === '' ? OLLAMA_DEFAULT_PORT : parseInt(trimmedPort, 10)
-    const port =
-      isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
-    if (String(port) !== portInput) setPortInput(String(port))
-    const host = hostInput.trim() || '127.0.0.1'
-    const fullUrl = `${host}:${port}`
-    const validation = validateOllamaUrl(fullUrl)
+    const hostRaw = hostInput.trim() || '127.0.0.1'
+    // Full URL paste (https tunnel or http://127.0.0.1:11434)
+    let candidate: string
+    if (/^https?:\/\//i.test(hostRaw)) {
+      candidate = hostRaw
+    } else {
+      // Empty / invalid port → Ollama default 11434
+      const trimmedPort = portInput.trim()
+      const portNum = trimmedPort === '' ? OLLAMA_DEFAULT_PORT : parseInt(trimmedPort, 10)
+      const port =
+        isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
+      if (String(port) !== portInput) setPortInput(String(port))
+      candidate = `${hostRaw}:${port}`
+    }
+    const validation = validateOllamaUrl(candidate)
     if (!validation.valid) {
       setValidationHint(validation.error || 'Invalid URL')
       return
@@ -94,7 +100,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       setValidationHint(null)
     }
     setConnecting(true)
-    await ai.connect(validation.normalized || fullUrl)
+    await ai.connect(validation.normalized || candidate)
     setConnecting(false)
   }
 
@@ -164,7 +170,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   const pageAllowsLocalHttp = typeof window !== 'undefined' ? canBrowserCallLocalHttp() : true
   const statusLabel =
     ai.status === 'available'
-      ? `Connected to ${ai.ollamaUrl}${ai.transport === 'browser' ? ' · this PC' : ai.transport === 'server' && ai.ollamaUrl.includes('ollama.com') ? ' · cloud' : ''}`
+      ? `Connected to ${ai.ollamaUrl}${ai.transport === 'browser' ? ' · browser' : ai.ollamaUrl.includes('ollama.com') ? ' · cloud' : ''}`
       : ai.status === 'checking'
         ? 'Connecting…'
         : ai.status === 'downloading'
@@ -174,6 +180,13 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
             : ai.status === 'error'
               ? `Error: ${ai.error || 'unknown'}`
               : 'Not configured'
+
+  const statusTextClass =
+    ai.status === 'available'
+      ? 'text-emerald-300'
+      : ai.status === 'error' || ai.status === 'unavailable'
+        ? 'text-red-300'
+        : 'text-slate-400'
 
   const handleConnectLocal = async () => {
     setValidationHint(null)
@@ -232,35 +245,37 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           <div>
             <p className="text-xs text-slate-400">
-              <strong className="text-slate-300">Ollama on this PC:</strong> the app talks to Ollama{' '}
-              <em>from your browser</em> (not the cloud server). Host{' '}
-              <code className="rounded bg-slate-800 px-1 text-slate-400">127.0.0.1</code> or{' '}
-              <code className="rounded bg-slate-800 px-1 text-slate-400">localhost</code>, port{' '}
-              <code className="rounded bg-slate-800 px-1 text-slate-400">11434</code>.
+              <strong className="text-slate-300">Your Ollama (this PC):</strong> traffic goes{' '}
+              <em>browser → port {OLLAMA_DEFAULT_PORT}</em> on your machine — not through App Hosting.
+              Default host <code className="rounded bg-slate-800 px-1 text-slate-400">127.0.0.1</code>,
+              port <code className="rounded bg-slate-800 px-1 text-slate-400">{OLLAMA_DEFAULT_PORT}</code>.
             </p>
-            {!pageAllowsLocalHttp && (
-              <p className="mt-1.5 text-xs text-amber-400/90 leading-relaxed">
-                You are on <strong>HTTPS</strong> — browsers block{' '}
-                <code className="text-amber-200">http://127.0.0.1</code> and{' '}
-                <code className="text-amber-200">http://localhost</code> the same way (mixed content).
-                Typing 127.0.0.1 does not bypass that. To use local models: run{' '}
-                <code className="text-amber-200">npm run dev</code> and open{' '}
-                <code className="text-amber-200">http://localhost:3000</code>, or use Ollama Cloud with
-                your API key below on this site.
-              </p>
-            )}
-            {pageAllowsLocalHttp && (
+            {pageAllowsLocalHttp ? (
               <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                If Connect fails, allow CORS on Ollama:{' '}
+                If Connect fails, allow CORS:{' '}
                 <code className="text-slate-400">$env:OLLAMA_ORIGINS=&quot;*&quot;; ollama serve</code>
+              </p>
+            ) : (
+              <p className="mt-1.5 text-xs text-amber-400/90 leading-relaxed">
+                This page is <strong>HTTPS</strong>, so the browser blocks plain{' '}
+                <code className="text-amber-200">http://127.0.0.1:{OLLAMA_DEFAULT_PORT}</code> (mixed
+                content). On this hosted site use <strong>Ollama Cloud + your API key</strong>, or paste an{' '}
+                <code className="text-amber-200">https://</code> tunnel URL that points at your{' '}
+                {OLLAMA_DEFAULT_PORT} Ollama (host field accepts full https:// URLs). CORS:{' '}
+                <code className="text-amber-200">OLLAMA_ORIGINS=*</code>.
               </p>
             )}
           </div>
 
           <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
-            <span className="truncate text-[11px] text-slate-400">{statusLabel}</span>
+            <span className={`truncate text-[11px] ${statusTextClass}`}>{statusLabel}</span>
           </div>
+          {ai.statusNote && ai.status === 'available' && (
+            <p className="text-[11px] font-medium text-emerald-400" data-testid="ai-status-note">
+              {ai.statusNote}
+            </p>
+          )}
 
           {/* Per-user Ollama Cloud API key */}
           <div className="rounded-lg border border-cyan-900/40 bg-cyan-950/20 p-3 space-y-2">
@@ -370,7 +385,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void handleConnect()
                 }}
-                placeholder="127.0.0.1"
+                placeholder="127.0.0.1 or https://tunnel…"
                 className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
               />
             </div>
@@ -439,7 +454,13 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           )}
 
           {ai.error && !validationHint && (
-            <p className="text-[10px] text-red-400">{ai.error}</p>
+            <p
+              className={`text-[10px] ${
+                ai.status === 'available' ? 'text-emerald-400' : 'text-red-400'
+              }`}
+            >
+              {ai.error}
+            </p>
           )}
 
           {ai.status === 'unavailable' &&

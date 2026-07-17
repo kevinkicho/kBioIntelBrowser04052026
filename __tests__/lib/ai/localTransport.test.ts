@@ -2,6 +2,7 @@
  * @jest-environment jsdom
  */
 import {
+  isBrowserTunnelOllamaUrl,
   isLocalOrLanOllamaUrl,
   isLoopbackHostname,
   shouldUseBrowserOllama,
@@ -22,8 +23,10 @@ describe('localTransport', () => {
     expect(isLocalOrLanOllamaUrl('https://ollama.com')).toBe(false)
   })
 
-  test('browser transport preferred for local URLs', () => {
+  test('browser transport preferred for local and tunnel URLs', () => {
     expect(shouldUseBrowserOllama('http://127.0.0.1:11434')).toBe(true)
     expect(shouldUseBrowserOllama('https://ollama.com')).toBe(false)
+    expect(isBrowserTunnelOllamaUrl('https://abc.trycloudflare.com')).toBe(true)
+    expect(shouldUseBrowserOllama('https://abc.trycloudflare.com')).toBe(true)
   })
 })

@@ -884,7 +884,10 @@ function SettingsTab({
           </span>
         </div>
 
-        {ai.error && ai.status !== 'error' && !validationHint && (
+        {ai.statusNote && ai.status === 'available' && (
+          <p className="text-[10px] text-emerald-400 mt-1">{ai.statusNote}</p>
+        )}
+        {ai.error && ai.status !== 'error' && ai.status !== 'available' && !validationHint && (
           <p className="text-[10px] text-red-400 mt-1">{ai.error}</p>
         )}
 

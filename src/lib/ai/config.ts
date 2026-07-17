@@ -6,7 +6,10 @@ export interface AIConfig {
   model: string
   ollamaUrl: string
   availableModels: string[]
+  /** Failures / blocking issues (shown in red). */
   error?: string
+  /** Non-error status line (shown in green when connected). */
+  statusNote?: string
 }
 
 export const AI_DEFAULTS: AIConfig = {
@@ -176,11 +179,21 @@ export function validateOllamaUrl(
     }
   }
 
-  // Client mode: loopback + private LAN (with warning). Cloud handled above.
+  // Client mode: loopback + private LAN + HTTPS remote (user tunnels to their Ollama).
+  // Public http:// hosts are not useful from an HTTPS app page (mixed content).
   if (!loopback && !privateHost) {
+    if (parsed.protocol === 'https:') {
+      // HTTPS tunnel / reverse proxy to user's Ollama — no forced :11434
+      const base = `${parsed.protocol}//${parsed.host}${parsed.pathname === '/' ? '' : parsed.pathname}`.replace(
+        /\/+$/,
+        '',
+      )
+      return { valid: true, normalized: base || `${parsed.protocol}//${parsed.host}` }
+    }
     return {
       valid: false,
-      error: 'Only localhost, private LAN (10.x, 172.16-31.x, 192.168.x, *.local), or ollama.com are allowed',
+      error:
+        'From the browser, use 127.0.0.1/localhost (HTTP pages only), a private LAN host, ollama.com, or an https:// tunnel to your Ollama',
     }
   }
 
