@@ -14,6 +14,9 @@ import {
 } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { recordSearch } from '@/lib/searchHistory'
+import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
+import { deleteCloudProjectSafe } from '@/lib/firebase/projectSync'
+import { backupProjectsJsonToCloud } from '@/lib/firebase/storageSync'
 
 const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
 
@@ -31,10 +34,12 @@ function promoteCount(p: Project): number {
 }
 
 export default function ProjectsPage() {
+  const auth = useFirebaseAuth()
   const [projects, setProjects] = useState<Project[]>([])
   const [name, setName] = useState('')
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [lastOpened, setLastOpened] = useState<Record<string, string>>({})
+  const [cloudBusy, setCloudBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(() => {
@@ -55,6 +60,11 @@ export default function ProjectsPage() {
   useEffect(() => {
     refresh()
   }, [refresh])
+
+  // After cloud sync, re-read local projects (pull may have added boards)
+  useEffect(() => {
+    if (auth.lastMigration?.finishedAt) refresh()
+  }, [auth.lastMigration?.finishedAt, refresh])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })
@@ -80,6 +90,10 @@ export default function ProjectsPage() {
       showBanner('err', result.message)
       return
     }
+    // Best-effort cloud cascade when signed in
+    if (auth.user?.uid) {
+      void deleteCloudProjectSafe(auth.user.uid, id)
+    }
     refresh()
     showBanner('ok', 'Project deleted')
   }
@@ -95,6 +109,50 @@ export default function ProjectsPage() {
       'application/json',
     )
     showBanner('ok', `Exported ${projects.length} project(s)`)
+  }
+
+  const handleCloudSync = async () => {
+    if (!auth.user) {
+      showBanner('err', 'Sign in to sync with Firestore.')
+      return
+    }
+    setCloudBusy(true)
+    try {
+      const report = await auth.syncNow()
+      refresh()
+      if (report) {
+        showBanner(report.ok ? 'ok' : 'err', report.message)
+      } else {
+        showBanner('err', 'Cloud sync failed.')
+      }
+    } finally {
+      setCloudBusy(false)
+    }
+  }
+
+  const handleCloudBackup = async () => {
+    if (!auth.user?.uid) {
+      showBanner('err', 'Sign in to back up to Firebase Storage.')
+      return
+    }
+    if (projects.length === 0) {
+      showBanner('err', 'No projects to back up.')
+      return
+    }
+    setCloudBusy(true)
+    try {
+      const result = await backupProjectsJsonToCloud(
+        auth.user.uid,
+        exportProjectsToJson(projects),
+      )
+      if (result.ok) {
+        showBanner('ok', `Cloud backup saved: ${result.fileName}`)
+      } else {
+        showBanner('err', result.message)
+      }
+    } finally {
+      setCloudBusy(false)
+    }
   }
 
   const handleImportFile = async (file: File | null) => {
@@ -123,10 +181,33 @@ export default function ProjectsPage() {
           <div>
             <h1 className="text-3xl font-bold text-slate-100">Projects</h1>
             <p className="mt-1 text-sm text-slate-400">
-              Local candidate boards for disease triage. Data stays in your browser — export anytime.
+              Local candidate boards for disease triage. Browser storage is the default; optional
+              cloud sync when signed in.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            {auth.user && (
+              <>
+                <button
+                  type="button"
+                  disabled={cloudBusy || auth.migrating}
+                  onClick={() => void handleCloudSync()}
+                  className="rounded-lg border border-sky-800/50 bg-sky-950/40 px-3 py-1.5 text-xs text-sky-300 hover:border-sky-700 hover:text-sky-100 disabled:opacity-50"
+                  data-testid="projects-cloud-sync"
+                >
+                  {cloudBusy || auth.migrating ? 'Syncing…' : 'Sync cloud'}
+                </button>
+                <button
+                  type="button"
+                  disabled={cloudBusy}
+                  onClick={() => void handleCloudBackup()}
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-1.5 text-xs text-slate-300 hover:border-slate-600 hover:text-slate-100 disabled:opacity-50"
+                  data-testid="projects-cloud-backup"
+                >
+                  Cloud backup
+                </button>
+              </>
+            )}
             <button
               type="button"
               onClick={handleExportAll}

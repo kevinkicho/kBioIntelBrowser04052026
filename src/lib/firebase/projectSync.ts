@@ -141,6 +141,27 @@ export async function deleteCloudProject(uid: string, projectId: string): Promis
 }
 
 /**
+ * Best-effort: remove cloud project when user deletes local board while signed in.
+ * Does not throw — local delete remains authoritative.
+ */
+export async function deleteCloudProjectSafe(uid: string, projectId: string): Promise<void> {
+  try {
+    await deleteCloudProject(uid, projectId)
+    logAgentActivity(
+      'firebase.sync.delete_project',
+      { uid, projectId },
+      { source: 'firebase' },
+    )
+  } catch (err) {
+    logAgentActivity(
+      'firebase.sync.delete_project_error',
+      { projectId, message: err instanceof Error ? err.message : String(err) },
+      { source: 'firebase', level: 'warn' },
+    )
+  }
+}
+
+/**
  * Push all local projects to cloud. Last-write-wins by updatedAt when both exist.
  */
 export async function pushAllLocalProjects(uid: string): Promise<SyncResult> {

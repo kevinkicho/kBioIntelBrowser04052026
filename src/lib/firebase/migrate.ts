@@ -4,11 +4,13 @@
 
 import { syncProjectsBidirectional, type SyncResult } from './projectSync'
 import { syncDiscoveryPreferences } from './settingsSync'
+import { syncPackMetadata, type PackMetaSyncResult } from './packMetaSync'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
 export type MigrationReport = {
   ok: boolean
   projects: SyncResult
+  packs: PackMetaSyncResult
   preferences: 'pushed' | 'pulled' | 'none' | 'error'
   message: string
   finishedAt: string
@@ -35,9 +37,16 @@ function setLastMigrateAt(iso: string): void {
 
 /**
  * Full bidirectional sync for a signed-in user.
+ * Projects + discovery prefs + pack metadata (not pack claim blobs).
  */
 export async function runFirebaseMigration(uid: string): Promise<MigrationReport> {
   const projects = await syncProjectsBidirectional(uid)
+  let packs: PackMetaSyncResult = { pushed: 0, pulled: 0, skipped: 0, errors: [] }
+  try {
+    packs = await syncPackMetadata(uid)
+  } catch (err) {
+    packs.errors.push(err instanceof Error ? err.message : String(err))
+  }
   let preferences: MigrationReport['preferences'] = 'none'
   try {
     preferences = await syncDiscoveryPreferences(uid)
@@ -48,14 +57,16 @@ export async function runFirebaseMigration(uid: string): Promise<MigrationReport
   const finishedAt = new Date().toISOString()
   setLastMigrateAt(finishedAt)
 
-  const ok = projects.errors.length === 0 && preferences !== 'error'
+  const ok =
+    projects.errors.length === 0 && packs.errors.length === 0 && preferences !== 'error'
   const message = ok
-    ? `Synced ${projects.pushed}↑ ${projects.pulled}↓ projects; prefs ${preferences}.`
-    : `Sync finished with issues: ${projects.errors.slice(0, 3).join('; ') || preferences}`
+    ? `Synced ${projects.pushed}↑ ${projects.pulled}↓ projects; ${packs.pushed}↑ ${packs.pulled}↓ pack meta; prefs ${preferences}.`
+    : `Sync finished with issues: ${[...projects.errors, ...packs.errors].slice(0, 3).join('; ') || preferences}`
 
   const report: MigrationReport = {
     ok,
     projects,
+    packs,
     preferences,
     message,
     finishedAt,
@@ -68,6 +79,8 @@ export async function runFirebaseMigration(uid: string): Promise<MigrationReport
       pushed: projects.pushed,
       pulled: projects.pulled,
       skipped: projects.skipped,
+      packPushed: packs.pushed,
+      packPulled: packs.pulled,
       prefs: preferences,
       ok,
     },

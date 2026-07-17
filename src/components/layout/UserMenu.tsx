@@ -13,6 +13,8 @@ import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 import { countUserProjects } from '@/lib/firebase/userProfile'
 import { isFirebaseConfigured } from '@/lib/firebase/config'
 import { getLastMigrateAt } from '@/lib/firebase/migrate'
+import { backupProjectsJsonToCloud } from '@/lib/firebase/storageSync'
+import { exportProjectsToJson, listProjects } from '@/lib/project'
 
 function initialsFromUser(name: string | null | undefined, email: string | null | undefined): string {
   const n = (name || '').trim()
@@ -46,6 +48,7 @@ export function UserMenu() {
   const auth = useFirebaseAuth()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
+  const [statusMsg, setStatusMsg] = useState<string | null>(null)
   const [projectCount, setProjectCount] = useState<number | null>(null)
   const [countTick, setCountTick] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -105,9 +108,33 @@ export function UserMenu() {
 
   const onSyncNow = async () => {
     setBusy(true)
+    setStatusMsg(null)
     try {
-      await auth.syncNow()
+      const report = await auth.syncNow()
       refreshProjectCount()
+      if (report) setStatusMsg(report.message)
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onCloudBackup = async () => {
+    if (!user?.uid) return
+    setBusy(true)
+    setStatusMsg(null)
+    try {
+      const projects = listProjects()
+      if (projects.length === 0) {
+        setStatusMsg('No local projects to back up.')
+        return
+      }
+      const json = exportProjectsToJson(projects)
+      const result = await backupProjectsJsonToCloud(user.uid, json)
+      setStatusMsg(
+        result.ok
+          ? `Stored ${result.fileName} in cloud Storage.`
+          : result.message,
+      )
     } finally {
       setBusy(false)
     }
@@ -282,6 +309,11 @@ export function UserMenu() {
                     {auth.error}
                   </p>
                 )}
+                {statusMsg && (
+                  <p className="mt-2 text-[10px] text-sky-300/90" data-testid="user-menu-status">
+                    {statusMsg}
+                  </p>
+                )}
               </div>
 
               <div className="border-b border-slate-800 py-1">
@@ -301,7 +333,22 @@ export function UserMenu() {
                       ? auth.lastMigration.message
                       : lastSyncLabel
                         ? `Last sync ${lastSyncLabel}`
-                        : 'Local ↔ Firestore · last-write-wins'}
+                        : 'Firestore · projects, pack meta, prefs'}
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={syncing}
+                  onClick={() => void onCloudBackup()}
+                  className="flex w-full flex-col px-3 py-2 text-left hover:bg-slate-800/60 disabled:opacity-50"
+                  data-testid="user-menu-cloud-backup"
+                >
+                  <span className="text-xs text-slate-200">
+                    {busy ? 'Backing up…' : 'Backup export to Storage'}
+                  </span>
+                  <span className="text-[10px] text-slate-600">
+                    JSON archive under users/…/exports (optional)
                   </span>
                 </button>
                 <Link

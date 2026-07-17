@@ -73,6 +73,7 @@ export {
   toProjectPackIndexEntry,
   listPackIndex,
   registerPackIndex,
+  upsertPackIndexEntry,
   removePackIndexEntry,
   clearPackIndex,
 } from './packIndex'

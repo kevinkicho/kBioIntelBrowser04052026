@@ -154,6 +154,31 @@ export function registerPackIndex(
   return { ok: true, value: entry }
 }
 
+/**
+ * Upsert a metadata-only pack index entry (e.g. cloud pull).
+ * Never accepts claims — use registerPackIndex for full packs.
+ */
+export function upsertPackIndexEntry(
+  entry: PackIndexEntry,
+  storage?: PackIndexStorage | null,
+): PackIndexResult<PackIndexEntry> {
+  const s = storage === undefined ? defaultStorage() : storage
+  if (!s) {
+    return { ok: false, error: 'unavailable', message: 'localStorage is not available.' }
+  }
+  if (!isPackIndexEntry(entry)) {
+    return { ok: false, error: 'invalid', message: 'Invalid pack index entry.' }
+  }
+  if ('claims' in (entry as object)) {
+    return { ok: false, error: 'invalid', message: 'Index entry must not include claims.' }
+  }
+  const existing = readAll(s).filter((e) => e.id !== entry.id)
+  const next = [entry, ...existing].slice(0, MAX_PACK_INDEX_ENTRIES)
+  const write = writeAll(s, next)
+  if (!write.ok) return write
+  return { ok: true, value: entry }
+}
+
 /** Remove a pack index entry by id. */
 export function removePackIndexEntry(
   id: string,
