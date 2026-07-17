@@ -1,8 +1,10 @@
 # Firebase App Hosting — backend id: biointel
 # https://firebase.google.com/docs/app-hosting/configure
 #
-# Client Firebase keys are public-by-design (embedded in browser).
-# Admin SDK credentials must use Secret Manager, never plain values.
+# Client Firebase web config is public-by-design (ends up in browser JS).
+# Still: do NOT put the Google API key as a plain `value` in git — GitHub
+# secret scanning flags AIza… patterns. Store it in Secret Manager instead.
+# Admin SDK private keys: Secret Manager only, RUNTIME only.
 
 runConfig:
   minInstances: 0
@@ -11,8 +13,10 @@ runConfig:
   # maxInstances: 20
 
 env:
+  # Web API key via Secret Manager (still injected as NEXT_PUBLIC_* at build).
+  # Rotate/set: firebase apphosting:secrets:set NEXT_PUBLIC_FIREBASE_API_KEY --data-file - --force
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: AIzaSyCoJCRE0IAxTHF_6bn63OGmigypQ-GLoXo
+    secret: NEXT_PUBLIC_FIREBASE_API_KEY
     availability:
       - BUILD
       - RUNTIME
@@ -49,7 +53,6 @@ env:
 
   # Server Admin SDK service-account JSON (Secret Manager — not committed).
   # Set/rotate: npm run firebase:apphosting:admin-secret
-  # Or: firebase apphosting:secrets:set FIREBASE_ADMIN_CREDENTIALS_JSON --data-file <adminsdk.json> --force
   - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
     secret: FIREBASE_ADMIN_CREDENTIALS_JSON
     availability:

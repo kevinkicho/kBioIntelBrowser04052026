@@ -50,16 +50,33 @@ Admin key JSON is **gitignored** (`*-firebase-adminsdk-*.json`).
 
 **Important:** The Firebase **Admin SDK cannot set App Hosting env vars**. App Hosting config is applied via:
 
-1. **`apphosting.yaml`** (repo) — public `NEXT_PUBLIC_FIREBASE_*` as plain `value`s  
-2. **Cloud Secret Manager** — sensitive server secrets referenced as `secret:`  
+1. **`apphosting.yaml`** (repo)  
+2. **Cloud Secret Manager** — referenced as `secret:`  
 3. **Firebase Console** → App Hosting → Settings → Environment (overrides yaml)
+
+### GitHub “Google API Key” secret scanning (normal)
+
+Firebase **web** API keys (`NEXT_PUBLIC_FIREBASE_API_KEY`, `AIza…`) are **designed to ship in client JS**. Security is **not** “hide the key”; it is:
+
+- Firestore / RTDB / Storage **security rules** (owner-only)
+- **API key restrictions** in Google Cloud Console (HTTP referrers)
+- Optional Firebase **App Check**
+
+GitHub still flags any `AIza…` string in the repo. That is expected. We keep the API key out of git plaintext by storing it in Secret Manager and referencing it from `apphosting.yaml`. You can **close the alert as “revoked” or false positive after the key is no longer in the file** — or rotate + restrict if you prefer.
+
+| Do | Don’t |
+|----|--------|
+| Restrict API key by HTTP referrer to your App Hosting domain + localhost | Treat web API key like a password |
+| Keep Admin SDK private key only in Secret Manager / local gitignored JSON | Commit `*-firebase-adminsdk-*.json` |
+| Rely on owner-only Firestore/Storage rules | Expect “backend not found” to mean auth key leak |
 
 ### What we deploy
 
 | Variable | Source | Availability |
 |----------|--------|--------------|
-| `NEXT_PUBLIC_FIREBASE_*` (7 keys) | `apphosting.yaml` plain values | BUILD + RUNTIME |
-| `FIREBASE_ADMIN_CREDENTIALS_JSON` | Secret Manager (from Admin SDK JSON file) | RUNTIME only |
+| `NEXT_PUBLIC_FIREBASE_API_KEY` | Secret Manager (not plain in git) | BUILD + RUNTIME |
+| Other `NEXT_PUBLIC_FIREBASE_*` | `apphosting.yaml` plain values (non-secret IDs/URLs) | BUILD + RUNTIME |
+| `FIREBASE_ADMIN_CREDENTIALS_JSON` | Secret Manager (Admin SDK JSON) | RUNTIME only |
 | `FIREBASE_CONFIG` / `FIREBASE_WEBAPP_CONFIG` | Auto-injected by App Hosting | system |
 
 ### Deploy / rotate Admin secret
