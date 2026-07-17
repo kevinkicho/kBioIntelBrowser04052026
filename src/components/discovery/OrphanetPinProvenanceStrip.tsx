@@ -16,7 +16,14 @@ export function OrphanetPinProvenanceStrip({
   onRerank,
   rerankDisabled,
 }: OrphanetPinProvenanceStripProps) {
-  if (!provenance || provenance.added <= 0) return null
+  if (!provenance) return null
+  // Show strip when boost ran: genes merged, genes known, or soft empty/error
+  const hasSignal =
+    provenance.added > 0 ||
+    provenance.genes.length > 0 ||
+    Boolean(provenance.orphaCode) ||
+    Boolean(provenance.error)
+  if (!hasSignal) return null
 
   return (
     <div
@@ -28,8 +35,16 @@ export function OrphanetPinProvenanceStrip({
         <div>
           <span className="font-semibold text-violet-200">Orphanet rare-disease pins</span>
           <p className="mt-0.5 text-[11px] text-violet-300/80">
-            Merged {provenance.added} gene
-            {provenance.added === 1 ? '' : 's'}
+            {provenance.added > 0 ? (
+              <>
+                Merged {provenance.added} gene
+                {provenance.added === 1 ? '' : 's'}
+              </>
+            ) : provenance.error ? (
+              <>Orphanet lookup soft-failed</>
+            ) : (
+              <>No new genes to merge (pins may already include them)</>
+            )}
             {provenance.diseaseName ? (
               <>
                 {' '}
@@ -43,6 +58,11 @@ export function OrphanetPinProvenanceStrip({
             ) : null}
             . Free Orphadata only — not a diagnosis.
           </p>
+          {provenance.error && (
+            <p className="mt-1 text-[10px] text-amber-300/90" data-testid="orphanet-provenance-error">
+              {provenance.error}
+            </p>
+          )}
           {provenance.genes.length > 0 && (
             <p className="mt-1 font-mono text-[10px] text-violet-400/90">
               {provenance.genes.slice(0, 12).join(', ')}
@@ -57,6 +77,7 @@ export function OrphanetPinProvenanceStrip({
             disabled={rerankDisabled}
             className="shrink-0 rounded-lg border border-violet-700/50 bg-violet-900/40 px-3 py-1.5 text-[11px] font-medium text-violet-100 hover:bg-violet-800/50 disabled:opacity-50"
             data-testid="orphanet-rerank-cta"
+            title="Re-run rank with current gene pins (never automatic)"
           >
             Re-rank with pins
           </button>

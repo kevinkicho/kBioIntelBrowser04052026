@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   endLocalSession,
+  factoryResetLocalWorkspace,
   initialsFromName,
   readLocalSession,
   writeLocalSession,
@@ -12,6 +13,7 @@ import {
 } from '@/lib/localSession'
 import { clearAllProfileRevisitCache } from '@/lib/profileClientCache'
 import { clearSearchHistory } from '@/lib/searchHistory'
+import { applyBeachheadPersona } from '@/lib/discovery/preferences'
 import { useAI } from '@/lib/ai/useAI'
 
 const QUICK_LINKS: { href: string; label: string; desc: string }[] = [
@@ -147,6 +149,37 @@ export function UserMenu() {
     }
   }
 
+  const onPersona = (persona: 'repurposing' | 'rare-lab') => {
+    applyBeachheadPersona(persona)
+    setOpen(false)
+    router.push('/discover')
+  }
+
+  const onFactoryReset = async () => {
+    const ok1 = window.confirm(
+      'FACTORY RESET — delete projects, packs, preferences, and browsing data on this device?\n\nThis cannot be undone. Export projects first if you need them.',
+    )
+    if (!ok1) return
+    const ok2 = window.confirm('Really erase all local BioIntel workspace data?')
+    if (!ok2) return
+    setBusy(true)
+    try {
+      if (ai.mounted && ai.enabled && typeof ai.disconnect === 'function') {
+        try {
+          ai.disconnect()
+        } catch {
+          /* ignore */
+        }
+      }
+      const next = await factoryResetLocalWorkspace()
+      setSession(next)
+      setOpen(false)
+      router.push('/')
+    } finally {
+      setBusy(false)
+    }
+  }
+
   return (
     <div className="relative" ref={rootRef} data-testid="user-menu">
       <button
@@ -258,6 +291,38 @@ export function UserMenu() {
 
           <div className="border-b border-slate-800 py-1">
             <p className="px-3 py-1 text-[9px] font-medium uppercase tracking-wider text-slate-600">
+              Beachhead persona
+            </p>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              onClick={() => onPersona('repurposing')}
+              className="flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-800/60 disabled:opacity-50"
+              data-testid="user-menu-persona-repurposing"
+            >
+              <span className="text-xs text-slate-200">Repurposing triage (default)</span>
+              <span className="text-[10px] text-slate-600">
+                Balanced rubric · mixed tour · Orphanet boost off
+              </span>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              onClick={() => onPersona('rare-lab')}
+              className="flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-800/60 disabled:opacity-50"
+              data-testid="user-menu-persona-rare"
+            >
+              <span className="text-xs text-slate-200">Rare-disease lab</span>
+              <span className="text-[10px] text-slate-600">
+                Rare tour · Orphanet gene pins on · soft AE
+              </span>
+            </button>
+          </div>
+
+          <div className="border-b border-slate-800 py-1">
+            <p className="px-3 py-1 text-[9px] font-medium uppercase tracking-wider text-slate-600">
               Data on this device
             </p>
             <button
@@ -270,7 +335,7 @@ export function UserMenu() {
             >
               <span className="text-xs text-slate-200">Clear profile cache</span>
               <span className="text-[10px] text-slate-600">
-                Category / pipeline revisit data (keeps history)
+                Category / pipeline / similar / vendors (keeps history)
               </span>
             </button>
             <button
@@ -296,7 +361,7 @@ export function UserMenu() {
             </button>
           </div>
 
-          <div className="p-1.5">
+          <div className="p-1.5 space-y-0.5">
             <button
               type="button"
               role="menuitem"
@@ -315,9 +380,19 @@ export function UserMenu() {
               </svg>
               {busy ? 'Signing out…' : 'Sign out'}
             </button>
+            <button
+              type="button"
+              role="menuitem"
+              disabled={busy}
+              onClick={() => void onFactoryReset()}
+              className="flex w-full px-2.5 py-1.5 text-left text-[10px] text-slate-500 hover:text-red-400 disabled:opacity-50"
+              data-testid="user-menu-factory-reset"
+            >
+              Factory reset (projects + packs too)…
+            </button>
             <p className="px-2.5 pb-1.5 pt-0.5 text-[9px] leading-snug text-slate-600">
-              Solo product: no cloud account. Sign out ends this browser session and clears browsing
-              residue; projects stay on-device.
+              Solo product: no cloud account. Sign out clears browsing residue; projects stay unless
+              you factory-reset.
             </p>
           </div>
         </div>

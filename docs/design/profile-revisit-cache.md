@@ -210,38 +210,14 @@ Do **not** claim “offline” or “always instant.”
 - [x] `npx tsc --noEmit` clean  
 - [x] No localStorage for category blobs in Phase A (quota safety)  
 
-### 3.4 Known Phase A limits
+### 3.4 Known limits (post A.1 + B)
 
-1. Full reload loses cache (motivates Phase B).  
-2. Very large category JSON still holds RAM for up to 120 entries — cap + TTL mitigate.  
-3. Soft-nav to same CID with different override/params uses different keys (correct).  
-4. Loading overlay may still flash if many categories go `loading` even when each resolves sync from memory — **optional polish:** detect sync cache hit and set `loaded` without paint of full-page overlay (Phase A.1 micro).  
-
-#### 3.4.1 Optional Phase A.1 — zero-flash restore
-
-If cache hit is synchronous, `loadCategory` can:
-
-```ts
-const data = await fetchCategoryData(...) // resolves sync when memory hit
-// Prefer: peek cache before setStatus('loading') to avoid overlay flicker
-```
-
-Implement as:
-
-```ts
-// fetchCategory.ts
-export function peekCategoryClientCache(...): Record<string, unknown> | undefined
-
-// ProfilePageClient loadCategory
-const peeked = !opts?.refresh ? peekCategoryClientCache(...) : undefined
-if (peeked) {
-  setCategoryData(...); setCategoryStatus loaded; return
-}
-setCategoryStatus loading
-// network path
-```
-
-**Priority:** low if users report only “slow,” high if they report “flash of loading despite instant data.”
+1. **Cold first open** still multi-source (by design).  
+2. Very large category JSON holds RAM for up to 120 L1 entries — cap + TTL.  
+3. Soft-nav with different overrides/params uses different keys (correct).  
+4. **A.1 shipped:** `peekCategoryClientCache` avoids loading flash on L1 hits.  
+5. **B shipped:** full reload hydrates from IDB before tier-1 network (`cacheReady` gate).  
+6. Similar + vendors also use L1/L2 keys (`similar:`, `vendors:`).
 
 ---
 

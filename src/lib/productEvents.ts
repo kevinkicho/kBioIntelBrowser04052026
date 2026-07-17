@@ -167,11 +167,30 @@ function enqueue(ev: ProductEvent): void {
   }
 }
 
+function attachSessionId(
+  props?: ProductEvent['props'],
+): ProductEvent['props'] | undefined {
+  if (typeof window === 'undefined') return props
+  try {
+    // Lazy import path avoided — read localStorage key directly to keep emit sync/cheap
+    const raw = localStorage.getItem('biointel-local-session-v1')
+    if (!raw) return props
+    const o = JSON.parse(raw) as { sessionId?: string }
+    const sessionId = typeof o.sessionId === 'string' ? o.sessionId : undefined
+    if (!sessionId) return props
+    if (props && 'sessionId' in props && props.sessionId != null) return props
+    return { ...props, sessionId }
+  } catch {
+    return props
+  }
+}
+
 function postOnce(name: ProductEventName, props?: ProductEvent['props']): void {
+  const withSession = attachSessionId(props)
   const ev: ProductEvent = {
     name,
     ts: new Date().toISOString(),
-    props,
+    props: withSession,
   }
   if (typeof window !== 'undefined') enqueue(ev)
   if (!canSend()) return
@@ -184,9 +203,9 @@ function postOnce(name: ProductEventName, props?: ProductEvent['props']): void {
         source: 'product',
         endpoint: name,
         status: 200,
-        duration_ms: typeof props?.ms === 'number' ? props.ms : 0,
-        items_count: typeof props?.count === 'number' ? props.count : 1,
-        error: props ? JSON.stringify(props).slice(0, 500) : undefined,
+        duration_ms: typeof withSession?.ms === 'number' ? withSession.ms : 0,
+        items_count: typeof withSession?.count === 'number' ? withSession.count : 1,
+        error: withSession ? JSON.stringify(withSession).slice(0, 500) : undefined,
       }),
       keepalive: true,
     }).catch(() => {})
@@ -197,6 +216,7 @@ function postOnce(name: ProductEventName, props?: ProductEvent['props']): void {
 
 /**
  * Emit a product event (canonical name only — no dual-emit).
+ * Auto-attaches local workspace `sessionId` when available (v2.1 measurement).
  */
 export function emitProductEvent(
   name: ProductEventName,

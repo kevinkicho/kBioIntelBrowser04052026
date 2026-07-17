@@ -1,0 +1,69 @@
+{
+  "diseaseName": "ATTR amyloidosis",
+  "diseaseId": "EFO_0000274",
+  "candidates": [
+    {
+      "name": "Tafamidis",
+      "cid": 208901,
+      "score": 0.82,
+      "sources": ["OpenTargets", "ChEMBL"],
+      "trialCountRaw": 12,
+      "clinicalPhaseRaw": 4,
+      "sharedTargetCountRaw": 1,
+      "confidence": "high"
+    },
+    {
+      "name": "Diflunisal",
+      "cid": 3059,
+      "score": 0.71,
+      "sources": ["ChEMBL", "ClinicalTrials"],
+      "trialCountRaw": 4,
+      "clinicalPhaseRaw": 3,
+      "sharedTargetCountRaw": 1,
+      "confidence": "medium"
+    }
+  ],
+  "genes": [{ "symbol": "TTR", "score": 0.9, "sources": ["OpenTargets"] }],
+  "v2": {
+    "candidates": [
+      {
+        "id": "mol:208901",
+        "displayName": "Tafamidis",
+        "kind": "molecule",
+        "identity": { "pubchemCid": 208901, "inchiKey": "HJBWBFZLDZWPHF-UHFFFAOYSA-N" },
+        "scores": {
+          "axes": {
+            "efficacy": 0.8,
+            "clinicalStage": 0.95,
+            "safety": 0.7,
+            "novelty": 0.3,
+            "identityTrust": 0.95
+          },
+          "axisStatus": {},
+          "composite": 0.82,
+          "scorePhase": "cheap",
+          "weights": {
+            "efficacy": 0.25,
+            "clinicalStage": 0.2,
+            "safety": 0.25,
+            "novelty": 0.15,
+            "identityTrust": 0.15
+          }
+        }
+      }
+    ],
+    "timingMs": {
+      "disease": 120,
+      "targets": 80,
+      "gather": 400,
+      "identity": 200,
+      "cheapScore": 50,
+      "total": 900
+    },
+    "sourceStatuses": [
+      { "source": "opentargets", "status": "ok", "ms": 200 },
+      { "source": "chembl", "status": "ok", "ms": 180 }
+    ],
+    "scorePhase": "cheap"
+  }
+}

@@ -54,3 +54,22 @@ describe('localSession', () => {
     expect(after.displayName).toBe('Local researcher')
   })
 })
+
+describe('applyBeachheadPersona', () => {
+  // lazy require to avoid circular import issues in isolation
+  test('rare-lab enables Orphanet boost and rare tour', () => {
+    const { applyBeachheadPersona, loadDiscoveryPreferences } = require('@/lib/discovery/preferences')
+    applyBeachheadPersona('rare-lab')
+    const p = loadDiscoveryPreferences()
+    expect(p.rareDiseaseBoost).toBe(true)
+    expect(p.tourExampleSet).toBe('rare-only')
+  })
+
+  test('repurposing disables Orphanet boost', () => {
+    const { applyBeachheadPersona, loadDiscoveryPreferences } = require('@/lib/discovery/preferences')
+    applyBeachheadPersona('repurposing')
+    const p = loadDiscoveryPreferences()
+    expect(p.rareDiseaseBoost).toBe(false)
+    expect(p.tourExampleSet).toBe('mixed')
+  })
+})

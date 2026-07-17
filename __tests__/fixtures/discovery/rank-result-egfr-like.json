@@ -1,0 +1,69 @@
+{
+  "diseaseName": "non-small cell lung carcinoma",
+  "diseaseId": "EFO_0003060",
+  "candidates": [
+    {
+      "name": "Gefitinib",
+      "cid": 123631,
+      "score": 0.88,
+      "sources": ["OpenTargets", "ChEMBL", "ClinicalTrials"],
+      "trialCountRaw": 40,
+      "clinicalPhaseRaw": 4,
+      "sharedTargetCountRaw": 1,
+      "confidence": "high"
+    },
+    {
+      "name": "Erlotinib",
+      "cid": 176870,
+      "score": 0.86,
+      "sources": ["OpenTargets", "ChEMBL"],
+      "trialCountRaw": 35,
+      "clinicalPhaseRaw": 4,
+      "sharedTargetCountRaw": 1,
+      "confidence": "high"
+    },
+    {
+      "name": "Osimertinib",
+      "cid": 71496458,
+      "score": 0.9,
+      "sources": ["OpenTargets", "ChEMBL"],
+      "trialCountRaw": 20,
+      "clinicalPhaseRaw": 4,
+      "sharedTargetCountRaw": 1,
+      "confidence": "high"
+    }
+  ],
+  "genes": [{ "symbol": "EGFR", "score": 0.95, "sources": ["OpenTargets"] }],
+  "v2": {
+    "candidates": [
+      {
+        "id": "mol:123631",
+        "displayName": "Gefitinib",
+        "kind": "molecule",
+        "identity": { "pubchemCid": 123631 },
+        "scores": {
+          "axes": {
+            "efficacy": 0.85,
+            "clinicalStage": 0.95,
+            "safety": 0.65,
+            "novelty": 0.25,
+            "identityTrust": 0.95
+          },
+          "axisStatus": {},
+          "composite": 0.88,
+          "scorePhase": "cheap",
+          "weights": {
+            "efficacy": 0.25,
+            "clinicalStage": 0.2,
+            "safety": 0.25,
+            "novelty": 0.15,
+            "identityTrust": 0.15
+          }
+        }
+      }
+    ],
+    "timingMs": { "total": 1200, "gather": 600, "cheapScore": 80 },
+    "sourceStatuses": [{ "source": "opentargets", "status": "ok", "ms": 300 }],
+    "scorePhase": "cheap"
+  }
+}

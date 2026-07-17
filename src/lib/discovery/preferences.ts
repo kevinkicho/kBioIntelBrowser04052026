@@ -298,3 +298,27 @@ export function updateDiscoveryPreferences(
   saveDiscoveryPreferences(next)
   return next
 }
+
+/** Beachhead persona presets (v2.1 §0.2) — local prefs only. */
+export type BeachheadPersonaId = 'repurposing' | 'rare-lab'
+
+export function applyBeachheadPersona(persona: BeachheadPersonaId): DiscoveryPreferences {
+  if (persona === 'rare-lab') {
+    return updateDiscoveryPreferences({
+      rubricPreset: 'repurposing',
+      aeAggressiveness: 'soft-flag',
+      harvestTiming: 'board-promote',
+      tourExampleSet: 'rare-only',
+      rareDiseaseBoost: true,
+      collaborationMode: 'solo-export',
+    })
+  }
+  return updateDiscoveryPreferences({
+    rubricPreset: 'balanced',
+    aeAggressiveness: 'soft-flag',
+    harvestTiming: 'board-promote',
+    tourExampleSet: 'mixed',
+    rareDiseaseBoost: false,
+    collaborationMode: 'solo-export',
+  })
+}

@@ -3,6 +3,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { PanelApiDetailModal } from '@/components/ui/PanelApiDetailModal'
 import type { CategoryApiTrace } from '@/lib/panelApiTrace'
+import { clientFetch } from '@/lib/clientFetch'
+import {
+  deleteProfileClientCache,
+  getProfileClientCacheAsync,
+  profileCacheKey,
+  setProfileClientCache,
+} from '@/lib/profileClientCache'
 
 interface VendorResult {
   name: string
@@ -31,11 +38,44 @@ export function VendorsPanel({ cid }: { cid: number }) {
     setError(null)
     const startedAt = new Date().toISOString()
     const path = `/api/molecule/${cid}/vendors${refresh ? '?refresh=1' : ''}`
+    const cacheKey = profileCacheKey('vendors', cid)
     try {
-      const res = await fetch(path)
+      if (!refresh) {
+        const cached = await getProfileClientCacheAsync<VendorsData>(cacheKey)
+        if (cached) {
+          const finishedAt = new Date().toISOString()
+          setData(cached)
+          setTrace({
+            categoryId: 'vendors',
+            cid,
+            moleculeName: cached.moleculeName,
+            requestPath: path,
+            method: 'GET',
+            startedAt,
+            finishedAt,
+            duration_ms: Date.parse(finishedAt) - Date.parse(startedAt),
+            fromCache: true,
+            forceRefresh: false,
+            sources: [],
+            responseSummary: {
+              keys: ['suppliers', 'databases', 'total'],
+              sourceCount: 0,
+              withData: (cached.suppliers?.length ?? 0) + (cached.databases?.length ?? 0) > 0 ? 1 : 0,
+              empty: 0,
+              errors: 0,
+              timeouts: 0,
+            },
+          })
+          return
+        }
+      } else {
+        deleteProfileClientCache(cacheKey)
+      }
+      const res = await clientFetch(path, undefined, { retries: 1, retryDelayMs: 400 })
       const finishedAt = new Date().toISOString()
       if (!res.ok) throw new Error(`Failed to fetch vendors (${res.status})`)
       const json: VendorsData = await res.json()
+      setProfileClientCache(cacheKey, json)
       setData(json)
       setTrace({
         categoryId: 'vendors',

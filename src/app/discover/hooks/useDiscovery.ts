@@ -61,6 +61,8 @@ export interface OrphanetPinProvenance {
   diseaseName: string | null
   genes: string[]
   added: number
+  /** Soft error message when Orphadata lookup fails (UI honesty). */
+  error?: string | null
 }
 
 export interface DiscoveryState {
@@ -378,12 +380,7 @@ export function useDiscovery() {
 
         // Rare-disease boost: merge Orphanet genes into pins (opt-in; free Orphadata)
         let mergedTargets = targets
-        let orphanetProvenance: {
-          orphaCode: string | null
-          diseaseName: string | null
-          genes: string[]
-          added: number
-        } | null = null
+        let orphanetProvenance: OrphanetPinProvenance | null = null
         if (prefs.rareDiseaseBoost && data.diseaseName) {
           try {
             const geneRes = await clientFetch(
@@ -407,6 +404,7 @@ export function useDiscovery() {
                 diseaseName: body.diseaseName ?? data.diseaseName ?? null,
                 genes,
                 added: Math.max(0, added),
+                error: body.error ?? null,
               }
               if (added > 0) {
                 emitProductEvent('discover_orphanet_genes', {
@@ -416,9 +414,26 @@ export function useDiscovery() {
                   total: mergedTargets.length,
                 })
               }
+            } else {
+              orphanetProvenance = {
+                orphaCode: null,
+                diseaseName: data.diseaseName ?? null,
+                genes: [],
+                added: 0,
+                error: `Orphanet genes HTTP ${geneRes.status}`,
+              }
             }
-          } catch {
+          } catch (e) {
             // Non-fatal: ranking already succeeded
+            if (!(e instanceof DOMException && e.name === 'AbortError')) {
+              orphanetProvenance = {
+                orphaCode: null,
+                diseaseName: data.diseaseName ?? null,
+                genes: [],
+                added: 0,
+                error: e instanceof Error ? e.message : 'Orphanet lookup failed',
+              }
+            }
           }
         }
 

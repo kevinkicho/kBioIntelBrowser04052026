@@ -1,0 +1,69 @@
+{
+  "id": "prj_fixture_attr",
+  "name": "ATTR fixture board",
+  "description": "Golden board for pack density tests",
+  "createdAt": "2026-07-01T00:00:00.000Z",
+  "updatedAt": "2026-07-01T00:00:00.000Z",
+  "disease": { "id": "EFO_0000274", "name": "ATTR amyloidosis" },
+  "targetIds": ["TTR"],
+  "candidates": [
+    {
+      "id": "mol:208901",
+      "displayName": "Tafamidis",
+      "kind": "molecule",
+      "identity": { "pubchemCid": 208901 },
+      "boardStatus": "promote",
+      "scores": {
+        "axes": {
+          "efficacy": 0.8,
+          "clinicalStage": 0.95,
+          "safety": 0.7,
+          "novelty": 0.3,
+          "identityTrust": 0.95
+        },
+        "axisStatus": {},
+        "composite": 0.82,
+        "scorePhase": "cheap",
+        "weights": {
+          "efficacy": 0.25,
+          "clinicalStage": 0.2,
+          "safety": 0.25,
+          "novelty": 0.15,
+          "identityTrust": 0.15
+        }
+      }
+    },
+    {
+      "id": "mol:3059",
+      "displayName": "Diflunisal",
+      "kind": "molecule",
+      "identity": { "pubchemCid": 3059 },
+      "boardStatus": "watching",
+      "scores": {
+        "axes": {
+          "efficacy": 0.6,
+          "clinicalStage": 0.7,
+          "safety": null,
+          "novelty": 0.4,
+          "identityTrust": 0.9
+        },
+        "axisStatus": { "safety": "not-retrieved" },
+        "composite": 0.65,
+        "scorePhase": "cheap",
+        "weights": {
+          "efficacy": 0.25,
+          "clinicalStage": 0.2,
+          "safety": 0.25,
+          "novelty": 0.15,
+          "identityTrust": 0.15
+        }
+      }
+    }
+  ],
+  "preferencesSnapshot": {
+    "rubricPreset": "balanced",
+    "aeAggressiveness": "soft-flag",
+    "harvestTiming": "board-promote"
+  },
+  "packIndex": []
+}

@@ -1,0 +1,38 @@
+{
+  "chemblMechanisms": [
+    {
+      "mechanismOfAction": "Transthyretin stabilizer",
+      "actionType": "STABILISER",
+      "maxPhase": 4,
+      "targetName": "Transthyretin",
+      "targetChemblId": "CHEMBL2363069",
+      "moleculeChemblId": "CHEMBL2103837"
+    }
+  ],
+  "chemblActivities": [
+    {
+      "targetName": "Transthyretin",
+      "standardType": "IC50",
+      "standardValue": 100,
+      "standardUnits": "nM",
+      "pchemblValue": 7.0,
+      "assayDescription": "TTR stabilization"
+    }
+  ],
+  "clinicalTrials": [
+    {
+      "nctId": "NCT01994889",
+      "title": "Tafamidis in ATTR",
+      "status": "Completed",
+      "phase": "Phase 3",
+      "conditions": ["ATTR amyloidosis"],
+      "interventions": ["Tafamidis"]
+    }
+  ],
+  "openTargets": {
+    "knownDrugs": [{ "drugName": "Tafamidis", "phase": 4, "targets": ["TTR"] }]
+  },
+  "adverseEvents": [
+    { "reaction": "Urinary tract infection", "count": 12, "serious": false }
+  ]
+}

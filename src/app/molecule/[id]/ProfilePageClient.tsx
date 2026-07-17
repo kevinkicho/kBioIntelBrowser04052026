@@ -222,6 +222,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [snapshotMeta, setSnapshotMeta] = useState<{ createdAt: string } | null>(null)
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
   const refreshKickoff = useRef(false)
+  /** Gate tiered loads until IDB L2 is promoted to L1 (avoids reopen storms). */
+  const [cacheReady, setCacheReady] = useState(() => Boolean(isEmbed || forceRefresh || snapshotId))
 
   // Search history stores href only; payloads live in profileClientCache L1/L2.
   useEffect(() => {
@@ -358,19 +360,26 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
   }, [cid, apiOverrides, apiParams, forceRefresh])
 
-  // Phase B: promote IDB → L1, then re-kick idle categories that can resolve from memory.
+  // Phase B: hydrate IDB → L1 *before* tiered loads (perf + durability).
   useEffect(() => {
-    if (isEmbed || snapshotId || forceRefresh) return
+    if (isEmbed || snapshotId || forceRefresh) {
+      setCacheReady(true)
+      return
+    }
     let cancelled = false
-    void hydrateProfileRevisitFromIdb(cid).then(() => {
-      if (cancelled) return
-      for (const id of ALL_CATEGORY_IDS) {
-        if (categoryStatusRef.current[id] !== 'idle') continue
-        if (peekCategoryClientCache(cid, id, apiOverrides, apiParams)) {
-          void loadCategory(id)
+    setCacheReady(false)
+    void hydrateProfileRevisitFromIdb(cid)
+      .catch(() => 0)
+      .then(() => {
+        if (cancelled) return
+        setCacheReady(true)
+        for (const id of ALL_CATEGORY_IDS) {
+          if (categoryStatusRef.current[id] !== 'idle') continue
+          if (peekCategoryClientCache(cid, id, apiOverrides, apiParams)) {
+            void loadCategory(id)
+          }
         }
-      }
-    })
+      })
     return () => {
       cancelled = true
     }
@@ -483,11 +492,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
   // Auto-load the active category when it changes
   useEffect(() => {
-    if (activeCategory === 'all') return
+    if (!cacheReady || activeCategory === 'all') return
     if (categoryStatusRef.current[activeCategory] === 'idle') {
       loadCategory(activeCategory)
     }
-  }, [activeCategory, loadCategory])
+  }, [activeCategory, loadCategory, cacheReady])
 
   // Snapshot mode: short-circuit live fetching with frozen data
   useEffect(() => {
@@ -523,19 +532,22 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   ]
 
   // Decision mode: prefer Core six panels' categories first (design §4.3)
-  // Full mode: legacy Tier-1 (pharma-first)
+  // Full mode: legacy Tier-1 (pharma-first). Wait for cacheReady so IDB hits win.
   useEffect(() => {
-    if (snapshotId) return
+    if (snapshotId || !cacheReady) return
     const firstPaint: CategoryId[] = isDecisionMode
       ? [...DECISION_CATEGORY_IDS]
       : [...TIER1]
     for (const id of firstPaint) loadCategory(id)
-  }, [loadCategory, snapshotId, isDecisionMode]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [loadCategory, snapshotId, isDecisionMode, cacheReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When arriving from discover (any mode), ensure decision categories are in flight
   const discoverLoadedRef = useRef(false)
   useEffect(() => {
-    if (!fromDiscover || discoverLoadedRef.current) return
+    discoverLoadedRef.current = false
+  }, [cid])
+  useEffect(() => {
+    if (!fromDiscover || !cacheReady || discoverLoadedRef.current) return
     discoverLoadedRef.current = true
     const priorityCategories: CategoryId[] = [
       ...DECISION_CATEGORY_IDS,
@@ -544,7 +556,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     for (const catId of priorityCategories) {
       loadCategory(catId)
     }
-  }, [fromDiscover, loadCategory]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [fromDiscover, loadCategory, cacheReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When hideEmpty is toggled on, load remaining idle categories so we can evaluate them
   // In decision mode only evaluate decision categories until user switches to full

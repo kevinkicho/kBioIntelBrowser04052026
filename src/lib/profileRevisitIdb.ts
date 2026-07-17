@@ -12,10 +12,12 @@ export const PROFILE_REVISIT_CID_LRU_MAX = 8
 export const PROFILE_REVISIT_TTL_MS = 24 * 3600_000
 export const PROFILE_REVISIT_MAX_RECORD_BYTES = 2_500_000
 
+export type ProfileRevisitKind = 'category' | 'pipeline' | 'similar' | 'vendors'
+
 export interface ProfileRevisitRecord {
   key: string
   cid: number
-  kind: 'category' | 'pipeline'
+  kind: ProfileRevisitKind
   categoryId?: string
   data: unknown
   savedAt: string
@@ -65,21 +67,29 @@ function waitTx(tx: IDBTransaction): Promise<void> {
   })
 }
 
+const VALID_KINDS = new Set<ProfileRevisitKind>([
+  'category',
+  'pipeline',
+  'similar',
+  'vendors',
+])
+
 export function parseProfileCacheKey(key: string): {
-  kind: 'category' | 'pipeline' | null
+  kind: ProfileRevisitKind | null
   cid: number
   categoryId?: string
 } {
   const first = key.indexOf(':')
   if (first < 0) return { kind: null, cid: 0 }
-  const kind = key.slice(0, first)
+  const kindRaw = key.slice(0, first)
   const rest = key.slice(first + 1)
   const second = rest.indexOf(':')
   if (second < 0) return { kind: null, cid: 0 }
   const cid = parseInt(rest.slice(0, second), 10)
   const extra = rest.slice(second + 1)
-  if (kind !== 'category' && kind !== 'pipeline') return { kind: null, cid: 0 }
+  if (!VALID_KINDS.has(kindRaw as ProfileRevisitKind)) return { kind: null, cid: 0 }
   if (!Number.isFinite(cid) || cid < 1) return { kind: null, cid: 0 }
+  const kind = kindRaw as ProfileRevisitKind
   const categoryId =
     kind === 'category' && extra
       ? extra.split('|')[0] || undefined

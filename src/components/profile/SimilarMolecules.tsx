@@ -5,6 +5,11 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { clientFetch } from '@/lib/clientFetch'
 import type { SimilarMolecule } from '@/lib/api/pubchem-similar'
+import {
+  getProfileClientCacheAsync,
+  profileCacheKey,
+  setProfileClientCache,
+} from '@/lib/profileClientCache'
 
 interface TargetRelatedMolecule {
   name: string
@@ -23,20 +28,40 @@ export function SimilarMolecules({ cid }: { cid: number }) {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    setLoading(true)
-    clientFetch(`/api/molecule/${cid}/similar`)
-      .then(res => res.ok ? res.json() : null)
-      .then(json => {
-        if (json && typeof json === 'object' && ('structural' in json || 'targetRelated' in json)) {
-          setData(json as SimilarResponse)
-        } else if (Array.isArray(json)) {
-          setData({ structural: json, targetRelated: [] })
-        } else {
-          setData(null)
+    let cancelled = false
+    async function load() {
+      setLoading(true)
+      const cacheKey = profileCacheKey('similar', cid)
+      try {
+        const cached = await getProfileClientCacheAsync<SimilarResponse>(cacheKey)
+        if (cached && !cancelled) {
+          setData(cached)
+          setLoading(false)
+          return
         }
-      })
-      .catch(() => setData(null))
-      .finally(() => setLoading(false))
+        const res = await clientFetch(`/api/molecule/${cid}/similar`, undefined, {
+          retries: 1,
+          retryDelayMs: 400,
+        })
+        const json = res.ok ? await res.json() : null
+        let next: SimilarResponse | null = null
+        if (json && typeof json === 'object' && ('structural' in json || 'targetRelated' in json)) {
+          next = json as SimilarResponse
+        } else if (Array.isArray(json)) {
+          next = { structural: json, targetRelated: [] }
+        }
+        if (next) setProfileClientCache(cacheKey, next)
+        if (!cancelled) setData(next)
+      } catch {
+        if (!cancelled) setData(null)
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+    void load()
+    return () => {
+      cancelled = true
+    }
   }, [cid])
 
   if (loading) {

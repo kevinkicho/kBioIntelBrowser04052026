@@ -30,7 +30,7 @@ beforeEach(async () => {
 })
 
 describe('profileCacheKey / parseProfileCacheKey', () => {
-  test('round-trips category and pipeline keys', () => {
+  test('round-trips category, pipeline, similar, vendors keys', () => {
     const cat = profileCacheKey('category', 3080836, 'pharmaceutical||')
     expect(cat).toBe('category:3080836:pharmaceutical||')
     expect(parseProfileCacheKey(cat)).toEqual({
@@ -43,6 +43,14 @@ describe('profileCacheKey / parseProfileCacheKey', () => {
       kind: 'pipeline',
       cid: 2244,
       categoryId: undefined,
+    })
+    expect(parseProfileCacheKey(profileCacheKey('similar', 1))).toMatchObject({
+      kind: 'similar',
+      cid: 1,
+    })
+    expect(parseProfileCacheKey(profileCacheKey('vendors', 2))).toMatchObject({
+      kind: 'vendors',
+      cid: 2,
     })
   })
 

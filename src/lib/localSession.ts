@@ -138,3 +138,63 @@ export async function endLocalSession(opts?: {
   }
   return next
 }
+
+/**
+ * Destructive factory reset: end session + clear projects, pack index, pack IDB.
+ * Requires explicit user confirmation in UI (double confirm).
+ */
+export async function factoryResetLocalWorkspace(): Promise<LocalSession> {
+  const next = await endLocalSession({
+    clearSearchHistory: true,
+    clearProfileCache: true,
+    clearProductEvents: true,
+    clearDiscoverRankCache: true,
+  })
+
+  try {
+    const { listProjects, deleteProject } = await import('./project/store')
+    for (const p of listProjects()) {
+      deleteProject(p.id)
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const { clearPackIndex } = await import('./evidence/packIndex')
+    clearPackIndex()
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    // Wipe pack IDB by deleting known DB
+    if (typeof indexedDB !== 'undefined') {
+      await new Promise<void>((resolve) => {
+        const req = indexedDB.deleteDatabase('biointel-packs')
+        req.onsuccess = () => resolve()
+        req.onerror = () => resolve()
+        req.onblocked = () => resolve()
+      })
+    }
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const { resetDiscoveryPreferences } = await import('./discovery/preferences')
+    resetDiscoveryPreferences()
+  } catch {
+    /* ignore */
+  }
+
+  try {
+    const { clearCachedDiscoverRank, clearSearchHistory } = await import('./searchHistory')
+    clearCachedDiscoverRank()
+    clearSearchHistory()
+  } catch {
+    /* ignore */
+  }
+
+  return next
+}
