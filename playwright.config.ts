@@ -2,6 +2,9 @@ import { defineConfig, devices } from '@playwright/test'
 
 const PORT = process.env.PORT || 33424
 const BASE_URL = process.env.PLAYWRIGHT_BASE_URL || `http://localhost:${PORT}`
+/** When E2E_WEBSERVER=1, Playwright starts `npm run dev` automatically. */
+const USE_WEBSERVER =
+  process.env.E2E_WEBSERVER === '1' || process.env.E2E_WEBSERVER === 'true'
 
 export default defineConfig({
   testDir: './e2e',
@@ -21,4 +24,15 @@ export default defineConfig({
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
   ],
+  ...(USE_WEBSERVER
+    ? {
+        webServer: {
+          command: `npx next dev -p ${PORT}`,
+          url: BASE_URL,
+          reuseExistingServer: !process.env.CI,
+          timeout: 180_000,
+        },
+      }
+    : {}),
 })
+

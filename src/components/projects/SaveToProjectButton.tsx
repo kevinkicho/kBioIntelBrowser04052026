@@ -191,6 +191,7 @@ export function SaveToProjectButton({
       <button
         type="button"
         className={baseBtn}
+        data-testid="save-to-project"
         onClick={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -247,6 +248,7 @@ export function SaveToProjectButton({
             )}
             <button
               type="button"
+              data-testid="save-to-project-new"
               className="w-full rounded-md border border-slate-700 bg-slate-800/60 px-2 py-1.5 text-xs text-emerald-300 hover:bg-slate-800"
               onClick={createAndSave}
             >

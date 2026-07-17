@@ -362,7 +362,22 @@ export function useDiscovery() {
         }))
       } catch (err) {
         if (progressRef.current) clearTimeout(progressRef.current)
-        if (err instanceof DOMException && err.name === 'AbortError') return
+        // Superseded search (new request or unmount) — leave state to the newer call
+        if (err instanceof DOMException && err.name === 'AbortError') {
+          if (abortRef.current !== controller) return
+          // Active request aborted without a replacement (e.g. Strict Mode unmount)
+          setState((prev) =>
+            prev.status === 'loading'
+              ? {
+                  ...prev,
+                  status: 'idle',
+                  progress: 0,
+                  progressLabel: '',
+                }
+              : prev,
+          )
+          return
+        }
 
         setState((prev) => ({
           ...prev,

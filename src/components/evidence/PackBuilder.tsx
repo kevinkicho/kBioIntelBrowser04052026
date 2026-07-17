@@ -345,6 +345,7 @@ export function PackBuilder({
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
+          data-testid="pack-download-json"
           onClick={() => handleDownload('json')}
           className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
         >
@@ -352,6 +353,7 @@ export function PackBuilder({
         </button>
         <button
           type="button"
+          data-testid="pack-download-md"
           onClick={() => handleDownload('md')}
           className="rounded-lg border border-emerald-800/40 bg-emerald-900/20 px-3 py-1.5 text-xs font-medium text-emerald-300 hover:bg-emerald-900/40"
         >

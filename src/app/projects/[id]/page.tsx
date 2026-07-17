@@ -496,6 +496,7 @@ export default function ProjectBoardPage() {
                   </div>
                   <button
                     type="button"
+                    data-testid={`seed-rh-${entry.id}`}
                     className="rounded border border-indigo-800/40 px-2 py-1 text-[10px] text-indigo-300 hover:bg-indigo-900/30"
                     onClick={() => {
                       const hyp = seedResearchHypothesisFromPack({
@@ -562,7 +563,7 @@ export default function ProjectBoardPage() {
         </section>
 
         {/* Research hypotheses — narrative theses, distinct from set-ops /hypothesis */}
-        <section className="mt-8 space-y-3">
+        <section className="mt-8 space-y-3" data-testid="research-hypotheses-section">
           <h2 className="text-lg font-semibold text-slate-100">Research hypotheses</h2>
           <p className="text-[11px] text-slate-500">
             Project-scoped narrative theses (not set-ops filter intersections). Seed from an evidence
@@ -571,16 +572,18 @@ export default function ProjectBoardPage() {
           {hypotheses.length === 0 ? (
             <p className="text-sm text-slate-600">No research hypotheses yet.</p>
           ) : (
-            <ul className="space-y-2">
+            <ul className="space-y-2" data-testid="research-hypotheses-list">
               {hypotheses.map((h) => (
                 <li
                   key={h.id}
                   className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
+                  data-testid={`rh-item-${h.id}`}
                 >
                   <div className="flex flex-wrap items-start justify-between gap-2">
                     <div className="text-sm font-medium text-slate-200">{h.title}</div>
                     <Link
                       href={`/projects/${project.id}/hypothesis/${h.id}`}
+                      data-testid={`rh-edit-${h.id}`}
                       className="text-[10px] text-indigo-400 hover:text-indigo-300"
                     >
                       Edit →

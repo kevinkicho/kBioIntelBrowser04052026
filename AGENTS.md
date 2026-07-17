@@ -33,7 +33,8 @@ npm run dev                              # required before e2e (no Playwright we
 npx tsc --noEmit
 npm test
 npm run test:gate                        # tsc + key jest suites (v2.1)
-npm run test:e2e:fixture                 # north-star e2e with E2E_FIXTURE=1
+npm run test:e2e:fixture                 # north-star e2e (needs npm run dev, E2E_FIXTURE=1)
+npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
 npm run test:e2e:live                    # north-star e2e against live APIs (optional)
 npm run lint
 npm run build
