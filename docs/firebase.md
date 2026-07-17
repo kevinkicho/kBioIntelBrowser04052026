@@ -20,7 +20,7 @@
 | **Firestore** | Projects, settings, pack **metadata** | `projectSync`, `settingsSync`, `packMetaSync` |
 | **Realtime Database** | Presence only (`presence/{uid}`) | `userProfile` online/offline |
 | **Storage** | Optional JSON export archives | `storageSync` → `users/{uid}/exports/…` |
-| **Functions** | Thin utilities (`health` probe) | `functions/src/index.ts` |
+| **Functions** | Thin utilities (`health` probe) | https://us-central1-kbiointelbrowser04052026.cloudfunctions.net/health |
 
 ## Local env
 
