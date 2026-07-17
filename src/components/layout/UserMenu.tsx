@@ -3,15 +3,16 @@
 /**
  * Top-right account menu — Firebase Auth only (no local mock identity).
  * Signed-out: Sign in with Google.
- * Signed-in: photo, name, email, cloud profile, sign out.
+ * Signed-in: photo, name, email, cloud profile, sync projects/prefs, sign out.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 import { countUserProjects } from '@/lib/firebase/userProfile'
 import { isFirebaseConfigured } from '@/lib/firebase/config'
+import { getLastMigrateAt } from '@/lib/firebase/migrate'
 
 function initialsFromUser(name: string | null | undefined, email: string | null | undefined): string {
   const n = (name || '').trim()
@@ -24,12 +25,29 @@ function initialsFromUser(name: string | null | undefined, email: string | null 
   return '?'
 }
 
+function formatSyncTime(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  try {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return null
+    return d.toLocaleString(undefined, {
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    })
+  } catch {
+    return null
+  }
+}
+
 export function UserMenu() {
   const router = useRouter()
   const auth = useFirebaseAuth()
   const [open, setOpen] = useState(false)
   const [busy, setBusy] = useState(false)
   const [projectCount, setProjectCount] = useState<number | null>(null)
+  const [countTick, setCountTick] = useState(0)
   const rootRef = useRef<HTMLDivElement>(null)
 
   const configured = auth.configured || isFirebaseConfigured()
@@ -38,6 +56,13 @@ export function UserMenu() {
   const email = user?.email || auth.profile?.email || null
   const photoURL = user?.photoURL || auth.profile?.photoURL || null
   const initials = initialsFromUser(displayName, email)
+  const syncing = busy || auth.migrating
+  const lastSyncIso = auth.lastMigration?.finishedAt ?? getLastMigrateAt()
+  const lastSyncLabel = formatSyncTime(lastSyncIso)
+
+  const refreshProjectCount = useCallback(() => {
+    setCountTick((t) => t + 1)
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -67,12 +92,22 @@ export function UserMenu() {
     return () => {
       cancelled = true
     }
-  }, [user?.uid, open])
+  }, [user?.uid, open, countTick, auth.lastMigration?.finishedAt])
 
   const onSignIn = async () => {
     setBusy(true)
     try {
       await auth.signInWithGoogle()
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onSyncNow = async () => {
+    setBusy(true)
+    try {
+      await auth.syncNow()
+      refreshProjectCount()
     } finally {
       setBusy(false)
     }
@@ -160,8 +195,9 @@ export function UserMenu() {
             <div className="p-3" data-testid="user-menu-signed-out">
               <p className="mb-1 text-sm font-medium text-slate-100">Sign in to BioIntel</p>
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                Use your Google account via Firebase Auth. Projects and research data stay private to
-                your account (owner-only security rules).
+                Optional Google sign-in via Firebase Auth. After sign-in, local projects and discovery
+                prefs can sync to your private cloud (owner-only rules). Solo local mode still works
+                without an account.
               </p>
               <button
                 type="button"
@@ -249,6 +285,25 @@ export function UserMenu() {
               </div>
 
               <div className="border-b border-slate-800 py-1">
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={syncing}
+                  onClick={() => void onSyncNow()}
+                  className="flex w-full flex-col px-3 py-2 text-left hover:bg-slate-800/60 disabled:opacity-50"
+                  data-testid="user-menu-sync"
+                >
+                  <span className="text-xs text-slate-200">
+                    {syncing ? 'Syncing…' : 'Sync projects & prefs'}
+                  </span>
+                  <span className="text-[10px] text-slate-600">
+                    {auth.lastMigration
+                      ? auth.lastMigration.message
+                      : lastSyncLabel
+                        ? `Last sync ${lastSyncLabel}`
+                        : 'Local ↔ Firestore · last-write-wins'}
+                  </span>
+                </button>
                 <Link
                   href="/projects"
                   role="menuitem"
@@ -259,7 +314,7 @@ export function UserMenu() {
                   <span className="text-xs text-slate-200">Projects</span>
                   <span className="text-[10px] text-slate-600">
                     Boards & packs
-                    {projectCount != null ? ` · ${projectCount} in cloud` : ''}
+                    {projectCount != null ? ` · ${projectCount} in cloud` : ' · local default'}
                   </span>
                 </Link>
                 <a
@@ -279,7 +334,7 @@ export function UserMenu() {
                 <button
                   type="button"
                   role="menuitem"
-                  disabled={busy}
+                  disabled={syncing}
                   onClick={() => void onSignOut()}
                   className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-medium text-red-300 hover:bg-red-950/40 disabled:opacity-50"
                   data-testid="user-menu-logout"

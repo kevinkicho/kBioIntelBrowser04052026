@@ -44,10 +44,14 @@ Admin key JSON is **gitignored** (`*-firebase-adminsdk-*.json`).
 | `src/lib/firebase/config.ts` | Read web config from env |
 | `src/lib/firebase/client.ts` | Browser Auth / Firestore / RTDB / Storage |
 | `src/lib/firebase/admin.ts` | Server Admin SDK (`server-only`) |
-| `src/lib/firebase/FirebaseProvider.tsx` | Auth state + Google popup + profile ensure |
+| `src/lib/firebase/FirebaseProvider.tsx` | Auth state + Google popup + profile + auto-migrate |
 | `src/lib/firebase/userProfile.ts` | Firestore `users/{uid}` + RTDB presence |
 | `src/lib/firebase/paths.ts` | Owner-scoped collection paths |
-| `src/components/layout/UserMenu.tsx` | Top-bar account menu (Firebase only) |
+| `src/lib/firebase/sanitize.ts` | Strip `undefined` for Firestore writes; size guard |
+| `src/lib/firebase/projectSync.ts` | Local projects ↔ `users/{uid}/projects/{id}` |
+| `src/lib/firebase/settingsSync.ts` | Discovery prefs ↔ `users/{uid}/settings/discovery` |
+| `src/lib/firebase/migrate.ts` | Bidirectional migrate + throttle + report |
+| `src/components/layout/UserMenu.tsx` | Account menu + **Sync projects & prefs** |
 | `apphosting.yaml` | App Hosting env for deploys |
 | `firebase.json` | Product wiring |
 | `firestore.rules` / `database.rules.json` / `storage.rules` | Owner-only security |
@@ -55,8 +59,34 @@ Admin key JSON is **gitignored** (`*-firebase-adminsdk-*.json`).
 ## Top-bar account menu
 
 - **Signed out:** Sign in with Google (Firebase Auth popup).
-- **Signed in:** Photo, display name, email, uid; cloud project count from Firestore; Sign out.
+- **Signed in:** Photo, display name, email, uid; cloud project count; **Sync projects & prefs**; Sign out.
+- Auto-migrate on login (throttled to once per hour per browser).
 - No local mock identity, personas, or placeholder nav chips in this menu.
+
+## Local ↔ cloud migration
+
+**Default remains local** (`localStorage` / IDB / download). Cloud is optional backup when signed in.
+
+| Data | Local store | Firestore path | Merge rule |
+|------|-------------|----------------|------------|
+| Project boards | `biointel-project-*` index + docs | `users/{uid}/projects/{projectId}` | Last-write-wins by `updatedAt` |
+| Discovery preferences | discovery prefs key | `users/{uid}/settings/discovery` | Last-write-wins by `updatedAt` |
+| Pack file blobs | download / IDB | Not uploaded (metadata path reserved) | N/A |
+| Research hypothesis packs | local | Not auto-synced yet | N/A |
+
+**Behavior**
+
+1. On Google sign-in, `maybeAutoMigrateOnLogin` runs if last migrate was ≥1h ago.
+2. Menu → **Sync projects & prefs** calls `syncNow()` → pull then push (newer wins each way).
+3. Oversized projects are slimmed (drop heavy links / evidence arrays) or skipped with a warn log.
+4. Firestore rejects `undefined`; all writes go through `stripUndefined`.
+5. Agent activity: `firebase.migrate.complete`, `firebase.sync.*`.
+
+**Deploy rules before relying on sync**
+
+```powershell
+firebase deploy --only firestore:rules
+```
 
 ## Deploy commands
 
@@ -82,6 +112,7 @@ firebase apphosting:backends:list
 
 ## What is intentionally not built yet
 
-- Automatic sync of local projects → Firestore  
-- Multi-tenant sharing  
+- Real-time multi-device live collaboration (sync is on login / manual)  
+- Pack binary / full claim blob upload to Storage or Firestore  
+- Multi-tenant sharing / team workspaces  
 - Replacing localStorage with cloud as the only store  

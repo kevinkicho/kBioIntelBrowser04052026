@@ -28,6 +28,7 @@ import {
   setUserPresenceOnline,
   type CloudUserProfile,
 } from './userProfile'
+import { maybeAutoMigrateOnLogin, runFirebaseMigration, type MigrationReport } from './migrate'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
 export type FirebaseAuthState = {
@@ -36,8 +37,12 @@ export type FirebaseAuthState = {
   user: User | null
   profile: CloudUserProfile | null
   error: string | null
+  lastMigration: MigrationReport | null
+  migrating: boolean
   signInWithGoogle: () => Promise<void>
   signOut: () => Promise<void>
+  /** Manual full sync: local ↔ Firestore projects + prefs */
+  syncNow: () => Promise<MigrationReport | null>
 }
 
 const FirebaseAuthContext = createContext<FirebaseAuthState | null>(null)
@@ -48,6 +53,8 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<CloudUserProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [lastMigration, setLastMigration] = useState<MigrationReport | null>(null)
+  const [migrating, setMigrating] = useState(false)
 
   useEffect(() => {
     if (!configured) {
@@ -67,6 +74,7 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
         setUser(u)
         if (!u) {
           setProfile(null)
+          setLastMigration(null)
           setReady(true)
           return
         }
@@ -79,6 +87,20 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
             { uid: u.uid, provider: u.providerData[0]?.providerId ?? 'unknown' },
             { source: 'firebase' },
           )
+          // Auto-migrate local projects/prefs ↔ cloud (throttled)
+          setMigrating(true)
+          try {
+            const report = await maybeAutoMigrateOnLogin(u.uid)
+            if (!cancelled && report) setLastMigration(report)
+          } catch (migErr) {
+            if (!cancelled) {
+              setError(
+                migErr instanceof Error ? migErr.message : 'Cloud sync failed',
+              )
+            }
+          } finally {
+            if (!cancelled) setMigrating(false)
+          }
         } catch (err) {
           if (!cancelled) {
             setProfile({
@@ -128,9 +150,30 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       if (uid) await setUserPresenceOffline(uid)
       await firebaseSignOut(auth)
       setProfile(null)
+      setLastMigration(null)
       logAgentActivity('firebase.auth.signed_out', {}, { source: 'firebase' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-out failed')
+    }
+  }, [])
+
+  const syncNow = useCallback(async () => {
+    const auth = getFirebaseAuth()
+    const uid = auth?.currentUser?.uid
+    if (!uid) return null
+    setMigrating(true)
+    setError(null)
+    try {
+      const report = await runFirebaseMigration(uid)
+      setLastMigration(report)
+      if (!report.ok) setError(report.message)
+      return report
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Sync failed'
+      setError(msg)
+      return null
+    } finally {
+      setMigrating(false)
     }
   }, [])
 
@@ -141,10 +184,24 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       user,
       profile,
       error,
+      lastMigration,
+      migrating,
       signInWithGoogle,
       signOut,
+      syncNow,
     }),
-    [configured, ready, user, profile, error, signInWithGoogle, signOut],
+    [
+      configured,
+      ready,
+      user,
+      profile,
+      error,
+      lastMigration,
+      migrating,
+      signInWithGoogle,
+      signOut,
+      syncNow,
+    ],
   )
 
   return (
@@ -161,8 +218,11 @@ export function useFirebaseAuth(): FirebaseAuthState {
       user: null,
       profile: null,
       error: null,
+      lastMigration: null,
+      migrating: false,
       signInWithGoogle: async () => {},
       signOut: async () => {},
+      syncNow: async () => null,
     }
   }
   return ctx
