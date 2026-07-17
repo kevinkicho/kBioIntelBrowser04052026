@@ -40,9 +40,31 @@ npm run test:e2e:fixture                 # north-star e2e (needs npm run dev, E2
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
 npm run test:e2e:live                    # north-star e2e against live APIs (optional)
 npm run logs:tail                        # last lines of today's agent activity JSONL
+npm run biointel -- help                 # product CLI v0 for agents (see below)
 npm run lint
 npm run build
 ```
+
+## BioIntel CLI v0 (agents / operators)
+
+Zero-dep CLI wrapping free APIs + repo gates. App must be running for HTTP commands (`npm run dev`).
+
+```text
+npm run biointel -- help
+npm run biointel -- law
+npm run biointel -- health
+npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR
+npm run biointel -- molecule get 3080836
+npm run biointel -- molecule category 3080836 pharmaceutical
+npm run biointel -- logs tail --n 30
+npm run biointel -- logs grep product.discover
+npm run biointel -- gate
+npm run biointel -- e2e auto
+```
+
+- Implementation: `scripts/biointel-cli.js` (also `bin.biointel`)
+- Base URL: `BIOINTEL_BASE` or `http://localhost:33424`
+- Full cookbook: `docs/design/agentic-workflow-cli.md` §3 + §CLI
 
 ## Agent activity logs (local)
 

@@ -3,7 +3,7 @@
 **Product:** BioIntel Discovery Workbench  
 **Audience:** Coding agents, CLI-driven automation, and human implementers operating the repo  
 **Date:** 2026-07-16  
-**Status:** Implementable design — **Draft / Rev 1.1** (review fixes)  
+**Status:** Implementable design — **Rev 1.2** (unified `biointel` CLI v0 shipped)  
 **Parent product design:** `docs/design/discovery-workbench-v2.1.md` (draft package: co-located product design temp file)  
 **Canonical project copy (when promoted):** `docs/design/agentic-workflow-cli.md`  
 **Repo root:** `C:\Users\kevin\workspace\kBioIntelBrowser04052026`  
@@ -152,6 +152,28 @@ Agents should read these before changing related behavior.
 **Shell note:** User environment is **Windows + PowerShell**. Prefer PowerShell snippets. Bash provided where agents run in Git Bash/WSL/CI Linux.
 
 **Chaining:** In the agent PowerShell tool environment, `&&` may be unsupported — use `;` or separate commands. In standard PowerShell 7+ / bash, `&&` is fine.
+
+### 3.0 Unified CLI (`biointel` v0) — preferred entry
+
+Implementation: `scripts/biointel-cli.js` · npm: `npm run biointel -- <cmd>` · package `bin.biointel`.
+
+| Intent | Command |
+|---|---|
+| Help / law | `npm run biointel -- help` · `… law` |
+| App up? | `npm run biointel -- health` |
+| Rank shortlist | `npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR` |
+| Harvest safety | `npm run biointel -- discover harvest --names "Tafamidis,Diflunisal" --safety` |
+| Molecule shell | `npm run biointel -- molecule get 208901` |
+| Category pack | `npm run biointel -- molecule category 208901 pharmaceutical` |
+| Orphanet pins | `npm run biointel -- orphanet genes --q "ATTR amyloidosis"` |
+| Activity logs | `npm run biointel -- logs tail --n 40` · `logs grep product\.` |
+| Quality gate | `npm run biointel -- gate` |
+| North-star e2e | `npm run biointel -- e2e auto` |
+| Raw API | `npm run biointel -- api get /api/molecule/2244` |
+
+**Env:** `BIOINTEL_BASE` (default `http://localhost:33424`). Start app with `npm run dev` before HTTP commands.
+
+**Not in v0 (by design):** project board mutations, pack file download (browser/IDB), multi-tenant auth. Use UI or extend CLI in a later rev.
 
 ### 3.1 Lifecycle
 
