@@ -4,12 +4,31 @@ import { useEffect, useState } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
 import { maskApiKey } from '@/lib/ai/userApiKey'
-import { canBrowserCallLocalHttp } from '@/lib/ai/localTransport'
+import { canBrowserCallLocalHttp, isLocalOrLanOllamaUrl } from '@/lib/ai/localTransport'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 
 interface AIConfigModalProps {
   isOpen: boolean
   onClose: () => void
+}
+
+/** Local Ollama form defaults — always port 11434 (Ollama standard). */
+function localFormDefaults(ollamaUrl?: string): { host: string; port: string } {
+  if (ollamaUrl && isLocalOrLanOllamaUrl(ollamaUrl)) {
+    try {
+      const raw = ollamaUrl.includes('://') ? ollamaUrl : `http://${ollamaUrl}`
+      const u = new URL(raw)
+      return {
+        host: u.hostname || '127.0.0.1',
+        // Ollama listens on 11434 when port omitted
+        port: u.port || String(OLLAMA_DEFAULT_PORT),
+      }
+    } catch {
+      /* fall through */
+    }
+  }
+  // Cloud / empty / invalid → local defaults (never ollama.com:11434)
+  return { host: '127.0.0.1', port: String(OLLAMA_DEFAULT_PORT) }
 }
 
 /**
@@ -18,20 +37,9 @@ interface AIConfigModalProps {
 export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   const ai = useAI()
   const auth = useFirebaseAuth()
-  const [hostInput, setHostInput] = useState(() => {
-    try {
-      return new URL(ai.ollamaUrl || 'http://localhost:11434').hostname
-    } catch {
-      return 'localhost'
-    }
-  })
-  const [portInput, setPortInput] = useState(() => {
-    try {
-      return String(new URL(ai.ollamaUrl || 'http://localhost:11434').port || OLLAMA_DEFAULT_PORT)
-    } catch {
-      return String(OLLAMA_DEFAULT_PORT)
-    }
-  })
+  const initial = localFormDefaults(ai.ollamaUrl)
+  const [hostInput, setHostInput] = useState(initial.host)
+  const [portInput, setPortInput] = useState(initial.port)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [keySaving, setKeySaving] = useState(false)
@@ -41,13 +49,9 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
 
   useEffect(() => {
     if (!isOpen) return
-    try {
-      const u = new URL(ai.ollamaUrl || 'http://localhost:11434')
-      setHostInput(u.hostname)
-      setPortInput(String(u.port || OLLAMA_DEFAULT_PORT))
-    } catch {
-      /* keep */
-    }
+    const d = localFormDefaults(ai.ollamaUrl)
+    setHostInput(d.host)
+    setPortInput(d.port)
     // Do not prefill raw key into the input; show blank until user pastes a new one
     setApiKeyInput('')
     setKeyHint(null)
@@ -70,9 +74,14 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   if (!isOpen) return null
 
   const handleConnect = async () => {
-    const portNum = parseInt(portInput, 10)
-    const port = isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
-    const fullUrl = `${hostInput.trim() || 'localhost'}:${port}`
+    // Empty / invalid port → Ollama default 11434
+    const trimmedPort = portInput.trim()
+    const portNum = trimmedPort === '' ? OLLAMA_DEFAULT_PORT : parseInt(trimmedPort, 10)
+    const port =
+      isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
+    if (String(port) !== portInput) setPortInput(String(port))
+    const host = hostInput.trim() || '127.0.0.1'
+    const fullUrl = `${host}:${port}`
     const validation = validateOllamaUrl(fullUrl)
     if (!validation.valid) {
       setValidationHint(validation.error || 'Invalid URL')
@@ -80,7 +89,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
     }
     if (validation.warning === 'lan-warning') {
       setValidationHint(
-        'LAN Ollama requires OLLAMA_ALLOW_LAN=1 on the Next.js server. Ensure this host is trusted and on your network.',
+        'LAN Ollama: browser will call this host directly. Ensure Ollama allows CORS (OLLAMA_ORIGINS=*) on that machine.',
       )
     } else {
       setValidationHint(null)
@@ -348,18 +357,24 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void handleConnect()
                 }}
-                placeholder="localhost"
+                placeholder="127.0.0.1"
                 className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
               />
             </div>
-            <div className="w-24">
-              <label className="mb-1 block text-[10px] text-slate-500">Port</label>
+            <div className="w-28">
+              <label className="mb-1 block text-[10px] text-slate-500">
+                Port <span className="text-slate-600">(default {OLLAMA_DEFAULT_PORT})</span>
+              </label>
               <input
                 type="text"
+                inputMode="numeric"
                 value={portInput}
                 onChange={(e) => {
                   setPortInput(e.target.value)
                   setValidationHint(null)
+                }}
+                onBlur={() => {
+                  if (!portInput.trim()) setPortInput(String(OLLAMA_DEFAULT_PORT))
                 }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter') void handleConnect()
