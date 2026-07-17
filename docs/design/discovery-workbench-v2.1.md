@@ -84,7 +84,7 @@ These are the **only** problem classes v2.1 is authorized to solve. Anything els
 | G2 | **No north-star e2e smoke** | `e2e/smoke.spec.ts` covers homepage, molecule, hypothesis, cohort, analytics — **not** discover → board → pack → RH | Playwright path for full loop |
 | G3 | **Pack density quality (not more panels)** | `selectPackCandidates` is status+CID only; empty panels silent; no “prefer richer Core” ranking | Empty-panel warnings; prefer promote CIDs with richer prior Core; stay ≤5 extractors |
 | G4 | **Rare-disease beachhead shallow** | Orphanet merge silent except event; no provenance UI; no optional re-rank; rare-only tour not guaranteed end-to-end | Provenance UI; optional re-rank; rare tour examples that work |
-| G5 | **Product/UX friction** | No saved discover sessions; harvest UX functional not polished; score trust copy partial; share can fail opaquely | Local sessions; harvest polish; trust UI; share reliability |
+| G5 | **Product/UX friction** | No saved discover sessions; harvest UX functional not polished; score trust copy partial; share can fail opaquely; history reopen re-fetched profiles | Local sessions; harvest polish; trust UI; share reliability; **profile revisit cache** (`docs/design/profile-revisit-cache.md`) |
 | G6 | **Engineering health** | Huge jest tree; no documented CI gate; no golden rank/pack fixtures for ATTR-like path; agents re-discover scripts | Golden fixtures; CI (`tsc` + key jest); M1 export; `AGENTS.md` |
 | G7 | **Beachhead framing** | Docs say repurposing; rare boost is a toggle without persona framing | Document selectable personas + default recommendation |
 

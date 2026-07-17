@@ -39,6 +39,7 @@ import { VendorsPanel } from '@/components/profile/VendorsPanel'
 import { ProfilePanelProvider } from '@/components/profile/ProfilePanelContext'
 import { sessionHistory } from '@/lib/sessionHistory'
 import { recordSearch } from '@/lib/searchHistory'
+import { invalidateProfileClientCache } from '@/lib/profileClientCache'
 import { categoryForPanel, type CategoryApiTrace } from '@/lib/panelApiTrace'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import type { ScoreVector } from '@/lib/domain'
@@ -215,7 +216,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
   const refreshKickoff = useRef(false)
 
-  // Record in search history sidebar (open = warm cache path)
+  // Search history stores href only; category/pipeline payloads live in
+  // profileClientCache (session) so reopening a history item skips full re-fetch.
   useEffect(() => {
     if (isEmbed) return
     recordSearch({
@@ -357,11 +359,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     [cid, moleculeName, loadCategory, loadingCategories, categoryTraces],
   )
 
-  // Sidebar "Refresh" → force re-query all categories (bust server process cache)
+  // Sidebar "Refresh" → force re-query (bust client session + server process cache)
   useEffect(() => {
     if (!forceRefresh || isEmbed) return
     if (refreshKickoff.current) return
     refreshKickoff.current = true
+    invalidateProfileClientCache(cid)
     pendingRef.current.clear()
     setCategoryStatus(initStatus())
     setCategoryData({})

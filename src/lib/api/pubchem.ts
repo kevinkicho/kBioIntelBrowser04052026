@@ -1,6 +1,7 @@
 import type { Molecule, SearchResult } from '../types'
 import { classifyMolecule, buildStructureImageUrl } from '../utils'
 import type { SearchType } from '../apiIdentifiers'
+import { getCached, setCache } from '../cache'
 
 const BASE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 const AUTOCOMPLETE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound'
@@ -8,6 +9,11 @@ const AUTOCOMPLETE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/com
 const fetchOptions: RequestInit = {
   next: { revalidate: 3600 }, // Cache for 1 hour (Next.js fetch cache)
 }
+
+/** Process-local success/not-found cache — avoids N parallel category routes re-hitting PubChem. */
+const MOLECULE_CACHE_TTL_MS = 3600_000
+/** In-flight de-dupe so concurrent pipeline+category loads share one lookup. */
+const moleculeInflight = new Map<number, Promise<Molecule | null>>()
 
 // Threshold for large molecules (peptides/proteins)
 const LARGE_MOLECULE_ATOM_THRESHOLD = 100
@@ -63,9 +69,62 @@ export async function searchMoleculesByName(query: string): Promise<SearchResult
   }
 }
 
+/**
+ * Transient PubChem / network failure. Callers should map this to 502/503,
+ * not 404 — a missing molecule is only when getMoleculeById returns null.
+ */
+export class PubChemUpstreamError extends Error {
+  readonly status?: number
+  readonly retryable = true
+
+  constructor(message: string, status?: number) {
+    super(message)
+    this.name = 'PubChemUpstreamError'
+    this.status = status
+  }
+}
+
+function isNotFoundStatus(status: number): boolean {
+  // 404 = absent; 400 often means bad/unknown CID shape from PubChem
+  return status === 404 || status === 400
+}
+
+/**
+ * Resolve a PubChem CID to a Molecule.
+ * - Returns null only when PubChem indicates the CID does not exist.
+ * - Throws PubChemUpstreamError on rate limits, 5xx, or network failures
+ *   so API routes do not mislabel flaky upstream as "Molecule not found".
+ * - De-dupes concurrent lookups and caches successes process-locally so a
+ *   profile page (pipeline + N categories) does not stampede PubChem.
+ */
 export async function getMoleculeById(cid: number): Promise<Molecule | null> {
+  const cacheKey = `pubchem:molecule:${cid}`
+  const cached = getCached<{ molecule: Molecule | null }>(cacheKey)
+  if (cached) return cached.molecule
+
+  const inflight = moleculeInflight.get(cid)
+  if (inflight) return inflight
+
+  const promise = fetchMoleculeByIdUncached(cid)
+    .then((molecule) => {
+      // Cache hits and true not-found; do not cache throws (retryable upstream).
+      setCache(cacheKey, { molecule }, MOLECULE_CACHE_TTL_MS)
+      return molecule
+    })
+    .finally(() => {
+      moleculeInflight.delete(cid)
+    })
+
+  moleculeInflight.set(cid, promise)
+  return promise
+}
+
+async function fetchMoleculeByIdUncached(cid: number): Promise<Molecule | null> {
+  let propsRes: Response
+  let synonymsRes: Response
+  let descRes: Response
   try {
-    const [propsRes, synonymsRes, descRes] = await Promise.all([
+    ;[propsRes, synonymsRes, descRes] = await Promise.all([
       fetch(
         `${BASE_URL}/compound/cid/${cid}/property/MolecularFormula,IUPACName,MolecularWeight,Title,InChIKey/JSON`,
         fetchOptions
@@ -73,46 +132,65 @@ export async function getMoleculeById(cid: number): Promise<Molecule | null> {
       fetch(`${BASE_URL}/compound/cid/${cid}/synonyms/JSON`, fetchOptions),
       fetch(`${BASE_URL}/compound/cid/${cid}/description/JSON`, fetchOptions),
     ])
+  } catch (err) {
+    throw new PubChemUpstreamError(
+      err instanceof Error ? err.message : 'PubChem network error',
+    )
+  }
 
-    if (!propsRes.ok) return null
+  if (!propsRes.ok) {
+    if (isNotFoundStatus(propsRes.status)) return null
+    throw new PubChemUpstreamError(
+      `PubChem property lookup failed (${propsRes.status})`,
+      propsRes.status,
+    )
+  }
 
-    const propsData = await propsRes.json()
-    const props = propsData.PropertyTable?.Properties?.[0]
-    if (!props) return null
+  let propsData: { PropertyTable?: { Properties?: Array<Record<string, unknown>> } }
+  try {
+    propsData = await propsRes.json()
+  } catch (err) {
+    throw new PubChemUpstreamError(
+      err instanceof Error ? err.message : 'PubChem response parse error',
+      propsRes.status,
+    )
+  }
 
-    const synonymsData = synonymsRes.ok ? await synonymsRes.json() : {}
-    const synonyms: string[] = synonymsData.InformationList?.Information?.[0]?.Synonym?.slice(0, 10) ?? []
+  const props = propsData.PropertyTable?.Properties?.[0]
+  if (!props) return null
 
-    const descData = descRes.ok ? await descRes.json() : {}
-    let description: string = descData.InformationList?.Information?.[0]?.Description?.[0] ?? ''
+  const synonymsData = synonymsRes.ok ? await synonymsRes.json().catch(() => ({})) : {}
+  const synonyms: string[] =
+    synonymsData.InformationList?.Information?.[0]?.Synonym?.slice(0, 10) ?? []
 
-    const formula = props.MolecularFormula ?? ''
-    const name = props.Title ?? `CID ${cid}`
-    
-    // Check if this is a large molecule and add appropriate messaging
-    if (isLargeMolecule(formula) && !description) {
-      description = getLargeMoleculeDescription(name, formula)
-    }
+  const descData = descRes.ok ? await descRes.json().catch(() => ({})) : {}
+  let description: string =
+    descData.InformationList?.Information?.[0]?.Description?.[0] ?? ''
 
-    // For large molecules, limit the formula display
-    const displayFormula = isLargeMolecule(formula) 
-      ? `${formula.slice(0, 50)}... (large molecule)` 
-      : formula
+  const formula = (props.MolecularFormula as string) ?? ''
+  const name = (props.Title as string) ?? `CID ${cid}`
 
-    return {
-      cid,
-      name,
-      formula: displayFormula,
-      iupacName: props.IUPACName ?? '',
-      molecularWeight: parseFloat(props.MolecularWeight) || 0,
-      classification: classifyMolecule(name, synonyms),
-      synonyms,
-      description,
-      structureImageUrl: buildStructureImageUrl(cid),
-      inchiKey: props.InChIKey,
-    }
-  } catch {
-    return null
+  // Check if this is a large molecule and add appropriate messaging
+  if (isLargeMolecule(formula) && !description) {
+    description = getLargeMoleculeDescription(name, formula)
+  }
+
+  // For large molecules, limit the formula display
+  const displayFormula = isLargeMolecule(formula)
+    ? `${formula.slice(0, 50)}... (large molecule)`
+    : formula
+
+  return {
+    cid,
+    name,
+    formula: displayFormula,
+    iupacName: (props.IUPACName as string) ?? '',
+    molecularWeight: parseFloat(String(props.MolecularWeight)) || 0,
+    classification: classifyMolecule(name, synonyms),
+    synonyms,
+    description,
+    structureImageUrl: buildStructureImageUrl(cid),
+    inchiKey: (props.InChIKey as string) ?? '',
   }
 }
 
@@ -235,7 +313,17 @@ export async function searchByType(query: string, type: SearchType): Promise<str
 }
 
 export async function getMoleculeByIdSafe(cid: number): Promise<Molecule | { error: string; cid: number }> {
-  const molecule = await getMoleculeById(cid)
+  let molecule: Molecule | null
+  try {
+    molecule = await getMoleculeById(cid)
+  } catch (err) {
+    return {
+      error: err instanceof PubChemUpstreamError
+        ? err.message
+        : 'Failed to fetch molecule',
+      cid,
+    }
+  }
   if (!molecule) {
     return { error: 'Molecule not found', cid }
   }

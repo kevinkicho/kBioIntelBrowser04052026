@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
 import { getClinicalTrialsByName } from '@/lib/api/clinicaltrials'
 import { getChemblIndicationsByName } from '@/lib/api/chembl-indications'
 import { getChemblMechanismsByName } from '@/lib/api/chembl-mechanisms'
@@ -37,7 +37,17 @@ export async function GET(
   let molecule
   try {
     molecule = await getMoleculeById(cid)
-  } catch {
+  } catch (error) {
+    if (error instanceof PubChemUpstreamError) {
+      return NextResponse.json(
+        {
+          error: 'Upstream molecule lookup unavailable',
+          retryable: true,
+          message: error.message,
+        },
+        { status: 502 },
+      )
+    }
     return NextResponse.json({ error: 'Failed to fetch molecule' }, { status: 500 })
   }
   if (!molecule) {

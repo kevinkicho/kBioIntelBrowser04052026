@@ -65,6 +65,7 @@ Agents should read these before changing related behavior.
 | Workbench v1 | `docs/design/discovery-workbench-v1.md` |
 | Workbench v2 (shipped) | `docs/design/discovery-workbench-v2.md` |
 | Workbench v2.1 (hardening) | `docs/design/discovery-workbench-v2.1.md` |
+| Profile revisit cache (history reopen) | `docs/design/profile-revisit-cache.md` |
 | This agent CLI spec | `docs/design/agentic-workflow-cli.md` |
 | Historical plans (non-binding) | `docs/plans/*` |
 | Memory (user prefs) | `memory/MEMORY.md`, `memory/feedback_*.md` |
@@ -111,6 +112,18 @@ Agents should read these before changing related behavior.
 | Analytics POST | `src/app/api/analytics/route.ts` |
 | Analytics summary | `src/app/api/analytics/summary/route.ts` |
 | v2.1 funnel helpers (planned) | `src/lib/analytics/m1Funnel.ts` |
+
+### 2.4.1 Search history + profile revisit cache
+
+| Concern | Path |
+|---|---|
+| History model / localStorage | `src/lib/searchHistory.ts` |
+| History sidebar UI | `src/components/layout/SearchHistorySidebar.tsx` |
+| Session L1 cache (shipped) | `src/lib/profileClientCache.ts` |
+| Category fetch + L1 wire | `src/lib/fetchCategory.ts` |
+| Profile page / refresh bust | `src/app/molecule/[id]/ProfilePageClient.tsx` |
+| Design (Phase A shipped, Phase B IDB) | `docs/design/profile-revisit-cache.md` |
+| Pack IDB (separate — RH packs only) | `src/lib/project/packCache.ts` |
 
 ### 2.5 Tests
 

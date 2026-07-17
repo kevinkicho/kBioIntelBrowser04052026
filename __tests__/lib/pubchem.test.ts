@@ -1,10 +1,12 @@
-import { searchMolecules, getMoleculeById } from '@/lib/api/pubchem'
+import { searchMolecules, getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
+import { clearCache } from '@/lib/cache'
 
 // Mock global fetch
 global.fetch = jest.fn()
 
 beforeEach(() => {
   jest.resetAllMocks()
+  clearCache()
 })
 
 describe('searchMolecules', () => {
@@ -89,8 +91,24 @@ describe('getMoleculeById', () => {
   })
 
   test('returns null when CID not found', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false, status: 404 })
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
+      .mockResolvedValueOnce({ ok: false, status: 404 })
     const result = await getMoleculeById(9999999999)
     expect(result).toBeNull()
+  })
+
+  test('throws PubChemUpstreamError on transient PubChem failure', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+      .mockResolvedValueOnce({ ok: false, status: 503 })
+    await expect(getMoleculeById(3080836)).rejects.toBeInstanceOf(PubChemUpstreamError)
+  })
+
+  test('throws PubChemUpstreamError on network error', async () => {
+    ;(fetch as jest.Mock).mockRejectedValue(new Error('Network error'))
+    await expect(getMoleculeById(3080836)).rejects.toBeInstanceOf(PubChemUpstreamError)
   })
 })

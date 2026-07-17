@@ -1,6 +1,13 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
+import { clientFetch } from '@/lib/clientFetch'
+import {
+  deleteProfileClientCache,
+  getProfileClientCache,
+  profileCacheKey,
+  setProfileClientCache,
+} from '@/lib/profileClientCache'
 
 interface PipelinePhase {
   phase: string
@@ -52,10 +59,26 @@ export function PipelinePanel({ cid }: { cid: number }) {
     async function fetchPipeline() {
       setLoading(true)
       setError(null)
+      const cacheKey = profileCacheKey('pipeline', cid)
+      // Instant reopen from search history / SPA navigation
+      const cached = getProfileClientCache<PipelineData>(cacheKey)
+      if (cached) {
+        if (!cancelled) {
+          setData(cached)
+          setLoading(false)
+        }
+        return
+      }
       try {
-        const res = await fetch(`/api/molecule/${cid}/pipeline`)
+        // Retries cover Fast Refresh route races and flaky PubChem→502.
+        const res = await clientFetch(
+          `/api/molecule/${cid}/pipeline`,
+          undefined,
+          { retries: 2, retryDelayMs: 400 },
+        )
         if (!res.ok) throw new Error(`Failed to fetch pipeline data (${res.status})`)
         const json: PipelineData = await res.json()
+        setProfileClientCache(cacheKey, json)
         if (!cancelled) setData(json)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load pipeline data')
@@ -271,7 +294,10 @@ export function PipelinePanel({ cid }: { cid: number }) {
         </h3>
         <p className="text-xs text-red-400">{error}</p>
         <button
-          onClick={() => { setRetryKey(k => k + 1) }}
+          onClick={() => {
+            deleteProfileClientCache(profileCacheKey('pipeline', cid))
+            setRetryKey((k) => k + 1)
+          }}
           className="text-xs text-indigo-400 hover:text-indigo-300 mt-2"
         >
           Retry

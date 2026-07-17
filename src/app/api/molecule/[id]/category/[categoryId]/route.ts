@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
 import { flushApiMetrics, metricsToSourceStatus } from '@/lib/api-tracker'
@@ -48,6 +48,16 @@ export async function GET(
     molecule = await getMoleculeById(cid)
   } catch (error) {
     console.error(`[api/category] Error fetching molecule ${cid}:`, error)
+    if (error instanceof PubChemUpstreamError) {
+      return NextResponse.json(
+        {
+          error: 'Upstream molecule lookup unavailable',
+          retryable: true,
+          message: error.message,
+        },
+        { status: 502 },
+      )
+    }
     return NextResponse.json({ error: 'Failed to fetch molecule data' }, { status: 500 })
   }
   if (!molecule) {

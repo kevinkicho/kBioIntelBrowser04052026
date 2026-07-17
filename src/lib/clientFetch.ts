@@ -44,10 +44,55 @@ function enqueueMetric(metric: Record<string, unknown>) {
   }
 }
 
+/** Status codes worth retrying (HMR race 404s, rate limits, flaky upstream). */
+const DEFAULT_RETRY_STATUSES = new Set([404, 429, 500, 502, 503])
+
+export interface ClientFetchOptions {
+  /**
+   * Extra attempts after the first try. Shared with in-flight dedupe waiters
+   * so concurrent callers benefit from the same retry chain.
+   */
+  retries?: number
+  /** Base delay in ms before first retry (exponential + jitter). Default 350. */
+  retryDelayMs?: number
+  /** Override which HTTP statuses trigger a retry. */
+  retryStatuses?: number[]
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function shouldRetryStatus(status: number, retryStatuses: Set<number>): boolean {
+  return retryStatuses.has(status)
+}
+
+function metricSource(url: string): string | null {
+  if (url.includes('/category/')) return null
+  if (url.includes('/panel/')) {
+    return 'panel:' + url.split('/panel/')[1]?.split('/')[0]?.split('?')[0]
+  }
+  if (url.includes('/search')) return 'search'
+  if (url.includes('/similar')) return 'similar'
+  if (url.includes('/pipeline')) return 'pipeline'
+  return url
+}
+
+/**
+ * Browser fetch with GET dedupe, optional retries, and dev logging.
+ * Use `retries` for profile/category/pipeline loads that race Fast Refresh
+ * or transient PubChem/upstream failures.
+ */
 export async function clientFetch(
   input: RequestInfo | URL,
   init?: RequestInit,
+  options?: ClientFetchOptions,
 ): Promise<Response> {
+  const retries = Math.max(0, options?.retries ?? 0)
+  const retryDelayMs = options?.retryDelayMs ?? 350
+  const retryStatuses = new Set(options?.retryStatuses ?? DEFAULT_RETRY_STATUSES)
+  const maxAttempts = 1 + retries
+
   const key = getKey(input, init)
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
   const method = init?.method || 'GET'
@@ -65,16 +110,44 @@ export async function clientFetch(
   const start = performance.now()
   if (IS_DEV) console.group(`%c→ ${method} %c${url}`, LOG_STYLE, DIM_STYLE)
 
-  const promise = fetch(input, init).then(response => {
+  const promise = (async (): Promise<Response> => {
+    let lastError: unknown
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const response = await fetch(input, init)
+        if (
+          response.ok ||
+          attempt === maxAttempts - 1 ||
+          !shouldRetryStatus(response.status, retryStatuses)
+        ) {
+          return response
+        }
+        if (IS_DEV) {
+          console.warn(
+            `%c↻ retry ${attempt + 1}/${retries} after ${response.status}`,
+            ERR_STYLE,
+          )
+        }
+        // Drain body so the connection can close cleanly before retry
+        await response.arrayBuffer().catch(() => {})
+        await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
+      } catch (error) {
+        lastError = error
+        if (attempt === maxAttempts - 1) throw error
+        if (IS_DEV) {
+          console.warn(
+            `%c↻ retry ${attempt + 1}/${retries} after network error`,
+            ERR_STYLE,
+          )
+        }
+        await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
+      }
+    }
+    throw lastError instanceof Error ? lastError : new Error('clientFetch failed')
+  })().finally(() => {
     if (isDedupable) {
       inFlight.delete(key)
     }
-    return response
-  }).catch(error => {
-    if (isDedupable) {
-      inFlight.delete(key)
-    }
-    throw error
   })
 
   if (isDedupable) {
@@ -93,15 +166,7 @@ export async function clientFetch(
     const size = response.headers?.get?.('content-length')
     const sizeStr = size ? ` ${Math.round(parseInt(size) / 1024)}KB` : ''
 
-    const source = url.includes('/category/')
-      ? null
-      : url.includes('/panel/')
-        ? 'panel:' + url.split('/panel/')[1]?.split('/')[0]?.split('?')[0]
-        : url.includes('/search')
-          ? 'search'
-          : url.includes('/similar')
-            ? 'similar'
-            : url
+    const source = metricSource(url)
 
     if (source) {
       enqueueMetric({
@@ -129,15 +194,7 @@ export async function clientFetch(
   } catch (error) {
     const duration = Math.round(performance.now() - start)
 
-    const source = url.includes('/category/')
-      ? null
-      : url.includes('/panel/')
-        ? 'panel:' + url.split('/panel/')[1]?.split('/')[0]?.split('?')[0]
-        : url.includes('/search')
-          ? 'search'
-          : url.includes('/similar')
-            ? 'similar'
-            : url
+    const source = metricSource(url)
 
     if (source) {
       enqueueMetric({

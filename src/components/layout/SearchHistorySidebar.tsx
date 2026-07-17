@@ -225,7 +225,7 @@ export function SearchHistorySidebar() {
                       type="button"
                       onClick={() => openEntry(entry, false)}
                       className="min-w-0 flex-1 text-left"
-                      title={`Open ${entry.title} (uses cache when available)`}
+                      title={`Open ${entry.title} (session cache when previously loaded)`}
                     >
                       <div className="flex items-center gap-1.5">
                         <span className="text-[11px]" aria-hidden>

@@ -17,6 +17,7 @@ Coding agents and human implementers: read this before changing product behavior
 - `docs/design/discovery-workbench-v1.md` — product law, metrics M1–M9, beachhead
 - `docs/design/discovery-workbench-v2.md` — loop-completion redesign (shipped)
 - `docs/design/discovery-workbench-v2.1.md` — post-v2 hardening + measurement (active plan)
+- `docs/design/profile-revisit-cache.md` — search-history reopen: session cache (shipped) + IDB durability (Phase B)
 - `docs/design/agentic-workflow-cli.md` — full CLI cookbook, playbooks, API surfaces
 
 ## Canonical code areas
@@ -26,6 +27,7 @@ Coding agents and human implementers: read this before changing product behavior
 - Events: `src/lib/productEvents.ts`
 - Extractors: `src/lib/evidence/extractAll.ts`
 - Search history sidebar: `src/lib/searchHistory.ts`, `src/components/layout/SearchHistorySidebar.tsx`
+- Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/fetchCategory.ts` (session L1; IDB L2 see design)
 
 ## Commands
 
