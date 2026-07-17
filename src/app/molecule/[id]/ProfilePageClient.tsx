@@ -873,7 +873,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           />
         )
       },
-      'ncats-translator': (panelId, lastFetched) => {
+      'ncats-translator': () => {
         const raw = d('translatorData')
         const associations = (raw?.data?.associations ??
           (Array.isArray(raw) ? raw : [])) as TranslatorAssociation[]
@@ -884,7 +884,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           />
         )
       },
-      'nhgri-anvil': (panelId, lastFetched) => {
+      'nhgri-anvil': () => {
         const raw = d('anvilData')
         const datasets = (raw?.data?.datasets ?? (Array.isArray(raw) ? raw : [])) as AnvilDataset[]
         return (
@@ -915,7 +915,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           />
         )
       },
-      'ninds-neurommsig': (panelId, lastFetched) => {
+      'ninds-neurommsig': () => {
         const raw = d('neuroMMSigData')
         const signatures = (raw?.data?.signatures ??
           (Array.isArray(raw) ? raw : [])) as NeuroMMSigSignature[]

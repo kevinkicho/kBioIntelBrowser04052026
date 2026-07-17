@@ -334,7 +334,15 @@ export function GeneDetailPageClient(props: GeneDetailPageClientProps) {
   )
 }
 
-function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, typeOfGene, aliases, ensemblId, uniprotId }: GeneDetailPageClientProps) {
+function GeneDetailPageClientInner({
+  geneId,
+  symbol,
+  name,
+  chromosome,
+  typeOfGene,
+  ensemblId,
+  uniprotId,
+}: GeneDetailPageClientProps) {
   const searchParams = useSearchParams()
   const router = useRouter()
   const initialTab = searchParams.get('tab') || 'gene-overview'
