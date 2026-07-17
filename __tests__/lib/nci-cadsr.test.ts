@@ -1,30 +1,14 @@
 "use strict"
 import { fetchCadsrData } from '@/lib/api/nci-cadsr'
-import { getApiKey } from '@/lib/api/utils'
-import { isApiSourceDisabled } from '@/lib/api/sourceAvailability'
-
-jest.mock('@/lib/api/utils', () => ({
-  ...jest.requireActual('@/lib/api/utils'),
-  getApiKey: jest.fn(() => 'fake-api-key'),
-}))
-
-jest.mock('@/lib/api/sourceAvailability', () => ({
-  isApiSourceDisabled: jest.fn(),
-  getApiSourceDisabledReason: jest.fn(),
-  DISABLED_API_SOURCES: {},
-}))
 
 global.fetch = jest.fn()
 beforeEach(() => {
   jest.resetAllMocks()
-  ;(getApiKey as jest.Mock).mockReturnValue(null)
-  ;(isApiSourceDisabled as jest.Mock).mockReturnValue(false)
 })
 
-describe('fetchCadsrData', () => {
-  test('returns empty without fetch when source is disabled', async () => {
-    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(true)
-    const response = await fetchCadsrData('melanoma')
+describe('fetchCadsrData (NCI EVS)', () => {
+  test('returns empty for short query without fetch', async () => {
+    const response = await fetchCadsrData('a')
     expect(response.data.concepts).toEqual([])
     expect(fetch).not.toHaveBeenCalled()
   })
@@ -36,12 +20,17 @@ describe('fetchCadsrData', () => {
       json: async () => ({
         concepts: [
           {
-            conceptId: 'C0025202',
-            preferredName: 'Melanoma',
-            definition: 'A malignant neoplasm derived from cells that are capable of forming melanin.',
-            context: 'Neoplastic Process',
-            workflowStatus: 'RELEASED',
-            evsSource: 'NCI',
+            code: 'C0025202',
+            name: 'Melanoma',
+            terminology: 'ncit',
+            conceptStatus: 'DEFAULT',
+            active: true,
+            definitions: [
+              {
+                definition:
+                  'A malignant neoplasm derived from cells that are capable of forming melanin.',
+              },
+            ],
           },
         ],
       }),
@@ -51,8 +40,14 @@ describe('fetchCadsrData', () => {
     expect(results).toHaveLength(1)
     expect(results[0].preferredName).toBe('Melanoma')
     expect(results[0].conceptId).toBe('C0025202')
-    expect(results[0].definition).toBe('A malignant neoplasm derived from cells that are capable of forming melanin.')
-    expect(results[0].context).toBe('Neoplastic Process')
+    expect(results[0].definition).toBe(
+      'A malignant neoplasm derived from cells that are capable of forming melanin.',
+    )
+    expect(results[0].context).toBe('ncit')
+    expect(fetch).toHaveBeenCalledWith(
+      expect.stringContaining('api-evsrest.nci.nih.gov'),
+      expect.any(Object),
+    )
   })
 
   test('returns empty array when API response is not ok', async () => {
@@ -79,4 +74,4 @@ describe('fetchCadsrData', () => {
     const response = await fetchCadsrData('melanoma')
     expect(response.data.concepts).toEqual([])
   })
-});
+})

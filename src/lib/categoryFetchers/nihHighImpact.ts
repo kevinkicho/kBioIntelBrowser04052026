@@ -8,19 +8,19 @@ import { fetchImmPortData } from '@/lib/api/niaid-immport'
 import { fetchNeuroMMSigData } from '@/lib/api/ninds-neurommsig'
 
 /**
- * NIH High-Impact category. Disabled sources (see sourceAvailability) short-circuit
- * to empty without network calls so they don't burn timeout budget or log noise.
+ * NIH High-Impact category.
+ * nci-cadsr (EVS) and niaid-immport are live free paths; other sources may still
+ * short-circuit via sourceAvailability when disabled.
  */
 export async function fetchNihHighImpact(name: string, queryFor: (s: string) => string) {
   const tasks: Array<Promise<unknown>> = []
 
-  // Always call disabled clients through trackedSafe so analytics still records
-  // empty panels — they return immediately without fetch.
   tasks.push(
     isApiSourceDisabled('ncats-translator')
       ? Promise.resolve(null)
       : trackedSafe('ncats-translator', fetchTranslatorData(queryFor('ncats-translator')), null),
   )
+  // Free NCI EVS REST (NCIt) — caDSR-adjacent panel
   tasks.push(
     trackedSafe('nci-cadsr', fetchCadsrData(queryFor('nci-cadsr')), null),
   )
@@ -29,6 +29,7 @@ export async function fetchNihHighImpact(name: string, queryFor: (s: string) => 
       ? Promise.resolve(null)
       : trackedSafe('nhgri-anvil', fetchAnvilData(queryFor('nhgri-anvil')), null),
   )
+  // Free ImmPort Shared Data Search API
   tasks.push(
     trackedSafe('niaid-immport', fetchImmPortData(queryFor('niaid-immport')), null),
   )

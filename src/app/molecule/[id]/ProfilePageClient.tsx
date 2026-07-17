@@ -834,7 +834,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'unichem': (panelId, lastFetched) => <LazyPanels.LazyUniChemPanel mappings={d('unichemMappings')} panelId={panelId} lastFetched={lastFetched} />,
       'foodb': (panelId, lastFetched) => <LazyPanels.LazyFooDBPanel compounds={d('foodbCompounds')} panelId={panelId} lastFetched={lastFetched} />,
       'lincs': (panelId, lastFetched) => <LazyPanels.LazyLINCSPanel signatures={d('lincsSignatures')} panelId={panelId} lastFetched={lastFetched} />,
-      // Disabled source (no public API) — still visible as next work target
       'ttd': (panelId, lastFetched) => (
         <LazyPanels.LazyTTDPanel
           targets={d('ttdTargets') ?? []}
@@ -853,16 +852,15 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'biomodels': (panelId, lastFetched) => <LazyPanels.LazyBioModelsPanel models={d('bioModelsModels')} panelId={panelId} lastFetched={lastFetched} />,
       'biosamples': (panelId, lastFetched) => <LazyPanels.LazyBioSamplesPanel samples={d('bioSamples')} panelId={panelId} lastFetched={lastFetched} />,
       'massive': (panelId, lastFetched) => <LazyPanels.LazyMassivePanel datasets={d('massiveDatasets')} panelId={panelId} lastFetched={lastFetched} />,
-      // Disabled / incomplete public APIs — always visible as “Next work” (not hidden)
       'nci-cadsr': (panelId, lastFetched) => {
         if (isPanelSourceDisabled('nci-cadsr')) {
           return (
             <Panel
               panelId={panelId}
-              title="NCI caDSR"
+              title="NCI caDSR / EVS"
               lastFetched={lastFetched}
               loadStatus="disabled"
-              empty="No live public caDSR endpoint configured."
+              empty="No live public endpoint configured."
             />
           )
         }

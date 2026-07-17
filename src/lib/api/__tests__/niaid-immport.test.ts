@@ -1,66 +1,67 @@
+/**
+ * ImmPort Shared Data Search API (hits/hits Elastic-style response).
+ */
+
 import { fetchImmPortData } from '@/lib/api/niaid-immport'
-import { isApiSourceDisabled } from '@/lib/api/sourceAvailability'
 
-jest.mock('@/lib/api/sourceAvailability', () => ({
-  isApiSourceDisabled: jest.fn(),
-  getApiSourceDisabledReason: jest.fn(),
-  DISABLED_API_SOURCES: {},
-}))
-
-function mockJsonFetch(body: unknown, ok = true) {
+function mockJsonFetch(body: unknown, ok = true, contentType = 'application/json') {
   const text = JSON.stringify(body)
   return {
     ok,
-    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
     text: async () => text,
     json: async () => body,
   }
 }
 
-global.fetch = jest.fn()
-
 describe('NIAID ImmPort API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(false)
+    global.fetch = jest.fn()
   })
 
-  it('skips network when source is disabled', async () => {
-    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(true)
-    const result = await fetchImmPortData('test')
-    expect(fetch).not.toHaveBeenCalled()
-    expect(result.data.studies).toEqual([])
-  })
-
-  it('should fetch and parse NIAID ImmPort data', async () => {
+  it('should fetch and parse ImmPort study hits', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonFetch({
-        studies: [
-          {
-            study_id: '12345',
-            title: 'Test Study',
-            description: 'Test description',
-            study_type: 'Clinical Trial',
-            condition_studied: 'Test Condition',
-            intervention: 'Test Intervention',
-            participant_count: 50,
-            arms: ['Arm A', 'Arm B'],
-            reagents: ['Reagent 1'],
-          },
-        ],
+        hits: {
+          total: { value: 1 },
+          hits: [
+            {
+              _id: 'SDY1',
+              _source: {
+                study_accession: 'SDY1',
+                brief_title: 'Test Study',
+                brief_description: 'Test description',
+                condition_or_disease: ['COVID-19'],
+                clinical_trial: 'Y',
+                actual_enrollment: 50,
+                arm_name: ['Arm A', 'Arm B'],
+                research_focus: ['Vaccine Response'],
+              },
+            },
+          ],
+        },
       }),
     )
 
-    const result = await fetchImmPortData('test')
+    const result = await fetchImmPortData('covid')
 
     expect(fetch).toHaveBeenCalledWith(
-      expect.stringContaining('immport.org'),
+      expect.stringContaining('immport.org/data/query/api/search/study'),
       expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     )
     expect(result.source).toBe('NIAID ImmPort')
     expect(result.data.studies).toHaveLength(1)
-    expect(result.data.studies[0].studyId).toBe('12345')
+    expect(result.data.studies[0].studyId).toBe('SDY1')
+    expect(result.data.studies[0].title).toBe('Test Study')
+    expect(result.data.studies[0].participantCount).toBe(50)
     expect(result.timestamp).toBeTruthy()
+  })
+
+  it('returns empty for short query without network', async () => {
+    const result = await fetchImmPortData('x')
+    expect(fetch).not.toHaveBeenCalled()
+    expect(result.data.studies).toEqual([])
   })
 
   it('should handle empty results gracefully', async () => {
@@ -69,6 +70,16 @@ describe('NIAID ImmPort API', () => {
     const result = await fetchImmPortData('nonexistent')
 
     expect(result.source).toBe('NIAID ImmPort')
+    expect(result.data.studies).toEqual([])
+  })
+
+  it('rejects HTML responses', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      headers: { get: () => 'text/html' },
+      text: async () => '<!doctype html><html></html>',
+    })
+    const result = await fetchImmPortData('test')
     expect(result.data.studies).toEqual([])
   })
 

@@ -1,18 +1,19 @@
 /**
- * Known-broken, stub, or non-API sources that should not be called on every molecule load.
- * Returning empty without a network round-trip avoids DNS/HTML noise and timeout budget waste.
+ * Sources that must not be called (broken host / no viable free JSON).
  *
- * Panels for these sources stay **visible but disabled** with a “Next work target” tooltip
- * (do not hide them). Re-enable by removing from this map after verifying a live JSON endpoint.
+ * After enabling a live free path, **remove** the key from this map.
+ * Panels for remaining keys stay visible as “Next work” (not hidden).
+ *
+ * Status (2026-07):
+ * - ttd: ENABLED — BioThings TTD KP (biothings.ncats.io/ttd)
+ * - nci-cadsr: ENABLED — NCI EVS REST (api-evsrest.nci.nih.gov NCIt)
+ * - niaid-immport: ENABLED — ImmPort Shared Data Search API
+ * - dfdb / phytohub: ENABLED via FooDB free public API substitute
  */
+
 export const DISABLED_API_SOURCES: Record<string, string> = {
-  'nci-cadsr':
-    'Next work target: NCI caDSR host does not resolve — need updated public JSON endpoint',
-  'niaid-immport':
-    'Next work target: ImmPort search returns HTML, not a documented public JSON API',
-  ttd: 'Next work target: Therapeutic Target Database has no free public REST API (FTP dumps only)',
-  dfdb: 'Next work target: Dietary Flavonoid Database has no public REST API',
-  phytohub: 'Next work target: PhytoHub has no public REST API',
+  // Empty map: all previously blocked sources now have free public paths.
+  // Re-add keys here if an upstream dies again.
 }
 
 /** panelId often matches source id; map when they diverge. */

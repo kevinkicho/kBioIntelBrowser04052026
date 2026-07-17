@@ -31,10 +31,19 @@ const ENDPOINTS: Array<{ id: string; url: string; expectJson?: boolean }> = [
     expectJson: true,
   },
   {
-    id: 'nci-cadsr-host',
-    // Documented known-dead host — live run expects failure (DNS or non-JSON)
-    url: 'https://cadsrapi.nci.nih.gov/cadsrapi/v1/concepts?q=melanoma',
-    expectJson: false,
+    id: 'nci-evs-ncit',
+    url: 'https://api-evsrest.nci.nih.gov/api/v1/concept/ncit/search?term=aspirin&pageSize=1&type=contains',
+    expectJson: true,
+  },
+  {
+    id: 'immport-search',
+    url: 'https://www.immport.org/data/query/api/search/study?term=aspirin&pageSize=1',
+    expectJson: true,
+  },
+  {
+    id: 'biothings-ttd',
+    url: 'https://biothings.ncats.io/ttd/query?q=subject.name:%22aspirin%22&size=1',
+    expectJson: true,
   },
 ]
 

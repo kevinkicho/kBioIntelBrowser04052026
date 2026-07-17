@@ -1,6 +1,14 @@
-import { getApiKey, standardizeResponse } from "./utils"
-import { z } from "zod"
-import { isApiSourceDisabled } from "./sourceAvailability"
+/**
+ * NCI terminology concepts via free public EVS REST API
+ * (replacement for dead cadsrapi.nci.nih.gov host).
+ * @see https://api-evsrest.nci.nih.gov/
+ *
+ * Panel remains labeled NCI caDSR-adjacent; data is NCI Thesaurus (NCIt) free public concepts.
+ * Never invents rows.
+ */
+
+import { standardizeResponse } from './utils'
+import { z } from 'zod'
 
 const CadsrConceptSchema = z.object({
   conceptId: z.string(),
@@ -20,53 +28,61 @@ export type CadsrResponse = z.infer<typeof CadsrResponseSchema>
 
 const EMPTY = (): ReturnType<typeof standardizeResponse<CadsrResponse>> => ({
   data: { concepts: [] },
-  source: 'NCI caDSR',
+  source: 'NCI EVS (NCIt)',
   timestamp: new Date().toISOString(),
 })
 
-export async function fetchCadsrData(query: string): Promise<ReturnType<typeof standardizeResponse<CadsrResponse>>> {
-  // Known-dead host — skip network until endpoint is updated (see sourceAvailability.ts)
-  if (isApiSourceDisabled('nci-cadsr')) {
-    return EMPTY()
-  }
+const EVS_SEARCH =
+  'https://api-evsrest.nci.nih.gov/api/v1/concept/ncit/search'
 
-  const apiKey = getApiKey('NCI_CADSR_API_KEY')
+export async function fetchCadsrData(
+  query: string,
+): Promise<ReturnType<typeof standardizeResponse<CadsrResponse>>> {
+  const q = query.trim()
+  if (q.length < 2) return EMPTY()
 
   try {
-    const baseUrl = 'https://cadsrapi.nci.nih.gov/cadsrapi/v1/concepts'
-    const url = new URL(baseUrl)
-    url.searchParams.append('q', query)
-    if (apiKey) url.searchParams.append('api_key', apiKey)
+    const url = new URL(EVS_SEARCH)
+    url.searchParams.set('term', q)
+    url.searchParams.set('include', 'minimal,summary')
+    url.searchParams.set('pageSize', '15')
+    url.searchParams.set('type', 'contains')
 
     const response = await fetch(url.toString(), {
       headers: { Accept: 'application/json' },
-      cache: 'no-store',
+      next: { revalidate: 86400 },
     })
-    if (!response.ok) {
-      return EMPTY()
-    }
+    if (!response.ok) return EMPTY()
 
     const contentType = (response.headers.get('content-type') || '').toLowerCase()
-    if (contentType.includes('text/html')) {
-      return EMPTY()
+    if (contentType.includes('text/html')) return EMPTY()
+
+    const data = (await response.json()) as {
+      concepts?: Array<Record<string, unknown>>
+      total?: number
     }
+    const list = Array.isArray(data.concepts) ? data.concepts : []
 
-    const data = await response.json()
-    const concepts = Array.isArray(data) ? data : (data.concepts ?? data.results ?? [])
-
-    const parsedConcepts = concepts.slice(0, 10).map((c: Record<string, unknown>) => ({
-      conceptId: String(c.conceptId || c.id || c.longName || ''),
-      preferredName: String(c.preferredName || c.name || c.label || ''),
-      definition: String(c.definition || c.preferredDefinition || ''),
-      context: String(c.context || c.workflowStatus || ''),
-      workflowStatus: String(c.workflowStatus || c.status || ''),
-      evsSource: String(c.evsSource || c.source || ''),
+    const concepts = list.slice(0, 15).map((c) => ({
+      conceptId: String(c.code || c.conceptId || c.id || ''),
+      preferredName: String(c.name || c.preferredName || ''),
+      definition: String(
+        (c.definitions as Array<{ definition?: string }> | undefined)?.[0]?.definition ||
+          c.definition ||
+          '',
+      ),
+      context: String(c.terminology || 'ncit'),
+      workflowStatus: String(c.conceptStatus || (c.active === false ? 'INACTIVE' : 'ACTIVE')),
+      evsSource: String(c.version || c.terminology || 'NCI Thesaurus'),
     }))
 
-    const parsedData = CadsrResponseSchema.parse({ concepts: parsedConcepts })
-    return { data: parsedData, source: 'NCI caDSR', timestamp: new Date().toISOString() }
+    const parsedData = CadsrResponseSchema.parse({ concepts })
+    return {
+      data: parsedData,
+      source: 'NCI EVS (NCIt)',
+      timestamp: new Date().toISOString(),
+    }
   } catch {
-    // Silent empty — avoid console spam for optional NIH sources
     return EMPTY()
   }
 }

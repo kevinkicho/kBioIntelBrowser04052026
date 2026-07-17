@@ -1,19 +1,8 @@
-jest.mock('@/lib/api/utils', () => ({
-  ...jest.requireActual('@/lib/api/utils'),
-  getApiKey: jest.fn(),
-}))
-
-jest.mock('@/lib/api/sourceAvailability', () => ({
-  isApiSourceDisabled: jest.fn(),
-  getApiSourceDisabledReason: jest.fn(),
-  DISABLED_API_SOURCES: {},
-}))
+/**
+ * NCI caDSR panel uses free NCI EVS REST (NCIt) after cadsrapi host died.
+ */
 
 import { fetchCadsrData } from '@/lib/api/nci-cadsr'
-import { getApiKey } from '@/lib/api/utils'
-import { isApiSourceDisabled } from '@/lib/api/sourceAvailability'
-
-const mockGetApiKey = getApiKey as jest.Mock
 
 function mockJsonFetch(body: unknown, ok = true) {
   return {
@@ -23,59 +12,46 @@ function mockJsonFetch(body: unknown, ok = true) {
   }
 }
 
-describe('NCI caDSR API', () => {
+describe('NCI EVS (caDSR panel) API', () => {
   beforeEach(() => {
     jest.clearAllMocks()
-    mockGetApiKey.mockReturnValue('test-key')
-    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(false)
+    global.fetch = jest.fn()
   })
 
-  it('skips network when source is disabled', async () => {
-    ;(isApiSourceDisabled as jest.Mock).mockReturnValue(true)
-    const result = await fetchCadsrData('test')
-    expect(global.fetch).not.toHaveBeenCalled()
-    expect(result.data.concepts).toEqual([])
-  })
-
-  it('should fetch and parse NCI caDSR data', async () => {
+  it('should fetch and map EVS concepts', async () => {
     ;(global.fetch as jest.Mock) = jest.fn().mockResolvedValueOnce(
       mockJsonFetch({
         concepts: [
           {
-            conceptId: '12345',
-            preferredName: 'Test Concept',
-            definition: 'Test definition',
-            context: 'Test Context',
-            workflowStatus: 'RELEASED',
-            evsSource: 'NCI',
+            code: 'C287',
+            name: 'Aspirin',
+            terminology: 'ncit',
+            version: '26.06e',
+            conceptStatus: 'DEFAULT',
+            active: true,
+            definitions: [{ definition: 'A salicylate NSAID.' }],
           },
         ],
       }),
     )
 
-    const result = await fetchCadsrData('test')
+    const result = await fetchCadsrData('aspirin')
 
     expect(global.fetch).toHaveBeenCalledWith(
-      'https://cadsrapi.nci.nih.gov/cadsrapi/v1/concepts?q=test&api_key=test-key',
+      expect.stringContaining('api-evsrest.nci.nih.gov'),
       expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
     )
-    expect(result.source).toBe('NCI caDSR')
+    expect(result.source).toBe('NCI EVS (NCIt)')
     expect(result.data.concepts).toHaveLength(1)
-    expect(result.data.concepts[0].conceptId).toBe('12345')
-    expect(result.data.concepts[0].preferredName).toBe('Test Concept')
+    expect(result.data.concepts[0].conceptId).toBe('C287')
+    expect(result.data.concepts[0].preferredName).toBe('Aspirin')
+    expect(result.data.concepts[0].definition).toContain('salicylate')
     expect(result.timestamp).toBeTruthy()
   })
 
-  it('should not include api_key when none provided', async () => {
-    mockGetApiKey.mockReturnValue(undefined)
-    ;(global.fetch as jest.Mock) = jest.fn().mockResolvedValueOnce(mockJsonFetch({ concepts: [] }))
-
-    const result = await fetchCadsrData('test')
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      'https://cadsrapi.nci.nih.gov/cadsrapi/v1/concepts?q=test',
-      expect.any(Object),
-    )
+  it('returns empty for short query without network', async () => {
+    const result = await fetchCadsrData('a')
+    expect(global.fetch).not.toHaveBeenCalled()
     expect(result.data.concepts).toEqual([])
   })
 
@@ -83,7 +59,13 @@ describe('NCI caDSR API', () => {
     ;(global.fetch as jest.Mock) = jest.fn().mockRejectedValueOnce(new Error('API error'))
     const result = await fetchCadsrData('test')
 
-    expect(result.source).toBe('NCI caDSR')
+    expect(result.source).toBe('NCI EVS (NCIt)')
+    expect(result.data.concepts).toEqual([])
+  })
+
+  it('returns empty when response is not ok', async () => {
+    ;(global.fetch as jest.Mock) = jest.fn().mockResolvedValueOnce(mockJsonFetch({}, false))
+    const result = await fetchCadsrData('test')
     expect(result.data.concepts).toEqual([])
   })
 })

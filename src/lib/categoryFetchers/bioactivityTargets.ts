@@ -14,6 +14,7 @@ import { getDiseaseAssociationsByName } from '@/lib/api/opentargets'
 import { getCTDData } from '@/lib/api/ctd'
 import { getIEDBData } from '@/lib/api/iedb'
 import { getLINCSSignaturesByName } from '@/lib/api/lincs'
+import { getTTDData } from '@/lib/api/ttd'
 
 
 export async function fetchBioactivityTargets(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
@@ -30,6 +31,7 @@ export async function fetchBioactivityTargets(name: string, queryFor: (s: string
     ctdData,
     iedbData,
     lincsSignatures,
+    ttdData,
   ] = await Promise.all([
     trackedSafe('chembl', getChemblActivitiesByName(queryFor('chembl'), chemblLimit), [], API_SOURCE_TIMEOUTS['chembl']),
     trackedSafe('bioassay', getBioAssaysByName(queryFor('bioassay')), []),
@@ -55,6 +57,7 @@ export async function fetchBioactivityTargets(name: string, queryFor: (s: string
     trackedSafe('ctd', getCTDData(queryFor('ctd'), false), { interactions: [], diseaseAssociations: [] }),
     trackedSafe('iedb', getIEDBData(queryFor('iedb')), { epitopes: [] }),
     trackedSafe('lincs', getLINCSSignaturesByName(queryFor('lincs')), [], API_SOURCE_TIMEOUTS['lincs']),
+    trackedSafe('ttd', getTTDData(queryFor('ttd') || name), { targets: [], drugs: [] }),
   ])
   return {
     chemblActivities,
@@ -69,5 +72,7 @@ export async function fetchBioactivityTargets(name: string, queryFor: (s: string
     ctdDiseaseAssociations: ctdData.diseaseAssociations,
     iedbEpitopes: iedbData.epitopes,
     lincsSignatures,
+    ttdTargets: ttdData.targets,
+    ttdDrugs: ttdData.drugs,
   }
 }
