@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAI } from '@/lib/ai/useAI'
 import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
@@ -47,6 +47,9 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   const [keyHint, setKeyHint] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [validationHint, setValidationHint] = useState<string | null>(null)
+  /** Flash animation when connection becomes available */
+  const [celebrateConnect, setCelebrateConnect] = useState(false)
+  const prevStatusRef = useRef(ai.status)
 
   useEffect(() => {
     if (!isOpen) return
@@ -57,7 +60,21 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
     setApiKeyInput('')
     setKeyHint(null)
     setShowApiKey(false)
+    setCelebrateConnect(false)
+    prevStatusRef.current = ai.status
   }, [isOpen, ai.ollamaUrl])
+
+  // Celebrate transition → available (fresh connect / reconnect)
+  useEffect(() => {
+    if (!isOpen) return
+    const prev = prevStatusRef.current
+    prevStatusRef.current = ai.status
+    if (ai.status === 'available' && prev !== 'available') {
+      setCelebrateConnect(true)
+      const t = window.setTimeout(() => setCelebrateConnect(false), 2800)
+      return () => window.clearTimeout(t)
+    }
+  }, [isOpen, ai.status])
 
   useEffect(() => {
     if (!isOpen) return
@@ -267,14 +284,71 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
             )}
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
-            <span className={`h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
-            <span className={`truncate text-[11px] ${statusTextClass}`}>{statusLabel}</span>
-          </div>
-          {ai.statusNote && ai.status === 'available' && (
-            <p className="text-[11px] font-medium text-emerald-400" data-testid="ai-status-note">
-              {ai.statusNote}
-            </p>
+          {ai.status === 'available' ? (
+            <div
+              role="status"
+              aria-live="polite"
+              data-testid="ai-connected-banner"
+              className={`relative overflow-hidden rounded-xl border px-3.5 py-3 transition-all duration-500 ${
+                celebrateConnect
+                  ? 'border-emerald-400/70 bg-gradient-to-r from-emerald-950/90 via-emerald-900/50 to-emerald-950/80 shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/40 scale-[1.02]'
+                  : 'border-emerald-800/50 bg-emerald-950/40 shadow-md shadow-emerald-900/20'
+              }`}
+            >
+              {celebrateConnect && (
+                <span
+                  className="pointer-events-none absolute inset-0 animate-pulse bg-emerald-400/10"
+                  aria-hidden
+                />
+              )}
+              <div className="relative flex items-start gap-3">
+                <span className="relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center">
+                  <span
+                    className={`absolute inline-flex h-full w-full rounded-full bg-emerald-400/40 ${
+                      celebrateConnect ? 'animate-ping' : ''
+                    }`}
+                    aria-hidden
+                  />
+                  <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm shadow-emerald-500/50">
+                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className={`text-sm font-semibold tracking-tight text-emerald-200 ${
+                      celebrateConnect ? 'animate-[pulse_1.2s_ease-in-out_2]' : ''
+                    }`}
+                  >
+                    Connected
+                  </p>
+                  <p className="mt-0.5 truncate font-mono text-[11px] text-emerald-300/80" title={ai.ollamaUrl}>
+                    {statusLabel.replace(/^Connected to /, '')}
+                  </p>
+                  {ai.statusNote && (
+                    <p
+                      className={`mt-1.5 text-xs font-medium text-emerald-300 ${
+                        celebrateConnect ? 'animate-[pulse_1.2s_ease-in-out_2]' : ''
+                      }`}
+                      data-testid="ai-status-note"
+                    >
+                      {ai.statusNote}
+                    </p>
+                  )}
+                  {ai.model && (
+                    <p className="mt-1 text-[10px] text-emerald-500/80">
+                      Model: <span className="font-mono text-emerald-400/90">{ai.model}</span>
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
+              <span className={`h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
+              <span className={`truncate text-[11px] ${statusTextClass}`}>{statusLabel}</span>
+            </div>
           )}
 
           {/* Per-user Ollama Cloud API key */}
