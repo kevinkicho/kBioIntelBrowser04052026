@@ -1,11 +1,9 @@
 import type { PhytoHubCompound } from '../types'
 
 /**
- * Search PhytoHub for dietary phytochemicals
- * PhytoHub contains information on phytochemicals found in plant-based foods
- * Note: PhytoHub does not have a public REST API - placeholder for future integration
+ * PhytoHub has no public REST API. Always empty — never invent phytochemical rows.
+ * Kept so imports do not break; source is disabled in sourceAvailability.
  */
 export async function searchPhytoHub(): Promise<PhytoHubCompound[]> {
-  // Placeholder - PhytoHub doesn't have a public REST API
   return []
 }

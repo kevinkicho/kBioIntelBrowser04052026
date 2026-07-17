@@ -73,7 +73,7 @@ const PANEL_FIELDS: Record<string, string[]> = {
   ctd: ['Gene', 'Interaction', 'Evidence', 'PMID'],
   iedb: ['Epitope', 'Organism', 'Assay Type', 'Response'],
   lincs: ['Perturbation', 'Cell Line', 'Z-Score', 'Dose'],
-  ttd: ['Target', 'Drug', 'Clinical Status'],
+
   uniprot: ['Protein', 'Gene', 'Organism', 'Accession', 'Function'],
   'uniprot-extended': ['Protein', 'Mass', 'Length', 'Domains'],
   interpro: ['Type', 'Name', 'Description'],

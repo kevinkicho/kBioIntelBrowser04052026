@@ -1,11 +1,9 @@
 import type { DFDBFlavonoid } from '../types'
 
 /**
- * Search DFDB for dietary flavonoids
- * DFDB is the Dietary Flavonoid Database
- * Note: DFDB does not have a public REST API - placeholder for future integration
+ * DFDB has no public REST API. Always empty — never invent flavonoid rows.
+ * Kept so imports do not break; source is disabled in sourceAvailability.
  */
 export async function searchDFDB(): Promise<DFDBFlavonoid[]> {
-  // Placeholder - DFDB doesn't have a public REST API
   return []
 }

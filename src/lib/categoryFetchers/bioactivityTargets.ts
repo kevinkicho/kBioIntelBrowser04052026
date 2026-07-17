@@ -14,23 +14,47 @@ import { getDiseaseAssociationsByName } from '@/lib/api/opentargets'
 import { getCTDData } from '@/lib/api/ctd'
 import { getIEDBData } from '@/lib/api/iedb'
 import { getLINCSSignaturesByName } from '@/lib/api/lincs'
-import { getTTDData } from '@/lib/api/ttd'
+
 
 export async function fetchBioactivityTargets(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const chemblLimit = getApiParamNumber(apiParams, 'chembl', 'maxResults', 20)
-  const [chemblActivities, bioAssays, chemblMechanisms, pharmacologyTargets, bindingAffinities, pharosTargets, drugGeneInteractions, diseaseAssociations, ctdData, iedbData, lincsSignatures, ttdData] = await Promise.all([
+  const [
+    chemblActivities,
+    bioAssays,
+    chemblMechanisms,
+    pharmacologyTargets,
+    bindingAffinities,
+    pharosTargets,
+    drugGeneInteractions,
+    diseaseAssociations,
+    ctdData,
+    iedbData,
+    lincsSignatures,
+  ] = await Promise.all([
     trackedSafe('chembl', getChemblActivitiesByName(queryFor('chembl'), chemblLimit), [], API_SOURCE_TIMEOUTS['chembl']),
     trackedSafe('bioassay', getBioAssaysByName(queryFor('bioassay')), []),
-    trackedSafe('chembl-mechanisms', getChemblMechanismsByName(queryFor('chembl-mechanisms'), getApiParamNumber(apiParams, 'chembl-mechanisms', 'maxResults', 20)), [], API_SOURCE_TIMEOUTS['chembl-mechanisms']),
+    trackedSafe(
+      'chembl-mechanisms',
+      getChemblMechanismsByName(
+        queryFor('chembl-mechanisms'),
+        getApiParamNumber(apiParams, 'chembl-mechanisms', 'maxResults', 20),
+      ),
+      [],
+      API_SOURCE_TIMEOUTS['chembl-mechanisms'],
+    ),
     trackedSafe('iuphar', getPharmacologyTargetsByName(queryFor('iuphar')), []),
     trackedSafe('bindingdb', getBindingAffinitiesByName(queryFor('bindingdb')), []),
     trackedSafe('pharos', getPharosTargetsByName(queryFor('pharos')), []),
     trackedSafe('dgidb', getDrugGeneInteractionsByName(queryFor('dgidb')), []),
-    trackedSafe('opentargets', getDiseaseAssociationsByName(queryFor('opentargets')), [], API_SOURCE_TIMEOUTS['opentargets']),
+    trackedSafe(
+      'opentargets',
+      getDiseaseAssociationsByName(queryFor('opentargets')),
+      [],
+      API_SOURCE_TIMEOUTS['opentargets'],
+    ),
     trackedSafe('ctd', getCTDData(queryFor('ctd'), false), { interactions: [], diseaseAssociations: [] }),
     trackedSafe('iedb', getIEDBData(queryFor('iedb')), { epitopes: [] }),
     trackedSafe('lincs', getLINCSSignaturesByName(queryFor('lincs')), [], API_SOURCE_TIMEOUTS['lincs']),
-    trackedSafe('ttd', getTTDData(queryFor('ttd')), { targets: [], drugs: [] }),
   ])
   return {
     chemblActivities,
@@ -45,7 +69,5 @@ export async function fetchBioactivityTargets(name: string, queryFor: (s: string
     ctdDiseaseAssociations: ctdData.diseaseAssociations,
     iedbEpitopes: iedbData.epitopes,
     lincsSignatures,
-    ttdTargets: ttdData.targets,
-    ttdDrugs: ttdData.drugs,
   }
 }

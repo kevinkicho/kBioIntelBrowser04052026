@@ -257,22 +257,27 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
         </p>
       </form>
 
-      <div className="flex flex-wrap justify-center gap-2">
-        {EXAMPLE_DISEASES.map((d) => (
-          <button
-            key={d}
-            type="button"
-            onClick={() => {
-              setQuery(d)
-              setOpen(false)
-              onSearch(d)
-            }}
-            disabled={isLoading}
-            className="text-xs px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-indigo-300 hover:border-indigo-600/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-          >
-            {d}
-          </button>
-        ))}
+      <div className="mt-1">
+        <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">
+          Try a live public disease query
+        </p>
+        <div className="flex flex-wrap justify-center gap-2">
+          {EXAMPLE_DISEASES.map((d) => (
+            <button
+              key={d}
+              type="button"
+              onClick={() => {
+                setQuery(d)
+                setOpen(false)
+                onSearch(d)
+              }}
+              disabled={isLoading}
+              className="text-xs px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-indigo-300 hover:border-indigo-600/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              {d}
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   )

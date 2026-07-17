@@ -5,13 +5,13 @@ describe('CATEGORIES', () => {
     expect(Object.keys(CATEGORIES)).toHaveLength(5)
   })
 
-  test('each category has title, description, and molecules array', () => {
+  test('each category has title, description, and live starterQueries', () => {
     for (const slug of Object.keys(CATEGORIES)) {
       const cat = CATEGORIES[slug]
       expect(cat.title).toBeTruthy()
       expect(cat.description).toBeTruthy()
-      expect(Array.isArray(cat.molecules)).toBe(true)
-      expect(cat.molecules.length).toBeGreaterThan(0)
+      expect(Array.isArray(cat.starterQueries)).toBe(true)
+      expect(cat.starterQueries.length).toBeGreaterThan(0)
     }
   })
 })

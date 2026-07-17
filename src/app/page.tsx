@@ -235,7 +235,7 @@ function HomePageContent() {
 
       <div className="mt-8 text-center">
         <p className="text-xs text-slate-600 uppercase tracking-wider mb-3">
-          Try searching for
+          Live public queries (not a local catalog)
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {exampleChips.map((chip) => (

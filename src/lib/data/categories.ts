@@ -1,34 +1,46 @@
+/**
+ * Browse taxonomy — category metadata only.
+ * No local molecule catalog: every compound is resolved live via PubChem name search.
+ */
+
 export interface Category {
   title: string
   description: string
-  molecules: string[]
+  /**
+   * Optional starter *queries* (not a DB dump). Each opens a live PubChem name lookup.
+   * Keep short; omit rather than inventing fake results.
+   */
+  starterQueries: string[]
 }
 
 export const CATEGORIES: Record<string, Category> = {
   therapeutics: {
     title: 'Therapeutics',
-    description: 'Approved drugs and therapeutic compounds used to treat diseases and conditions.',
-    molecules: ['insulin', 'metformin', 'aspirin', 'doxorubicin', 'penicillin', 'ibuprofen', 'amoxicillin', 'omeprazole'],
+    description:
+      'Start from well-known drug names. Lookups hit free public APIs (PubChem) — nothing is stored as a local catalog.',
+    starterQueries: ['insulin', 'metformin', 'aspirin', 'ibuprofen'],
   },
   enzymes: {
     title: 'Enzymes',
-    description: 'Biological catalysts used in research, diagnostics, and industrial manufacturing.',
-    molecules: ['amylase', 'trypsin', 'lipase', 'catalase', 'lactase', 'pepsin', 'urease', 'lysozyme'],
+    description:
+      'Common enzyme names as live search seeds. Results come from public compound databases when available.',
+    starterQueries: ['amylase', 'trypsin', 'lipase', 'catalase'],
   },
   diagnostics: {
     title: 'Diagnostics',
-    description: 'Compounds used in medical imaging, laboratory diagnostics, and detection assays.',
-    molecules: ['fluorescein', 'gadolinium', 'glucose', 'urea', 'creatinine', 'bilirubin', 'cholesterol'],
+    description:
+      'Imaging / lab-related compound names as live search seeds (not a diagnostic database).',
+    starterQueries: ['fluorescein', 'glucose', 'creatinine', 'bilirubin'],
   },
   reagents: {
     title: 'Research Reagents',
-    description: 'Common laboratory chemicals and reagents used in biological research.',
-    molecules: ['ethanol', 'glycerol', 'DMSO', 'formaldehyde', 'acetic acid', 'sodium chloride', 'tris'],
+    description: 'Common reagent names as live PubChem lookup seeds.',
+    starterQueries: ['ethanol', 'glycerol', 'DMSO', 'sodium chloride'],
   },
   industrial: {
     title: 'Industrial Biotech',
-    description: 'Enzymes and compounds used in industrial manufacturing, food processing, and biofuels.',
-    molecules: ['cellulase', 'protease', 'xylanase', 'phytase', 'laccase', 'citric acid', 'ethanol', 'lactic acid'],
+    description: 'Industrial / processing compound names as live search seeds.',
+    starterQueries: ['cellulase', 'protease', 'citric acid', 'lactic acid'],
   },
 }
 

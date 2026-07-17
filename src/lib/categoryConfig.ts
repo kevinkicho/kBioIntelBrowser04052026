@@ -112,7 +112,7 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'ctd', title: 'CTD', propKey: 'ctdInteractions', isNullable: true, tier: 'supporting' },
       { id: 'iedb', title: 'IEDB', propKey: 'iedbEpitopes', isNullable: true, tier: 'supporting' },
       { id: 'lincs', title: 'LINCS L1000', propKey: 'lincsSignatures', isNullable: true, tier: 'supporting' },
-      { id: 'ttd', title: 'TTD', propKey: 'ttdTargets', isNullable: true, tier: 'experimental' },
+      // TTD removed: no public REST API (was always empty stub — not mock data, just dead panel)
     ],
   },
   {

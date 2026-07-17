@@ -75,7 +75,7 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
       { propKey: 'ctdInteractions', title: 'CTD Interactions' },
       { propKey: 'iedbEpitopes', title: 'IEDB Epitopes' },
       { propKey: 'lincsSignatures', title: 'LINCS L1000' },
-      { propKey: 'ttdTargets', title: 'TTD Targets' },
+
     ],
   },
   {
