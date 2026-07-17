@@ -2,7 +2,8 @@
  * Decide whether Ollama should be reached from the browser (user's machine)
  * vs the Next.js server (App Hosting / SSR proxy).
  *
- * Hosted HTTPS cannot open http://localhost (mixed content). Local npm run dev can.
+ * Hosted HTTPS cannot open http://127.0.0.1 or http://localhost (mixed content —
+ * both are treated the same by browsers). Local npm run dev on http:// can.
  */
 
 import { isPrivateHostname, normalizeOllamaUrl } from './config'
@@ -32,7 +33,7 @@ export function canBrowserCallLocalHttp(): boolean {
   if (typeof window === 'undefined') return false
   // http://localhost:3000 → http://127.0.0.1:11434 is fine
   if (window.location.protocol === 'http:') return true
-  // https://… → http://localhost is mixed content (blocked)
+  // https://… → http://127.0.0.1 or http://localhost are both mixed content (blocked)
   return false
 }
 
@@ -50,9 +51,10 @@ export function shouldUseBrowserOllama(url: string): boolean {
 
 export function localOllamaMixedContentHint(): string {
   return (
-    'This page is HTTPS, so the browser blocks http://localhost (mixed content). ' +
-    'To use Ollama on your PC: run `npm run dev`, open http://localhost:3000, then Connect to localhost:11434. ' +
-    'Or use Ollama Cloud with your API key on this hosted site.'
+    'This page is HTTPS, so the browser blocks all http:// loopback addresses — ' +
+    'including 127.0.0.1:11434 and localhost:11434 (same mixed-content rule; the name does not matter). ' +
+    'To use Ollama on your PC: run npm run dev, open http://localhost:3000 (HTTP, not this HTTPS site), ' +
+    'then click “Use my Ollama (11434)”. On this hosted site, use Ollama Cloud with your API key instead.'
   )
 }
 

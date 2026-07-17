@@ -240,10 +240,13 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
             </p>
             {!pageAllowsLocalHttp && (
               <p className="mt-1.5 text-xs text-amber-400/90 leading-relaxed">
-                You are on <strong>HTTPS</strong> — browsers block http://localhost from secure pages.
-                Open <code className="text-amber-200">http://localhost:3000</code> via{' '}
-                <code className="text-amber-200">npm run dev</code> to use your local models, or use
-                Ollama Cloud with your API key below.
+                You are on <strong>HTTPS</strong> — browsers block{' '}
+                <code className="text-amber-200">http://127.0.0.1</code> and{' '}
+                <code className="text-amber-200">http://localhost</code> the same way (mixed content).
+                Typing 127.0.0.1 does not bypass that. To use local models: run{' '}
+                <code className="text-amber-200">npm run dev</code> and open{' '}
+                <code className="text-amber-200">http://localhost:3000</code>, or use Ollama Cloud with
+                your API key below on this site.
               </p>
             )}
             {pageAllowsLocalHttp && (
