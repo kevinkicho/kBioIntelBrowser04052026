@@ -154,11 +154,17 @@ export function VendorsPanel({ cid }: { cid: number }) {
   const hasMore = data.suppliers.length > 8 || data.databases.length > 6
 
   return (
-    <div id="suppliers" className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-5 mb-2">
+    <div
+      id="chemical-suppliers"
+      className="mb-2 scroll-mt-24 rounded-xl border border-slate-700/40 bg-slate-900/60 p-5"
+      data-testid="chemical-suppliers-panel"
+    >
+      {/* legacy hash #suppliers still works */}
+      <span id="suppliers" className="sr-only" />
       <div className="mb-3 flex items-start justify-between gap-2">
-        <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
-          <span>🛒</span> Chemical Suppliers
-          <span className="text-xs text-slate-500 font-normal">
+        <h3 className="flex items-center gap-2 text-sm font-semibold text-slate-300">
+          <span aria-hidden>🛒</span> Chemical Suppliers
+          <span className="text-xs font-normal text-slate-500">
             ({data.total} sources on PubChem
             {data.moleculeName ? ` · ${data.moleculeName}` : ''})
           </span>

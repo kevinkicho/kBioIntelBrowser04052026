@@ -1123,7 +1123,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
           {!isDecisionMode && (
             <>
-              <ErrorBoundary><NextStepsPanel moleculeName={moleculeName} data={mergedData} /></ErrorBoundary>
+              <ErrorBoundary>
+                <NextStepsPanel moleculeName={moleculeName} data={mergedData} cid={cid} />
+              </ErrorBoundary>
 
               <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
 
