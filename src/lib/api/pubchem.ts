@@ -26,20 +26,20 @@ const fetchOptions: RequestInit = {
 
 const RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
 
-async function pubchemFetch(url: string, attempts = 3): Promise<Response> {
+async function pubchemFetch(url: string, attempts = 2): Promise<Response> {
   let lastErr: unknown
+  // Keep retries short: App Hosting often gets PubChem 503; fall back to MyChem/ChEMBL faster.
   for (let i = 0; i < attempts; i++) {
     try {
       const res = await fetch(url, fetchOptions)
       if (res.ok || !RETRY_STATUSES.has(res.status) || i === attempts - 1) {
         return res
       }
-      // brief backoff for PubChem rate / cold GCP egress
-      await new Promise((r) => setTimeout(r, 300 * 2 ** i + Math.floor(Math.random() * 150)))
+      await new Promise((r) => setTimeout(r, 200 * (i + 1)))
     } catch (err) {
       lastErr = err
       if (i === attempts - 1) throw err
-      await new Promise((r) => setTimeout(r, 300 * 2 ** i))
+      await new Promise((r) => setTimeout(r, 200 * (i + 1)))
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error('PubChem fetch failed')
@@ -307,36 +307,58 @@ export async function getMoleculeCandidatesByName(
   try {
     const url = `${BASE_URL}/compound/name/${encodeURIComponent(name)}/cids/JSON`
     const res = await pubchemFetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    const cids: number[] = (data.IdentifierList?.CID ?? []).slice(0, limit)
-    if (!cids.length) return []
-
-    const propUrl = `${BASE_URL}/compound/cid/${cids.join(',')}/property/Title,MolecularFormula,MolecularWeight,InChIKey,IUPACName/JSON`
-    const propRes = await pubchemFetch(propUrl)
-    if (!propRes.ok) {
-      return cids.map((cid) => ({
-        cid,
-        name,
-        formula: '',
-        molecularWeight: 0,
-        inchiKey: '',
-        iupacName: '',
-      }))
+    if (res.ok) {
+      const data = await res.json()
+      const cids: number[] = (data.IdentifierList?.CID ?? []).slice(0, limit)
+      if (cids.length) {
+        const propUrl = `${BASE_URL}/compound/cid/${cids.join(',')}/property/Title,MolecularFormula,MolecularWeight,InChIKey,IUPACName/JSON`
+        const propRes = await pubchemFetch(propUrl)
+        if (!propRes.ok) {
+          return cids.map((cid) => ({
+            cid,
+            name,
+            formula: '',
+            molecularWeight: 0,
+            inchiKey: '',
+            iupacName: '',
+          }))
+        }
+        const propData = await propRes.json()
+        const props = propData.PropertyTable?.Properties ?? []
+        return props.map((p: Record<string, unknown>) => ({
+          cid: Number(p.CID),
+          name: String(p.Title || name),
+          formula: String(p.MolecularFormula || ''),
+          molecularWeight: parseFloat(String(p.MolecularWeight || '0')) || 0,
+          inchiKey: String(p.InChIKey || ''),
+          iupacName: String(p.IUPACName || ''),
+        }))
+      }
     }
-    const propData = await propRes.json()
-    const props = propData.PropertyTable?.Properties ?? []
-    return props.map((p: Record<string, unknown>) => ({
-      cid: Number(p.CID),
-      name: String(p.Title || name),
-      formula: String(p.MolecularFormula || ''),
-      molecularWeight: parseFloat(String(p.MolecularWeight || '0')) || 0,
-      inchiKey: String(p.InChIKey || ''),
-      iupacName: String(p.IUPACName || ''),
-    }))
   } catch {
-    return []
+    /* fall through to MyChem */
   }
+
+  // Cloud fallback when PubChem PUG is blocked/503 from App Hosting
+  try {
+    const { resolveCidViaMyChem } = await import('./cloudSearchFallback')
+    const cid = await resolveCidViaMyChem(name)
+    if (cid) {
+      return [
+        {
+          cid,
+          name,
+          formula: '',
+          molecularWeight: 0,
+          inchiKey: '',
+          iupacName: '',
+        },
+      ]
+    }
+  } catch {
+    /* empty */
+  }
+  return []
 }
 
 /**

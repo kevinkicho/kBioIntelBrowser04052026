@@ -6,7 +6,11 @@ function escapeGraphQLString(str: string): string {
 }
 
 const API_URL = 'https://api.platform.opentargets.org/api/v4/graphql'
-const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
+// no-store: avoid sticky empty caches when GraphQL schema/upstream blips on App Hosting
+const fetchOptions: RequestInit = {
+  cache: 'no-store',
+  headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+}
 
 /**
  * Search for disease associations by molecule name using OpenTargets Platform
@@ -84,24 +88,21 @@ async function queryDrugDiseases(chemblId: string): Promise<DiseaseAssociation[]
 }
 
 export async function searchDiseases(queryString: string): Promise<DiseaseAssociation[]> {
+  // Open Targets Platform API 26+: SearchResult uses `hits`, not legacy `results`.
+  // Using `results` returns GraphQL errors and empty disease search (homepage default mode).
   const query = `
-    query {
+    query DiseaseSearch($q: String!) {
       search(
-        queryString: "${escapeGraphQLString(queryString)}"
+        queryString: $q
         entityNames: ["disease"]
         page: { index: 0, size: 10 }
       ) {
         total
-        results {
-          ... on Disease {
-            id
-            name
-            description
-            therapeuticAreas {
-              id
-              name
-            }
-          }
+        hits {
+          id
+          name
+          entity
+          description
         }
       }
     }
@@ -109,32 +110,44 @@ export async function searchDiseases(queryString: string): Promise<DiseaseAssoci
 
   const res = await fetch(API_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
     ...fetchOptions,
+    headers: { ...((fetchOptions.headers as Record<string, string>) || {}), 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      query,
+      variables: { q: queryString },
+    }),
   })
 
-  if (!res.ok) return []
-  
+  if (!res.ok) {
+    console.error('[opentargets] searchDiseases HTTP', res.status)
+    return []
+  }
+
   const data = await res.json()
-  
+
   if (data.errors) {
     console.error('OpenTargets GraphQL errors:', data.errors)
     return []
   }
 
-  const results = data.data?.search?.results ?? []
-  return results.map((result: {
-    id: string
-    name: string
+  const hits = (data.data?.search?.hits ?? []) as Array<{
+    id?: string
+    name?: string
+    entity?: string
     description?: string
-    therapeuticAreas?: { id: string; name: string }[]
-  }) => ({
-    diseaseId: result.id ?? '',
-    diseaseName: result.name ?? '',
-    description: result.description ?? undefined,
-    therapeuticAreas: (result.therapeuticAreas ?? []).map(ta => ta.name),
-  }))
+  }>
+
+  return hits
+    .filter((h) => (h.entity || 'disease').toLowerCase() === 'disease' && h.name)
+    .map((h) => ({
+      diseaseId: h.id ?? '',
+      diseaseName: h.name ?? '',
+      description: h.description ?? undefined,
+      score: 0,
+      evidenceCount: 0,
+      sources: ['Open Targets'],
+      therapeuticAreas: [] as string[],
+    }))
 }
 
 /**
