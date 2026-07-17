@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { API_METADATA } from '@/lib/analytics/api-meta'
 import type { ApiMeta } from '@/lib/analytics/api-meta'
+import { ProductFunnelPanel } from '@/components/analytics/ProductFunnelPanel'
+import { productEventLabel } from '@/lib/productEvents'
 
 function ApiMetaInfo({ meta }: { meta: ApiMeta }) {
   return (
@@ -250,7 +252,14 @@ const API_DISPLAY_NAMES: Record<string, string> = {
 }
 
 function apiName(source: string) {
+  if (source === 'product') return 'Product funnel'
   return API_DISPLAY_NAMES[source] ?? source.replace(/^category:/, '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase())
+}
+
+/** Label product funnel endpoints (event names) when viewing call rows. */
+function endpointLabel(source: string, endpoint: string) {
+  if (source === 'product') return productEventLabel(endpoint)
+  return endpoint
 }
 
 function Sparkline({ data, key_ }: { data: number[]; key_: string }) {
@@ -366,8 +375,10 @@ export default function AnalyticsPage() {
       <div className="max-w-7xl mx-auto">
         <div className="flex items-center justify-between mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">API Analytics</h1>
-            <p className="text-slate-400 mt-1">Monitor API health, response times, and data availability</p>
+            <h1 className="text-3xl font-bold text-white">Analytics</h1>
+            <p className="text-slate-400 mt-1">
+              Product funnel (M1–M9) and API health, response times, and data availability
+            </p>
           </div>
           <div className="flex items-center gap-3">
             {view === 'summary' && (
@@ -426,6 +437,9 @@ export default function AnalyticsPage() {
             </button>
           ))}
         </div>
+
+        {/* Always show product funnel on overview (local + server product source) */}
+        {view === 'summary' && <ProductFunnelPanel />}
 
         {loading ? (
           <div className="text-center py-12 text-slate-500 animate-pulse">Loading analytics...</div>
@@ -803,14 +817,22 @@ export default function AnalyticsPage() {
                       {detail.recent_calls.map(call => (
                         <div key={call.id} className={`rounded px-2 py-1 text-[10px] ${call.status >= 400 || call.status === 0 ? 'bg-red-950/20 border border-red-900/20' : 'bg-slate-800/30'}`}>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-1.5">
-                              <span className={`font-mono ${call.status >= 400 ? 'text-red-400' : 'text-emerald-400'}`}>{call.status}</span>
-                              <span className="text-slate-300">{fmtMs(call.duration_ms)}</span>
-                              <span className={`px-1 py-px rounded text-[9px] font-medium ${call.has_data ? 'bg-emerald-900/40 text-emerald-400' : 'bg-yellow-900/40 text-yellow-400'}`}>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className={`font-mono shrink-0 ${call.status >= 400 ? 'text-red-400' : 'text-emerald-400'}`}>{call.status}</span>
+                              <span className="text-slate-300 shrink-0">{fmtMs(call.duration_ms)}</span>
+                              {detailSource && (
+                                <span
+                                  className="truncate text-indigo-300/90"
+                                  title={call.endpoint}
+                                >
+                                  {endpointLabel(detailSource, call.endpoint)}
+                                </span>
+                              )}
+                              <span className={`px-1 py-px rounded text-[9px] font-medium shrink-0 ${call.has_data ? 'bg-emerald-900/40 text-emerald-400' : 'bg-yellow-900/40 text-yellow-400'}`}>
                                 {call.has_data ? 'data' : 'empty'}
                               </span>
                             </div>
-                            <span className="text-slate-600">{timeAgo(call.timestamp)}</span>
+                            <span className="text-slate-600 shrink-0 ml-2">{timeAgo(call.timestamp)}</span>
                           </div>
                           {call.error && (
                             <div className="text-red-400/60 break-all leading-tight mt-0.5">{call.error.slice(0, 120)}</div>

@@ -11,6 +11,7 @@ import { PREFERENCE_TOOLTIPS } from '@/lib/discovery/preferences'
 import type { RubricPresetId, ScoreAxisWeights } from '@/lib/domain/score'
 import type { AeAggressivenessPref } from '@/lib/discovery/preferences'
 import { RubricEditor } from '@/app/discover/components/RubricEditor'
+import { PrefTooltip } from '@/components/discovery/PrefTooltip'
 
 export interface DiscoverySettingsDrawerProps {
   open: boolean
@@ -18,23 +19,6 @@ export interface DiscoverySettingsDrawerProps {
   prefs: DiscoveryPreferences
   onChange: (patch: Partial<Omit<DiscoveryPreferences, 'version'>>) => void
   onReset: () => void
-}
-
-function Tooltip({ text }: { text: string }) {
-  return (
-    <span className="group relative inline-flex ml-1 align-middle">
-      <span
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-600 text-[9px] text-slate-400 cursor-help"
-        tabIndex={0}
-        aria-label="More info"
-      >
-        ?
-      </span>
-      <span className="pointer-events-none absolute z-50 right-0 top-5 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 text-[11px] leading-snug text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        {text}
-      </span>
-    </span>
-  )
 }
 
 export function DiscoverySettingsDrawer({
@@ -116,7 +100,11 @@ export function DiscoverySettingsDrawer({
           <div>
             <div className="flex items-center text-xs font-semibold text-slate-300 mb-2">
               Harvest timing
-              <Tooltip text={PREFERENCE_TOOLTIPS.harvestTiming[prefs.harvestTiming]} />
+              <PrefTooltip
+                align="right"
+                eventKey="harvestTiming"
+                text={PREFERENCE_TOOLTIPS.harvestTiming[prefs.harvestTiming]}
+              />
             </div>
             <div className="flex flex-col gap-2">
               {(
@@ -156,7 +144,9 @@ export function DiscoverySettingsDrawer({
           <div>
             <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
               Collaboration
-              <Tooltip
+              <PrefTooltip
+                align="right"
+                eventKey="collaborationMode"
                 text={
                   PREFERENCE_TOOLTIPS.collaborationMode?.[prefs.collaborationMode] ??
                   'Solo export always works. Share links require enabling this mode (PR18).'

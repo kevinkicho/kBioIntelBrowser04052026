@@ -1,5 +1,6 @@
 'use client'
 
+import { useRef } from 'react'
 import type { RubricPresetId, ScoreAxisWeights } from '@/lib/domain/score'
 import { RUBRIC_PRESETS } from '@/lib/domain/score'
 import type { AeAggressivenessPref } from '@/lib/discovery/preferences'
@@ -7,6 +8,8 @@ import {
   PREFERENCE_TOOLTIPS,
   RUBRIC_PRESET_LABELS,
 } from '@/lib/discovery/preferences'
+import { PrefTooltip } from '@/components/discovery/PrefTooltip'
+import { emitProductEvent } from '@/lib/productEvents'
 
 const AXIS_KEYS: (keyof ScoreAxisWeights)[] = [
   'efficacy',
@@ -34,23 +37,6 @@ export interface RubricEditorProps {
   compact?: boolean
 }
 
-function Tooltip({ text }: { text: string }) {
-  return (
-    <span className="group relative inline-flex ml-1 align-middle">
-      <span
-        className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-600 text-[9px] text-slate-400 cursor-help"
-        tabIndex={0}
-        aria-label="More info"
-      >
-        ?
-      </span>
-      <span className="pointer-events-none absolute z-50 left-0 top-5 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 text-[11px] leading-snug text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100 group-focus-within:opacity-100">
-        {text}
-      </span>
-    </span>
-  )
-}
-
 export function RubricEditor({
   preset,
   aeAggressiveness,
@@ -62,15 +48,32 @@ export function RubricEditor({
 }: RubricEditorProps) {
   const weights = customWeights ?? RUBRIC_PRESETS[preset]
   const isCustom = !!customWeights
+  const customWeightsEmitted = useRef(false)
 
   function handleSlider(key: keyof ScoreAxisWeights, value: number) {
     const next = { ...weights, [key]: value }
     onWeightsChange(next)
+    // Once per custom-edit session to avoid slider spam (M4)
+    if (!customWeightsEmitted.current) {
+      customWeightsEmitted.current = true
+      emitProductEvent('rubric_changed', { field: 'customWeights', axis: key })
+    }
   }
 
   function handlePreset(p: RubricPresetId) {
+    customWeightsEmitted.current = false
     onWeightsChange(undefined)
     onPresetChange(p)
+    emitProductEvent('rubric_changed', { field: 'preset', preset: p })
+  }
+
+  function handleAe(mode: AeAggressivenessPref) {
+    onAeChange(mode)
+    emitProductEvent('rubric_changed', {
+      field: 'aeAggressiveness',
+      preset,
+      value: mode,
+    })
   }
 
   return (
@@ -78,7 +81,10 @@ export function RubricEditor({
       <div>
         <div className="flex items-center text-xs font-semibold text-slate-300 mb-2">
           Rubric preset
-          <Tooltip text="How investigation-priority weights are distributed across axes. Changes re-rank candidates." />
+          <PrefTooltip
+            eventKey="rubricPreset"
+            text="How investigation-priority weights are distributed across axes. Changes re-rank candidates."
+          />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
           {(Object.keys(RUBRIC_PRESET_LABELS) as RubricPresetId[]).map((id) => (
@@ -109,7 +115,10 @@ export function RubricEditor({
       <div>
         <div className="flex items-center text-xs font-semibold text-slate-300 mb-2">
           Axis weights {isCustom ? '(custom)' : `(${preset})`}
-          <Tooltip text="Sliders override the preset. Composite = weighted sum with missing-axis policy." />
+          <PrefTooltip
+            eventKey="axisWeights"
+            text="Sliders override the preset. Composite = weighted sum with missing-axis policy."
+          />
         </div>
         <div className="space-y-2">
           {AXIS_KEYS.map((key) => (
@@ -135,7 +144,10 @@ export function RubricEditor({
       <div>
         <div className="flex items-center text-xs font-semibold text-slate-300 mb-2">
           Safety policy (AE aggressiveness)
-          <Tooltip text={PREFERENCE_TOOLTIPS.aeAggressiveness[aeAggressiveness]} />
+          <PrefTooltip
+            eventKey="aeAggressiveness"
+            text={PREFERENCE_TOOLTIPS.aeAggressiveness[aeAggressiveness]}
+          />
         </div>
         <div className="flex flex-col gap-2">
           {(
@@ -147,7 +159,7 @@ export function RubricEditor({
             <button
               key={id}
               type="button"
-              onClick={() => onAeChange(id)}
+              onClick={() => handleAe(id)}
               className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
                 aeAggressiveness === id
                   ? 'bg-indigo-900/40 border-indigo-500/60 text-indigo-100'
