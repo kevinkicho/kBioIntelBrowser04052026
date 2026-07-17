@@ -142,7 +142,27 @@ export default function GeneSearchPage() {
                 {g.aliases && g.aliases.length > 0 && (
                   <div className="flex flex-wrap gap-1">
                     {g.aliases.map(a => (
-                      <span key={a} className="text-xs px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-400">{a}</span>
+                      <span
+                        key={a}
+                        role="link"
+                        tabIndex={0}
+                        title={`Search genes for “${a}”`}
+                        className="text-xs px-1.5 py-0.5 rounded border border-slate-600/50 bg-slate-700/80 text-slate-400 transition-colors hover:border-indigo-600/50 hover:bg-indigo-950/50 hover:text-indigo-300 cursor-pointer"
+                        onClick={(e) => {
+                          e.preventDefault()
+                          e.stopPropagation()
+                          router.push(`/gene?q=${encodeURIComponent(a)}`)
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            router.push(`/gene?q=${encodeURIComponent(a)}`)
+                          }
+                        }}
+                      >
+                        {a}
+                      </span>
                     ))}
                   </div>
                 )}

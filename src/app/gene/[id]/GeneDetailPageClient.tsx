@@ -12,6 +12,29 @@ import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
+/** Alias / synonym chip → gene search for that name */
+function GeneAliasChip({
+  alias,
+  size = 'sm',
+}: {
+  alias: string
+  size?: 'sm' | 'xs'
+}) {
+  const sizeClass =
+    size === 'xs'
+      ? 'text-[10px] px-1.5 py-0.5'
+      : 'text-xs px-1.5 py-0.5'
+  return (
+    <Link
+      href={`/gene?q=${encodeURIComponent(alias)}`}
+      className={`${sizeClass} rounded border border-slate-700/60 bg-slate-800 text-slate-400 transition-colors hover:border-indigo-600/50 hover:bg-indigo-950/50 hover:text-indigo-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500`}
+      title={`Search genes for “${alias}”`}
+    >
+      {alias}
+    </Link>
+  )
+}
+
 function buildFullStatus(catId: CategoryId, state: CategoryLoadState): Record<CategoryId, CategoryLoadState> {
   const result = {} as Record<CategoryId, CategoryLoadState>
   for (const cat of CATEGORIES) {
@@ -62,10 +85,10 @@ function GeneOverview({ overview }: { overview: GeneOverviewType | null }) {
       </div>
 
       {overview.aliases && overview.aliases.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1">
+        <div className="mt-3 flex flex-wrap items-center gap-1">
           <span className="text-xs text-slate-500 mr-1">Aliases:</span>
           {overview.aliases.map(a => (
-            <span key={a} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-400">{a}</span>
+            <GeneAliasChip key={a} alias={a} size="xs" />
           ))}
         </div>
       )}
@@ -411,7 +434,7 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
           {displayAliases.length > 0 && (
             <div className="mt-2 flex flex-wrap gap-1">
               {displayAliases.map(a => (
-                <span key={a} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{a}</span>
+                <GeneAliasChip key={a} alias={a} size="xs" />
               ))}
             </div>
           )}
