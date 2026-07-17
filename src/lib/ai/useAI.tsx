@@ -7,8 +7,21 @@ import {
   loadLocalOllamaApiKey,
   saveLocalOllamaApiKey,
 } from './userApiKey'
+import {
+  clientCheckHealth,
+  clientGenerateChat,
+  clientPullModel,
+  clientShowModel,
+} from './clientOllama'
+import {
+  isLocalOrLanOllamaUrl,
+  shouldUseBrowserOllama,
+} from './localTransport'
 import { getSignedInUid } from '@/lib/firebase/aiDataSync'
 import { pushAiSettings, syncAiSettings } from '@/lib/firebase/aiSettingsSync'
+
+/** How we reach Ollama: browser = user's PC; server = Next proxy / cloud. */
+export type AITransport = 'browser' | 'server'
 
 const RETRY_INTERVAL_MS = 15000
 const RETRY_MAX_ATTEMPTS = 20
@@ -25,6 +38,8 @@ export interface ModelInfo {
 interface AIContextValue extends AIConfig {
   mounted: boolean
   modelInfo: ModelInfo | null
+  /** browser = user's machine Ollama; server = cloud/proxy */
+  transport: AITransport
   /** User's Ollama Cloud API key (never logged). Empty if unset. */
   ollamaApiKey: string
   /** True when a non-empty user key is stored. */
@@ -56,20 +71,89 @@ async function checkOllama(
   error?: string
   viaCloud?: boolean
   usingUserKey?: boolean
+  transport: AITransport
   /** Server-effective URL (e.g. https://ollama.com after cloud fallback) */
   effectiveUrl?: string
 }> {
+  const local = isLocalOrLanOllamaUrl(ollamaUrl)
+
+  // Prefer browser → user's Ollama so App Hosting never talks to "its" localhost
+  if (shouldUseBrowserOllama(ollamaUrl)) {
+    const browser = await clientCheckHealth(ollamaUrl)
+    if (browser.available) {
+      return {
+        available: true,
+        models: browser.models,
+        transport: 'browser',
+        viaCloud: false,
+        effectiveUrl: ollamaUrl,
+      }
+    }
+    // On the user's machine with npm run dev, server proxy can still reach loopback
+    // without CORS. Try server only when page is local-ish (not pure cloud fallback).
+    const pageIsLocal =
+      typeof window !== 'undefined' &&
+      (window.location.hostname === 'localhost' ||
+        window.location.hostname === '127.0.0.1' ||
+        window.location.hostname === '[::1]')
+
+    if (pageIsLocal) {
+      try {
+        const res = await fetch('/api/ai/health', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ollamaUrl,
+            noCloudFallback: true,
+            ...(ollamaApiKey ? { ollamaApiKey } : {}),
+          }),
+        })
+        if (res.ok) {
+          const data = await res.json()
+          if (data.available) {
+            return {
+              available: true,
+              models: data.models ?? [],
+              transport: 'server',
+              viaCloud: false,
+              effectiveUrl:
+                typeof data.ollamaUrl === 'string' && data.ollamaUrl.length > 0
+                  ? data.ollamaUrl
+                  : ollamaUrl,
+            }
+          }
+        }
+      } catch {
+        /* fall through to browser error */
+      }
+    }
+
+    return {
+      available: false,
+      models: [],
+      transport: 'browser',
+      error: browser.error || 'Cannot connect to local Ollama',
+    }
+  }
+
+  // Cloud / remote via server proxy
   try {
     const res = await fetch('/api/ai/health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ollamaUrl,
+        noCloudFallback: local,
         ...(ollamaApiKey ? { ollamaApiKey } : {}),
       }),
     })
     if (!res.ok) {
-      return { available: false, models: [], error: `Server returned ${res.status}` }
+      return {
+        available: false,
+        models: [],
+        transport: 'server',
+        error: `Server returned ${res.status}`,
+      }
     }
     const data = await res.json()
     return {
@@ -78,13 +162,19 @@ async function checkOllama(
       error: data.error,
       viaCloud: Boolean(data.viaCloud),
       usingUserKey: Boolean(data.usingUserKey),
+      transport: 'server',
       effectiveUrl:
         typeof data.ollamaUrl === 'string' && data.ollamaUrl.length > 0
           ? data.ollamaUrl
           : undefined,
     }
   } catch (err) {
-    return { available: false, models: [], error: err instanceof Error ? err.message : 'Connection failed' }
+    return {
+      available: false,
+      models: [],
+      transport: 'server',
+      error: err instanceof Error ? err.message : 'Connection failed',
+    }
   }
 }
 
@@ -94,8 +184,34 @@ async function fetchModelInfo(
   ollamaUrl: string,
   modelName: string,
   ollamaApiKey?: string,
+  transport: AITransport = 'server',
 ): Promise<ModelInfo> {
   try {
+    if (transport === 'browser' || shouldUseBrowserOllama(ollamaUrl)) {
+      const data = await clientShowModel(ollamaUrl, modelName)
+      if (!data.available) return EMPTY_MODEL_INFO
+      const info = data.model_info ?? data.details ?? {}
+      const ctxLen = (info as { context_length?: number; num_ctx?: number }).context_length
+        ?? (info as { num_ctx?: number }).num_ctx
+        ?? null
+      return {
+        contextLength: typeof ctxLen === 'number' ? ctxLen : null,
+        parameterSize: (data.details as { parameter_size?: string } | undefined)?.parameter_size
+          ?? (info as { parameter_size?: string }).parameter_size
+          ?? null,
+        family: (data.details as { family?: string } | undefined)?.family
+          ?? (info as { family?: string }).family
+          ?? null,
+        quantizationLevel: (data.details as { quantization_level?: string } | undefined)?.quantization_level
+          ?? (info as { quantization_level?: string }).quantization_level
+          ?? null,
+        format: (data.details as { format?: string } | undefined)?.format
+          ?? (info as { format?: string }).format
+          ?? null,
+        sizeBytes: data.size ?? (info as { size?: number }).size ?? null,
+      }
+    }
+
     const res = await fetch('/api/ai/show', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -126,6 +242,7 @@ async function fetchModelInfo(
 export function AIProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false)
   const [config, setConfig] = useState<AIConfig>(AI_DEFAULTS)
+  const [transport, setTransport] = useState<AITransport>('server')
   const [ollamaApiKey, setOllamaApiKeyState] = useState('')
   const [pullProgress, setPullProgress] = useState<{ status: string; progress: number } | null>(null)
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
@@ -134,6 +251,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const healthInProgressRef = useRef(false)
   const apiKeyRef = useRef('')
+  const transportRef = useRef<AITransport>('server')
 
   useEffect(() => {
     const saved = loadAIConfig()
@@ -246,8 +364,14 @@ export function AIProvider({ children }: { children: ReactNode }) {
         // Stick to cloud base after fallback so chat/show do not re-hit dead localhost
         const effectiveUrl =
           result.viaCloud && result.effectiveUrl ? result.effectiveUrl : config.ollamaUrl
-        const via = result.viaCloud ? ' (via Ollama Cloud fallback)' : ''
+        const via = result.viaCloud
+          ? ' (via Ollama Cloud)'
+          : result.transport === 'browser'
+            ? ' (browser → your PC)'
+            : ''
         console.log(`[ai] Connected to ${effectiveUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
+        setTransport(result.transport)
+        transportRef.current = result.transport
         setConfig(prev => ({
           ...prev,
           ollamaUrl: effectiveUrl,
@@ -258,12 +382,19 @@ export function AIProvider({ children }: { children: ReactNode }) {
             ? (result.viaCloud
               ? (result.usingUserKey
                 ? 'Using Ollama Cloud with your API key'
-                : 'Using Ollama Cloud (local Ollama unavailable)')
-              : undefined)
-            : 'No models found on this Ollama instance.',
+                : 'Using Ollama Cloud')
+              : result.transport === 'browser'
+                ? 'Connected to Ollama on this computer (browser)'
+                : undefined)
+            : 'No models found on this Ollama instance. Run: ollama pull <model>',
         }))
         if (model) {
-          const info = await fetchModelInfo(effectiveUrl, model, apiKeyRef.current || undefined)
+          const info = await fetchModelInfo(
+            effectiveUrl,
+            model,
+            apiKeyRef.current || undefined,
+            result.transport,
+          )
           if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
             console.log('[ai] Model info:', info)
           }
@@ -271,6 +402,8 @@ export function AIProvider({ children }: { children: ReactNode }) {
         }
       } else {
         console.warn(`[ai] Cannot connect to ${config.ollamaUrl}:`, result.error)
+        setTransport(result.transport)
+        transportRef.current = result.transport
         setConfig(prev => ({
           ...prev,
           status: 'unavailable' as AIStatus,
@@ -302,12 +435,17 @@ export function AIProvider({ children }: { children: ReactNode }) {
     const result = await checkOllama(normalized, apiKeyRef.current || undefined)
     if (result.available) {
       const model = pickFirstModel(result.models) || ''
-      // On App Hosting, localhost is the *server's* loopback — cloud fallback
-      // returns effectiveUrl=https://ollama.com; persist that for chat/show.
+      // Only take cloud effectiveUrl when we intentionally used cloud
       const effectiveUrl =
         result.viaCloud && result.effectiveUrl ? result.effectiveUrl : normalized
-      const via = result.viaCloud ? ' (via Ollama Cloud fallback)' : ''
+      const via = result.viaCloud
+        ? ' (via Ollama Cloud)'
+        : result.transport === 'browser'
+          ? ' (browser → your PC)'
+          : ''
       console.log(`[ai] Connected to ${effectiveUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
+      setTransport(result.transport)
+      transportRef.current = result.transport
       setConfig(prev => ({
         ...prev,
         ollamaUrl: effectiveUrl,
@@ -319,18 +457,27 @@ export function AIProvider({ children }: { children: ReactNode }) {
           ? (result.viaCloud
               ? (result.usingUserKey
                 ? 'Using Ollama Cloud with your API key'
-                : 'Using Ollama Cloud (hosted app cannot reach Ollama on your PC)')
-              : undefined)
-          : 'No models found on this Ollama instance.',
+                : 'Using Ollama Cloud')
+              : result.transport === 'browser'
+                ? 'Connected to Ollama on this computer (browser)'
+                : undefined)
+          : 'No models found on this Ollama instance. Run: ollama pull <model>',
       }))
       if (model) {
-        const info = await fetchModelInfo(effectiveUrl, model, apiKeyRef.current || undefined)
+        const info = await fetchModelInfo(
+          effectiveUrl,
+          model,
+          apiKeyRef.current || undefined,
+          result.transport,
+        )
         if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
           console.log('[ai] Model info:', info)
         }
         setModelInfo(info)
       }
     } else {
+      setTransport(result.transport)
+      transportRef.current = result.transport
       setConfig(prev => ({
         ...prev,
         ollamaUrl: normalized,
@@ -350,6 +497,8 @@ export function AIProvider({ children }: { children: ReactNode }) {
       clearTimeout(retryTimerRef.current)
       retryTimerRef.current = null
     }
+    setTransport('server')
+    transportRef.current = 'server'
     setConfig(prev => ({ ...prev, enabled: false, status: 'unknown' as AIStatus, availableModels: [], error: undefined }))
     setModelInfo(null)
   }, [])
@@ -358,7 +507,12 @@ export function AIProvider({ children }: { children: ReactNode }) {
     console.log('[ai] Selecting model:', model)
     setConfig(prev => ({ ...prev, model }))
     if (config.ollamaUrl) {
-      fetchModelInfo(config.ollamaUrl, model, apiKeyRef.current || undefined).then(info => {
+      fetchModelInfo(
+        config.ollamaUrl,
+        model,
+        apiKeyRef.current || undefined,
+        transportRef.current,
+      ).then(info => {
         if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
           console.log('[ai] New model info:', info)
         }
@@ -374,6 +528,20 @@ export function AIProvider({ children }: { children: ReactNode }) {
     setPullProgress({ status: 'starting', progress: 0 })
 
     try {
+      if (transportRef.current === 'browser' || shouldUseBrowserOllama(config.ollamaUrl)) {
+        const result = await clientPullModel(config.ollamaUrl, model, (status, progress) => {
+          setPullProgress({ status, progress })
+        })
+        if (!result.success) {
+          setConfig(prev => ({ ...prev, status: 'error' as AIStatus, error: result.error }))
+          setPullProgress(null)
+          return result
+        }
+        setPullProgress(null)
+        await reconnect()
+        return { success: true }
+      }
+
       const res = await fetch('/api/ai/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -444,10 +612,16 @@ export function AIProvider({ children }: { children: ReactNode }) {
       yield '[Error: No model selected. Connect to Ollama and select a model in Settings.]'
       return
     }
-    console.log(`[ai-chat] Sending chat | model: ${modelToUse} | messages: ${messages.length}`)
+    console.log(`[ai-chat] Sending chat | model: ${modelToUse} | messages: ${messages.length} | transport: ${transportRef.current}`)
 
     const controller = new AbortController()
     abortRef.current = controller
+
+    // Local Ollama on the user's machine — stream from the browser, not App Hosting
+    if (transportRef.current === 'browser' || shouldUseBrowserOllama(config.ollamaUrl)) {
+      yield* clientGenerateChat(config.ollamaUrl, modelToUse, messages, controller.signal)
+      return
+    }
 
     async function* streamTokens() {
       try {
@@ -507,6 +681,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
     ...config,
     mounted,
     modelInfo,
+    transport,
     ollamaApiKey,
     hasUserApiKey: Boolean(ollamaApiKey.trim()),
     setOllamaApiKey,

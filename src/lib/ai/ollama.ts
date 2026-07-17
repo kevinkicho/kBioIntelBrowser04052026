@@ -68,6 +68,8 @@ function extractModelNames(data: Record<string, unknown>): string[] {
 export type OllamaAuthOpts = {
   /** Per-user Ollama Cloud API key (preferred over server env). */
   apiKey?: string | null
+  /** When true, do not fall back to Ollama Cloud if local fails. */
+  noCloudFallback?: boolean
 }
 
 async function checkOllamaHealthOnce(
@@ -141,8 +143,12 @@ export async function checkOllamaHealth(
   const primary = await checkOllamaHealthOnce(primaryUrl, opts)
   if (primary.available) return primary
 
-  // Already targeting cloud, or no API key configured
-  if (isOllamaCloudUrl(primaryUrl) || !hasOllamaCloudFallback(opts?.apiKey)) {
+  // Already targeting cloud, explicit local-only, or no API key configured
+  if (
+    opts?.noCloudFallback ||
+    isOllamaCloudUrl(primaryUrl) ||
+    !hasOllamaCloudFallback(opts?.apiKey)
+  ) {
     return primary
   }
 

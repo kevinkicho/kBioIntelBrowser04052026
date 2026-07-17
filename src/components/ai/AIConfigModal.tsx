@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
 import { maskApiKey } from '@/lib/ai/userApiKey'
+import { canBrowserCallLocalHttp } from '@/lib/ai/localTransport'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 
 interface AIConfigModalProps {
@@ -152,9 +153,10 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           ? 'bg-red-400'
           : 'bg-slate-500'
 
+  const pageAllowsLocalHttp = typeof window !== 'undefined' ? canBrowserCallLocalHttp() : true
   const statusLabel =
     ai.status === 'available'
-      ? `Connected to ${ai.ollamaUrl}`
+      ? `Connected to ${ai.ollamaUrl}${ai.transport === 'browser' ? ' · this PC' : ai.transport === 'server' && ai.ollamaUrl.includes('ollama.com') ? ' · cloud' : ''}`
       : ai.status === 'checking'
         ? 'Connecting…'
         : ai.status === 'downloading'
@@ -164,6 +166,15 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
             : ai.status === 'error'
               ? `Error: ${ai.error || 'unknown'}`
               : 'Not configured'
+
+  const handleConnectLocal = async () => {
+    setValidationHint(null)
+    setHostInput('127.0.0.1')
+    setPortInput(String(OLLAMA_DEFAULT_PORT))
+    setConnecting(true)
+    await ai.connect(`127.0.0.1:${OLLAMA_DEFAULT_PORT}`)
+    setConnecting(false)
+  }
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-4">
@@ -202,18 +213,26 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           <div>
             <p className="text-xs text-slate-400">
-              <strong className="text-slate-300">Hosted site:</strong> use{' '}
-              <span className="text-cyan-400">Ollama Cloud</span> with{' '}
-              <strong className="text-slate-300">your own API key</strong> (below). Your PC&apos;s{' '}
-              <code className="rounded bg-slate-800 px-1 text-slate-400">localhost:11434</code> is not
-              reachable from App Hosting.
+              <strong className="text-slate-300">Ollama on this PC:</strong> the app talks to Ollama{' '}
+              <em>from your browser</em> (not the cloud server). Host{' '}
+              <code className="rounded bg-slate-800 px-1 text-slate-400">127.0.0.1</code> or{' '}
+              <code className="rounded bg-slate-800 px-1 text-slate-400">localhost</code>, port{' '}
+              <code className="rounded bg-slate-800 px-1 text-slate-400">11434</code>.
             </p>
-            <p className="mt-1.5 text-xs text-slate-500">
-              <strong className="text-slate-400">Local Ollama:</strong> run{' '}
-              <code className="rounded bg-slate-800 px-1 text-slate-400">npm run dev</code>, open{' '}
-              <code className="text-slate-400">http://localhost:3000</code>, then connect to{' '}
-              <code className="text-slate-400">localhost:11434</code> (no cloud key needed).
-            </p>
+            {!pageAllowsLocalHttp && (
+              <p className="mt-1.5 text-xs text-amber-400/90 leading-relaxed">
+                You are on <strong>HTTPS</strong> — browsers block http://localhost from secure pages.
+                Open <code className="text-amber-200">http://localhost:3000</code> via{' '}
+                <code className="text-amber-200">npm run dev</code> to use your local models, or use
+                Ollama Cloud with your API key below.
+              </p>
+            )}
+            {pageAllowsLocalHttp && (
+              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
+                If Connect fails, allow CORS on Ollama:{' '}
+                <code className="text-slate-400">$env:OLLAMA_ORIGINS=&quot;*&quot;; ollama serve</code>
+              </p>
+            )}
           </div>
 
           <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
@@ -352,6 +371,16 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           </div>
 
           <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void handleConnectLocal()}
+              disabled={connecting}
+              className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500"
+              title="Connect to Ollama on this computer at 127.0.0.1:11434"
+              data-testid="ai-connect-local"
+            >
+              {connecting ? 'Connecting…' : 'Use my Ollama (11434)'}
+            </button>
             <button
               type="button"
               onClick={() => void handleConnect()}

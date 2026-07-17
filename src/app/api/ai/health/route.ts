@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const ollamaUrl = body.ollamaUrl
   const apiKey = parseRequestOllamaApiKey(body)
-  const auth = { apiKey }
+  const noCloudFallback = Boolean(body.noCloudFallback)
+  const auth = { apiKey, noCloudFallback }
 
   // Allow empty URL when cloud fallback is configured — check cloud directly.
   if (!ollamaUrl) {
