@@ -65,7 +65,15 @@ function extractModelNames(data: Record<string, unknown>): string[] {
   return []
 }
 
-async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthResponse> {
+export type OllamaAuthOpts = {
+  /** Per-user Ollama Cloud API key (preferred over server env). */
+  apiKey?: string | null
+}
+
+async function checkOllamaHealthOnce(
+  ollamaUrl: string,
+  opts?: OllamaAuthOpts,
+): Promise<OllamaHealthResponse> {
   if (!ollamaUrl) {
     return { available: false, models: [], error: 'No Ollama URL provided' }
   }
@@ -78,7 +86,7 @@ async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthRes
 
     const res = await fetch(`${url}/api/tags`, {
       signal: controller.signal,
-      headers: ollamaRequestHeaders(url),
+      headers: ollamaRequestHeaders(url, {}, opts?.apiKey),
       redirect: redirectModeFor(url),
     })
     clearTimeout(timeout)
@@ -123,21 +131,24 @@ async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthRes
 
 /**
  * Health check with optional Ollama Cloud fallback when local/LAN is down
- * and OLLAMA_API_KEY is set.
+ * and a cloud API key is available (user key or server env).
  */
-export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealthResponse> {
+export async function checkOllamaHealth(
+  ollamaUrl: string,
+  opts?: OllamaAuthOpts,
+): Promise<OllamaHealthResponse> {
   const primaryUrl = normalizeOllamaUrl(ollamaUrl)
-  const primary = await checkOllamaHealthOnce(primaryUrl)
+  const primary = await checkOllamaHealthOnce(primaryUrl, opts)
   if (primary.available) return primary
 
   // Already targeting cloud, or no API key configured
-  if (isOllamaCloudUrl(primaryUrl) || !hasOllamaCloudFallback()) {
+  if (isOllamaCloudUrl(primaryUrl) || !hasOllamaCloudFallback(opts?.apiKey)) {
     return primary
   }
 
   const cloudBase = normalizeOllamaUrl(getOllamaCloudBase())
   console.log('[ai] Local Ollama unavailable; falling back to Ollama Cloud at', cloudBase)
-  const cloud = await checkOllamaHealthOnce(cloudBase)
+  const cloud = await checkOllamaHealthOnce(cloudBase, opts)
   if (cloud.available) {
     return {
       ...cloud,
@@ -161,13 +172,14 @@ export async function pullModel(
   ollamaUrl: string,
   modelName: string,
   onProgress: (status: string, progress: number) => void,
+  opts?: OllamaAuthOpts,
 ): Promise<{ success: boolean; error?: string }> {
   const tryPull = async (rawUrl: string) => {
     const url = normalizeOllamaUrl(rawUrl)
     console.log('[ai] Pulling model', modelName, 'from', url)
     const res = await fetch(`${url}/api/pull`, {
       method: 'POST',
-      headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
+      headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }, opts?.apiKey),
       body: JSON.stringify({ name: modelName, stream: true }),
       redirect: redirectModeFor(url),
     })
@@ -217,13 +229,13 @@ export async function pullModel(
 
   try {
     let result = await tryPull(ollamaUrl)
-    if (!result.success && !isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+    if (!result.success && !isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback(opts?.apiKey)) {
       console.log('[ai] Pull falling back to Ollama Cloud')
       result = await tryPull(getOllamaCloudBase())
     }
     return result
   } catch (err) {
-    if (!isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+    if (!isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback(opts?.apiKey)) {
       try {
         console.log('[ai] Pull exception; falling back to Ollama Cloud')
         return await tryPull(getOllamaCloudBase())
@@ -245,6 +257,7 @@ export async function generateChat(
   messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
   onToken: (token: string) => void,
   signal?: AbortSignal,
+  opts?: OllamaAuthOpts,
 ): Promise<{ success: boolean; error?: string; viaCloud?: boolean }> {
   const openStream = async (rawUrl: string): Promise<{ res: Response } | { error: string }> => {
     const url = normalizeOllamaUrl(rawUrl)
@@ -252,7 +265,7 @@ export async function generateChat(
     try {
       const res = await fetch(`${url}/api/chat`, {
         method: 'POST',
-        headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
+        headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }, opts?.apiKey),
         body: JSON.stringify({ model, messages, stream: true }),
         signal,
         redirect: redirectModeFor(url),
@@ -277,7 +290,7 @@ export async function generateChat(
 
   if ('error' in opened && opened.error !== 'aborted'
     && !isOllamaCloudUrl(ollamaUrl)
-    && hasOllamaCloudFallback()
+    && hasOllamaCloudFallback(opts?.apiKey)
     && !signal?.aborted) {
     console.log('[ai] Chat falling back to Ollama Cloud')
     opened = await openStream(getOllamaCloudBase())
@@ -343,13 +356,22 @@ export async function generateOnce(
   ollamaUrl: string,
   model: string,
   prompt: string,
-  options?: { temperature?: number; num_predict?: number; signal?: AbortSignal },
+  options?: {
+    temperature?: number
+    num_predict?: number
+    signal?: AbortSignal
+    apiKey?: string | null
+  },
 ): Promise<{ success: true; response: string; viaCloud?: boolean } | { success: false; error: string }> {
   const tryOnce = async (rawUrl: string) => {
     const url = normalizeOllamaUrl(rawUrl)
     const res = await fetch(`${url}/api/generate`, {
       method: 'POST',
-      headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
+      headers: ollamaRequestHeaders(
+        url,
+        { 'Content-Type': 'application/json' },
+        options?.apiKey,
+      ),
       body: JSON.stringify({
         model,
         prompt,
@@ -373,7 +395,7 @@ export async function generateOnce(
   try {
     let result = await tryOnce(ollamaUrl)
     let viaCloud = isOllamaCloudUrl(ollamaUrl)
-    if (!result.ok && !isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+    if (!result.ok && !isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback(options?.apiKey)) {
       console.log('[ai] Generate falling back to Ollama Cloud')
       result = await tryOnce(getOllamaCloudBase())
       viaCloud = true
@@ -381,7 +403,7 @@ export async function generateOnce(
     if (!result.ok) return { success: false, error: result.error }
     return { success: true, response: result.response, viaCloud }
   } catch (err) {
-    if (!isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback()) {
+    if (!isOllamaCloudUrl(ollamaUrl) && hasOllamaCloudFallback(options?.apiKey)) {
       try {
         console.log('[ai] Generate exception; falling back to Ollama Cloud')
         const result = await tryOnce(getOllamaCloudBase())

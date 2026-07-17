@@ -14,6 +14,7 @@ import { listAll, deleteObject, ref } from 'firebase/storage'
 import { getFirebaseFirestore, getFirebaseStorage } from './client'
 import { FIRESTORE_COLLECTIONS, userDocPath } from './paths'
 import { clearAIConfig } from '@/lib/ai/config'
+import { clearLocalOllamaApiKey } from '@/lib/ai/userApiKey'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
 export type DeleteUserDataReport = {
@@ -126,6 +127,7 @@ export async function deleteAllUserData(uid: string): Promise<DeleteUserDataRepo
 
   try {
     clearAIConfig()
+    clearLocalOllamaApiKey()
   } catch {
     /* ignore */
   }

@@ -2,6 +2,13 @@
 
 import { createContext, useContext, useState, useEffect, useCallback, useRef, type ReactNode } from 'react'
 import { AI_DEFAULTS, loadAIConfig, saveAIConfig, pickFirstModel, normalizeOllamaUrl, type AIConfig, type AIStatus } from './config'
+import {
+  clearLocalOllamaApiKey,
+  loadLocalOllamaApiKey,
+  saveLocalOllamaApiKey,
+} from './userApiKey'
+import { getSignedInUid } from '@/lib/firebase/aiDataSync'
+import { pushAiSettings, syncAiSettings } from '@/lib/firebase/aiSettingsSync'
 
 const RETRY_INTERVAL_MS = 15000
 const RETRY_MAX_ATTEMPTS = 20
@@ -18,6 +25,12 @@ export interface ModelInfo {
 interface AIContextValue extends AIConfig {
   mounted: boolean
   modelInfo: ModelInfo | null
+  /** User's Ollama Cloud API key (never logged). Empty if unset. */
+  ollamaApiKey: string
+  /** True when a non-empty user key is stored. */
+  hasUserApiKey: boolean
+  setOllamaApiKey: (key: string) => Promise<void>
+  clearOllamaApiKey: () => Promise<void>
   connect: (url: string) => Promise<void>
   disconnect: () => void
   selectModel: (model: string) => void
@@ -34,11 +47,15 @@ export function useAI(): AIContextValue {
   return ctx
 }
 
-async function checkOllama(ollamaUrl: string): Promise<{
+async function checkOllama(
+  ollamaUrl: string,
+  ollamaApiKey?: string,
+): Promise<{
   available: boolean
   models: string[]
   error?: string
   viaCloud?: boolean
+  usingUserKey?: boolean
   /** Server-effective URL (e.g. https://ollama.com after cloud fallback) */
   effectiveUrl?: string
 }> {
@@ -46,7 +63,10 @@ async function checkOllama(ollamaUrl: string): Promise<{
     const res = await fetch('/api/ai/health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ollamaUrl }),
+      body: JSON.stringify({
+        ollamaUrl,
+        ...(ollamaApiKey ? { ollamaApiKey } : {}),
+      }),
     })
     if (!res.ok) {
       return { available: false, models: [], error: `Server returned ${res.status}` }
@@ -57,6 +77,7 @@ async function checkOllama(ollamaUrl: string): Promise<{
       models: data.models ?? [],
       error: data.error,
       viaCloud: Boolean(data.viaCloud),
+      usingUserKey: Boolean(data.usingUserKey),
       effectiveUrl:
         typeof data.ollamaUrl === 'string' && data.ollamaUrl.length > 0
           ? data.ollamaUrl
@@ -69,12 +90,20 @@ async function checkOllama(ollamaUrl: string): Promise<{
 
 const EMPTY_MODEL_INFO: ModelInfo = { contextLength: null, parameterSize: null, family: null, quantizationLevel: null, format: null, sizeBytes: null }
 
-async function fetchModelInfo(ollamaUrl: string, modelName: string): Promise<ModelInfo> {
+async function fetchModelInfo(
+  ollamaUrl: string,
+  modelName: string,
+  ollamaApiKey?: string,
+): Promise<ModelInfo> {
   try {
     const res = await fetch('/api/ai/show', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ollamaUrl, name: modelName }),
+      body: JSON.stringify({
+        ollamaUrl,
+        name: modelName,
+        ...(ollamaApiKey ? { ollamaApiKey } : {}),
+      }),
     })
     if (!res.ok) return EMPTY_MODEL_INFO
     const data = await res.json()
@@ -97,21 +126,43 @@ async function fetchModelInfo(ollamaUrl: string, modelName: string): Promise<Mod
 export function AIProvider({ children }: { children: ReactNode }) {
   const [mounted, setMounted] = useState(false)
   const [config, setConfig] = useState<AIConfig>(AI_DEFAULTS)
+  const [ollamaApiKey, setOllamaApiKeyState] = useState('')
   const [pullProgress, setPullProgress] = useState<{ status: string; progress: number } | null>(null)
   const [modelInfo, setModelInfo] = useState<ModelInfo | null>(null)
   const abortRef = useRef<AbortController | null>(null)
   const retryCountRef = useRef(0)
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const healthInProgressRef = useRef(false)
+  const apiKeyRef = useRef('')
 
   useEffect(() => {
     const saved = loadAIConfig()
     if (saved && Object.keys(saved).length > 0) {
-      console.log('[ai] Restoring saved config:', saved)
+      // Never log secrets — only non-sensitive fields
+      console.log('[ai] Restoring saved config:', {
+        model: saved.model,
+        ollamaUrl: saved.ollamaUrl,
+        enabled: saved.enabled,
+      })
       setConfig(prev => ({ ...prev, ...saved }))
     }
+    const key = loadLocalOllamaApiKey()
+    setOllamaApiKeyState(key)
+    apiKeyRef.current = key
     setMounted(true)
   }, [])
+
+  // Pull/push API key when user signs in (Firebase ready)
+  useEffect(() => {
+    if (!mounted) return
+    const uid = getSignedInUid()
+    if (!uid) return
+    void syncAiSettings(uid).then(() => {
+      const key = loadLocalOllamaApiKey()
+      setOllamaApiKeyState(key)
+      apiKeyRef.current = key
+    })
+  }, [mounted])
 
   useEffect(() => {
     if (!mounted || !config.ollamaUrl) return
@@ -153,6 +204,35 @@ export function AIProvider({ children }: { children: ReactNode }) {
     saveAIConfig(toSave)
   }, [mounted, config])
 
+  const setOllamaApiKey = useCallback(async (key: string) => {
+    const t = key.trim()
+    saveLocalOllamaApiKey(t)
+    setOllamaApiKeyState(t)
+    apiKeyRef.current = t
+    const uid = getSignedInUid()
+    if (uid) {
+      try {
+        await pushAiSettings(uid, t)
+      } catch (err) {
+        console.warn('[ai] Failed to sync API key to Firestore', err instanceof Error ? err.message : err)
+      }
+    }
+  }, [])
+
+  const clearOllamaApiKeyFn = useCallback(async () => {
+    clearLocalOllamaApiKey()
+    setOllamaApiKeyState('')
+    apiKeyRef.current = ''
+    const uid = getSignedInUid()
+    if (uid) {
+      try {
+        await pushAiSettings(uid, '')
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [])
+
   const reconnect = useCallback(async () => {
     if (!config.ollamaUrl || healthInProgressRef.current) return
     healthInProgressRef.current = true
@@ -160,7 +240,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
     setConfig(prev => ({ ...prev, status: 'checking' as AIStatus }))
 
     try {
-      const result = await checkOllama(config.ollamaUrl)
+      const result = await checkOllama(config.ollamaUrl, apiKeyRef.current || undefined)
       if (result.available) {
         const model = config.model || pickFirstModel(result.models) || ''
         // Stick to cloud base after fallback so chat/show do not re-hit dead localhost
@@ -175,11 +255,15 @@ export function AIProvider({ children }: { children: ReactNode }) {
           availableModels: result.models,
           model: model || prev.model,
           error: model
-            ? (result.viaCloud ? 'Using Ollama Cloud (local Ollama unavailable)' : undefined)
+            ? (result.viaCloud
+              ? (result.usingUserKey
+                ? 'Using Ollama Cloud with your API key'
+                : 'Using Ollama Cloud (local Ollama unavailable)')
+              : undefined)
             : 'No models found on this Ollama instance.',
         }))
         if (model) {
-          const info = await fetchModelInfo(effectiveUrl, model)
+          const info = await fetchModelInfo(effectiveUrl, model, apiKeyRef.current || undefined)
           if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
             console.log('[ai] Model info:', info)
           }
@@ -215,7 +299,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
     retryCountRef.current = 0
     setConfig(prev => ({ ...prev, ollamaUrl: normalized, status: 'checking' as AIStatus }))
 
-    const result = await checkOllama(normalized)
+    const result = await checkOllama(normalized, apiKeyRef.current || undefined)
     if (result.available) {
       const model = pickFirstModel(result.models) || ''
       // On App Hosting, localhost is the *server's* loopback — cloud fallback
@@ -233,12 +317,14 @@ export function AIProvider({ children }: { children: ReactNode }) {
         enabled: model ? true : prev.enabled,
         error: model
           ? (result.viaCloud
-              ? 'Using Ollama Cloud (hosted app cannot reach Ollama on your PC)'
+              ? (result.usingUserKey
+                ? 'Using Ollama Cloud with your API key'
+                : 'Using Ollama Cloud (hosted app cannot reach Ollama on your PC)')
               : undefined)
           : 'No models found on this Ollama instance.',
       }))
       if (model) {
-        const info = await fetchModelInfo(effectiveUrl, model)
+        const info = await fetchModelInfo(effectiveUrl, model, apiKeyRef.current || undefined)
         if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
           console.log('[ai] Model info:', info)
         }
@@ -272,7 +358,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
     console.log('[ai] Selecting model:', model)
     setConfig(prev => ({ ...prev, model }))
     if (config.ollamaUrl) {
-      fetchModelInfo(config.ollamaUrl, model).then(info => {
+      fetchModelInfo(config.ollamaUrl, model, apiKeyRef.current || undefined).then(info => {
         if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
           console.log('[ai] New model info:', info)
         }
@@ -291,7 +377,11 @@ export function AIProvider({ children }: { children: ReactNode }) {
       const res = await fetch('/api/ai/pull', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ model, ollamaUrl: config.ollamaUrl }),
+        body: JSON.stringify({
+          model,
+          ollamaUrl: config.ollamaUrl,
+          ...(apiKeyRef.current ? { ollamaApiKey: apiKeyRef.current } : {}),
+        }),
       })
 
       if (!res.ok || !res.body) {
@@ -364,7 +454,12 @@ export function AIProvider({ children }: { children: ReactNode }) {
         const res = await fetch('/api/ai/chat', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model: modelToUse, messages, ollamaUrl: config.ollamaUrl }),
+          body: JSON.stringify({
+            model: modelToUse,
+            messages,
+            ollamaUrl: config.ollamaUrl,
+            ...(apiKeyRef.current ? { ollamaApiKey: apiKeyRef.current } : {}),
+          }),
           signal: controller.signal,
         })
 
@@ -412,6 +507,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
     ...config,
     mounted,
     modelInfo,
+    ollamaApiKey,
+    hasUserApiKey: Boolean(ollamaApiKey.trim()),
+    setOllamaApiKey,
+    clearOllamaApiKey: clearOllamaApiKeyFn,
     connect,
     disconnect,
     selectModel,

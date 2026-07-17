@@ -3,6 +3,8 @@
 import { useEffect, useState } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
+import { maskApiKey } from '@/lib/ai/userApiKey'
+import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 
 interface AIConfigModalProps {
   isOpen: boolean
@@ -14,6 +16,7 @@ interface AIConfigModalProps {
  */
 export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   const ai = useAI()
+  const auth = useFirebaseAuth()
   const [hostInput, setHostInput] = useState(() => {
     try {
       return new URL(ai.ollamaUrl || 'http://localhost:11434').hostname
@@ -28,6 +31,10 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       return String(OLLAMA_DEFAULT_PORT)
     }
   })
+  const [apiKeyInput, setApiKeyInput] = useState('')
+  const [showApiKey, setShowApiKey] = useState(false)
+  const [keySaving, setKeySaving] = useState(false)
+  const [keyHint, setKeyHint] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [validationHint, setValidationHint] = useState<string | null>(null)
 
@@ -40,6 +47,10 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
     } catch {
       /* keep */
     }
+    // Do not prefill raw key into the input; show blank until user pastes a new one
+    setApiKeyInput('')
+    setKeyHint(null)
+    setShowApiKey(false)
   }, [isOpen, ai.ollamaUrl])
 
   useEffect(() => {
@@ -80,9 +91,56 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
 
   const handleConnectCloud = async () => {
     setValidationHint(null)
+    let hasKey = ai.hasUserApiKey
+    // Persist key from input first if user typed one this session
+    if (apiKeyInput.trim()) {
+      setKeySaving(true)
+      await ai.setOllamaApiKey(apiKeyInput.trim())
+      setKeySaving(false)
+      setApiKeyInput('')
+      hasKey = true
+    }
+    if (!hasKey) {
+      setValidationHint(
+        'Paste your Ollama Cloud API key above (from ollama.com), save it, then click Use Cloud. Without a key, the server may use a shared app key if configured.',
+      )
+    }
     setConnecting(true)
     await ai.connect('https://ollama.com')
     setConnecting(false)
+  }
+
+  const handleSaveApiKey = async () => {
+    const t = apiKeyInput.trim()
+    if (!t) {
+      setKeyHint('Paste a non-empty API key')
+      return
+    }
+    setKeySaving(true)
+    setKeyHint(null)
+    try {
+      await ai.setOllamaApiKey(t)
+      setApiKeyInput('')
+      setKeyHint(
+        auth.user
+          ? 'Saved under your account (Firestore) and this browser.'
+          : 'Saved in this browser. Sign in to store it under your user in the cloud.',
+      )
+    } finally {
+      setKeySaving(false)
+    }
+  }
+
+  const handleClearApiKey = async () => {
+    setKeySaving(true)
+    setKeyHint(null)
+    try {
+      await ai.clearOllamaApiKey()
+      setApiKeyInput('')
+      setKeyHint('Your Ollama API key was removed from this browser and your cloud settings.')
+    } finally {
+      setKeySaving(false)
+    }
   }
 
   const statusColor =
@@ -145,7 +203,8 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           <div>
             <p className="text-xs text-slate-400">
               <strong className="text-slate-300">Hosted site:</strong> use{' '}
-              <span className="text-cyan-400">Ollama Cloud</span> (server-side API key). Your PC&apos;s{' '}
+              <span className="text-cyan-400">Ollama Cloud</span> with{' '}
+              <strong className="text-slate-300">your own API key</strong> (below). Your PC&apos;s{' '}
               <code className="rounded bg-slate-800 px-1 text-slate-400">localhost:11434</code> is not
               reachable from App Hosting.
             </p>
@@ -153,13 +212,94 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
               <strong className="text-slate-400">Local Ollama:</strong> run{' '}
               <code className="rounded bg-slate-800 px-1 text-slate-400">npm run dev</code>, open{' '}
               <code className="text-slate-400">http://localhost:3000</code>, then connect to{' '}
-              <code className="text-slate-400">localhost:11434</code>.
+              <code className="text-slate-400">localhost:11434</code> (no cloud key needed).
             </p>
           </div>
 
           <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
             <span className={`h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
             <span className="truncate text-[11px] text-slate-400">{statusLabel}</span>
+          </div>
+
+          {/* Per-user Ollama Cloud API key */}
+          <div className="rounded-lg border border-cyan-900/40 bg-cyan-950/20 p-3 space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300/90">
+                Your Ollama Cloud API key
+              </p>
+              {ai.hasUserApiKey && (
+                <span className="font-mono text-[10px] text-slate-500" title="Key is stored">
+                  saved {maskApiKey(ai.ollamaApiKey)}
+                </span>
+              )}
+            </div>
+            <p className="text-[10px] text-slate-500 leading-relaxed">
+              Create a key at{' '}
+              <a
+                href="https://ollama.com"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-cyan-400 hover:underline"
+              >
+                ollama.com
+              </a>
+              . It is sent only to our AI proxy for your requests, preferred over any app default key.
+              Sign in to store it under{' '}
+              <code className="text-slate-400">users/…/settings/ai</code> (owner-only).
+            </p>
+            <div className="flex gap-2">
+              <input
+                type={showApiKey ? 'text' : 'password'}
+                value={apiKeyInput}
+                onChange={(e) => {
+                  setApiKeyInput(e.target.value)
+                  setKeyHint(null)
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') void handleSaveApiKey()
+                }}
+                placeholder={ai.hasUserApiKey ? 'Paste new key to replace…' : 'Paste API key…'}
+                autoComplete="off"
+                spellCheck={false}
+                className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-300 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
+                data-testid="ai-api-key-input"
+              />
+              <button
+                type="button"
+                onClick={() => setShowApiKey((v) => !v)}
+                className="shrink-0 rounded-lg border border-slate-700 px-2 py-2 text-[10px] text-slate-400 hover:text-slate-200"
+              >
+                {showApiKey ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => void handleSaveApiKey()}
+                disabled={keySaving || !apiKeyInput.trim()}
+                className="rounded-lg bg-cyan-800/80 px-3 py-1.5 text-xs font-medium text-cyan-50 hover:bg-cyan-700 disabled:bg-slate-700 disabled:text-slate-500"
+                data-testid="ai-api-key-save"
+              >
+                {keySaving ? 'Saving…' : 'Save key'}
+              </button>
+              {ai.hasUserApiKey && (
+                <button
+                  type="button"
+                  onClick={() => void handleClearApiKey()}
+                  disabled={keySaving}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:border-red-800 hover:text-red-300 disabled:opacity-50"
+                  data-testid="ai-api-key-clear"
+                >
+                  Remove key
+                </button>
+              )}
+            </div>
+            {keyHint && <p className="text-[10px] text-cyan-300/80">{keyHint}</p>}
+            {!auth.user && (
+              <p className="text-[10px] text-amber-400/80">
+                Not signed in — key stays on this device only until you sign in.
+              </p>
+            )}
           </div>
 
           {ai.status === 'downloading' && ai.pullProgress && ai.pullProgress.progress >= 0 && (
@@ -225,7 +365,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
               onClick={() => void handleConnectCloud()}
               disabled={connecting}
               className="rounded-lg border border-cyan-800/50 bg-cyan-950/40 px-3 py-2 text-xs font-medium text-cyan-300 transition-colors hover:bg-cyan-900/40 disabled:opacity-50"
-              title="Use Ollama Cloud via App Hosting (OLLAMA_API_KEY)"
+              title="Connect to Ollama Cloud using your saved API key (or app fallback)"
             >
               Use Cloud
             </button>
@@ -292,8 +432,8 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           )}
 
           <p className="text-[10px] text-slate-600">
-            AI outputs are stored under your signed-in account in Firestore (private, owner-only). Sign
-            in from the user menu for cloud privacy storage.
+            Your API key and AI outputs are stored under your signed-in account in Firestore (private,
+            owner-only). Delete all cloud data from the user menu if you want them wiped.
           </p>
         </div>
       </div>

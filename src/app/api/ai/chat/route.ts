@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { generateChat } from '@/lib/ai/ollama'
 import { validateOllamaUrl } from '@/lib/ai/config'
+import { parseRequestOllamaApiKey } from '@/lib/ai/cloudConfig'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const model = body.model
   const ollamaUrl = body.ollamaUrl
   const messages: { role: 'system' | 'user' | 'assistant'; content: string }[] = body.messages ?? []
+  const apiKey = parseRequestOllamaApiKey(body)
 
   if (!ollamaUrl) {
     return NextResponse.json({ error: 'No Ollama URL provided' }, { status: 400 })
@@ -26,7 +28,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No messages provided' }, { status: 400 })
   }
 
-  console.log('[ai/chat] Streaming chat with', model, 'at', ollamaUrl, '- messages:', messages.length)
+  console.log(
+    '[ai/chat] Streaming chat with',
+    model,
+    'at',
+    ollamaUrl,
+    '- messages:',
+    messages.length,
+    '| userKey:',
+    Boolean(apiKey),
+  )
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
@@ -40,6 +51,8 @@ export async function POST(request: NextRequest) {
             controller.enqueue(encoder.encode(JSON.stringify({ token }) + '\n'))
           } catch {}
         },
+        undefined,
+        { apiKey },
       )
 
       if (!result.success) {

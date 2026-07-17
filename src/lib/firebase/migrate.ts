@@ -5,6 +5,7 @@
 import { syncProjectsBidirectional, type SyncResult } from './projectSync'
 import { syncDiscoveryPreferences } from './settingsSync'
 import { syncPackMetadata, type PackMetaSyncResult } from './packMetaSync'
+import { syncAiSettings } from './aiSettingsSync'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
 export type MigrationReport = {
@@ -12,6 +13,7 @@ export type MigrationReport = {
   projects: SyncResult
   packs: PackMetaSyncResult
   preferences: 'pushed' | 'pulled' | 'none' | 'error'
+  aiSettings: 'pushed' | 'pulled' | 'none' | 'error'
   message: string
   finishedAt: string
 }
@@ -54,20 +56,31 @@ export async function runFirebaseMigration(uid: string): Promise<MigrationReport
     preferences = 'error'
   }
 
+  let aiSettings: MigrationReport['aiSettings'] = 'none'
+  try {
+    aiSettings = await syncAiSettings(uid)
+  } catch {
+    aiSettings = 'error'
+  }
+
   const finishedAt = new Date().toISOString()
   setLastMigrateAt(finishedAt)
 
   const ok =
-    projects.errors.length === 0 && packs.errors.length === 0 && preferences !== 'error'
+    projects.errors.length === 0 &&
+    packs.errors.length === 0 &&
+    preferences !== 'error' &&
+    aiSettings !== 'error'
   const message = ok
-    ? `Synced ${projects.pushed}↑ ${projects.pulled}↓ projects; ${packs.pushed}↑ ${packs.pulled}↓ pack meta; prefs ${preferences}.`
-    : `Sync finished with issues: ${[...projects.errors, ...packs.errors].slice(0, 3).join('; ') || preferences}`
+    ? `Synced ${projects.pushed}↑ ${projects.pulled}↓ projects; ${packs.pushed}↑ ${packs.pulled}↓ pack meta; prefs ${preferences}; AI key ${aiSettings}.`
+    : `Sync finished with issues: ${[...projects.errors, ...packs.errors].slice(0, 3).join('; ') || preferences || aiSettings}`
 
   const report: MigrationReport = {
     ok,
     projects,
     packs,
     preferences,
+    aiSettings,
     message,
     finishedAt,
   }
@@ -82,6 +95,7 @@ export async function runFirebaseMigration(uid: string): Promise<MigrationReport
       packPushed: packs.pushed,
       packPulled: packs.pulled,
       prefs: preferences,
+      aiSettings,
       ok,
     },
     { source: 'firebase' },

@@ -8,6 +8,8 @@ import {
   isOllamaCloudUrl,
   getCloudAuthHeaders,
   ollamaRequestHeaders,
+  resolveOllamaApiKey,
+  parseRequestOllamaApiKey,
 } from '@/lib/ai/cloudConfig'
 
 describe('cloudConfig', () => {
@@ -33,6 +35,16 @@ describe('cloudConfig', () => {
     expect(getOllamaApiKey()).toBe('test-key')
   })
 
+  test('user API key wins over server env', () => {
+    process.env.OLLAMA_API_KEY = 'server-key'
+    expect(resolveOllamaApiKey('user-key')).toBe('user-key')
+    expect(resolveOllamaApiKey('')).toBe('server-key')
+    expect(resolveOllamaApiKey(null)).toBe('server-key')
+    expect(getCloudAuthHeaders('https://ollama.com', 'user-key')).toEqual({
+      Authorization: 'Bearer user-key',
+    })
+  })
+
   test('auth headers only for cloud URLs', () => {
     process.env.OLLAMA_API_KEY = 'secret-key'
     expect(getCloudAuthHeaders('http://localhost:11434')).toEqual({})
@@ -44,5 +56,12 @@ describe('cloudConfig', () => {
       'Content-Type': 'application/json',
       Authorization: 'Bearer secret-key',
     })
+  })
+
+  test('parseRequestOllamaApiKey reads body fields', () => {
+    expect(parseRequestOllamaApiKey({ ollamaApiKey: ' abc ' })).toBe('abc')
+    expect(parseRequestOllamaApiKey({ apiKey: 'xyz' })).toBe('xyz')
+    expect(parseRequestOllamaApiKey({ ollamaApiKey: '' })).toBeUndefined()
+    expect(parseRequestOllamaApiKey(null)).toBeUndefined()
   })
 })

@@ -56,6 +56,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           },
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
+          ...(ai.ollamaApiKey ? { ollamaApiKey: ai.ollamaApiKey } : {}),
         }),
       })
       const data = (await res.json()) as {

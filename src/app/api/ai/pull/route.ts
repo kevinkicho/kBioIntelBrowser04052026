@@ -1,11 +1,13 @@
 import { NextRequest } from 'next/server'
 import { pullModel } from '@/lib/ai/ollama'
 import { validateOllamaUrl } from '@/lib/ai/config'
+import { parseRequestOllamaApiKey } from '@/lib/ai/cloudConfig'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
   const modelName = body.model
   const ollamaUrl = body.ollamaUrl
+  const apiKey = parseRequestOllamaApiKey(body)
 
   if (!ollamaUrl) {
     return new Response(JSON.stringify({ status: 'error', error: 'No Ollama URL provided' }) + '\n', {
@@ -27,16 +29,21 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  console.log('[ai/pull] Starting model pull:', modelName, 'at', validatedUrl)
+  console.log('[ai/pull] Starting model pull:', modelName, 'at', validatedUrl, '| userKey:', Boolean(apiKey))
 
   const encoder = new TextEncoder()
   const stream = new ReadableStream({
     async start(controller) {
-      const result = await pullModel(validatedUrl, modelName, (status, progress) => {
-        try {
-          controller.enqueue(encoder.encode(JSON.stringify({ status, progress }) + '\n'))
-        } catch {}
-      })
+      const result = await pullModel(
+        validatedUrl,
+        modelName,
+        (status, progress) => {
+          try {
+            controller.enqueue(encoder.encode(JSON.stringify({ status, progress }) + '\n'))
+          } catch {}
+        },
+        { apiKey },
+      )
 
       if (!result.success) {
         controller.enqueue(encoder.encode(JSON.stringify({ status: 'error', error: result.error }) + '\n'))

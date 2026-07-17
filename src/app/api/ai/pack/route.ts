@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { validateOllamaUrl } from '@/lib/ai/config'
 import { generateChat } from '@/lib/ai/ollama'
+import { parseRequestOllamaApiKey } from '@/lib/ai/cloudConfig'
 import {
   buildPackAiContext,
   packModeSystemPrompt,
@@ -25,7 +26,10 @@ export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Partial<PackAiRequest> & {
     model?: string
     ollamaUrl?: string
+    ollamaApiKey?: string
+    apiKey?: string
   }
+  const apiKey = parseRequestOllamaApiKey(body)
 
   const mode = body.mode
   if (!mode || !MODES.has(mode)) {
@@ -50,9 +54,16 @@ export async function POST(request: NextRequest) {
   ]
 
   let raw = ''
-  const result = await generateChat(validation.normalized!, body.model, messages, (token) => {
-    raw += token
-  })
+  const result = await generateChat(
+    validation.normalized!,
+    body.model,
+    messages,
+    (token) => {
+      raw += token
+    },
+    undefined,
+    { apiKey },
+  )
 
   if (!result.success) {
     return NextResponse.json({
