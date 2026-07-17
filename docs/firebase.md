@@ -46,13 +46,37 @@ FIREBASE_ADMIN_CREDENTIALS_JSON={"type":"service_account",...}
 
 Admin key JSON is **gitignored** (`*-firebase-adminsdk-*.json`).
 
-## App Hosting environment variables
+## App Hosting environment variables (not Firebase Hosting)
 
-**Important:** The Firebase **Admin SDK cannot set App Hosting env vars**. App Hosting config is applied via:
+App Hosting ≠ classic Firebase Hosting. Env is **not** `firebase functions:config` and **not** Hosting-only.
 
-1. **`apphosting.yaml`** (repo)  
-2. **Cloud Secret Manager** — referenced as `secret:`  
-3. **Firebase Console** → App Hosting → Settings → Environment (overrides yaml)
+### Where env actually lives (official hierarchy)
+
+1. **Console overrides** — Settings → Environment (“environment variable overrides”)  
+2. **`apphosting.<env>.yaml`** — e.g. `apphosting.prod.yaml` (backend `environment: prod`)  
+3. **`apphosting.yaml`** — repo source of truth for this project  
+4. **Firebase system** — `FIREBASE_CONFIG`, `FIREBASE_WEBAPP_CONFIG`, etc.
+
+**“No environment variable overrides found” in the Console is normal** when you only use yaml + secrets. That panel is *optional console overrides*, not a list of all active vars.
+
+**To see vars that actually ran on a deploy:** open a **rollout/build** → **Environment variables in this build**. You should see `origin: APPHOSTING_YAML` for our keys.
+
+### Agent / CLI workflow (firebase-app-hosting-basics skill)
+
+```powershell
+# Push secrets from local .env + rewrite apphosting.yaml
+npm run firebase:apphosting:env
+
+# Same + force rollout
+npm run firebase:apphosting:env:rollout
+
+# Or skill-style commands:
+npx -y firebase-tools@latest apphosting:secrets:set OLLAMA_API_KEY --data-file - --force
+npx -y firebase-tools@latest apphosting:secrets:grantaccess OLLAMA_API_KEY -b biointel
+npx -y firebase-tools@latest apphosting:rollouts:create biointel -b main -f
+```
+
+Secrets live in **Cloud Secret Manager**; yaml only has `secret: NAME` references (safe to commit).
 
 ### GitHub “Google API Key” secret scanning (normal)
 
