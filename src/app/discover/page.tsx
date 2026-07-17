@@ -95,12 +95,16 @@ export default function DiscoverPage() {
     router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
   }
 
-  function handleSearch(query: string) {
+  function handleSearch(query: string, opts?: { diseaseId?: string }) {
     const params = new URLSearchParams()
     params.set('q', query)
+    if (opts?.diseaseId) params.set('diseaseId', opts.diseaseId)
     if (state.targets.length > 0) params.set('targets', state.targets.join(','))
     router.replace(`/discover?${params.toString()}`, { scroll: false })
-    void search(query, { targets: state.targets })
+    void search(query, {
+      targets: state.targets,
+      diseaseId: opts?.diseaseId,
+    })
   }
 
   function handleDiseaseSelect(diseaseId: string) {
