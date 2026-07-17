@@ -16,7 +16,11 @@ import { ExportButton } from '@/components/profile/ExportButton'
 import { CiteButton } from '@/components/profile/CiteButton'
 import { ShareButton } from '@/components/profile/ShareButton'
 import { computeMoleculeSummary } from '@/lib/moleculeSummary'
-import { fetchCategoryData, type CategoryLoadState } from '@/lib/fetchCategory'
+import {
+  fetchCategoryData,
+  peekCategoryClientCache,
+  type CategoryLoadState,
+} from '@/lib/fetchCategory'
 import type { FreshnessMap } from '@/lib/dataFreshness'
 import { buildGraphData } from '@/lib/buildGraphData'
 import type { CompanyProduct, SynthesisRoute, Patent, UniprotEntry, CadsrConcept, TranslatorAssociation, AnvilDataset, ImmPortStudy, NeuroMMSigSignature } from '@/lib/types'
@@ -39,7 +43,10 @@ import { VendorsPanel } from '@/components/profile/VendorsPanel'
 import { ProfilePanelProvider } from '@/components/profile/ProfilePanelContext'
 import { sessionHistory } from '@/lib/sessionHistory'
 import { recordSearch } from '@/lib/searchHistory'
-import { invalidateProfileClientCache } from '@/lib/profileClientCache'
+import {
+  hydrateProfileRevisitFromIdb,
+  invalidateProfileClientCache,
+} from '@/lib/profileClientCache'
 import { categoryForPanel, type CategoryApiTrace } from '@/lib/panelApiTrace'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import type { ScoreVector } from '@/lib/domain'
@@ -216,8 +223,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
   const refreshKickoff = useRef(false)
 
-  // Search history stores href only; category/pipeline payloads live in
-  // profileClientCache (session) so reopening a history item skips full re-fetch.
+  // Search history stores href only; payloads live in profileClientCache L1/L2.
   useEffect(() => {
     if (isEmbed) return
     recordSearch({
@@ -317,11 +323,26 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     if (pendingRef.current.has(catId) && !opts?.force) return
     const cur = categoryStatusRef.current[catId]
     if (!opts?.force && !opts?.refresh && (cur === 'loaded' || cur === 'loading')) return
+    const doRefresh = opts?.refresh || forceRefresh
+
+    // Phase A.1: sync L1 hit → no loading flash / overlay
+    if (!doRefresh) {
+      const peeked = peekCategoryClientCache(cid, catId, apiOverrides, apiParams)
+      if (peeked) {
+        setCategoryData(prev => ({ ...prev, [catId]: peeked }))
+        setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
+        setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
+        const trace = peeked._apiTrace as CategoryApiTrace | undefined
+        if (trace) setCategoryTraces((prev) => ({ ...prev, [catId]: trace }))
+        return
+      }
+    }
+
     pendingRef.current.add(catId)
     setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
     try {
       const data = await fetchCategoryData(cid, catId, apiOverrides, apiParams, {
-        refresh: opts?.refresh || forceRefresh,
+        refresh: doRefresh,
       })
       setCategoryData(prev => ({ ...prev, [catId]: data }))
       setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
@@ -336,6 +357,24 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       pendingRef.current.delete(catId)
     }
   }, [cid, apiOverrides, apiParams, forceRefresh])
+
+  // Phase B: promote IDB → L1, then re-kick idle categories that can resolve from memory.
+  useEffect(() => {
+    if (isEmbed || snapshotId || forceRefresh) return
+    let cancelled = false
+    void hydrateProfileRevisitFromIdb(cid).then(() => {
+      if (cancelled) return
+      for (const id of ALL_CATEGORY_IDS) {
+        if (categoryStatusRef.current[id] !== 'idle') continue
+        if (peekCategoryClientCache(cid, id, apiOverrides, apiParams)) {
+          void loadCategory(id)
+        }
+      }
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [cid, isEmbed, snapshotId, forceRefresh, apiOverrides, apiParams, loadCategory])
 
   const loadingCategories = useMemo(() => {
     const s = new Set<CategoryId>()

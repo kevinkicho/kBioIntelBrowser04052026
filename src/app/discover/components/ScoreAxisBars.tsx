@@ -82,6 +82,26 @@ export function ScoreAxisBars({
       data-testid="score-axis-bars"
       data-score-phase={scores.scorePhase}
     >
+      {!compact && (
+        <p
+          className="text-[9px] leading-snug text-slate-600 mb-0.5"
+          data-testid="score-trust-footnote"
+        >
+          Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
+          {onOpenBreakdown ? (
+            <>
+              {' '}
+              <button
+                type="button"
+                onClick={onOpenBreakdown}
+                className="text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
+              >
+                How scoring works
+              </button>
+            </>
+          ) : null}
+        </p>
+      )}
       {AXIS_ORDER.map((key) => {
         const v = scores.axes[key]
         const status = scores.axisStatus[key]

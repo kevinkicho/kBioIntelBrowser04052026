@@ -27,7 +27,7 @@ Coding agents and human implementers: read this before changing product behavior
 - Events: `src/lib/productEvents.ts`
 - Extractors: `src/lib/evidence/extractAll.ts`
 - Search history sidebar: `src/lib/searchHistory.ts`, `src/components/layout/SearchHistorySidebar.tsx`
-- Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/fetchCategory.ts` (session L1; IDB L2 see design)
+- Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/profileRevisitIdb.ts`, `src/lib/fetchCategory.ts`
 
 ## Commands
 

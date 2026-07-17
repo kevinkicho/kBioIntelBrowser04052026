@@ -1,5 +1,6 @@
 'use client'
 
+import { useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import {
@@ -9,6 +10,7 @@ import {
   hrefWithRefresh,
   kindLabel,
 } from '@/lib/searchHistory'
+import { clearAllProfileRevisitCache } from '@/lib/profileClientCache'
 
 const FILTERS: { id: SearchHistoryFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -71,6 +73,7 @@ function isActiveHref(pathname: string, href: string): boolean {
 export function SearchHistorySidebar() {
   const router = useRouter()
   const pathname = usePathname() ?? ''
+  const [cacheClearing, setCacheClearing] = useState(false)
   const {
     hydrated,
     visible,
@@ -91,6 +94,22 @@ export function SearchHistorySidebar() {
   const openEntry = (entry: SearchHistoryEntry, refresh: boolean) => {
     const href = refresh ? hrefWithRefresh(entry.href) : entry.href
     router.push(href)
+  }
+
+  const clearProfileCache = async () => {
+    if (
+      !window.confirm(
+        'Clear cached profile data (categories & pipeline) for all molecules? Search history is kept. Next open will re-fetch live sources.',
+      )
+    ) {
+      return
+    }
+    setCacheClearing(true)
+    try {
+      await clearAllProfileRevisitCache()
+    } finally {
+      setCacheClearing(false)
+    }
   }
 
   if (ui.collapsed) {
@@ -203,8 +222,8 @@ export function SearchHistorySidebar() {
       <div className="flex-1 overflow-y-auto px-2 py-2">
         {visible.length === 0 ? (
           <p className="px-2 py-6 text-center text-[11px] leading-relaxed text-slate-600">
-            No searches yet. Molecule, disease, gene, and Discover queries appear here so you can
-            reopen them without waiting for a full multi-source fetch.
+            No searches yet. Molecule, disease, gene, and Discover queries appear here. Reopening a
+            molecule uses session/disk cache when available so panels do not re-fetch from every source.
           </p>
         ) : (
           <ul className="space-y-1" data-testid="search-history-list">
@@ -292,10 +311,21 @@ export function SearchHistorySidebar() {
         )}
       </div>
 
-      <div className="border-t border-slate-800/60 px-3 py-2 text-[9px] leading-snug text-slate-600">
-        <strong className="text-slate-500">Open</strong> reuses warm server/browser cache when
-        possible. <strong className="text-slate-500">Refresh</strong> re-queries public APIs for the
-        latest data (slower).
+      <div className="border-t border-slate-800/60 px-3 py-2 space-y-1.5">
+        <p className="text-[9px] leading-snug text-slate-600">
+          <strong className="text-slate-500">Open</strong> uses session/disk cache when available.{' '}
+          <strong className="text-slate-500">Refresh</strong> re-queries public APIs (slower).
+        </p>
+        <button
+          type="button"
+          onClick={() => void clearProfileCache()}
+          disabled={cacheClearing}
+          className="w-full rounded border border-slate-800 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500 hover:border-slate-700 hover:text-slate-300 disabled:opacity-50"
+          title="Clear cached category and pipeline data (keeps search history)"
+          data-testid="search-history-clear-profile-cache"
+        >
+          {cacheClearing ? 'Clearing profile cache…' : 'Clear profile cache'}
+        </button>
       </div>
     </aside>
   )

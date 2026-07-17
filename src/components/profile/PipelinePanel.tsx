@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
 import {
   deleteProfileClientCache,
-  getProfileClientCache,
+  getProfileClientCacheAsync,
   profileCacheKey,
   setProfileClientCache,
 } from '@/lib/profileClientCache'
@@ -60,8 +60,8 @@ export function PipelinePanel({ cid }: { cid: number }) {
       setLoading(true)
       setError(null)
       const cacheKey = profileCacheKey('pipeline', cid)
-      // Instant reopen from search history / SPA navigation
-      const cached = getProfileClientCache<PipelineData>(cacheKey)
+      // L1 memory or L2 IDB (history reopen / hard reload)
+      const cached = await getProfileClientCacheAsync<PipelineData>(cacheKey)
       if (cached) {
         if (!cancelled) {
           setData(cached)

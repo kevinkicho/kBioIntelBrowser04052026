@@ -3,6 +3,7 @@ import { clientFetch } from './clientFetch'
 import type { ApiIdentifierType, ApiParamValue } from './apiIdentifiers'
 import {
   getProfileClientCache,
+  getProfileClientCacheAsync,
   profileCacheKey,
   setProfileClientCache,
 } from './profileClientCache'
@@ -34,6 +35,27 @@ function categoryCacheExtra(
   return `${categoryId}|${o}|${p}`
 }
 
+export function categoryProfileCacheKey(
+  cid: number,
+  categoryId: CategoryId,
+  apiOverrides?: Record<string, ApiIdentifierType>,
+  apiParams?: Record<string, ApiParamValue>,
+): string {
+  return profileCacheKey('category', cid, categoryCacheExtra(categoryId, apiOverrides, apiParams))
+}
+
+/** Sync L1 peek — avoids loading flash when memory already has data. */
+export function peekCategoryClientCache(
+  cid: number,
+  categoryId: CategoryId,
+  apiOverrides?: Record<string, ApiIdentifierType>,
+  apiParams?: Record<string, ApiParamValue>,
+): Record<string, unknown> | undefined {
+  return getProfileClientCache<Record<string, unknown>>(
+    categoryProfileCacheKey(cid, categoryId, apiOverrides, apiParams),
+  )
+}
+
 export async function fetchCategoryData(
   cid: number,
   categoryId: CategoryId,
@@ -41,12 +63,11 @@ export async function fetchCategoryData(
   apiParams?: Record<string, ApiParamValue>,
   opts?: { refresh?: boolean },
 ): Promise<Record<string, unknown>> {
-  const cacheExtra = categoryCacheExtra(categoryId, apiOverrides, apiParams)
-  const cacheKey = profileCacheKey('category', cid, cacheExtra)
+  const cacheKey = categoryProfileCacheKey(cid, categoryId, apiOverrides, apiParams)
 
-  // History / SPA revisit: serve last successful payload without network.
+  // History / SPA / hard-reload: L1 memory then L2 IDB without network.
   if (!opts?.refresh) {
-    const cached = getProfileClientCache<Record<string, unknown>>(cacheKey)
+    const cached = await getProfileClientCacheAsync<Record<string, unknown>>(cacheKey)
     if (cached) return cached
   }
 

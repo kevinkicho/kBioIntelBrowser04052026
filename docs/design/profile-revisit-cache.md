@@ -5,9 +5,10 @@
 **Audience:** Implementers (engineers / coding agents) in this repo  
 **Author role:** Principal product + systems design  
 **Date:** 2026-07-16  
-**Status:** Implementable design — **Rev 1.0**  
-  - **Phase A (session memory):** shipped on main (this revision documents as-built + contracts)  
-  - **Phase B (IndexedDB durability):** design-complete, not required for Phase A DoD  
+**Status:** Implementable design — **Rev 1.1**  
+  - **Phase A (session memory):** shipped  
+  - **Phase A.1 (zero-flash peek):** shipped  
+  - **Phase B (IndexedDB durability):** shipped (`profileRevisitIdb.ts` + L1/L2 wire + sidebar clear)  
 **Constraint law (binding):** Free public APIs only; evidence-first; no regulatory decision support; **solo + file export default (localStorage / IDB / download)**; no multi-tenant cloud DB as a product requirement  
 **Beachhead fit:** Reduces friction when a user reopens the same CID while building a shortlist / pack (M1 loop steps that leave and re-enter profile)  
 **Canonical path:** `docs/design/profile-revisit-cache.md`  
@@ -15,13 +16,15 @@
 - `docs/design/discovery-workbench-v2.1.md` — G5 solo UX friction, Wave 3  
 - `docs/design/agentic-workflow-cli.md` — agent entry points  
 - Root `AGENTS.md`  
-**As-built code (Phase A):**  
-- `src/lib/profileClientCache.ts`  
-- `src/lib/fetchCategory.ts`  
+**As-built code (Phase A–B):**  
+- `src/lib/profileClientCache.ts` — L1 memory + L2 bridge  
+- `src/lib/profileRevisitIdb.ts` — IndexedDB store `biointel-profile-revisit`  
+- `src/lib/fetchCategory.ts` — peek + async L1/L2 read  
 - `src/components/profile/PipelinePanel.tsx`  
-- `src/app/molecule/[id]/ProfilePageClient.tsx` (refresh bust)  
-- `src/lib/searchHistory.ts` + `SearchHistorySidebar.tsx` (href-only history)  
-- Supporting reliability (same friction wave): `src/lib/api/pubchem.ts` (in-flight + process cache), `src/lib/clientFetch.ts` (retries)
+- `src/app/molecule/[id]/ProfilePageClient.tsx` — hydrate + forceRefresh invalidate  
+- `src/components/layout/SearchHistorySidebar.tsx` — clear profile cache  
+- Tests: `__tests__/lib/profileRevisitCache.test.ts`  
+- Supporting reliability: `src/lib/api/pubchem.ts`, `src/lib/clientFetch.ts`
 
 ---
 
@@ -507,8 +510,15 @@ npx tsc --noEmit
 
 | Phase | Storage | Survives SPA nav | Survives reload | Status |
 |---|---|---|---|---|
-| **A** | In-memory Map | Yes | No | **Shipped** (document as-built) |
-| **A.1** | Same + peek | Yes | No | Optional polish |
-| **B** | IndexedDB + memory | Yes | Yes (≤8 CIDs, 24h) | **Designed — implement next** |
+| **A** | In-memory Map | Yes | No alone | **Shipped** |
+| **A.1** | Same + peek | Yes | No alone | **Shipped** |
+| **B** | IndexedDB + memory | Yes | Yes (≤8 CIDs, 24h) | **Shipped** |
 
 Search history remains a **navigation log**. Profile revisit cache is the **payload layer** that makes “open previous search” feel like resume, not restart — without violating solo-local product law or Refresh honesty.
+
+### Rev history
+
+| Rev | Date | Notes |
+|---|---|---|
+| 1.0 | 2026-07-16 | Problem, Phase A as-built, Phase B design |
+| 1.1 | 2026-07-16 | Phase A.1 + B implemented; clear cache UX; unit tests |
