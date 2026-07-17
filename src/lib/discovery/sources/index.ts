@@ -16,6 +16,7 @@ export {
   MAX_COMPOUNDS_PER_TARGET,
 } from './chemblByTarget'
 export type { GatherGenesResult } from './genes'
+export { diseaseAssociationGenesOnly } from './genes'
 export type { GatherTargetMoleculesResult } from './dgidb'
 export type { GatherTrialDrugsResult } from './trials'
 export type { GatherIndicationsResult, IndicationRow } from './indications'

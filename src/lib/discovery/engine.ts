@@ -96,15 +96,26 @@ function findPinnedDisease(hits: DiseaseResult[], diseaseId: string): DiseaseRes
   return hits.find((d) => d.id && d.id.toLowerCase() === lower)
 }
 
+/**
+ * Inject user-pinned symbols into the gene list used for drug gather / scoring.
+ * These are NOT disease–gene associations from public DBs — source is `pinned-target`
+ * so the GeneTable can hide them (pins already have TargetPinPanel).
+ * Score 1.0 only affects gather preference + geneAssociation axis when a drug hits the pin.
+ */
 function mergePinnedGenes(genes: DiseaseGene[], pins: string[]): DiseaseGene[] {
   if (pins.length === 0) return genes
-  const have = new Set(genes.map((g) => g.symbol.toUpperCase()))
+  const bySym = new Map(genes.map((g) => [g.symbol.toUpperCase(), g]))
   const out = [...genes]
   for (const symbol of pins) {
     const s = symbol.trim().toUpperCase()
-    if (!s || have.has(s)) continue
-    have.add(s)
-    out.unshift({ symbol: s, score: 1, source: 'pinned-target' } as DiseaseGene)
+    if (!s) continue
+    const existing = bySym.get(s)
+    if (existing) {
+      // Real disease association already present — keep DB score/source; pin still biases via panel
+      continue
+    }
+    bySym.set(s, { symbol: s, score: 1, source: 'pinned-target' })
+    out.unshift({ symbol: s, score: 1, source: 'pinned-target' })
   }
   return out
 }

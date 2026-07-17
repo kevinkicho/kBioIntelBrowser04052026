@@ -85,7 +85,8 @@ export async function gatherDiseaseGenes(
 
 /**
  * Pure: top gene symbols for DGIdb from an already-gathered DiseaseGene list.
- * Prefer OT-sourced genes first (core), then fill from supporting sources by score order.
+ * Priority: user pins → Open Targets (core) → other supporting sources by score.
+ * Pins positively bias gene→drug gather without inventing disease associations.
  */
 export function geneSymbolsForDgidb(
   genes: DiseaseGene[],
@@ -96,24 +97,37 @@ export function geneSymbolsForDgidb(
   const symbols: string[] = []
   const seen = new Set<string>()
 
-  // Prefer Open Targets (core) while preserving score order within that set
-  for (const g of genes) {
-    if (!g.source.startsWith('Open Targets')) continue
-    const sym = g.symbol
-    if (!sym || seen.has(sym.toUpperCase())) continue
-    seen.add(sym.toUpperCase())
+  const push = (sym: string | undefined) => {
+    if (!sym) return false
+    const key = sym.toUpperCase()
+    if (seen.has(key)) return false
+    seen.add(key)
     symbols.push(sym)
-    if (symbols.length >= max) return symbols
+    return symbols.length >= max
   }
 
-  // Fill remaining slots from supporting sources (already score-sorted overall)
+  // 1) User-pinned targets first (strong positive bias for drug gather)
   for (const g of genes) {
-    const sym = g.symbol
-    if (!sym || seen.has(sym.toUpperCase())) continue
-    seen.add(sym.toUpperCase())
-    symbols.push(sym)
-    if (symbols.length >= max) break
+    if (g.source !== 'pinned-target') continue
+    if (push(g.symbol)) return symbols
+  }
+
+  // 2) Open Targets (core disease associations)
+  for (const g of genes) {
+    if (!g.source.startsWith('Open Targets')) continue
+    if (push(g.symbol)) return symbols
+  }
+
+  // 3) Supporting sources (DisGeNET, etc.) — already score-sorted overall
+  for (const g of genes) {
+    if (g.source === 'pinned-target' || g.source.startsWith('Open Targets')) continue
+    if (push(g.symbol)) return symbols
   }
 
   return symbols
+}
+
+/** Genes from public DBs only (exclude synthetic user pins). */
+export function diseaseAssociationGenesOnly(genes: DiseaseGene[]): DiseaseGene[] {
+  return genes.filter((g) => g.source !== 'pinned-target')
 }

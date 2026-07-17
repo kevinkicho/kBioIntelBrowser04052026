@@ -62,7 +62,7 @@ export function TargetPinPanel({
             Pinned targets
           </span>
           <span className="text-[10px] text-slate-500">
-            ({targets.length}) — used to bias gene→drug gather when ranking
+            ({targets.length}) — prioritized in gene→drug gather (DGIdb / ChEMBL-by-target)
           </span>
         </div>
         {onClear && (
@@ -102,12 +102,11 @@ export function TargetPinPanel({
           </span>
         ))}
       </div>
-      {waitingForDisease && (
-        <p className="mt-2 text-[11px] text-slate-500">
-          Enter a disease above to rank candidates for these targets. Pins survive
-          disease confirm via the URL <code className="text-slate-600">targets=</code> param.
-        </p>
-      )}
+      <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
+        {waitingForDisease
+          ? 'Enter a disease above to rank candidates. Pins survive via the URL targets= param and are preferred when gathering drugs for ranking (deterministic — not AI rank).'
+          : 'Pinned symbols are preferred when gathering drugs for this disease (positive bias). Ranking stays deterministic; AI is not used in the score path.'}
+      </p>
     </div>
   )
 }
