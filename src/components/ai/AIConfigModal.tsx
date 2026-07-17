@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { useAI } from '@/lib/ai/useAI'
 import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
 import { maskApiKey } from '@/lib/ai/userApiKey'
@@ -70,8 +71,6 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       document.body.style.overflow = 'unset'
     }
   }, [isOpen, onClose])
-
-  if (!isOpen) return null
 
   const handleConnect = async () => {
     // Empty / invalid port → Ollama default 11434
@@ -185,21 +184,32 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
     setConnecting(false)
   }
 
-  return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-4">
-      <div
-        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
+  // Portal to body so sticky header z-40 stacking does not bury the overlay
+  if (!isOpen || typeof document === 'undefined') return null
+
+  const modal = (
+    <div
+      className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4"
+      data-testid="ai-config-modal-root"
+    >
+      {/* Full-viewport dim + blur; click away closes */}
+      <button
+        type="button"
+        className="absolute inset-0 z-0 cursor-default border-0 bg-slate-950/75 backdrop-blur-md"
         onClick={onClose}
-        aria-hidden
+        aria-label="Close AI settings"
+        data-testid="ai-config-backdrop"
       />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-config-title"
-        className="relative z-[1] flex w-full max-w-lg max-h-[min(100dvh,100vh)] sm:max-h-[min(100dvh-2rem,100vh-2rem)] flex-col overflow-hidden rounded-t-2xl border border-slate-700/60 bg-[#0f1117] shadow-2xl shadow-black/50 sm:my-auto sm:rounded-2xl"
+        className="relative z-10 flex w-full max-w-lg max-h-[min(100dvh,100vh)] sm:max-h-[min(100dvh-2rem,100vh-2rem)] flex-col overflow-hidden rounded-t-2xl border border-slate-700/60 bg-[#0f1117] shadow-2xl shadow-black/50 sm:my-auto sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
       >
         {/* Sticky header so close stays reachable when body scrolls */}
-        <div className="flex shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-900/95 px-5 py-3.5 backdrop-blur-sm">
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-900 px-5 py-3.5">
           <h2 id="ai-config-title" className="text-base font-semibold text-slate-100">
             Configure AI
           </h2>
@@ -483,4 +493,6 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       </div>
     </div>
   )
+
+  return createPortal(modal, document.body)
 }
