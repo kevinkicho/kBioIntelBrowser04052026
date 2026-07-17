@@ -44,7 +44,16 @@ export default async function MoleculePage({ params }: { params: { id: string } 
   const cid = parseInt(params.id, 10)
   if (isNaN(cid)) notFound()
 
-  const molecule = await getMoleculeById(cid)
+  // Catch upstream throws so MyChem shell can still render (App Hosting / PubChem 503)
+  let molecule = await getMoleculeById(cid).catch(() => null)
+  if (!molecule) {
+    try {
+      const { getMoleculeByCidViaMyChem } = await import('@/lib/api/cloudSearchFallback')
+      molecule = await getMoleculeByCidViaMyChem(cid)
+    } catch {
+      molecule = null
+    }
+  }
   if (!molecule) notFound()
 
   return (
