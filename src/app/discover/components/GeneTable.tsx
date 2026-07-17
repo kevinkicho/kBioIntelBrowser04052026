@@ -135,8 +135,9 @@ export function GeneTable({
                 </button>
               )}
               <Link
-                href={`/gene/${gene.symbol}`}
+                href={`/gene?q=${encodeURIComponent(gene.symbol)}`}
                 className="min-w-0 flex-1 flex items-center gap-1.5"
+                title={`Open gene search for ${gene.symbol}`}
               >
                 <span
                   className={`text-sm font-mono font-semibold truncate ${

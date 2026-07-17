@@ -82,8 +82,9 @@ export function TargetPinPanel({
             className="inline-flex items-center gap-1 rounded-md border border-emerald-800/50 bg-emerald-900/40 pl-2 pr-1 py-0.5"
           >
             <Link
-              href={`/gene?q=${encodeURIComponent(symbol)}`}
+              href={`/gene/${encodeURIComponent(symbol)}`}
               className="text-xs font-mono font-semibold text-emerald-300 hover:text-emerald-200"
+              title={`Open ${symbol} gene page`}
             >
               {symbol}
             </Link>
