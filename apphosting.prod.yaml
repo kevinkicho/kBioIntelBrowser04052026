@@ -1,7 +1,8 @@
-# App Hosting environment-specific config for backend environment name: "prod"
+# Environment-specific config for backend environment name: "prod"
 # https://firebase.google.com/docs/app-hosting/multiple-environments
-# Merged over apphosting.yaml (same env — keeps prod explicit for Console clarity).
-# Sensitive values remain Secret Manager references.
+# https://firebase.google.com/docs/app-hosting/configure#secret-parameters
+#
+# Same as apphosting.yaml (prod is the live backend environment name).
 
 runConfig:
   minInstances: 0
@@ -10,55 +11,25 @@ runConfig:
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: NEXT_PUBLIC_FIREBASE_API_KEY
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "kbiointelbrowser04052026.firebaseapp.com"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-    value: "https://kbiointelbrowser04052026-default-rtdb.firebaseio.com"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "kbiointelbrowser04052026"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "kbiointelbrowser04052026.firebasestorage.app"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "888935385467"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:888935385467:web:24d1b4fde75682ad5415de"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: NCBI_EMAIL
-    value: "kevinkicho@gmail.com"
-    availability:
-      - BUILD
-      - RUNTIME
-  - variable: OLLAMA_CLOUD_BASE_URL
-    value: "https://ollama.com"
-    availability:
-      - BUILD
-      - RUNTIME
+  - variable: OLLAMA_API_KEY
+    secret: OLLAMA_API_KEY
   - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
     secret: FIREBASE_ADMIN_CREDENTIALS_JSON
     availability:
       - RUNTIME
-  - variable: OLLAMA_API_KEY
-    secret: OLLAMA_API_KEY
-    availability:
-      - BUILD
-      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: kbiointelbrowser04052026.firebaseapp.com
+  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    value: https://kbiointelbrowser04052026-default-rtdb.firebaseio.com
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: kbiointelbrowser04052026
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: kbiointelbrowser04052026.firebasestorage.app
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "888935385467"
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: 1:888935385467:web:24d1b4fde75682ad5415de
+  - variable: NCBI_EMAIL
+    value: kevinkicho@gmail.com
+  - variable: OLLAMA_CLOUD_BASE_URL
+    value: https://ollama.com
