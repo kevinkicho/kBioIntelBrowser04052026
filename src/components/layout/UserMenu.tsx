@@ -15,6 +15,7 @@ import { clearAllProfileRevisitCache } from '@/lib/profileClientCache'
 import { clearSearchHistory } from '@/lib/searchHistory'
 import { applyBeachheadPersona } from '@/lib/discovery/preferences'
 import { useAI } from '@/lib/ai/useAI'
+import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 
 const QUICK_LINKS: { href: string; label: string; desc: string }[] = [
   { href: '/projects', label: 'Projects', desc: 'Boards & evidence packs' },
@@ -31,6 +32,7 @@ const QUICK_LINKS: { href: string; label: string; desc: string }[] = [
 export function UserMenu() {
   const router = useRouter()
   const ai = useAI()
+  const cloudAuth = useFirebaseAuth()
   const [open, setOpen] = useState(false)
   const [session, setSession] = useState<LocalSession | null>(null)
   const [renaming, setRenaming] = useState(false)
@@ -127,12 +129,20 @@ export function UserMenu() {
       'Sign out of this browser session?\n\n' +
         '• Clears search history, profile panel cache, and local product-event queue\n' +
         '• Starts a fresh local workspace name\n' +
+        '• Signs out of Firebase Auth if connected\n' +
         '• Projects, packs, and preferences on this device are kept\n\n' +
         'Continue?',
     )
     if (!ok) return
     setBusy(true)
     try {
+      if (cloudAuth.user) {
+        try {
+          await cloudAuth.signOutCloud()
+        } catch {
+          /* ignore */
+        }
+      }
       if (ai.mounted && ai.enabled && typeof ai.disconnect === 'function') {
         try {
           ai.disconnect()
@@ -144,6 +154,16 @@ export function UserMenu() {
       setSession(next)
       setOpen(false)
       router.push('/')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const onGoogleSignIn = async () => {
+    setBusy(true)
+    try {
+      await cloudAuth.signInWithGoogle()
+      setOpen(false)
     } finally {
       setBusy(false)
     }
@@ -254,7 +274,11 @@ export function UserMenu() {
                   </button>
                 )}
                 <p className="mt-0.5 text-[10px] text-slate-500">
-                  Local workspace · solo (no cloud login)
+                  {cloudAuth.user
+                    ? `Cloud · ${cloudAuth.user.email || cloudAuth.user.uid.slice(0, 8)}`
+                    : cloudAuth.configured
+                      ? 'Local workspace · optional Google sign-in'
+                      : 'Local workspace · solo (Firebase env not set)'}
                 </p>
                 <p className="mt-0.5 font-mono text-[9px] text-slate-600" title={session.sessionId}>
                   {session.sessionId.slice(0, 18)}…
@@ -268,8 +292,55 @@ export function UserMenu() {
               <span className="rounded-full border border-emerald-900/50 bg-emerald-950/40 px-2 py-0.5 text-[9px] text-emerald-400/90">
                 Free APIs only
               </span>
+              {cloudAuth.user && (
+                <span className="rounded-full border border-sky-900/50 bg-sky-950/40 px-2 py-0.5 text-[9px] text-sky-300/90">
+                  Firebase Auth
+                </span>
+              )}
             </div>
+            {cloudAuth.error && (
+              <p className="mt-2 text-[10px] text-amber-400/90" data-testid="user-menu-firebase-error">
+                {cloudAuth.error}
+              </p>
+            )}
           </div>
+
+          {cloudAuth.configured && (
+            <div className="border-b border-slate-800 py-1">
+              <p className="px-3 py-1 text-[9px] font-medium uppercase tracking-wider text-slate-600">
+                Cloud account (optional)
+              </p>
+              {!cloudAuth.user ? (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy || !cloudAuth.ready}
+                  onClick={() => void onGoogleSignIn()}
+                  className="flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-800/60 disabled:opacity-50"
+                  data-testid="user-menu-google-signin"
+                >
+                  <span className="text-xs text-slate-200">Sign in with Google</span>
+                  <span className="text-[10px] text-slate-600">
+                    Optional — local projects still work offline
+                  </span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  role="menuitem"
+                  disabled={busy}
+                  onClick={() => void cloudAuth.signOutCloud().then(() => setOpen(false))}
+                  className="flex w-full flex-col px-3 py-1.5 text-left hover:bg-slate-800/60 disabled:opacity-50"
+                  data-testid="user-menu-google-signout"
+                >
+                  <span className="text-xs text-slate-200">Sign out of Google</span>
+                  <span className="text-[10px] text-slate-600">
+                    Keeps local workspace data on this device
+                  </span>
+                </button>
+              )}
+            </div>
+          )}
 
           <div className="border-b border-slate-800 py-1">
             <p className="px-3 py-1 text-[9px] font-medium uppercase tracking-wider text-slate-600">

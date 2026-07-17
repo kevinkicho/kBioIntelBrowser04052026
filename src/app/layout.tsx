@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { AIProvider } from '@/lib/ai/useAI'
+import { FirebaseProvider } from '@/lib/firebase/FirebaseProvider'
 import { AppShell } from '@/components/layout/AppShell'
 import './globals.css'
 
@@ -26,7 +27,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark scroll-smooth">
       <body className={`${inter.className} bg-[#0f1117] text-slate-200 min-h-screen`}>
         <AIProvider>
-          <AppShell>{children}</AppShell>
+          <FirebaseProvider>
+            <AppShell>{children}</AppShell>
+          </FirebaseProvider>
         </AIProvider>
         <script
           dangerouslySetInnerHTML={{

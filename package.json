@@ -22,12 +22,16 @@
     "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences|searchHistory|profileRevisitCache|pubchem|localSession|PackBuilder.share|agentActivity\" --passWithNoTests",
     "logs:tail": "node scripts/biointel-cli.js logs tail --n 40",
     "test:live": "node scripts/test-live.js",
-    "tune-timeouts": "node scripts/tune-timeouts.js"
+    "tune-timeouts": "node scripts/tune-timeouts.js",
+    "firebase:deploy:rules": "firebase deploy --only firestore:rules,storage,database",
+    "firebase:deploy:functions": "npm --prefix functions run build && firebase deploy --only functions"
   },
   "dependencies": {
     "@tanstack/react-virtual": "^3.13.23",
     "@types/d3": "^7.4.3",
     "d3": "^7.9.0",
+    "firebase": "^11.10.0",
+    "firebase-admin": "^14.2.0",
     "next": "14.2.35",
     "react": "^18",
     "react-dom": "^18",

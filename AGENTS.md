@@ -66,6 +66,14 @@ npm run biointel -- e2e auto
 - Base URL: `BIOINTEL_BASE` or `http://localhost:33424`
 - Full cookbook: `docs/design/agentic-workflow-cli.md` §3 + §CLI
 
+## Firebase (optional cloud)
+
+- Config: `docs/firebase.md`, `firebase.json`, `apphosting.yaml` (backend **biointel**)
+- Client: `src/lib/firebase/*` — Auth optional; app works fully without cloud
+- Secrets: Admin SDK JSON gitignored; web keys via `NEXT_PUBLIC_FIREBASE_*` in `.env`
+- Deploy rules: `npm run firebase:deploy:rules`
+- **Do not** make Firestore/RTDB required for Discover → pack loop (solo local default)
+
 ## Agent activity logs (local)
 
 - Written to `logs/agent-activity-YYYY-MM-DD.jsonl` (gitignored; see `logs/README.md`)

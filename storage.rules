@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// Optional exports / attachments. Owner-only paths.
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isOwner(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    // Max 25MB per object for personal exports
+    function underSizeLimit() {
+      return request.resource == null || request.resource.size < 25 * 1024 * 1024;
+    }
+
+    match /users/{uid}/exports/{fileName} {
+      allow read: if isOwner(uid);
+      allow write: if isOwner(uid) && underSizeLimit();
+      allow delete: if isOwner(uid);
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if false;
+    }
+  }
+}
