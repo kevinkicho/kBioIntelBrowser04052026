@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getMoleculeById } from '@/lib/api/pubchem'
 import { buildStructureImageUrl } from '@/lib/utils'
+import { extractCasFromSynonyms } from '@/lib/vendorCatalogLinks'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
 import { ScrollToTop } from '@/components/ui/ScrollToTop'
 import { ProfilePageClient } from './ProfilePageClient'
@@ -59,6 +60,8 @@ export default async function MoleculePage({ params }: { params: { id: string } 
           molecularWeight={molecule.molecularWeight}
           inchiKey={molecule.inchiKey}
           iupacName={molecule.iupacName}
+          cas={extractCasFromSynonyms(molecule.synonyms)}
+          synonyms={molecule.synonyms}
         />
       </main>
       <ScrollToTop />

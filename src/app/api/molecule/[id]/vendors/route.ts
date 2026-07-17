@@ -1,4 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
+import {
+  extractCasFromSynonyms,
+  fillCatalogTemplate,
+  SUPPLIER_CATALOG_TEMPLATES,
+  type CatalogLinkVars,
+} from '@/lib/vendorCatalogLinks'
 
 const CACHE_DURATION = 86400
 
@@ -9,48 +15,9 @@ interface VendorResult {
   sourceType: 'supplier' | 'database'
 }
 
-const SUPPLIER_TEMPLATES: { pattern: RegExp; name: string; urlTemplate: string }[] = [
-  { pattern: /\bSigma-Aldrich\b/i, name: 'Sigma-Aldrich', urlTemplate: 'https://www.sigmaaldrich.com/US/en/search/{name}?focus=products' },
-  { pattern: /\bTCI\b.*Chemical/i, name: 'TCI Chemicals', urlTemplate: 'https://www.tcichemicals.com/US/en/search/?q={name}' },
-  { pattern: /\bFisher\s*Chem/i, name: 'Fisher Chemical', urlTemplate: 'https://www.fishersci.com/us/en/search/{name}' },
-  { pattern: /\bThermo\s*Fisher/i, name: 'Thermo Fisher Scientific', urlTemplate: 'https://www.thermofisher.com/search?query={name}' },
-  { pattern: /\bAlfa\s*(Aesar|Chemistry)/i, name: 'Alfa Aesar', urlTemplate: 'https://www.alfa.com/en/search?q={name}' },
-  { pattern: /\bEnamine\b/i, name: 'Enamine', urlTemplate: 'https://enamine.net/catalog-search?term={name}' },
-  { pattern: /\bMolPort\b/i, name: 'MolPort', urlTemplate: 'https://www.molport.com/shop/index/search?search_item={name}' },
-  { pattern: /\bCombi-?Blocks\b/i, name: 'Combi-Blocks', urlTemplate: 'https://www.combiblocks.com/catalog/search?q={name}' },
-  { pattern: /\bChemBridge\b/i, name: 'ChemBridge', urlTemplate: 'https://www.chembridge.com/search/?q={name}' },
-  { pattern: /\bChemDiv\b/i, name: 'ChemDiv', urlTemplate: 'https://chemdiv.com/catalog-search?term={name}' },
-  { pattern: /\bSelleck(?:Chem)?\b/i, name: 'Selleck Chemicals', urlTemplate: 'https://www.selleckchem.com/search.html?q={name}' },
-  { pattern: /\bCayman\s*Chem/i, name: 'Cayman Chemical', urlTemplate: 'https://www.caymanchem.com/search?q={name}' },
-  { pattern: /\bAmbeed\b/i, name: 'Ambeed', urlTemplate: 'https://www.ambeed.com/search.html?keyword={name}' },
-  { pattern: /\bBLD\s*Pharm/i, name: 'BLD Pharmatech', urlTemplate: 'https://www.bldpharm.com/search?keyword={name}' },
-  { pattern: /\bAK\s*Scientific/i, name: 'AK Scientific', urlTemplate: 'https://www.aksci.com/search?keyword={name}' },
-  { pattern: /\bKey\s*Organics/i, name: 'Key Organics / BIONET', urlTemplate: 'https://www.keyorganics.net/search?q={name}' },
-  { pattern: /\bLife\s*Chemicals?\b/i, name: 'Life Chemicals', urlTemplate: 'https://lifechemicals.com/search?query={name}' },
-  { pattern: /\bTargetMol\b/i, name: 'TargetMol', urlTemplate: 'https://www.targetmol.com/search?q={name}' },
-  { pattern: /\bBenchChem\b/i, name: 'BenchChem', urlTemplate: 'https://www.benchchem.com/search?q={name}' },
-  { pattern: /\bVitas[-\s]M\b/i, name: 'Vitas-M Laboratory', urlTemplate: 'https://www.vitasm.com/search?q={name}' },
-  { pattern: /\bBiorbyt\b/i, name: 'Biorbyt', urlTemplate: 'https://www.biorbyt.com/search?keyword={name}' },
-  { pattern: /\bSmolecule\b/i, name: 'Smolecule', urlTemplate: 'https://www.smolecule.com/search?q={name}' },
-  { pattern: /\beMolecules?\b/i, name: 'eMolecules', urlTemplate: 'https://www.emolecules.com/search-structure/?q={name}' },
-  { pattern: /\bA2B\s*Chem\b/i, name: 'A2B Chem', urlTemplate: 'https://www.a2bchem.com/search/?q={name}' },
-  { pattern: /\bBOC\s*Sciences\b/i, name: 'BOC Sciences', urlTemplate: 'https://www.bocsci.com/search?q={name}' },
-  { pattern: /\bMedChem\s*Express\b/i, name: 'MedChem Express', urlTemplate: 'https://www.medchemexpress.com/search.html?q={name}' },
-  { pattern: /\bCSNpharm/i, name: 'CSNpharm', urlTemplate: 'https://www.csnpharm.com/search?q={name}' },
-  { pattern: /\bOtava\b/i, name: 'Otava Chemicals', urlTemplate: 'https://www.otavachemicals.com/search?q={name}' },
-  { pattern: /\bUorsy\b/i, name: 'UORSY', urlTemplate: 'https://uorsy.com/search?q={name}' },
-  { pattern: /\bAcros\s*Organics\b/i, name: 'Acros Organics', urlTemplate: 'https://www.fishersci.com/us/en/search/{name}' },
-  { pattern: /\bApexBio\b/i, name: 'ApexBio', urlTemplate: 'https://www.apexbt.com/search?q={name}' },
-  { pattern: /\bAbaChemScene\b/i, name: 'AbaChemScene', urlTemplate: 'https://www.abachemscene.com/search.html?q={name}' },
-  { pattern: /\bAngene\s*Chem/i, name: 'Angene Chemical', urlTemplate: 'https://www.angene-chemical.com/search?q={name}' },
-  { pattern: /\bBioVision\b/i, name: 'BioVision', urlTemplate: 'https://www.biovision.com/search?q={name}' },
-  { pattern: /\bMedKoo\b/i, name: 'MedKoo', urlTemplate: 'https://www.medkoo.com/search?q={name}' },
-]
-
 /**
  * Reference / deposit databases — molecule-specific URL templates only.
- * Placeholders: {name} (encoded Title), {cid}, {inchikey}, {inchikey_raw}
- * Never bare homepages (user: generic website links are pointless).
+ * Placeholders: {name}, {cid}, {inchikey}, {inchikey_raw}, {cas}
  */
 const DATABASE_TEMPLATES: { pattern: RegExp; name: string; urlTemplate: string }[] = [
   { pattern: /^ChemSpider$/i, name: 'ChemSpider', urlTemplate: 'https://www.chemspider.com/Search.aspx?q={name}' },
@@ -64,7 +31,7 @@ const DATABASE_TEMPLATES: { pattern: RegExp; name: string; urlTemplate: string }
   { pattern: /^MoNA$/i, name: 'MoNA', urlTemplate: 'https://mona.fiehnlab.ucdavis.edu/#/spectra/browse?query=compound.names=q=%22{name}%22' },
   { pattern: /Human Metabolome|HMDB/i, name: 'HMDB', urlTemplate: 'https://hmdb.ca/unearth/q?utf8=%E2%9C%93&query={name}&searcher=metabolites' },
   { pattern: /DrugCentral/i, name: 'DrugCentral', urlTemplate: 'https://drugcentral.org/?q={name}' },
-  { pattern: /BindingDB/i, name: 'BindingDB', urlTemplate: 'https://www.bindingdb.org/rwd/bind/chemsearch/marvin/MolStructure.jsp?monomerid=&submit=Find+by+Name&minPath=0&maxPath=0&name={name}' },
+  { pattern: /BindingDB/i, name: 'BindingDB', urlTemplate: 'https://www.bindingdb.org/rwd/bind/chemsearch/marvin/FMServlet?search_type=ByName&name={name}' },
   { pattern: /Guide to PHARMACOLOGY|IUPHAR/i, name: 'IUPHAR/BPS', urlTemplate: 'https://www.guidetopharmacology.org/GRAC/DatabaseSearchForward?searchString={name}&searchCategories=all&species=none&type=all&comments=includeComments&order=forward' },
   { pattern: /ClinicalTrials\.gov/i, name: 'ClinicalTrials.gov', urlTemplate: 'https://clinicaltrials.gov/search?term={name}' },
   { pattern: /DailyMed/i, name: 'DailyMed', urlTemplate: 'https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query={name}' },
@@ -76,7 +43,6 @@ const DATABASE_TEMPLATES: { pattern: RegExp; name: string; urlTemplate: string }
   { pattern: /Wikipedia/i, name: 'Wikipedia', urlTemplate: 'https://en.wikipedia.org/w/index.php?search={name}' },
   { pattern: /ChemIDplus/i, name: 'ChemIDplus', urlTemplate: 'https://pubchem.ncbi.nlm.nih.gov/compound/{cid}' },
   { pattern: /NCI\/CADD|NCI Open/i, name: 'NCI CADD', urlTemplate: 'https://cactus.nci.nih.gov/chemical/structure/{name}/file?format=sdf' },
-  { pattern: /GNPS/i, name: 'GNPS', urlTemplate: 'https://gnps.ucsd.edu/ProteoSAFe/static/gnps-splash.jsp' },
   { pattern: /MetaboLights/i, name: 'MetaboLights', urlTemplate: 'https://www.ebi.ac.uk/metabolights/search?freeTextQuery={name}' },
   { pattern: /LOTUS/i, name: 'LOTUS', urlTemplate: 'https://lotus.naturalproducts.net/search/simple/{name}' },
   { pattern: /NPAtlas|Natural Product Atlas/i, name: 'NP Atlas', urlTemplate: 'https://www.npatlas.org/explore/compounds?search={name}' },
@@ -84,7 +50,6 @@ const DATABASE_TEMPLATES: { pattern: RegExp; name: string; urlTemplate: string }
   { pattern: /PubChem/i, name: 'PubChem', urlTemplate: 'https://pubchem.ncbi.nlm.nih.gov/compound/{cid}' },
 ]
 
-/** Host fragments → preferred database display name (match PubChem SBURL deep links). */
 const SBURL_HOST_HINTS: { host: RegExp; name: string }[] = [
   { host: /chemspider\.com/i, name: 'ChemSpider' },
   { host: /zinc\.docking\.org|zinc15\.docking\.org/i, name: 'ZINC' },
@@ -106,26 +71,13 @@ const SBURL_HOST_HINTS: { host: RegExp; name: string }[] = [
   { host: /mona\.fiehnlab/i, name: 'MoNA' },
   { host: /genome\.jp|kegg\.jp/i, name: 'KEGG' },
   { host: /wikipedia\.org/i, name: 'Wikipedia' },
-  { host: /chembank\.broadinstitute\.org/i, name: 'ChemBank' },
   { host: /pubchem\.ncbi\.nlm\.nih\.gov/i, name: 'PubChem' },
 ]
 
-const DATABASE_BLACKLIST = new Set([
-  // Already surfaced elsewhere in profile with richer panels — avoid duplicate generic chips
-  'PubChem Substance',
-])
+const DATABASE_BLACKLIST = new Set(['PubChem Substance'])
 
-function fillTemplate(
-  template: string,
-  vars: { name: string; cid: number; inchikey: string | null },
-): string {
-  const encName = encodeURIComponent(vars.name)
-  const ik = vars.inchikey ?? ''
-  return template
-    .split('{name}').join(encName)
-    .split('{cid}').join(String(vars.cid))
-    .split('{inchikey}').join(encodeURIComponent(ik))
-    .split('{inchikey_raw}').join(ik)
+function fillDbTemplate(template: string, vars: CatalogLinkVars): string {
+  return fillCatalogTemplate(template, vars)
 }
 
 function hostnameOf(url: string): string {
@@ -136,14 +88,11 @@ function hostnameOf(url: string): string {
   }
 }
 
-/** Prefer substance/record URLs that embed an ID path (not bare domain roots). */
 function isMoleculeDeepLink(url: string): boolean {
   try {
     const u = new URL(url)
     const path = u.pathname.replace(/\/+$/, '')
-    // Reject bare origins like http://example.com/ or http://example.com
     if (!path || path === '') return false
-    // Require some path depth or query (record pages)
     if (path.split('/').filter(Boolean).length >= 1) return true
     if (u.search && u.search.length > 1) return true
     return false
@@ -163,25 +112,44 @@ export async function GET(
 
   let moleculeName: string | null = null
   let inchiKey: string | null = null
+  let cas: string | null = null
   try {
-    const molRes = await fetch(
-      `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,IUPACName,InChIKey/JSON`,
-      { next: { revalidate: CACHE_DURATION } },
-    )
+    const [molRes, synRes] = await Promise.all([
+      fetch(
+        `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,IUPACName,InChIKey/JSON`,
+        { next: { revalidate: CACHE_DURATION } },
+      ),
+      fetch(
+        `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/synonyms/JSON`,
+        { next: { revalidate: CACHE_DURATION } },
+      ),
+    ])
     if (molRes.ok) {
       const molData = await molRes.json()
       const props = molData.PropertyTable?.Properties?.[0]
       moleculeName = props?.Title || props?.IUPACName || null
       inchiKey = props?.InChIKey || null
     }
+    if (synRes.ok) {
+      const synData = await synRes.json()
+      const syns: string[] =
+        synData.InformationList?.Information?.[0]?.Synonym?.slice(0, 40) ?? []
+      cas = extractCasFromSynonyms(syns)
+    }
   } catch {
     /* non-fatal */
   }
 
   const displayName = moleculeName || String(cid)
-  const linkVars = { name: displayName, cid, inchikey: inchiKey }
+  // Prefer CAS for catalog queries when present (disambiguates salts / forms)
+  const searchName = cas || displayName
+  const linkVars: CatalogLinkVars = {
+    name: searchName,
+    cid,
+    cas,
+    inchiKey,
+  }
 
-  // PubChem SBURL = substance/record deep links (molecule-specific), not DBURL homepages
   let sburls: string[] = []
   try {
     const sbRes = await fetch(
@@ -199,7 +167,6 @@ export async function GET(
     /* non-fatal */
   }
 
-  // Index SBURLs by host hint for matching SourceName chips
   const sburlByName = new Map<string, string>()
   for (const url of sburls) {
     const host = hostnameOf(url)
@@ -216,7 +183,14 @@ export async function GET(
       { next: { revalidate: CACHE_DURATION } },
     )
     if (!res.ok) {
-      return NextResponse.json({ suppliers: [], databases: [], total: 0 })
+      return NextResponse.json({
+        suppliers: [],
+        databases: [],
+        total: 0,
+        moleculeName: displayName,
+        cas,
+        inchiKey,
+      })
     }
     const data = await res.json()
     const sources: string[] = data.InformationList?.Information?.[0]?.SourceName ?? []
@@ -226,13 +200,23 @@ export async function GET(
     const databases: VendorResult[] = []
 
     for (const source of sources) {
-      const supplierMatch = SUPPLIER_TEMPLATES.find((t) => t.pattern.test(source))
+      const supplierMatch = SUPPLIER_CATALOG_TEMPLATES.find((t) => t.pattern.test(source))
       if (supplierMatch) {
         if (seen.has(supplierMatch.name)) continue
         seen.add(supplierMatch.name)
+        // Prefer PubChem SBURL when it is a true record deep link for this supplier
+        const sb = sburls.find((u) => {
+          try {
+            return supplierMatch.pattern.test(u) || u.toLowerCase().includes(supplierMatch.name.split(' ')[0]!.toLowerCase())
+          } catch {
+            return false
+          }
+        })
         suppliers.push({
           name: supplierMatch.name,
-          url: fillTemplate(supplierMatch.urlTemplate, linkVars),
+          url: sb && isMoleculeDeepLink(sb)
+            ? sb
+            : fillCatalogTemplate(supplierMatch.urlTemplate, linkVars),
           sourceType: 'supplier',
         })
         continue
@@ -245,27 +229,19 @@ export async function GET(
       if (seen.has(key)) continue
       seen.add(key)
 
-      // Priority: template deep link → PubChem SBURL match → null (not clickable)
       let url: string | null = null
       if (dbMatch) {
-        url = fillTemplate(dbMatch.urlTemplate, linkVars)
-        // Templates that require InChIKey: fall back to SBURL if missing
+        url = fillDbTemplate(dbMatch.urlTemplate, linkVars)
         if (dbMatch.urlTemplate.includes('{inchikey') && !inchiKey) {
           url = sburlByName.get(key) ?? null
         }
       }
-      if (!url) {
-        url = sburlByName.get(key) ?? null
-      }
-      // Last resort: molecule-specific PubChem compound page (not a bare vendor homepage)
-      if (!url) {
-        url = `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`
-      }
+      if (!url) url = sburlByName.get(key) ?? null
+      if (!url) url = `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`
 
       databases.push({ name: key, url, sourceType: 'database' })
     }
 
-    // Surface extra SBURL deep links not already covered by SourceName chips
     sburlByName.forEach((url, name) => {
       if (seen.has(name)) return
       seen.add(name)
@@ -278,7 +254,9 @@ export async function GET(
         databases,
         total: sources.length,
         moleculeName: displayName,
+        cas,
         inchiKey,
+        searchTerm: searchName,
       },
       { headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` } },
     )

@@ -3,6 +3,10 @@
 import { useMemo, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { logAgentActivity } from '@/lib/agentActivityLog'
+import {
+  buildOrderCatalogLinks as buildCatalogLinksFromVars,
+  extractCasFromSynonyms,
+} from '@/lib/vendorCatalogLinks'
 
 interface ActionCard {
   id: string
@@ -20,69 +24,13 @@ interface Props {
   cid?: number | null
 }
 
-/** External catalog search templates (public storefronts — not checkout). */
+/** @deprecated Prefer buildOrderCatalogLinks from @/lib/vendorCatalogLinks */
 export function buildOrderCatalogLinks(
   moleculeName: string,
   cid?: number | null,
+  cas?: string | null,
 ): { name: string; url: string; hint: string }[] {
-  const name = encodeURIComponent(moleculeName)
-  const cidPart = cid && cid > 0 ? String(cid) : ''
-  return [
-    {
-      name: 'Sigma-Aldrich',
-      url: `https://www.sigmaaldrich.com/US/en/search/${name}?focus=products`,
-      hint: 'Research chemicals catalog search',
-    },
-    {
-      name: 'TCI Chemicals',
-      url: `https://www.tcichemicals.com/US/en/search/?q=${name}`,
-      hint: 'Fine chemicals / building blocks',
-    },
-    {
-      name: 'Fisher Scientific',
-      url: `https://www.fishersci.com/us/en/search/${name}`,
-      hint: 'Lab supplies catalog search',
-    },
-    {
-      name: 'Thermo Fisher',
-      url: `https://www.thermofisher.com/search?query=${name}`,
-      hint: 'Broad scientific catalog',
-    },
-    {
-      name: 'Cayman Chemical',
-      url: `https://www.caymanchem.com/search?q=${name}`,
-      hint: 'Bioactive / research compounds',
-    },
-    {
-      name: 'Selleck Chemicals',
-      url: `https://www.selleckchem.com/search.html?q=${name}`,
-      hint: 'Inhibitors / tool compounds',
-    },
-    {
-      name: 'MedChemExpress',
-      url: `https://www.medchemexpress.com/search.html?q=${name}`,
-      hint: 'Bioactive screening compounds',
-    },
-    {
-      name: 'MolPort',
-      url: `https://www.molport.com/shop/index/search?search_item=${name}`,
-      hint: 'Multi-supplier chemical marketplace search',
-    },
-    {
-      name: 'eMolecules',
-      url: `https://www.emolecules.com/search-structure/?q=${name}`,
-      hint: 'Building-block search',
-    },
-    ...(cidPart
-      ? [
-          {
-            name: 'PubChem (CID)',
-            url: `https://pubchem.ncbi.nlm.nih.gov/compound/${cidPart}`,
-            hint: 'Identity + vendor cross-references on PubChem',
-          },
-        ]
-      : []),
-  ]
+  return buildCatalogLinksFromVars({ name: moleculeName, cid, cas })
 }
 
 export function NextStepsPanel({ moleculeName, data, cid }: Props) {
@@ -155,9 +103,17 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
     return result
   }, [data])
 
+  const cas = useMemo(() => {
+    const synonyms = data.synonyms as string[] | undefined
+    const fromSyn = extractCasFromSynonyms(synonyms)
+    if (fromSyn) return fromSyn
+    if (typeof data.cas === 'string') return data.cas
+    return null
+  }, [data])
+
   const catalogLinks = useMemo(
-    () => buildOrderCatalogLinks(moleculeName, cid),
-    [moleculeName, cid],
+    () => buildCatalogLinksFromVars({ name: moleculeName, cid, cas }),
+    [moleculeName, cid, cas],
   )
 
   const inchiKey =
@@ -295,18 +251,23 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
                 Order / procure research material
               </h4>
               <p className="mt-0.5 text-[11px] leading-relaxed text-slate-400">
-                External <strong className="font-medium text-slate-300">catalog searches</strong> for{' '}
+                Deep links open <strong className="font-medium text-slate-300">vendor search results</strong>{' '}
+                for{' '}
                 <span className="text-slate-200">{moleculeName}</span>
+                {cas ? (
+                  <>
+                    {' '}
+                    · CAS <span className="font-mono text-cyan-300/90">{cas}</span>
+                  </>
+                ) : null}
                 {cid != null && cid > 0 ? (
                   <>
                     {' '}
-                    · CID{' '}
-                    <span className="font-mono text-cyan-300/90">{cid}</span>
+                    · CID <span className="font-mono text-cyan-300/90">{cid}</span>
                   </>
                 ) : null}
-                . BioIntel does <strong className="text-slate-300">not</strong> place orders, quote
-                prices, or guarantee stock — open a vendor catalog and complete procurement under
-                your lab&apos;s policies.
+                . BioIntel does <strong className="text-slate-300">not</strong> place orders or quote
+                prices — complete procurement on the vendor site under your lab&apos;s policies.
               </p>
             </div>
             <button

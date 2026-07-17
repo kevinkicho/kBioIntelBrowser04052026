@@ -83,6 +83,8 @@ interface Props {
   molecularWeight: number
   inchiKey: string
   iupacName: string
+  cas?: string | null
+  synonyms?: string[]
   embedMode?: EmbedMode
 }
 
@@ -134,15 +136,24 @@ function initStatus(): CategoriesStatus {
   return s
 }
 
-export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName, embedMode }: Props) {
+export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
   return (
     <Suspense fallback={<div className="animate-pulse h-96 bg-slate-800/50 rounded-xl" />}>
-      <ProfilePageClientInner cid={cid} moleculeName={moleculeName} molecularWeight={molecularWeight} inchiKey={inchiKey} iupacName={iupacName} embedMode={embedMode} />
+      <ProfilePageClientInner
+        cid={cid}
+        moleculeName={moleculeName}
+        molecularWeight={molecularWeight}
+        inchiKey={inchiKey}
+        iupacName={iupacName}
+        cas={cas}
+        synonyms={synonyms}
+        embedMode={embedMode}
+      />
     </Suspense>
   )
 }
 
-function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, iupacName, embedMode }: Props) {
+function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
   const isEmbed = !!embedMode
   const allowedPanelSet = useMemo(() => {
     if (!embedMode?.allowedPanels) return null
@@ -1124,7 +1135,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           {!isDecisionMode && (
             <>
               <ErrorBoundary>
-                <NextStepsPanel moleculeName={moleculeName} data={mergedData} cid={cid} />
+                <NextStepsPanel
+                  moleculeName={moleculeName}
+                  data={{ ...mergedData, synonyms, cas, inchiKey }}
+                  cid={cid}
+                />
               </ErrorBoundary>
 
               <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
