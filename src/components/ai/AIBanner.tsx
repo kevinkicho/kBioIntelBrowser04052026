@@ -78,6 +78,14 @@ export function AIBanner() {
     setConnecting(false)
   }
 
+  /** Hosted App Hosting: skip localhost and connect via server-side Ollama Cloud. */
+  const handleConnectCloud = async () => {
+    setValidationHint(null)
+    setConnecting(true)
+    await ai.connect('https://ollama.com')
+    setConnecting(false)
+  }
+
   return (
     <div className="w-full max-w-2xl mx-auto mb-4 px-4">
       <div className="bg-gradient-to-r from-slate-900/60 via-indigo-900/20 to-slate-900/60 border border-slate-700/40 rounded-xl p-4">
@@ -90,7 +98,16 @@ export function AIBanner() {
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-slate-300">AI Copilot — Connect Ollama</h3>
             <p className="text-xs text-slate-500 mt-1">
-              All AI processing stays local. Install from <span className="text-cyan-400">ollama.com</span>, then run <code className="text-slate-400 bg-slate-800 px-1 rounded">ollama serve</code>.
+              <strong className="text-slate-400">On this hosted site:</strong> Connect uses{' '}
+              <span className="text-cyan-400">Ollama Cloud</span> (server-side API key). Your PC&apos;s{' '}
+              <code className="text-slate-400 bg-slate-800 px-1 rounded">localhost:11434</code> is not
+              reachable from App Hosting.
+            </p>
+            <p className="text-xs text-slate-500 mt-1">
+              <strong className="text-slate-400">For local Ollama on your machine:</strong> run{' '}
+              <code className="text-slate-400 bg-slate-800 px-1 rounded">npm run dev</code> on this
+              laptop (with Ollama serving), open <code className="text-slate-400">http://localhost:3000</code>,
+              then connect to <code className="text-slate-400">localhost:11434</code>.
             </p>
 
             <div className="mt-3 flex gap-2">
@@ -116,13 +133,22 @@ export function AIBanner() {
                   className="w-full text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-600 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none font-mono"
                 />
               </div>
-              <div className="flex items-end">
+              <div className="flex items-end gap-2">
                 <button
                   onClick={handleConnect}
                   disabled={connecting || !hostInput.trim()}
                   className="px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors whitespace-nowrap"
                 >
                   {connecting ? 'Connecting...' : 'Connect'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleConnectCloud()}
+                  disabled={connecting}
+                  className="px-3 py-2 rounded-lg text-xs font-medium border border-cyan-800/50 bg-cyan-950/40 text-cyan-300 hover:bg-cyan-900/40 disabled:opacity-50 transition-colors whitespace-nowrap"
+                  title="Use Ollama Cloud via App Hosting (OLLAMA_API_KEY)"
+                >
+                  Use Cloud
                 </button>
               </div>
             </div>

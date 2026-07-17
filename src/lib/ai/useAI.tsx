@@ -218,21 +218,27 @@ export function AIProvider({ children }: { children: ReactNode }) {
     const result = await checkOllama(normalized)
     if (result.available) {
       const model = pickFirstModel(result.models) || ''
+      // On App Hosting, localhost is the *server's* loopback — cloud fallback
+      // returns effectiveUrl=https://ollama.com; persist that for chat/show.
+      const effectiveUrl =
+        result.viaCloud && result.effectiveUrl ? result.effectiveUrl : normalized
       const via = result.viaCloud ? ' (via Ollama Cloud fallback)' : ''
-      console.log(`[ai] Connected to ${normalized}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
+      console.log(`[ai] Connected to ${effectiveUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
       setConfig(prev => ({
         ...prev,
-        ollamaUrl: normalized,
+        ollamaUrl: effectiveUrl,
         status: model ? 'available' as AIStatus : 'unavailable' as AIStatus,
         availableModels: result.models,
         model: model || prev.model,
         enabled: model ? true : prev.enabled,
         error: model
-          ? (result.viaCloud ? 'Using Ollama Cloud (local Ollama unavailable)' : undefined)
+          ? (result.viaCloud
+              ? 'Using Ollama Cloud (hosted app cannot reach Ollama on your PC)'
+              : undefined)
           : 'No models found on this Ollama instance.',
       }))
       if (model) {
-        const info = await fetchModelInfo(normalized, model)
+        const info = await fetchModelInfo(effectiveUrl, model)
         if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
           console.log('[ai] Model info:', info)
         }
