@@ -386,13 +386,82 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
 
   const displaySymbol = overview?.symbol || symbol
   const displayName = overview?.name || name
-  const displaySummary = overview?.summary || summary
   const displayChromosome = overview?.chromosome || chromosome
   const displayType = overview?.typeOfGene || typeOfGene
-  const displayAliases = normalizeAliases(overview?.aliases ?? aliases)
+  const displayMapLocation = overview?.mapLocation || ''
   const displayEnsemblId = overview?.ensemblId || ensemblId
   const displayUniprotId = overview?.uniprotId || uniprotId
   const displayUrl = overview?.url || `https://www.ncbi.nlm.nih.gov/gene/${geneId}`
+
+  // Panel counts for at-a-glance strip (real loaded category data only)
+  const drugCount = Array.isArray(categoryData?.geneDrugs)
+    ? (categoryData.geneDrugs as unknown[]).length
+    : 0
+  const diseaseCount = (
+    (categoryData?.geneDiseases as { disgenetAssociations?: unknown[] } | undefined)
+      ?.disgenetAssociations ?? []
+  ).length
+  const clinvarCount = (
+    (categoryData?.geneVariants as { clinvarVariants?: unknown[] } | undefined)?.clinvarVariants ??
+    []
+  ).length
+  const dbsnpCount = (
+    (categoryData?.geneVariants as { dbsnpVariants?: unknown[] } | undefined)?.dbsnpVariants ?? []
+  ).length
+  const variantCount = clinvarCount + dbsnpCount
+  const gtexCount = (
+    (categoryData?.geneExpressionData as { gtexExpressions?: unknown[] } | undefined)
+      ?.gtexExpressions ?? []
+  ).length
+  const pathwayBundle = categoryData?.genePathways as
+    | {
+        reactomePathways?: unknown[]
+        wikiPathways?: unknown[]
+        goTerms?: unknown[]
+      }
+    | undefined
+  const pathwayCount =
+    (pathwayBundle?.reactomePathways?.length ?? 0) +
+    (pathwayBundle?.wikiPathways?.length ?? 0) +
+    (pathwayBundle?.goTerms?.length ?? 0)
+
+  const glanceTiles: {
+    id: (typeof GENE_PANELS)[number]['id']
+    label: string
+    count: number | null
+    hint: string
+  }[] = [
+    {
+      id: 'gene_drugs',
+      label: 'Targeted drugs',
+      count: loaded ? drugCount : null,
+      hint: 'DGIdb interactions',
+    },
+    {
+      id: 'gene-diseases',
+      label: 'Diseases',
+      count: loaded ? diseaseCount : null,
+      hint: 'DisGeNET associations',
+    },
+    {
+      id: 'gene-variants',
+      label: 'Variants',
+      count: loaded ? variantCount : null,
+      hint: 'ClinVar + dbSNP',
+    },
+    {
+      id: 'gene-expression',
+      label: 'Expression',
+      count: loaded ? gtexCount : null,
+      hint: 'GTEx tissues',
+    },
+    {
+      id: 'gene-pathways',
+      label: 'Pathways',
+      count: loaded ? pathwayCount : null,
+      hint: 'Reactome / Wiki / GO',
+    },
+  ]
 
   return (
     <div className="min-h-screen bg-[#0f1117] flex flex-col">
@@ -405,7 +474,8 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
           <span className="text-indigo-300/80">{displaySymbol}</span>
         </div>
 
-        <div className="mb-6">
+        {/* Compact identity — full summary/aliases live only in Overview tab */}
+        <div className="mb-4">
           <div className="flex items-start justify-between gap-3 mb-2">
             <div>
               <h1 className="text-3xl font-bold text-slate-100">{displaySymbol}</h1>
@@ -438,6 +508,14 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
             {displayChromosome && (
               <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/50">chr {displayChromosome}</span>
             )}
+            {displayMapLocation && displayMapLocation !== displayChromosome && (
+              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700" title="Map location">
+                {displayMapLocation}
+              </span>
+            )}
+            <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
+              Entrez {geneId}
+            </span>
             {displayEnsemblId && (
               <a href={`https://ensembl.org/Homo_sapiens/Gene/Summary?g=${displayEnsemblId}`} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded bg-violet-900/40 text-violet-300 border border-violet-800/50 hover:underline">Ensembl: {displayEnsemblId}</a>
             )}
@@ -445,18 +523,37 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
               <a href={`https://www.uniprot.org/uniprot/${displayUniprotId}`} target="_blank" rel="noopener noreferrer" className="text-[10px] px-2 py-0.5 rounded bg-cyan-900/40 text-cyan-300 border border-cyan-800/50 hover:underline">UniProt: {displayUniprotId}</a>
             )}
           </div>
+        </div>
 
-          {displaySummary && (
-            <p className="text-sm text-slate-400 mt-3 leading-relaxed">{displaySummary}</p>
-          )}
-
-          {displayAliases.length > 0 && (
-            <div className="mt-2 flex flex-wrap gap-1">
-              {displayAliases.map(a => (
-                <GeneAliasChip key={a} alias={a} size="xs" />
-              ))}
-            </div>
-          )}
+        {/* At-a-glance: jump into evidence panels (replaces duplicate overview body) */}
+        <div
+          className="mb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2"
+          data-testid="gene-at-a-glance"
+        >
+          {glanceTiles.map((tile) => (
+            <button
+              key={tile.id}
+              type="button"
+              onClick={() => setActivePanel(tile.id)}
+              disabled={!loaded && tile.count === null}
+              className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                activePanel === tile.id
+                  ? 'border-indigo-600/50 bg-indigo-950/40'
+                  : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800/60'
+              } disabled:opacity-60`}
+              title={tile.hint}
+            >
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">{tile.label}</p>
+              <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-100">
+                {loading && tile.count === null ? (
+                  <span className="inline-block h-5 w-8 animate-pulse rounded bg-slate-700" />
+                ) : (
+                  tile.count ?? '—'
+                )}
+              </p>
+              <p className="mt-0.5 text-[9px] text-slate-600 truncate">{tile.hint}</p>
+            </button>
+          ))}
         </div>
 
         <div className="flex gap-1 mb-4 overflow-x-auto no-scrollbar border-b border-slate-800/60 pb-px">
@@ -471,6 +568,15 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
               onClick={() => setActivePanel(p.id)}
             >
               {p.label}
+              {p.id !== 'gene-overview' && loaded && (
+                <span className="ml-1 text-[10px] font-normal text-slate-600">
+                  {p.id === 'gene_drugs' && drugCount > 0 ? drugCount : ''}
+                  {p.id === 'gene-diseases' && diseaseCount > 0 ? diseaseCount : ''}
+                  {p.id === 'gene-variants' && variantCount > 0 ? variantCount : ''}
+                  {p.id === 'gene-expression' && gtexCount > 0 ? gtexCount : ''}
+                  {p.id === 'gene-pathways' && pathwayCount > 0 ? pathwayCount : ''}
+                </span>
+              )}
             </button>
           ))}
         </div>
