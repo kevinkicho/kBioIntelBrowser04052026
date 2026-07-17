@@ -6,8 +6,43 @@ import { getCached, setCache } from '../cache'
 const BASE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 const AUTOCOMPLETE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/autocomplete/compound'
 
+/**
+ * PubChem from cloud hosts (App Hosting / GCP) is flaky: 503 and empty
+ * responses are common. Do not use Next fetch data-cache for these — sticky
+ * 503s poison the app for an hour. Process-local success cache is enough.
+ */
+const PUBCHEM_UA =
+  process.env.NCBI_EMAIL
+    ? `BioIntel/0.1 (mailto:${process.env.NCBI_EMAIL})`
+    : 'BioIntel/0.1 (+https://github.com/kevinkicho/kBioIntelBrowser04052026)'
+
 const fetchOptions: RequestInit = {
-  next: { revalidate: 3600 }, // Cache for 1 hour (Next.js fetch cache)
+  cache: 'no-store',
+  headers: {
+    Accept: 'application/json',
+    'User-Agent': PUBCHEM_UA,
+  },
+}
+
+const RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
+
+async function pubchemFetch(url: string, attempts = 3): Promise<Response> {
+  let lastErr: unknown
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const res = await fetch(url, fetchOptions)
+      if (res.ok || !RETRY_STATUSES.has(res.status) || i === attempts - 1) {
+        return res
+      }
+      // brief backoff for PubChem rate / cold GCP egress
+      await new Promise((r) => setTimeout(r, 300 * 2 ** i + Math.floor(Math.random() * 150)))
+    } catch (err) {
+      lastErr = err
+      if (i === attempts - 1) throw err
+      await new Promise((r) => setTimeout(r, 300 * 2 ** i))
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('PubChem fetch failed')
 }
 
 /** Process-local success/not-found cache — avoids N parallel category routes re-hitting PubChem. */
@@ -43,7 +78,7 @@ function getLargeMoleculeDescription(name: string, formula: string): string {
 export async function searchMolecules(query: string): Promise<string[]> {
   try {
     const url = `${AUTOCOMPLETE_URL}/${encodeURIComponent(query)}/JSON?limit=8`
-    const res = await fetch(url, fetchOptions)
+    const res = await pubchemFetch(url)
     if (!res.ok) return []
     const data = await res.json()
     return data.dictionary_terms?.compound ?? []
@@ -55,7 +90,7 @@ export async function searchMolecules(query: string): Promise<string[]> {
 export async function searchMoleculesByName(query: string): Promise<SearchResult[]> {
   try {
     const url = `${BASE_URL}/compound/name/${encodeURIComponent(query)}/property/MolecularFormula/JSON`
-    const res = await fetch(url, fetchOptions)
+    const res = await pubchemFetch(url)
     if (!res.ok) return []
     const data = await res.json()
     const props = data.PropertyTable?.Properties ?? []
@@ -125,12 +160,11 @@ async function fetchMoleculeByIdUncached(cid: number): Promise<Molecule | null> 
   let descRes: Response
   try {
     ;[propsRes, synonymsRes, descRes] = await Promise.all([
-      fetch(
+      pubchemFetch(
         `${BASE_URL}/compound/cid/${cid}/property/MolecularFormula,IUPACName,MolecularWeight,Title,InChIKey/JSON`,
-        fetchOptions
       ),
-      fetch(`${BASE_URL}/compound/cid/${cid}/synonyms/JSON`, fetchOptions),
-      fetch(`${BASE_URL}/compound/cid/${cid}/description/JSON`, fetchOptions),
+      pubchemFetch(`${BASE_URL}/compound/cid/${cid}/synonyms/JSON`),
+      pubchemFetch(`${BASE_URL}/compound/cid/${cid}/description/JSON`),
     ])
   } catch (err) {
     throw new PubChemUpstreamError(
@@ -197,7 +231,7 @@ async function fetchMoleculeByIdUncached(cid: number): Promise<Molecule | null> 
 export async function getMoleculeCidByName(name: string): Promise<number | null> {
   try {
     const url = `${BASE_URL}/compound/name/${encodeURIComponent(name)}/cids/JSON`
-    const res = await fetch(url, fetchOptions)
+    const res = await pubchemFetch(url)
     if (!res.ok) return null
     const data = await res.json()
     return data.IdentifierList?.CID?.[0] ?? null
@@ -225,14 +259,14 @@ export async function getMoleculeCandidatesByName(
 ): Promise<MoleculeCandidate[]> {
   try {
     const url = `${BASE_URL}/compound/name/${encodeURIComponent(name)}/cids/JSON`
-    const res = await fetch(url, fetchOptions)
+    const res = await pubchemFetch(url)
     if (!res.ok) return []
     const data = await res.json()
     const cids: number[] = (data.IdentifierList?.CID ?? []).slice(0, limit)
     if (!cids.length) return []
 
     const propUrl = `${BASE_URL}/compound/cid/${cids.join(',')}/property/Title,MolecularFormula,MolecularWeight,InChIKey,IUPACName/JSON`
-    const propRes = await fetch(propUrl, fetchOptions)
+    const propRes = await pubchemFetch(propUrl)
     if (!propRes.ok) {
       return cids.map((cid) => ({
         cid,
@@ -287,7 +321,7 @@ export async function resolveIdentifier(query: string, type: SearchType): Promis
         url = `${BASE_URL}/compound/name/${encodeURIComponent(query)}/cids/JSON`
         break
     }
-    const res = await fetch(url, fetchOptions)
+    const res = await pubchemFetch(url)
     if (!res.ok) return null
     const data = await res.json()
     const cidList = data.IdentifierList?.CID ?? data.PC_URIs?.[0]?.CID

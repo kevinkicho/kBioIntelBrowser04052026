@@ -8,8 +8,8 @@
 
 runConfig:
   minInstances: 0
-  # Optional: raise if category/discover fan-out hits memory limits
-  # memoryMiB: 1024
+  # Molecule/discover fan-out is memory-hungry on cold starts
+  memoryMiB: 1024
   # maxInstances: 20
 
 env:
@@ -56,4 +56,18 @@ env:
   - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
     secret: FIREBASE_ADMIN_CREDENTIALS_JSON
     availability:
+      - RUNTIME
+
+  # Ollama Cloud fallback for AI brief / chat when localhost:11434 is absent.
+  # Set: firebase apphosting:secrets:set OLLAMA_API_KEY --data-file - --force
+  - variable: OLLAMA_API_KEY
+    secret: OLLAMA_API_KEY
+    availability:
+      - RUNTIME
+
+  # NCBI etiquette for PubChem/eutils from cloud egress
+  - variable: NCBI_EMAIL
+    value: kevinkicho@gmail.com
+    availability:
+      - BUILD
       - RUNTIME
