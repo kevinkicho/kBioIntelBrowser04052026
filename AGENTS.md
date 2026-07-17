@@ -32,8 +32,9 @@ Coding agents and human implementers: read this before changing product behavior
 npm run dev                              # required before e2e (no Playwright webServer by default)
 npx tsc --noEmit
 npm test
-npm test -- --testPathPattern="packClaims|productEvents|boardHarvest|m1Funnel"
-npm run test:e2e                         # after V21-02: prefer E2E_FIXTURE=1 for CI
+npm run test:gate                        # tsc + key jest suites (v2.1)
+npm run test:e2e:fixture                 # north-star e2e with E2E_FIXTURE=1
+npm run test:e2e:live                    # north-star e2e against live APIs (optional)
 npm run lint
 npm run build
 ```
