@@ -103,6 +103,7 @@ describe('rehydrateClaimsForHypothesis', () => {
     ;(packClaims.buildBoardPackClaims as jest.Mock).mockResolvedValue({
       claims: [makeClaim('cl_a', 'Rebuilt A'), makeClaim('cl_b', 'Rebuilt B')],
       warnings: [],
+      citableCount: 2,
     })
     const res = await rehydrateClaimsForHypothesis(makeHyp(), makeProject())
     expect(res.source).toBe('rebuild')
@@ -114,6 +115,7 @@ describe('rehydrateClaimsForHypothesis', () => {
     ;(packClaims.buildBoardPackClaims as jest.Mock).mockResolvedValue({
       claims: [],
       warnings: ['No panels'],
+      citableCount: 0,
     })
     const res = await rehydrateClaimsForHypothesis(makeHyp(), makeProject())
     expect(res.source).toBe('none')

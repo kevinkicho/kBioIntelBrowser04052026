@@ -128,3 +128,20 @@ export function claimSourceNames(claims: readonly EvidenceClaim[]): string[] {
   }
   return Array.from(sources).sort()
 }
+
+/**
+ * M3 citation density: claim has non-empty source + retrievedAt (design v1 metric).
+ */
+export function isCitableClaim(c: EvidenceClaim): boolean {
+  const src = c.provenance?.source?.trim()
+  const at = c.provenance?.retrievedAt?.trim()
+  return Boolean(src && at)
+}
+
+export function countCitableClaims(claims: readonly EvidenceClaim[]): number {
+  let n = 0
+  for (const c of claims) {
+    if (isCitableClaim(c)) n += 1
+  }
+  return n
+}

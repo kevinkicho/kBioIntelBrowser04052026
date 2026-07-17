@@ -38,6 +38,8 @@ export {
   dedupeClaimsById,
   countClaimsByType,
   claimSourceNames,
+  isCitableClaim,
+  countCitableClaims,
 } from './extractAll'
 export type { CorePanelEvidenceInput, ExtractAllOptions } from './extractAll'
 

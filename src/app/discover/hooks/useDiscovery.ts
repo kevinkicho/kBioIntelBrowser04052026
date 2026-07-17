@@ -144,7 +144,7 @@ export function useDiscovery() {
         } else {
           saveDiscoveryPreferences(next)
         }
-        emitProductEvent('discover_prefs_change', {
+        emitProductEvent('preference_changed', {
           keys: Object.keys(patch).join(','),
           rubricPreset: next.rubricPreset,
           harvestTiming: next.harvestTiming,
@@ -159,7 +159,7 @@ export function useDiscovery() {
 
   const resetPrefs = useCallback(() => {
     const next = resetDiscoveryPreferences()
-    emitProductEvent('discover_prefs_change', { keys: 'reset' })
+    emitProductEvent('preference_changed', { keys: 'reset' })
     setState((prev) => ({ ...prev, prefs: next }))
   }, [])
 
@@ -222,7 +222,7 @@ export function useDiscovery() {
       }))
 
       advanceProgress(stages, 0)
-      emitProductEvent('discover_search', {
+      emitProductEvent('discover_started', {
         hasDiseaseId: Boolean(diseaseId),
         targetCount: targets.length,
       })
@@ -258,7 +258,7 @@ export function useDiscovery() {
 
         if (needsConfirmation(data) && !diseaseId) {
           const candidates = extractDiseaseCandidates(data)
-          emitProductEvent('discover_search', {
+          emitProductEvent('discover_started', {
             multiHit: true,
             count: candidates.length,
           })
@@ -276,7 +276,7 @@ export function useDiscovery() {
           return
         }
 
-        emitProductEvent('discover_rank_complete', {
+        emitProductEvent('discover_rank_completed', {
           count: data.candidates.length,
           diseaseId: data.diseaseId ?? diseaseId ?? null,
           scorePhase: data.v2?.scorePhase ?? 'cheap',
@@ -346,7 +346,7 @@ export function useDiscovery() {
   const confirmDisease = useCallback(
     (diseaseId: string) => {
       if (!state.query) return
-      emitProductEvent('discover_disease_confirm', { diseaseId })
+      emitProductEvent('discover_disease_confirmed', { diseaseId })
       return search(state.query, { diseaseId, targets: state.targets })
     },
     [search, state.query, state.targets],

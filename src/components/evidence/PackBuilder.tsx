@@ -1,13 +1,14 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
-import type { DiseaseEntity, MoleculeCandidate, TargetEntity } from '@/lib/domain'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import type { DiseaseEntity, EvidenceClaim, MoleculeCandidate, TargetEntity } from '@/lib/domain'
 import type { DiscoveryPreferencesSnapshot } from '@/lib/discovery/preferences'
 import { loadDiscoveryPreferences, snapshotDiscoveryPreferences } from '@/lib/discovery/preferences'
 import { downloadFile } from '@/lib/exportData'
 import {
   MAX_PACK_CLAIMS,
   buildEvidencePack,
+  countCitableClaims,
   corePanelsFromProfileData,
   defaultPackRubric,
   packExportFilename,
@@ -26,6 +27,12 @@ import { PackAiPanel } from './PackAiPanel'
 export interface PackBuilderProps {
   /** Profile merged-data bag or already-shaped Core panels. */
   panels?: CorePanelEvidenceInput
+  /**
+   * Pre-extracted multi-subject claims (board pack path).
+   * When non-empty, preferred over re-extracting from merged panels
+   * so subjectCandidateId attribution is preserved (design §6.5.4).
+   */
+  claims?: EvidenceClaim[]
   /** Raw profile data — Core panels extracted automatically. */
   profileData?: Record<string, unknown>
   candidates?: MoleculeCandidate[]
@@ -52,6 +59,7 @@ export interface PackBuilderProps {
  */
 export function PackBuilder({
   panels: panelsProp,
+  claims: claimsProp,
   profileData,
   candidates = [],
   disease = null,
@@ -73,6 +81,7 @@ export function PackBuilder({
   const [showPreview, setShowPreview] = useState(true)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const openedEmitted = useRef(false)
   const collabMode = useMemo(() => {
     try {
       return loadDiscoveryPreferences().collaborationMode
@@ -87,6 +96,11 @@ export function PackBuilder({
     return {}
   }, [panelsProp, profileData])
 
+  const preClaims = useMemo(
+    () => (claimsProp && claimsProp.length > 0 ? claimsProp : null),
+    [claimsProp],
+  )
+
   const preferencesSnapshot = useMemo(() => {
     if (prefsProp) return prefsProp
     try {
@@ -98,6 +112,20 @@ export function PackBuilder({
 
   const build = useCallback((): EvidencePack => {
     const retrievedAt = new Date().toISOString()
+    // Prefer pre-extracted multi-subject claims (board); avoid re-extract from merged panels
+    if (preClaims) {
+      return buildEvidencePack({
+        title,
+        claims: preClaims,
+        candidates,
+        disease,
+        targets,
+        preferencesSnapshot,
+        rubric: defaultPackRubric(preferencesSnapshot),
+        projectId: projectId ?? undefined,
+        maxClaims: MAX_PACK_CLAIMS,
+      })
+    }
     return buildEvidencePack({
       title,
       panels,
@@ -117,6 +145,7 @@ export function PackBuilder({
   }, [
     title,
     panels,
+    preClaims,
     subjectCandidateId,
     moleculeName,
     candidates,
@@ -125,6 +154,18 @@ export function PackBuilder({
     preferencesSnapshot,
     projectId,
   ])
+
+  useEffect(() => {
+    if (openedEmitted.current) return
+    if (panelsLoading) return
+    if (!preClaims && !panelsProp && !profileData) return
+    openedEmitted.current = true
+    emitProductEvent('pack_opened', {
+      projectId: projectId ?? null,
+      claimCount: preClaims?.length ?? 0,
+      citable: preClaims ? countCitableClaims(preClaims) : 0,
+    })
+  }, [panelsLoading, preClaims, panelsProp, profileData, projectId])
 
   const flash = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })
@@ -155,10 +196,15 @@ export function PackBuilder({
       const mime = format === 'json' ? 'application/json' : 'text/markdown'
       downloadFile(body, packExportFilename(pack, format), mime)
       registerSideEffects(pack)
-      emitProductEvent('pack_export', { format, count: pack.claimCount })
+      const citable = countCitableClaims(pack.claims)
+      emitProductEvent('pack_exported', {
+        format,
+        count: pack.claimCount,
+        citable,
+      })
       flash(
         'ok',
-        `Downloaded ${format.toUpperCase()} · ${pack.claimCount} claim${pack.claimCount === 1 ? '' : 's'} (cap ${MAX_PACK_CLAIMS})`,
+        `Downloaded ${format.toUpperCase()} · ${pack.claimCount} claim${pack.claimCount === 1 ? '' : 's'} (${citable} citable · cap ${MAX_PACK_CLAIMS})`,
       )
       onExported?.(pack, format)
     } catch (err) {
@@ -229,6 +275,12 @@ export function PackBuilder({
             Download-primary export · max {MAX_PACK_CLAIMS} claims · content-hashed for cite. Full
             packs are not stored in the browser — index metadata only.
             {panelsLoading && ' · Fetching Core panels for claim density…'}
+            {!panelsLoading && preClaims && (
+              <>
+                {' '}
+                · {preClaims.length} pre-extracted · {countCitableClaims(preClaims)} citable
+              </>
+            )}
           </p>
         </div>
       </div>

@@ -21,7 +21,7 @@ import {
   seedResearchHypothesisFromPack,
   setBoardStatusAndSave,
 } from '@/lib/project'
-import type { CorePanelEvidenceInput } from '@/lib/evidence'
+import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
@@ -50,6 +50,7 @@ export default function ProjectBoardPage() {
   const [harvestingIds, setHarvestingIds] = useState<string[]>([])
   const [harvestBusy, setHarvestBusy] = useState(false)
   const [boardPanels, setBoardPanels] = useState<CorePanelEvidenceInput>({})
+  const [boardClaims, setBoardClaims] = useState<EvidenceClaim[]>([])
   const [panelsLoading, setPanelsLoading] = useState(false)
   const signalsLoadedFor = useRef<string | null>(null)
   const harvestGen = useRef(0)
@@ -74,10 +75,11 @@ export default function ProjectBoardPage() {
     if (id) emitProductEvent('project_opened', { projectId: id })
   }, [id])
 
-  // Claim-rich packs: fetch Core panels for promoted CIDs (V2-04)
+  // Claim-rich packs: parallel Core panel fetch + per-CID extract (V2 density)
   useEffect(() => {
     if (!project || project.candidates.length === 0) {
       setBoardPanels({})
+      setBoardClaims([])
       return
     }
     const key = `${project.id}:${project.candidates
@@ -91,12 +93,16 @@ export default function ProjectBoardPage() {
       .then((res) => {
         if (cancelled) return
         setBoardPanels(res.panels)
+        setBoardClaims(res.claims)
         if (res.warnings.length && res.claims.length === 0) {
           // non-blocking; user can still download empty pack
         }
       })
       .catch(() => {
-        if (!cancelled) setBoardPanels({})
+        if (!cancelled) {
+          setBoardPanels({})
+          setBoardClaims([])
+        }
       })
       .finally(() => {
         if (!cancelled) setPanelsLoading(false)
@@ -522,6 +528,7 @@ export default function ProjectBoardPage() {
           )}
           <PackBuilder
             panels={boardPanels}
+            claims={boardClaims}
             panelsLoading={panelsLoading}
             candidates={project.candidates}
             disease={project.disease ?? null}
@@ -546,7 +553,8 @@ export default function ProjectBoardPage() {
           />
           <p className="text-[11px] text-slate-600">
             Board packs auto-fetch Core panels (mechanisms, activities, trials, AE, Open Targets) for
-            promoted CIDs. Download fills claims (≤200). Enable “Share links when available” in Discover
+            promoted CIDs with parallel budgets. Pre-extracted multi-subject claims (≤200) preserve
+            per-candidate attribution. Enable “Share links when available” in Discover
             preferences for Share pack.
           </p>
         </section>

@@ -116,7 +116,7 @@ export function SaveToProjectButton({
     (projectId: string) => {
       const result = addCandidateAndSave(projectId, candidate)
       if (result.ok) {
-        emitProductEvent('project_add_candidate', {
+        emitProductEvent('board_candidate_added', {
           projectId,
           candidateId: candidate.candidateId,
         })
@@ -174,7 +174,7 @@ export function SaveToProjectButton({
     })
     if (created.ok) {
       emitProductEvent('project_create', { projectId: created.value.id })
-      emitProductEvent('project_add_candidate', {
+      emitProductEvent('board_candidate_added', {
         projectId: created.value.id,
         candidateId: candidate.candidateId,
       })

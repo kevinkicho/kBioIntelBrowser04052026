@@ -310,12 +310,15 @@ describe('pack index — localStorage metadata only', () => {
     expect(Object.keys(idx)).not.toContain('claims')
 
     const pIdx = toProjectPackIndexEntry(pack)
-    expect(pIdx).toEqual({
-      id: 'pack_meta',
-      title: 'Meta',
-      createdAt: FIXTURE_RETRIEVED_AT,
-      candidateCount: 2,
-    })
+    expect(pIdx.id).toBe('pack_meta')
+    expect(pIdx.title).toBe('Meta')
+    expect(pIdx.createdAt).toBe(FIXTURE_RETRIEVED_AT)
+    expect(pIdx.candidateCount).toBe(2)
+    expect(pIdx.claimCount).toBe(9)
+    expect(pIdx.contentHash).toBe(pack.contentHash)
+    expect(pIdx.claimIds?.length).toBeGreaterThan(0)
+    // metadata only — never embed full claim statements
+    expect(JSON.stringify(pIdx)).not.toContain(pack.claims[0].statement)
   })
 
   it('clearPackIndex empties storage key', () => {

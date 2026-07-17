@@ -76,6 +76,11 @@ export {
 } from './boardHarvest'
 
 export {
+  PACK_MAX_CANDIDATES,
+  PACK_CANDIDATE_CONCURRENCY,
+  PACK_PANEL_CONCURRENCY,
+  PACK_PANEL_TIMEOUT_MS,
+  PACK_CATEGORIES,
   selectPackCandidates,
   fetchCorePanelsForCid,
   buildBoardPackClaims,

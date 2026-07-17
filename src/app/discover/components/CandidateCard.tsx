@@ -16,6 +16,7 @@ import {
   type SaveProjectContext,
 } from '@/components/projects/SaveToProjectButton'
 import { buildMoleculeLinkUrl, AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
+import { emitProductEvent } from '@/lib/productEvents'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
 
@@ -104,7 +105,13 @@ function ScoreExplainer({
   return (
     <div className="relative inline-block">
       <button
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => {
+          const next = !open
+          setOpen(next)
+          if (next) {
+            emitProductEvent('score_breakdown_opened', { preset: String(preset) })
+          }
+        }}
         className="text-slate-500 hover:text-slate-300 transition-colors"
         aria-label="How is this score calculated?"
         type="button"
