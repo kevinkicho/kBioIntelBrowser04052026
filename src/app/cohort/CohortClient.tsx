@@ -341,7 +341,7 @@ export function CohortClient() {
               <span className="inline-block w-3 h-3 rounded" style={{ backgroundColor: 'rgba(102, 230, 120, 0.5)' }} />
               high
             </span>
-            <span className="ml-2">Inverted for unfavorable rows (e.g. adverse events). Cells with no data show "—".</span>
+            <span className="ml-2">Inverted for unfavorable rows (e.g. adverse events). Cells with no data show &quot;—&quot;.</span>
           </div>
         </>
       )}

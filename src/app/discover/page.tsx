@@ -15,7 +15,6 @@ import { TargetPinPanel } from '@/components/discover/TargetPinPanel'
 import { DiscoverySettingsDrawer } from '@/components/discovery/DiscoverySettingsDrawer'
 import { OrphanetPinProvenanceStrip } from '@/components/discovery/OrphanetPinProvenanceStrip'
 import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
-import type { DiseaseEntity } from '@/lib/domain/entities'
 import { MAX_DISCOVER_TARGETS, parseTargetsParam } from '@/lib/discovery/discoverUrl'
 import { matchDomainCandidate } from '@/lib/discovery/matchDomainCandidate'
 import {
@@ -91,7 +90,7 @@ export default function DiscoverPage() {
     void search(query, { targets: state.targets })
   }
 
-  function handleDiseaseSelect(diseaseId: string, _disease: DiseaseEntity) {
+  function handleDiseaseSelect(diseaseId: string) {
     const params = new URLSearchParams()
     if (state.query) params.set('q', state.query)
     params.set('diseaseId', diseaseId)

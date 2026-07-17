@@ -3,7 +3,7 @@
  * Distinct from set-ops `/hypothesis` types (KD17).
  */
 
-import type { ResearchHypothesis, NextExperiment, Project } from '@/lib/domain'
+import type { ResearchHypothesis, NextExperiment } from '@/lib/domain'
 import type { StoreResult, ProjectStorage } from './store'
 import { getProject, saveProject } from './store'
 

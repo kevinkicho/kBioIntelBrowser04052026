@@ -32,16 +32,31 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script
           dangerouslySetInnerHTML={{
             __html: `
-              if ('serviceWorker' in navigator && window.location.hostname !== 'localhost') {
-                window.addEventListener('load', () => {
-                  navigator.serviceWorker.register('/sw.js').catch(() => {})
-                })
-              } else if ('serviceWorker' in navigator && window.location.hostname === 'localhost') {
-                // Periodically unregister in dev to avoid 404 cache loops
-                navigator.serviceWorker.getRegistrations().then(regs => {
-                  for (let reg of regs) reg.unregister();
+              (function () {
+                if (!('serviceWorker' in navigator)) return;
+                var h = window.location.hostname;
+                var isLocal =
+                  h === 'localhost' ||
+                  h === '127.0.0.1' ||
+                  h === '[::1]' ||
+                  h.endsWith('.local');
+                if (isLocal) {
+                  // Dev: always unregister SW + clear Cache Storage to avoid stale
+                  // /_next/static chunks (SyntaxError: Invalid or unexpected token).
+                  navigator.serviceWorker.getRegistrations().then(function (regs) {
+                    regs.forEach(function (reg) { reg.unregister(); });
+                  });
+                  if (window.caches && caches.keys) {
+                    caches.keys().then(function (keys) {
+                      keys.forEach(function (k) { caches.delete(k); });
+                    });
+                  }
+                  return;
+                }
+                window.addEventListener('load', function () {
+                  navigator.serviceWorker.register('/sw.js').catch(function () {});
                 });
-              }
+              })();
             `,
           }}
         />
