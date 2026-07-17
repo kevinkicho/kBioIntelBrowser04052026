@@ -34,6 +34,11 @@ tmp_*.txt
 .env.*.local
 !.env.local.example
 
+# Firebase Admin SDK service account keys (never commit)
+*-firebase-adminsdk-*.json
+kbiointelbrowser04052026-firebase-adminsdk-fbsvc-fbbefa2c0f.json
+serviceAccount*.json
+
 # vercel
 .vercel
 
