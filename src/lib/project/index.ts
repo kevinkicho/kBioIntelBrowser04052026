@@ -22,6 +22,8 @@ export {
   saveProject,
   deleteProject,
   createAndSaveProject,
+  registerProjectMutateHook,
+  type ProjectMutateHook,
   addCandidateAndSave,
   setBoardStatusAndSave,
   addPackIndexEntryToProject,

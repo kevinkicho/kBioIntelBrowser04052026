@@ -108,6 +108,7 @@ Then push / create a rollout so the new secret version is bound.
 | `src/lib/firebase/packMetaSync.ts` | Pack **index meta** ↔ Firestore (no claims) |
 | `src/lib/firebase/storageSync.ts` | Optional JSON backup to Storage |
 | `src/lib/firebase/migrate.ts` | Bidirectional migrate + throttle + report |
+| `src/lib/firebase/writeThrough.ts` | Debounced project/prefs push while signed in |
 | `src/components/layout/UserMenu.tsx` | Sign-in, sync, Storage backup |
 | `src/app/projects/page.tsx` | **Sync cloud** / **Cloud backup** when signed in |
 | `apphosting.yaml` | App Hosting `NEXT_PUBLIC_FIREBASE_*` |
@@ -138,10 +139,11 @@ Then push / create a rollout so the new secret version is bound.
 
 1. On Google sign-in, `maybeAutoMigrateOnLogin` runs if last migrate was ≥1h ago.
 2. Menu / Projects → **Sync** runs pull-then-push for projects + pack meta + prefs.
-3. Oversized projects are slimmed or skipped with a warn log.
-4. Firestore rejects `undefined`; writes go through `stripUndefined`.
-5. Local project delete also best-effort deletes the matching cloud project when signed in.
-6. Agent activity: `firebase.migrate.complete`, `firebase.sync.*`, `firebase.storage.*`.
+3. While signed in, **write-through** debounces project save/delete and discovery prefs to Firestore (local still wins offline).
+4. Projects → **Cloud archives** lists Storage JSON backups and can restore into local boards.
+5. Oversized projects are slimmed or skipped with a warn log.
+6. Firestore rejects `undefined`; writes go through `stripUndefined`.
+7. Agent activity: `firebase.migrate.complete`, `firebase.sync.*`, `firebase.write_through.*`, `firebase.storage.*`.
 
 ## Deploy commands
 
@@ -171,9 +173,11 @@ so pushes to `main` build automatically. `apphosting.yaml` already injects Fireb
 1. Authentication → Sign-in method → **Google** enabled  
 2. Authorized domains include:
    - `localhost`
-   - `biointel--kbiointelbrowser04052026.us-east4.hosted.app`
+   - `biointel--kbiointelbrowser04052026.us-east4.hosted.app` (**added**)
    - any custom domain you attach  
 3. OAuth support email set (`firebase.json` auth providers)
+
+Sign-in popup on App Hosting needs the hosted.app domain in authorized domains (done via Identity Toolkit admin API).
 
 ## Security posture
 

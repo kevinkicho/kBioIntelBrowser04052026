@@ -16,7 +16,12 @@ import { emitProductEvent } from '@/lib/productEvents'
 import { recordSearch } from '@/lib/searchHistory'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 import { deleteCloudProjectSafe } from '@/lib/firebase/projectSync'
-import { backupProjectsJsonToCloud } from '@/lib/firebase/storageSync'
+import {
+  backupProjectsJsonToCloud,
+  downloadCloudExportText,
+  listCloudExports,
+  type CloudExportItem,
+} from '@/lib/firebase/storageSync'
 
 const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
 
@@ -40,6 +45,8 @@ export default function ProjectsPage() {
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [lastOpened, setLastOpened] = useState<Record<string, string>>({})
   const [cloudBusy, setCloudBusy] = useState(false)
+  const [cloudExports, setCloudExports] = useState<CloudExportItem[]>([])
+  const [showArchives, setShowArchives] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(() => {
@@ -57,6 +64,15 @@ export default function ProjectsPage() {
     )
   }, [])
 
+  const refreshCloudExports = useCallback(async () => {
+    if (!auth.user?.uid) {
+      setCloudExports([])
+      return
+    }
+    const items = await listCloudExports(auth.user.uid)
+    setCloudExports(items)
+  }, [auth.user?.uid])
+
   useEffect(() => {
     refresh()
   }, [refresh])
@@ -65,6 +81,10 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (auth.lastMigration?.finishedAt) refresh()
   }, [auth.lastMigration?.finishedAt, refresh])
+
+  useEffect(() => {
+    if (showArchives && auth.user?.uid) void refreshCloudExports()
+  }, [showArchives, auth.user?.uid, refreshCloudExports])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })
@@ -147,9 +167,39 @@ export default function ProjectsPage() {
       )
       if (result.ok) {
         showBanner('ok', `Cloud backup saved: ${result.fileName}`)
+        if (showArchives) void refreshCloudExports()
       } else {
         showBanner('err', result.message)
       }
+    } finally {
+      setCloudBusy(false)
+    }
+  }
+
+  const handleRestoreCloudExport = async (fileName: string) => {
+    if (!auth.user?.uid) return
+    if (
+      !window.confirm(
+        `Restore “${fileName}” into local projects? Existing boards with the same id may be renamed.`,
+      )
+    ) {
+      return
+    }
+    setCloudBusy(true)
+    try {
+      const dl = await downloadCloudExportText(auth.user.uid, fileName)
+      if (!dl.ok) {
+        showBanner('err', dl.message)
+        return
+      }
+      const result = importProjectsFromJson(dl.text)
+      if (!result.ok) {
+        showBanner('err', result.message)
+        return
+      }
+      refresh()
+      // Write-through will push restored boards when signed in
+      showBanner('ok', `Restored ${result.imported.length} project(s) from cloud archive`)
     } finally {
       setCloudBusy(false)
     }
@@ -205,6 +255,15 @@ export default function ProjectsPage() {
                   data-testid="projects-cloud-backup"
                 >
                   Cloud backup
+                </button>
+                <button
+                  type="button"
+                  disabled={cloudBusy}
+                  onClick={() => setShowArchives((v) => !v)}
+                  className="rounded-lg border border-slate-700 bg-slate-800/50 px-3 py-1.5 text-xs text-slate-300 hover:border-slate-600 hover:text-slate-100 disabled:opacity-50"
+                  data-testid="projects-cloud-archives"
+                >
+                  {showArchives ? 'Hide archives' : 'Cloud archives'}
                 </button>
               </>
             )}
@@ -265,6 +324,59 @@ export default function ProjectsPage() {
             Create project
           </button>
         </div>
+
+        {auth.user && showArchives && (
+          <div
+            className="mb-8 rounded-xl border border-sky-900/40 bg-sky-950/20 p-4"
+            data-testid="projects-cloud-archive-list"
+          >
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-medium text-sky-200">Storage archives</h2>
+              <button
+                type="button"
+                disabled={cloudBusy}
+                onClick={() => void refreshCloudExports()}
+                className="text-[11px] text-sky-400 hover:text-sky-200 disabled:opacity-50"
+              >
+                Refresh
+              </button>
+            </div>
+            <p className="mb-3 text-[11px] text-slate-500">
+              JSON exports under <code className="text-slate-400">users/…/exports</code>. Restore
+              merges into local boards (does not replace your cloud Firestore sync).
+            </p>
+            {cloudExports.length === 0 ? (
+              <p className="text-xs text-slate-500">No cloud archives yet. Use Cloud backup.</p>
+            ) : (
+              <ul className="space-y-2">
+                {cloudExports.map((item) => (
+                  <li
+                    key={item.fullPath}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
+                  >
+                    <div className="min-w-0">
+                      <p className="truncate font-mono text-xs text-slate-200">{item.name}</p>
+                      <p className="text-[10px] text-slate-600">
+                        {item.updated
+                          ? new Date(item.updated).toLocaleString()
+                          : 'unknown date'}
+                        {item.size != null ? ` · ${Math.round(item.size / 1024)} KB` : ''}
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={cloudBusy}
+                      onClick={() => void handleRestoreCloudExport(item.name)}
+                      className="rounded-lg border border-sky-800/50 bg-sky-950/40 px-2.5 py-1 text-[11px] text-sky-300 hover:bg-sky-900/40 disabled:opacity-50"
+                    >
+                      Restore
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
 
         {projects.length === 0 ? (
           <div className="rounded-xl border border-dashed border-slate-700 px-6 py-16 text-center">

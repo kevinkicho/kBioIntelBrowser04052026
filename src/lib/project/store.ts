@@ -46,6 +46,46 @@ export function projectStorageKey(id: string): string {
   return `${PROJECT_KEY_PREFIX}${id}`
 }
 
+/**
+ * Optional side effects after local save/delete (e.g. Firebase write-through).
+ * Must never throw into the store path — callers wrap.
+ */
+export type ProjectMutateHook = {
+  onSave?: (project: Project) => void
+  onDelete?: (projectId: string) => void
+}
+
+const mutateHooks: ProjectMutateHook[] = []
+
+/** Register a hook; returns unsubscribe. Safe for optional cloud sync. */
+export function registerProjectMutateHook(hook: ProjectMutateHook): () => void {
+  mutateHooks.push(hook)
+  return () => {
+    const i = mutateHooks.indexOf(hook)
+    if (i >= 0) mutateHooks.splice(i, 1)
+  }
+}
+
+function runSaveHooks(project: Project): void {
+  for (const h of mutateHooks) {
+    try {
+      h.onSave?.(project)
+    } catch {
+      /* non-fatal */
+    }
+  }
+}
+
+function runDeleteHooks(projectId: string): void {
+  for (const h of mutateHooks) {
+    try {
+      h.onDelete?.(projectId)
+    } catch {
+      /* non-fatal */
+    }
+  }
+}
+
 function nowIso(): string {
   return new Date().toISOString()
 }
@@ -311,6 +351,7 @@ export function saveProject(
     }
   }
 
+  runSaveHooks(capped)
   return { ok: true, value: capped }
 }
 
@@ -328,6 +369,7 @@ export function deleteProject(
     const ids = readIndex(s).filter((x) => x !== id)
     const indexResult = writeIndex(s, ids)
     if (!indexResult.ok) return indexResult
+    runDeleteHooks(id)
     return { ok: true, value: true }
   } catch (err) {
     if (isQuotaError(err)) {

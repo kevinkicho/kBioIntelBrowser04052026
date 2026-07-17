@@ -29,6 +29,11 @@ import {
   type CloudUserProfile,
 } from './userProfile'
 import { maybeAutoMigrateOnLogin, runFirebaseMigration, type MigrationReport } from './migrate'
+import {
+  disableProjectWriteThrough,
+  enableProjectWriteThrough,
+  setWriteThroughUid,
+} from './writeThrough'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
 export type FirebaseAuthState = {
@@ -56,6 +61,16 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   const [lastMigration, setLastMigration] = useState<MigrationReport | null>(null)
   const [migrating, setMigrating] = useState(false)
 
+  // Best-effort cloud write-through for local project save/delete
+  useEffect(() => {
+    if (!configured) return
+    enableProjectWriteThrough()
+    return () => {
+      disableProjectWriteThrough()
+      setWriteThroughUid(null)
+    }
+  }, [configured])
+
   useEffect(() => {
     if (!configured) {
       setReady(true)
@@ -72,6 +87,7 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       void (async () => {
         if (cancelled) return
         setUser(u)
+        setWriteThroughUid(u?.uid ?? null)
         if (!u) {
           setProfile(null)
           setLastMigration(null)
@@ -119,6 +135,7 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
 
     return () => {
       cancelled = true
+      setWriteThroughUid(null)
       unsub()
     }
   }, [configured])
@@ -149,6 +166,7 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     try {
       if (uid) await setUserPresenceOffline(uid)
       await firebaseSignOut(auth)
+      setWriteThroughUid(null)
       setProfile(null)
       setLastMigration(null)
       logAgentActivity('firebase.auth.signed_out', {}, { source: 'firebase' })

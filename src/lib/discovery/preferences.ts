@@ -267,6 +267,18 @@ export function loadDiscoveryPreferences(): DiscoveryPreferences {
   }
 }
 
+type PrefsSaveHook = (prefs: DiscoveryPreferences) => void
+const prefsSaveHooks: PrefsSaveHook[] = []
+
+/** Optional side effect after local prefs save (e.g. Firebase write-through). */
+export function registerDiscoveryPrefsSaveHook(hook: PrefsSaveHook): () => void {
+  prefsSaveHooks.push(hook)
+  return () => {
+    const i = prefsSaveHooks.indexOf(hook)
+    if (i >= 0) prefsSaveHooks.splice(i, 1)
+  }
+}
+
 export function saveDiscoveryPreferences(prefs: DiscoveryPreferences): void {
   if (typeof window === 'undefined') return
   try {
@@ -276,6 +288,13 @@ export function saveDiscoveryPreferences(prefs: DiscoveryPreferences): void {
       updatedAt: prefs.updatedAt || new Date().toISOString(),
     }
     localStorage.setItem(DISCOVERY_PREFS_STORAGE_KEY, JSON.stringify(toStore))
+    for (const h of prefsSaveHooks) {
+      try {
+        h(toStore)
+      } catch {
+        /* non-fatal */
+      }
+    }
   } catch {
     // quota / private mode — ignore
   }
