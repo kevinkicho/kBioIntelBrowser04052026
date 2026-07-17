@@ -202,7 +202,7 @@ export function NetworkGraph({
 
       {selected && provenance && (
         <div
-          className="fixed z-[70] w-80 max-w-[90vw] rounded-lg border border-slate-600 bg-[#12141c] shadow-xl p-3"
+          className="fixed z-[300] w-80 max-w-[90vw] rounded-lg border border-slate-600 bg-[#12141c] shadow-xl p-3"
           style={{
             left: Math.min(selected.clientX, typeof window !== 'undefined' ? window.innerWidth - 340 : selected.clientX),
             top: Math.min(selected.clientY + 12, typeof window !== 'undefined' ? window.innerHeight - 280 : selected.clientY),

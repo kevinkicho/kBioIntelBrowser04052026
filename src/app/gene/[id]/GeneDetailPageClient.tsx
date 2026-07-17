@@ -164,7 +164,7 @@ function GeneDiseasesPanel({
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-3">Associated Diseases ({diseases.length})</h3>
-      <p className="text-[10px] text-slate-600 mb-2">Click a row for API source, timestamp, and endpoint.</p>
+      <p className="text-[10px] text-slate-600 mb-2">Use the <span className="font-semibold text-slate-400">API</span> button on a row for source, timestamp, and endpoint.</p>
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {diseases.slice(0, 30).map((d, i) => {
           const discoverHref = buildDiscoverHref({
@@ -215,7 +215,7 @@ function GeneVariantsPanel({
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <p className="text-[10px] text-slate-600 mb-2">Click a row for API source, timestamp, and endpoint.</p>
+      <p className="text-[10px] text-slate-600 mb-2">Use the <span className="font-semibold text-slate-400">API</span> button for source, timestamp, and endpoint.</p>
       {clinvarVariants && clinvarVariants.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-slate-200 mb-3">ClinVar Variants ({clinvarVariants.length})</h3>
@@ -285,7 +285,7 @@ function GeneExpressionPanel({
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <p className="text-[10px] text-slate-600 mb-3">
-        Counts sum GTEx + Bgee + Expression Atlas. Click any row for API source, fetch time, endpoint, and URL.
+        Counts sum GTEx + Bgee + Expression Atlas. Use the API button on a row for source, fetch time, endpoint, and URL.
       </p>
       {gtexExps && gtexExps.length > 0 && (
         <div className="mb-4">
@@ -390,7 +390,7 @@ function TargetedDrugsPanel({
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-1">Drugs targeting this gene ({drugs.length})</h3>
-      <p className="text-[10px] text-slate-600 mb-3">Click a row for API source, timestamp, and endpoint.</p>
+      <p className="text-[10px] text-slate-600 mb-3">Use the <span className="font-semibold text-slate-400">API</span> button for source, timestamp, and endpoint.</p>
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {drugs.map((d, i) => (
           <DataPoint
@@ -453,7 +453,7 @@ function GenePathwaysPanel({
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <p className="text-[10px] text-slate-600 mb-3">Click a row for API source, timestamp, and endpoint.</p>
+      <p className="text-[10px] text-slate-600 mb-3">Use the <span className="font-semibold text-slate-400">API</span> button for source, timestamp, and endpoint.</p>
       {reactome && reactome.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-slate-200 mb-3">Reactome Pathways ({reactome.length})</h3>
