@@ -130,6 +130,13 @@ export function validateOllamaUrl(
   if (isBlockedHostname(hostname)) {
     return { valid: false, error: 'Reserved IP addresses are not allowed' }
   }
+
+  // Cloud hosts: never invent :11434 (HTTPS 443 / default)
+  if (isOllamaCloudHostname(hostname)) {
+    const cloudNorm = normalizeOllamaUrl(`${parsed.protocol}//${hostname}`)
+    return { valid: true, normalized: cloudNorm }
+  }
+
   if (!parsed.port) {
     normalized = `${parsed.protocol}//${parsed.host}:${OLLAMA_DEFAULT_PORT}`
     parsed = new URL(normalized)
@@ -161,18 +168,19 @@ export function validateOllamaUrl(
         warning: 'lan-warning',
       }
     }
-    // Public hostnames: never proxy from untrusted clients
+    // Other public hostnames: never proxy from untrusted clients (SSRF)
     return {
       valid: false,
-      error: 'Only localhost (or LAN with OLLAMA_ALLOW_LAN=1) is allowed for server-side Ollama',
+      error:
+        'Only localhost, private LAN (with OLLAMA_ALLOW_LAN=1), or Ollama Cloud is allowed for server-side Ollama',
     }
   }
 
-  // Client mode: loopback + private LAN (with warning). Block public hostnames.
+  // Client mode: loopback + private LAN (with warning). Cloud handled above.
   if (!loopback && !privateHost) {
     return {
       valid: false,
-      error: 'Only localhost or private LAN addresses (10.x, 172.16-31.x, 192.168.x, *.local) are allowed',
+      error: 'Only localhost, private LAN (10.x, 172.16-31.x, 192.168.x, *.local), or ollama.com are allowed',
     }
   }
 
@@ -180,6 +188,18 @@ export function validateOllamaUrl(
   return { valid: true, normalized: `${parsed.protocol}//${hostname}:${port}`, warning }
 }
 
+/** Hosts that speak the Ollama HTTP API on standard HTTPS (not :11434). */
+function isOllamaCloudHostname(hostname: string): boolean {
+  const h = hostname.toLowerCase()
+  return h === 'ollama.com' || h === 'www.ollama.com' || h === 'api.ollama.com'
+}
+
+/**
+ * Normalize an Ollama base URL.
+ * - Local/LAN HTTP installs default to port 11434 when omitted.
+ * - HTTPS (incl. Ollama Cloud) must NOT get :11434 — that breaks cloud fallback
+ *   (https://ollama.com:11434 is unreachable from App Hosting).
+ */
 export function normalizeOllamaUrl(url: string): string {
   let normalized = url.trim().replace(/\/+$/, '')
   if (normalized && !normalized.startsWith('http')) {
@@ -188,10 +208,24 @@ export function normalizeOllamaUrl(url: string): string {
   if (normalized) {
     try {
       const parsed = new URL(normalized)
+      const host = parsed.hostname.toLowerCase()
+      // Strip mistaken :11434 on cloud hosts (saved from older clients / bugs)
+      if (
+        isOllamaCloudHostname(host) &&
+        (parsed.port === String(OLLAMA_DEFAULT_PORT) || parsed.port === '11434')
+      ) {
+        return `${parsed.protocol}//${host}`
+      }
       if (!parsed.port) {
+        if (parsed.protocol === 'https:' || isOllamaCloudHostname(host)) {
+          return `${parsed.protocol}//${host}`
+        }
+        // Local Ollama default listen port
         return `${parsed.protocol}//${parsed.hostname}:${OLLAMA_DEFAULT_PORT}`
       }
-    } catch {}
+    } catch {
+      /* keep as-is */
+    }
   }
   return normalized
 }

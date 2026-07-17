@@ -100,6 +100,13 @@ describe('validateOllamaUrl', () => {
       const result = validateOllamaUrl('http://evil.example.com:11434', { forServer: true })
       expect(result.valid).toBe(false)
     })
+
+    it('allows Ollama Cloud host on server without LAN flag', () => {
+      delete process.env.OLLAMA_ALLOW_LAN
+      const result = validateOllamaUrl('https://ollama.com', { forServer: true })
+      expect(result.valid).toBe(true)
+      expect(result.normalized).toBe('https://ollama.com')
+    })
   })
 
   describe('blocks reserved/unsafe ranges', () => {
@@ -227,5 +234,14 @@ describe('normalizeOllamaUrl', () => {
 
   it('handles empty string', () => {
     expect(normalizeOllamaUrl('')).toBe('')
+  })
+
+  it('does not append :11434 to Ollama Cloud HTTPS', () => {
+    expect(normalizeOllamaUrl('https://ollama.com')).toBe('https://ollama.com')
+    expect(normalizeOllamaUrl('https://api.ollama.com')).toBe('https://api.ollama.com')
+  })
+
+  it('strips mistaken :11434 from cloud hosts', () => {
+    expect(normalizeOllamaUrl('https://ollama.com:11434')).toBe('https://ollama.com')
   })
 })

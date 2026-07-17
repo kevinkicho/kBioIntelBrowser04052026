@@ -37,6 +37,11 @@ export interface OllamaHealthResponse {
 
 const OLLAMA_TIMEOUT = 15000
 
+function redirectModeFor(url: string): RequestRedirect {
+  // Local SSRF hardening: refuse redirects. Cloud CDN/API may redirect — allow follow.
+  return isOllamaCloudUrl(url) ? 'follow' : 'error'
+}
+
 function extractModelNames(data: Record<string, unknown>): string[] {
   if (Array.isArray(data.models) && data.models.length > 0) {
     return (data.models as unknown[]).map((m: unknown) => {
@@ -65,7 +70,8 @@ async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthRes
     return { available: false, models: [], error: 'No Ollama URL provided' }
   }
   const url = normalizeOllamaUrl(ollamaUrl)
-  console.log('[ai] Checking Ollama health at', url)
+  const cloud = isOllamaCloudUrl(url)
+  console.log('[ai] Checking Ollama health at', url, cloud ? '(cloud)' : '(local)')
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT)
@@ -73,13 +79,19 @@ async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthRes
     const res = await fetch(`${url}/api/tags`, {
       signal: controller.signal,
       headers: ollamaRequestHeaders(url),
-      redirect: 'error',
+      redirect: redirectModeFor(url),
     })
     clearTimeout(timeout)
 
     if (!res.ok) {
-      console.warn('[ai] Ollama responded with status', res.status)
-      return { available: false, models: [], error: `Ollama returned ${res.status}` }
+      const body = await res.text().catch(() => '')
+      console.warn('[ai] Ollama responded with status', res.status, body.slice(0, 200))
+      return {
+        available: false,
+        models: [],
+        error: `Ollama returned ${res.status}${body ? `: ${body.slice(0, 120)}` : ''}`,
+        effectiveUrl: url,
+      }
     }
 
     const data: OllamaTagsResponse = await res.json()
@@ -90,17 +102,22 @@ async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthRes
     return {
       available: true,
       models,
-      viaCloud: isOllamaCloudUrl(url),
+      viaCloud: cloud,
       effectiveUrl: url,
     }
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('abort') || message.includes('AbortError') || message.includes('timeout')) {
-      console.warn('[ai] Ollama health check timed out')
-      return { available: false, models: [], error: 'Connection timed out' }
+      console.warn('[ai] Ollama health check timed out for', url)
+      return { available: false, models: [], error: `Connection timed out (${url})`, effectiveUrl: url }
     }
-    console.warn('[ai] Ollama not available:', message)
-    return { available: false, models: [], error: 'Cannot connect to Ollama' }
+    console.warn('[ai] Ollama not available at', url, ':', message)
+    return {
+      available: false,
+      models: [],
+      error: `Cannot connect to Ollama (${url}): ${message}`,
+      effectiveUrl: url,
+    }
   }
 }
 
@@ -109,20 +126,23 @@ async function checkOllamaHealthOnce(ollamaUrl: string): Promise<OllamaHealthRes
  * and OLLAMA_API_KEY is set.
  */
 export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealthResponse> {
-  const primary = await checkOllamaHealthOnce(ollamaUrl)
+  const primaryUrl = normalizeOllamaUrl(ollamaUrl)
+  const primary = await checkOllamaHealthOnce(primaryUrl)
   if (primary.available) return primary
 
-  if (isOllamaCloudUrl(ollamaUrl) || !hasOllamaCloudFallback()) {
+  // Already targeting cloud, or no API key configured
+  if (isOllamaCloudUrl(primaryUrl) || !hasOllamaCloudFallback()) {
     return primary
   }
 
-  console.log('[ai] Local Ollama unavailable; falling back to Ollama Cloud')
-  const cloud = await checkOllamaHealthOnce(OLLAMA_CLOUD_BASE)
+  const cloudBase = normalizeOllamaUrl(OLLAMA_CLOUD_BASE)
+  console.log('[ai] Local Ollama unavailable; falling back to Ollama Cloud at', cloudBase)
+  const cloud = await checkOllamaHealthOnce(cloudBase)
   if (cloud.available) {
     return {
       ...cloud,
       viaCloud: true,
-      effectiveUrl: OLLAMA_CLOUD_BASE,
+      effectiveUrl: cloudBase,
       error: undefined,
     }
   }
@@ -133,6 +153,7 @@ export async function checkOllamaHealth(ollamaUrl: string): Promise<OllamaHealth
     error: primary.error
       ? `${primary.error} (cloud fallback also failed: ${cloud.error ?? 'unknown'})`
       : cloud.error,
+    effectiveUrl: cloudBase,
   }
 }
 
@@ -141,13 +162,14 @@ export async function pullModel(
   modelName: string,
   onProgress: (status: string, progress: number) => void,
 ): Promise<{ success: boolean; error?: string }> {
-  const tryPull = async (url: string) => {
+  const tryPull = async (rawUrl: string) => {
+    const url = normalizeOllamaUrl(rawUrl)
     console.log('[ai] Pulling model', modelName, 'from', url)
     const res = await fetch(`${url}/api/pull`, {
       method: 'POST',
       headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({ name: modelName, stream: true }),
-      redirect: 'error',
+      redirect: redirectModeFor(url),
     })
 
     if (!res.ok || !res.body) {
@@ -224,7 +246,8 @@ export async function generateChat(
   onToken: (token: string) => void,
   signal?: AbortSignal,
 ): Promise<{ success: boolean; error?: string; viaCloud?: boolean }> {
-  const openStream = async (url: string): Promise<{ res: Response } | { error: string }> => {
+  const openStream = async (rawUrl: string): Promise<{ res: Response } | { error: string }> => {
+    const url = normalizeOllamaUrl(rawUrl)
     console.log('[ai] Generating chat with', model, 'at', url, '- messages:', messages.length)
     try {
       const res = await fetch(`${url}/api/chat`, {
@@ -232,7 +255,7 @@ export async function generateChat(
         headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ model, messages, stream: true }),
         signal,
-        redirect: 'error',
+        redirect: redirectModeFor(url),
       })
 
       if (!res.ok || !res.body) {
@@ -322,7 +345,8 @@ export async function generateOnce(
   prompt: string,
   options?: { temperature?: number; num_predict?: number; signal?: AbortSignal },
 ): Promise<{ success: true; response: string; viaCloud?: boolean } | { success: false; error: string }> {
-  const tryOnce = async (url: string) => {
+  const tryOnce = async (rawUrl: string) => {
+    const url = normalizeOllamaUrl(rawUrl)
     const res = await fetch(`${url}/api/generate`, {
       method: 'POST',
       headers: ollamaRequestHeaders(url, { 'Content-Type': 'application/json' }),
@@ -336,7 +360,7 @@ export async function generateOnce(
         },
       }),
       signal: options?.signal,
-      redirect: 'error',
+      redirect: redirectModeFor(url),
     })
     if (!res.ok) {
       const text = await res.text().catch(() => '')

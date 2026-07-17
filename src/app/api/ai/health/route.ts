@@ -63,8 +63,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       available: false,
       models: [],
-      ollamaUrl: validatedUrl,
-      viaCloud: false,
+      ollamaUrl: health.effectiveUrl ?? validatedUrl,
+      viaCloud: Boolean(health.viaCloud),
       cloudFallbackConfigured: hasOllamaCloudFallback(),
       error: health.error,
     })
@@ -78,6 +78,7 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({
     available: true,
     models: health.models,
+    // Prefer cloud base when fallback succeeded so later chat/show hit cloud, not dead localhost
     ollamaUrl: health.effectiveUrl ?? validatedUrl,
     viaCloud,
     cloudFallbackConfigured: hasOllamaCloudFallback(),

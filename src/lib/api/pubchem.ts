@@ -76,12 +76,38 @@ function getLargeMoleculeDescription(name: string, formula: string): string {
 }
 
 export async function searchMolecules(query: string): Promise<string[]> {
+  // 1) PubChem autocomplete (best when reachable)
   try {
     const url = `${AUTOCOMPLETE_URL}/${encodeURIComponent(query)}/JSON?limit=8`
     const res = await pubchemFetch(url)
-    if (!res.ok) return []
-    const data = await res.json()
-    return data.dictionary_terms?.compound ?? []
+    if (res.ok) {
+      const data = await res.json()
+      const terms: string[] = data.dictionary_terms?.compound ?? []
+      if (terms.length > 0) return terms
+    }
+  } catch {
+    /* try fallbacks */
+  }
+
+  // 2) Cloud-friendly free APIs (App Hosting / GCP often gets PubChem 503)
+  try {
+    const { searchChemblMoleculeNames, searchMyChemMoleculeNames } = await import(
+      './cloudSearchFallback'
+    )
+    const [chembl, mychem] = await Promise.all([
+      searchChemblMoleculeNames(query, 8),
+      searchMyChemMoleculeNames(query, 8),
+    ])
+    const seen = new Set<string>()
+    const merged: string[] = []
+    for (const n of [...chembl, ...mychem]) {
+      const key = n.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      merged.push(n)
+      if (merged.length >= 8) break
+    }
+    return merged
   } catch {
     return []
   }
@@ -154,6 +180,15 @@ export async function getMoleculeById(cid: number): Promise<Molecule | null> {
   return promise
 }
 
+async function fetchMoleculeFallback(cid: number): Promise<Molecule | null> {
+  try {
+    const { getMoleculeByCidViaMyChem } = await import('./cloudSearchFallback')
+    return await getMoleculeByCidViaMyChem(cid)
+  } catch {
+    return null
+  }
+}
+
 async function fetchMoleculeByIdUncached(cid: number): Promise<Molecule | null> {
   let propsRes: Response
   let synonymsRes: Response
@@ -167,6 +202,8 @@ async function fetchMoleculeByIdUncached(cid: number): Promise<Molecule | null> 
       pubchemFetch(`${BASE_URL}/compound/cid/${cid}/description/JSON`),
     ])
   } catch (err) {
+    const alt = await fetchMoleculeFallback(cid)
+    if (alt) return alt
     throw new PubChemUpstreamError(
       err instanceof Error ? err.message : 'PubChem network error',
     )
@@ -174,6 +211,8 @@ async function fetchMoleculeByIdUncached(cid: number): Promise<Molecule | null> 
 
   if (!propsRes.ok) {
     if (isNotFoundStatus(propsRes.status)) return null
+    const alt = await fetchMoleculeFallback(cid)
+    if (alt) return alt
     throw new PubChemUpstreamError(
       `PubChem property lookup failed (${propsRes.status})`,
       propsRes.status,
@@ -232,9 +271,17 @@ export async function getMoleculeCidByName(name: string): Promise<number | null>
   try {
     const url = `${BASE_URL}/compound/name/${encodeURIComponent(name)}/cids/JSON`
     const res = await pubchemFetch(url)
-    if (!res.ok) return null
-    const data = await res.json()
-    return data.IdentifierList?.CID?.[0] ?? null
+    if (res.ok) {
+      const data = await res.json()
+      const cid = data.IdentifierList?.CID?.[0]
+      if (typeof cid === 'number' && cid > 0) return cid
+    }
+  } catch {
+    /* fallback */
+  }
+  try {
+    const { resolveCidViaMyChem } = await import('./cloudSearchFallback')
+    return await resolveCidViaMyChem(name)
   } catch {
     return null
   }

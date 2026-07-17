@@ -71,8 +71,41 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ suggestions, searchType: 'disease' })
     }
 
-    const suggestions = await searchByType(query, typeParam as SearchType)
-    return NextResponse.json({ suggestions })
+    let suggestions = await searchByType(query, typeParam as SearchType)
+
+    // If PubChem path is empty (common on App Hosting / GCP 503), fall back explicitly
+    if (
+      suggestions.length === 0 &&
+      (typeParam === 'name' || typeParam === 'cas')
+    ) {
+      try {
+        const { searchChemblMoleculeNames, searchMyChemMoleculeNames } =
+          await import('@/lib/api/cloudSearchFallback')
+        const [a, b] = await Promise.all([
+          searchChemblMoleculeNames(query, 8),
+          searchMyChemMoleculeNames(query, 8),
+        ])
+        const seen = new Set<string>()
+        const merged: string[] = []
+        for (const n of [...a, ...b]) {
+          const k = n.toLowerCase()
+          if (seen.has(k)) continue
+          seen.add(k)
+          merged.push(n)
+          if (merged.length >= 8) break
+        }
+        suggestions = merged
+      } catch {
+        /* keep empty */
+      }
+    }
+
+    return NextResponse.json({
+      suggestions,
+      ...(suggestions.length === 0
+        ? { warning: 'No matches from PubChem or cloud fallback sources' }
+        : {}),
+    })
   } catch (error) {
     console.error('[api/search] Error:', error)
     return NextResponse.json({ error: 'Search failed', message: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })

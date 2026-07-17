@@ -39,6 +39,8 @@ async function checkOllama(ollamaUrl: string): Promise<{
   models: string[]
   error?: string
   viaCloud?: boolean
+  /** Server-effective URL (e.g. https://ollama.com after cloud fallback) */
+  effectiveUrl?: string
 }> {
   try {
     const res = await fetch('/api/ai/health', {
@@ -55,6 +57,10 @@ async function checkOllama(ollamaUrl: string): Promise<{
       models: data.models ?? [],
       error: data.error,
       viaCloud: Boolean(data.viaCloud),
+      effectiveUrl:
+        typeof data.ollamaUrl === 'string' && data.ollamaUrl.length > 0
+          ? data.ollamaUrl
+          : undefined,
     }
   } catch (err) {
     return { available: false, models: [], error: err instanceof Error ? err.message : 'Connection failed' }
@@ -157,10 +163,14 @@ export function AIProvider({ children }: { children: ReactNode }) {
       const result = await checkOllama(config.ollamaUrl)
       if (result.available) {
         const model = config.model || pickFirstModel(result.models) || ''
+        // Stick to cloud base after fallback so chat/show do not re-hit dead localhost
+        const effectiveUrl =
+          result.viaCloud && result.effectiveUrl ? result.effectiveUrl : config.ollamaUrl
         const via = result.viaCloud ? ' (via Ollama Cloud fallback)' : ''
-        console.log(`[ai] Connected to ${config.ollamaUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
+        console.log(`[ai] Connected to ${effectiveUrl}${via} | models: [${result.models.join(', ')}] | using: ${model || 'none'}`)
         setConfig(prev => ({
           ...prev,
+          ollamaUrl: effectiveUrl,
           status: model ? 'available' as AIStatus : 'unavailable' as AIStatus,
           availableModels: result.models,
           model: model || prev.model,
@@ -169,7 +179,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
             : 'No models found on this Ollama instance.',
         }))
         if (model) {
-          const info = await fetchModelInfo(config.ollamaUrl, model)
+          const info = await fetchModelInfo(effectiveUrl, model)
           if (info.contextLength ?? info.parameterSize ?? info.family ?? info.quantizationLevel ?? info.format ?? info.sizeBytes) {
             console.log('[ai] Model info:', info)
           }
