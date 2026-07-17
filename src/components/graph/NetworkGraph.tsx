@@ -1,9 +1,13 @@
 'use client'
 
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import type { GraphData, GraphNode } from '@/lib/types'
 import { useRouter } from 'next/navigation'
+import {
+  formatProvenanceTimestamp,
+  resolveProvenance,
+} from '@/lib/provenance'
 
 const NODE_COLORS: Record<GraphNode['type'], string> = {
   molecule: '#6366f1',   // indigo
@@ -19,14 +23,42 @@ const NODE_COLORS: Record<GraphNode['type'], string> = {
   grant:    '#84cc16',   // lime
 }
 
+/** Default free-public source key by graph node type */
+const TYPE_SOURCE: Partial<Record<GraphNode['type'], string>> = {
+  molecule: 'pubchem',
+  company: 'openfda',
+  patent: 'patents',
+  trial: 'clinicaltrials',
+  target: 'opentargets',
+  pathway: 'reactome',
+  gene: 'ncbi-gene',
+  product: 'fda-ndc',
+  publication: 'pubmed',
+  grant: 'nihreporter',
+  synthesis: 'synthesis',
+}
+
 interface SimNode extends d3.SimulationNodeDatum, GraphNode {}
 interface SimEdge extends d3.SimulationLinkDatum<SimNode> {
   label: string
 }
 
-export function NetworkGraph({ data }: { data: GraphData }) {
+interface SelectedNodeInfo {
+  node: GraphNode
+  clientX: number
+  clientY: number
+}
+
+export function NetworkGraph({
+  data,
+  fetchedAt,
+}: {
+  data: GraphData
+  fetchedAt?: Date | string | null
+}) {
   const svgRef = useRef<SVGSVGElement>(null)
   const router = useRouter()
+  const [selected, setSelected] = useState<SelectedNodeInfo | null>(null)
 
   useEffect(() => {
     if (!svgRef.current || data.nodes.length === 0) return
@@ -96,8 +128,20 @@ export function NetworkGraph({ data }: { data: GraphData }) {
           .on('drag', (event, d) => { d.fx = event.x; d.fy = event.y })
           .on('end', (event, d) => { if (!event.active) simulation.alphaTarget(0); d.fx = null; d.fy = null })
       )
-      .on('click', (_event, d) => {
+      .on('click', (event, d) => {
+        event.stopPropagation()
+        setSelected({
+          node: d,
+          clientX: event.clientX,
+          clientY: event.clientY,
+        })
+      })
+      .on('dblclick', (_event, d) => {
         if (d.type === 'molecule') router.push(`/molecule/${d.id.replace('mol-', '')}`)
+        if (d.type === 'gene') {
+          const gid = String(d.data?.geneId || d.id.replace('gene-', ''))
+          if (gid) router.push(`/gene/${gid}`)
+        }
       })
 
     const node = nodeSelection
@@ -131,9 +175,22 @@ export function NetworkGraph({ data }: { data: GraphData }) {
     return () => { simulation.stop() }
   }, [data, router])
 
+  const provenance = selected
+    ? resolveProvenance(
+        String(selected.node.data?.sourceKey || TYPE_SOURCE[selected.node.type] || selected.node.type),
+        {
+          recordUrl: typeof selected.node.data?.url === 'string' ? selected.node.data.url : undefined,
+          fetchedAt: fetchedAt ?? (typeof selected.node.data?.fetchedAt === 'string' ? selected.node.data.fetchedAt : null),
+        },
+      )
+    : null
+
   return (
     <div className="relative w-full bg-slate-900 border border-slate-700 rounded-xl overflow-hidden" style={{ height: '520px' }}>
       <svg ref={svgRef} width="100%" height="100%" />
+      <p className="absolute top-3 left-3 text-[10px] text-slate-500 pointer-events-none">
+        Click a node for API provenance · double-click to open molecule/gene
+      </p>
       <div className="absolute bottom-4 right-4 flex flex-wrap gap-2 text-xs pointer-events-none">
         {(Object.entries(NODE_COLORS) as [GraphNode['type'], string][]).map(([type, color]) => (
           <span key={type} className="flex items-center gap-1 text-slate-400">
@@ -142,6 +199,99 @@ export function NetworkGraph({ data }: { data: GraphData }) {
           </span>
         ))}
       </div>
+
+      {selected && provenance && (
+        <div
+          className="fixed z-[70] w-80 max-w-[90vw] rounded-lg border border-slate-600 bg-[#12141c] shadow-xl p-3"
+          style={{
+            left: Math.min(selected.clientX, typeof window !== 'undefined' ? window.innerWidth - 340 : selected.clientX),
+            top: Math.min(selected.clientY + 12, typeof window !== 'undefined' ? window.innerHeight - 280 : selected.clientY),
+          }}
+          role="dialog"
+          aria-label={`Provenance for ${selected.node.label}`}
+          data-testid="graph-node-provenance"
+        >
+          <div className="flex items-start justify-between gap-2 mb-2">
+            <div className="min-w-0">
+              <p className="text-[10px] uppercase tracking-wide text-slate-500">API provenance</p>
+              <p className="text-xs font-semibold text-slate-100 truncate">{selected.node.label}</p>
+              <p className="text-[10px] text-slate-500 capitalize">{selected.node.type}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelected(null)}
+              className="rounded p-0.5 text-slate-500 hover:text-slate-200 hover:bg-slate-800"
+              aria-label="Close"
+            >
+              ✕
+            </button>
+          </div>
+          <dl className="space-y-1.5 text-[11px]">
+            <div className="flex gap-2">
+              <dt className="w-14 shrink-0 text-[10px] text-slate-500">Source</dt>
+              <dd className="text-slate-300">{provenance.organization}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-14 shrink-0 text-[10px] text-slate-500">API</dt>
+              <dd className="font-mono text-[10px] text-slate-300">{provenance.api}</dd>
+            </div>
+            <div className="flex gap-2">
+              <dt className="w-14 shrink-0 text-[10px] text-slate-500">Fetched</dt>
+              <dd className="font-mono text-[10px] text-slate-300">
+                {formatProvenanceTimestamp(provenance.fetchedAt)}
+              </dd>
+            </div>
+            {provenance.endpoint && (
+              <div className="flex gap-2">
+                <dt className="w-14 shrink-0 text-[10px] text-slate-500">Endpoint</dt>
+                <dd className="min-w-0">
+                  <a
+                    href={provenance.endpoint}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all font-mono text-[10px] text-cyan-400/90 hover:text-cyan-300"
+                  >
+                    {provenance.endpoint}
+                  </a>
+                </dd>
+              </div>
+            )}
+            {provenance.docs && (
+              <div className="flex gap-2">
+                <dt className="w-14 shrink-0 text-[10px] text-slate-500">Docs</dt>
+                <dd className="min-w-0">
+                  <a
+                    href={provenance.docs}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all font-mono text-[10px] text-indigo-400 hover:text-indigo-300"
+                  >
+                    {provenance.docs}
+                  </a>
+                </dd>
+              </div>
+            )}
+            {provenance.recordUrl && (
+              <div className="flex gap-2">
+                <dt className="w-14 shrink-0 text-[10px] text-slate-500">Record</dt>
+                <dd className="min-w-0">
+                  <a
+                    href={provenance.recordUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="break-all font-mono text-[10px] text-cyan-400/90 hover:text-cyan-300"
+                  >
+                    {provenance.recordUrl}
+                  </a>
+                </dd>
+              </div>
+            )}
+          </dl>
+          <p className="mt-2 text-[9px] text-slate-600">
+            Free public source — verify upstream yourself. Double-click molecule/gene nodes to open.
+          </p>
+        </div>
+      )}
     </div>
   )
 }

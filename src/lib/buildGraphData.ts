@@ -16,7 +16,12 @@ export function buildGraphData(
     id: moleculeNodeId,
     label: molecule.name,
     type: 'molecule',
-    data: { cid: molecule.cid, formula: molecule.formula },
+    data: {
+      cid: molecule.cid,
+      formula: molecule.formula,
+      sourceKey: 'pubchem',
+      url: `https://pubchem.ncbi.nlm.nih.gov/compound/${molecule.cid}`,
+    },
   })
 
   // Company nodes
@@ -29,7 +34,12 @@ export function buildGraphData(
         id: companyId,
         label: product.company,
         type: 'company',
-        data: { brandName: product.brandName, route: product.route },
+        data: {
+          brandName: product.brandName,
+          route: product.route,
+          sourceKey: 'openfda',
+          url: 'https://open.fda.gov/apis/drug/ndc/',
+        },
       })
       edges.push({ source: moleculeNodeId, target: companyId, label: 'manufactured by' })
     }
@@ -43,7 +53,11 @@ export function buildGraphData(
       id: routeId,
       label: route.method.length > 25 ? route.method.slice(0, 23) + '…' : route.method,
       type: 'synthesis',
-      data: { description: route.description, enzymes: route.enzymesInvolved },
+      data: {
+        description: route.description,
+        enzymes: route.enzymesInvolved,
+        sourceKey: 'synthesis',
+      },
     })
     edges.push({ source: moleculeNodeId, target: routeId, label: 'synthesized via' })
   }
@@ -55,7 +69,13 @@ export function buildGraphData(
       id: patentId,
       label: patent.patentNumber,
       type: 'patent',
-      data: { title: patent.title, assignee: patent.assignee, filingDate: patent.filingDate },
+      data: {
+        title: patent.title,
+        assignee: patent.assignee,
+        filingDate: patent.filingDate,
+        sourceKey: 'patents',
+        url: `https://patents.google.com/patent/${encodeURIComponent(patent.patentNumber)}`,
+      },
     })
     edges.push({ source: moleculeNodeId, target: patentId, label: 'patented by' })
   }
@@ -67,7 +87,13 @@ export function buildGraphData(
       id: geneId,
       label: gene.geneName || gene.proteinName,
       type: 'gene',
-      data: { proteinName: gene.proteinName, organism: gene.organism, accession: gene.accession },
+      data: {
+        proteinName: gene.proteinName,
+        organism: gene.organism,
+        accession: gene.accession,
+        sourceKey: 'uniprot',
+        url: `https://www.uniprot.org/uniprotkb/${gene.accession}`,
+      },
     })
     edges.push({ source: moleculeNodeId, target: geneId, label: 'targets' })
   }

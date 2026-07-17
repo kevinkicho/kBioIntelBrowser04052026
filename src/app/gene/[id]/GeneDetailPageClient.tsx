@@ -9,6 +9,8 @@ import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
 import { EmptySection, ErrorSection } from '@/components/ui/DataStatus'
 import type { SectionStatus } from '@/lib/dataStatus'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
+import { DataPoint } from '@/components/ui/DataPoint'
+import type { BgeeExpression, GeneExpression, dbSNPVariant } from '@/lib/types'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -70,14 +72,22 @@ interface GeneDetailPageClientProps {
   uniprotId: string
 }
 
-function GeneOverview({ overview }: { overview: GeneOverviewType | null }) {
+function GeneOverview({
+  overview,
+  fetchedAt,
+}: {
+  overview: GeneOverviewType | null
+  fetchedAt?: Date | null
+}) {
   if (!overview) return null
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <div className="flex items-start gap-4 mb-4">
         <div className="flex-1">
-          <h2 className="text-2xl font-bold text-indigo-300">{overview.symbol}</h2>
-          <p className="text-sm text-slate-400 mt-0.5">{overview.name}</p>
+          <DataPoint sourceKey="mygene" fetchedAt={fetchedAt} label="Gene symbol (MyGene)" recordUrl={overview.url}>
+            <h2 className="text-2xl font-bold text-indigo-300">{overview.symbol}</h2>
+            <p className="text-sm text-slate-400 mt-0.5">{overview.name}</p>
+          </DataPoint>
         </div>
         <div className="flex flex-wrap gap-1.5 shrink-0">
           {overview.typeOfGene && (
@@ -90,13 +100,35 @@ function GeneOverview({ overview }: { overview: GeneOverviewType | null }) {
       </div>
 
       {overview.summary && (
-        <p className="text-sm text-slate-300 leading-relaxed mb-4">{overview.summary}</p>
+        <DataPoint sourceKey="ncbi-gene" fetchedAt={fetchedAt} label="Gene summary" recordUrl={overview.url}>
+          <p className="text-sm text-slate-300 leading-relaxed mb-4">{overview.summary}</p>
+        </DataPoint>
       )}
 
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 text-xs">
-        <div><span className="text-slate-500">Entrez:</span> <a href={overview.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.geneId}</a></div>
-        {overview.ensemblId && <div><span className="text-slate-500">Ensembl:</span> <a href={`https://ensembl.org/Homo_sapiens/Gene/Summary?g=${overview.ensemblId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.ensemblId}</a></div>}
-        {overview.uniprotId && <div><span className="text-slate-500">UniProt:</span> <a href={`https://www.uniprot.org/uniprot/${overview.uniprotId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.uniprotId}</a></div>}
+        <DataPoint sourceKey="ncbi-gene" fetchedAt={fetchedAt} label="Entrez Gene" recordUrl={overview.url}>
+          <div><span className="text-slate-500">Entrez:</span> <a href={overview.url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.geneId}</a></div>
+        </DataPoint>
+        {overview.ensemblId && (
+          <DataPoint
+            sourceKey="ensembl"
+            fetchedAt={fetchedAt}
+            label="Ensembl gene"
+            recordUrl={`https://ensembl.org/Homo_sapiens/Gene/Summary?g=${overview.ensemblId}`}
+          >
+            <div><span className="text-slate-500">Ensembl:</span> <a href={`https://ensembl.org/Homo_sapiens/Gene/Summary?g=${overview.ensemblId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.ensemblId}</a></div>
+          </DataPoint>
+        )}
+        {overview.uniprotId && (
+          <DataPoint
+            sourceKey="uniprot"
+            fetchedAt={fetchedAt}
+            label="UniProt"
+            recordUrl={`https://www.uniprot.org/uniprot/${overview.uniprotId}`}
+          >
+            <div><span className="text-slate-500">UniProt:</span> <a href={`https://www.uniprot.org/uniprot/${overview.uniprotId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.uniprotId}</a></div>
+          </DataPoint>
+        )}
       </div>
 
       {(() => {
@@ -119,10 +151,12 @@ function GeneDiseasesPanel({
   data,
   status,
   geneSymbol,
+  fetchedAt,
 }: {
   data: Record<string, unknown> | null
   status?: SectionStatus
   geneSymbol?: string
+  fetchedAt?: Date | null
 }) {
   const diseases = (data?.geneDiseases as Record<string, unknown>)?.disgenetAssociations as Array<{ diseaseName: string; score: number; diseaseId: string; source: string; geneSymbol?: string }> | undefined
   if (status?.status === 'error') return <ErrorSection label="disease associations" error={status.error} />
@@ -130,26 +164,38 @@ function GeneDiseasesPanel({
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
       <h3 className="text-sm font-semibold text-slate-200 mb-3">Associated Diseases ({diseases.length})</h3>
+      <p className="text-[10px] text-slate-600 mb-2">Click a row for API source, timestamp, and endpoint.</p>
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {diseases.slice(0, 30).map((d, i) => {
           const discoverHref = buildDiscoverHref({
             q: d.diseaseName,
             targets: geneSymbol ? [geneSymbol] : undefined,
           })
+          const recordUrl = d.diseaseId
+            ? `https://www.disgenet.org/browser/0/1/0/${encodeURIComponent(d.diseaseId)}/`
+            : undefined
           return (
-            <div key={`${d.diseaseId}-${i}`} className="flex items-center justify-between gap-2 py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
-              <Link href={`/disease?q=${encodeURIComponent(d.diseaseName)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2 min-w-0">{d.diseaseName}</Link>
-              <div className="flex items-center gap-2 shrink-0">
-                <Link
-                  href={discoverHref}
-                  className="text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/30 text-emerald-300 hover:border-emerald-500 hover:text-emerald-200 transition-colors"
-                  title={`Rank candidates for ${d.diseaseName}${geneSymbol ? ` with target ${geneSymbol}` : ''}`}
-                >
-                  Discover
-                </Link>
-                <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">{d.score.toFixed(2)}</span>
+            <DataPoint
+              key={`${d.diseaseId}-${i}`}
+              sourceKey="disgenet"
+              fetchedAt={fetchedAt}
+              label={d.diseaseName}
+              recordUrl={recordUrl}
+            >
+              <div className="flex items-center justify-between gap-2 py-1.5 px-2 rounded text-sm">
+                <Link href={`/disease?q=${encodeURIComponent(d.diseaseName)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2 min-w-0">{d.diseaseName}</Link>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Link
+                    href={discoverHref}
+                    className="text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/30 text-emerald-300 hover:border-emerald-500 hover:text-emerald-200 transition-colors"
+                    title={`Rank candidates for ${d.diseaseName}${geneSymbol ? ` with target ${geneSymbol}` : ''}`}
+                  >
+                    Discover
+                  </Link>
+                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">{d.score.toFixed(2)}</span>
+                </div>
               </div>
-            </div>
+            </DataPoint>
           )
         })}
       </div>
@@ -157,23 +203,38 @@ function GeneDiseasesPanel({
   )
 }
 
-function GeneVariantsPanel({ data }: { data: Record<string, unknown> | null }) {
+function GeneVariantsPanel({
+  data,
+  fetchedAt,
+}: {
+  data: Record<string, unknown> | null
+  fetchedAt?: Date | null
+}) {
   const clinvarVariants = (data?.geneVariants as Record<string, unknown>)?.clinvarVariants as Array<{ title?: string; clinicalSignificance: string; geneSymbol: string; conditionName?: string; url?: string }> | undefined
-  const dbsnpVariants = (data?.geneVariants as Record<string, unknown>)?.dbsnpVariants as Array<unknown> | undefined
+  const dbsnpVariants = (data?.geneVariants as Record<string, unknown>)?.dbsnpVariants as dbSNPVariant[] | undefined
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+      <p className="text-[10px] text-slate-600 mb-2">Click a row for API source, timestamp, and endpoint.</p>
       {clinvarVariants && clinvarVariants.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-slate-200 mb-3">ClinVar Variants ({clinvarVariants.length})</h3>
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {clinvarVariants.slice(0, 20).map((v, i) => (
-              <div key={i} className="py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
-                <span className="text-slate-300">{v.geneSymbol}</span>
-                <span className="mx-2 text-slate-600">|</span>
-                <span className="text-slate-400">{v.clinicalSignificance}</span>
-                {v.conditionName && <><span className="mx-2 text-slate-600">|</span><span className="text-slate-400">{v.conditionName}</span></>}
-              </div>
+              <DataPoint
+                key={i}
+                sourceKey="clinvar"
+                fetchedAt={fetchedAt}
+                label={v.title || v.clinicalSignificance}
+                recordUrl={v.url}
+              >
+                <div className="py-1.5 px-2 rounded text-sm">
+                  <span className="text-slate-300">{v.geneSymbol}</span>
+                  <span className="mx-2 text-slate-600">|</span>
+                  <span className="text-slate-400">{v.clinicalSignificance}</span>
+                  {v.conditionName && <><span className="mx-2 text-slate-600">|</span><span className="text-slate-400">{v.conditionName}</span></>}
+                </div>
+              </DataPoint>
             ))}
           </div>
         </div>
@@ -181,6 +242,26 @@ function GeneVariantsPanel({ data }: { data: Record<string, unknown> | null }) {
       {dbsnpVariants && dbsnpVariants.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-slate-200 mb-3">dbSNP Variants ({dbsnpVariants.length})</h3>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {dbsnpVariants.slice(0, 20).map((v, i) => {
+              const rs = v.rsId || v.refSNPId
+              const url = rs
+                ? `https://www.ncbi.nlm.nih.gov/snp/${String(rs).replace(/^rs/i, 'rs')}`
+                : undefined
+              return (
+                <DataPoint key={i} sourceKey="dbsnp" fetchedAt={fetchedAt} label={rs || 'dbSNP'} recordUrl={url}>
+                  <div className="py-1 px-2 rounded text-sm text-slate-300 font-mono">
+                    {rs || '—'}
+                    {v.chromosome ? (
+                      <span className="ml-2 text-slate-500">
+                        chr{v.chromosome}:{v.position}
+                      </span>
+                    ) : null}
+                  </div>
+                </DataPoint>
+              )
+            })}
+          </div>
         </div>
       )}
       {(!clinvarVariants || clinvarVariants.length === 0) && (!dbsnpVariants || dbsnpVariants.length === 0) && (
@@ -190,24 +271,45 @@ function GeneVariantsPanel({ data }: { data: Record<string, unknown> | null }) {
   )
 }
 
-function GeneExpressionPanel({ data }: { data: Record<string, unknown> | null }) {
+function GeneExpressionPanel({
+  data,
+  fetchedAt,
+}: {
+  data: Record<string, unknown> | null
+  fetchedAt?: Date | null
+}) {
   const gtexExps = (data?.geneExpressionData as Record<string, unknown>)?.gtexExpressions as Array<{ tissueName?: string; tpm?: number; geneSymbol?: string }> | undefined
-  const bgeeExps = (data?.geneExpressionData as Record<string, unknown>)?.bgeeExpressions as Array<unknown> | undefined
-  const atlasData = (data?.geneExpressionData as Record<string, unknown>)?.expressionAtlasData as Array<unknown> | undefined
+  const bgeeExps = (data?.geneExpressionData as Record<string, unknown>)?.bgeeExpressions as BgeeExpression[] | undefined
+  const atlasData = (data?.geneExpressionData as Record<string, unknown>)?.expressionAtlasData as GeneExpression[] | undefined
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+      <p className="text-[10px] text-slate-600 mb-3">
+        Counts sum GTEx + Bgee + Expression Atlas. Click any row for API source, fetch time, endpoint, and URL.
+      </p>
       {gtexExps && gtexExps.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">GTEx Top Tissues</h3>
+          <h3 className="text-sm font-semibold text-slate-200 mb-3">GTEx Top Tissues ({gtexExps.length})</h3>
           <div className="space-y-1.5">
-            {gtexExps.slice(0, 10).map((e, i) => (
-              <div key={i} className="flex items-center justify-between py-1 px-2 rounded hover:bg-slate-700/50 text-sm">
-                <span className="text-slate-300 truncate">{e.tissueName || 'Unknown'}</span>
-                <span className="text-xs px-2 py-0.5 rounded bg-indigo-900/40 text-indigo-300 shrink-0 ml-2">
-                  TPM: {typeof e.tpm === 'number' ? e.tpm.toFixed(1) : '—'}
-                </span>
-              </div>
+            {gtexExps.slice(0, 15).map((e, i) => (
+              <DataPoint
+                key={i}
+                sourceKey="gtex"
+                fetchedAt={fetchedAt}
+                label={e.tissueName || 'GTEx tissue'}
+                recordUrl={
+                  e.geneSymbol
+                    ? `https://gtexportal.org/home/gene/${encodeURIComponent(e.geneSymbol)}`
+                    : 'https://gtexportal.org/home/'
+                }
+              >
+                <div className="flex items-center justify-between py-1 px-2 rounded text-sm">
+                  <span className="text-slate-300 truncate">{e.tissueName || 'Unknown'}</span>
+                  <span className="text-xs px-2 py-0.5 rounded bg-indigo-900/40 text-indigo-300 shrink-0 ml-2">
+                    TPM: {typeof e.tpm === 'number' ? e.tpm.toFixed(1) : '—'}
+                  </span>
+                </div>
+              </DataPoint>
             ))}
           </div>
         </div>
@@ -215,11 +317,56 @@ function GeneExpressionPanel({ data }: { data: Record<string, unknown> | null })
       {bgeeExps && bgeeExps.length > 0 && (
         <div className="mb-4">
           <h3 className="text-sm font-semibold text-slate-200 mb-3">Bgee Expression ({bgeeExps.length})</h3>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {bgeeExps.slice(0, 30).map((e, i) => (
+              <DataPoint
+                key={i}
+                sourceKey="bgee"
+                fetchedAt={fetchedAt}
+                label={e.anatomicalEntityName || 'Bgee'}
+                recordUrl={
+                  e.geneSymbol
+                    ? `https://www.bgee.org/?page=gene&gene_id=${encodeURIComponent(e.geneId || e.geneSymbol)}`
+                    : 'https://www.bgee.org/'
+                }
+              >
+                <div className="flex items-center justify-between py-1 px-2 rounded text-sm gap-2">
+                  <span className="text-slate-300 truncate">{e.anatomicalEntityName || '—'}</span>
+                  <span className="text-[10px] text-slate-500 shrink-0">
+                    {e.expressionLevel}
+                    {typeof e.expressionScore === 'number' && e.expressionScore > 0
+                      ? ` · ${e.expressionScore.toFixed(2)}`
+                      : ''}
+                  </span>
+                </div>
+              </DataPoint>
+            ))}
+          </div>
         </div>
       )}
       {atlasData && atlasData.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-slate-200 mb-3">Expression Atlas ({atlasData.length})</h3>
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {atlasData.slice(0, 30).map((e, i) => (
+              <DataPoint
+                key={i}
+                sourceKey="expression-atlas"
+                fetchedAt={fetchedAt}
+                label={e.experimentDescription || e.experimentType || 'Expression Atlas'}
+                recordUrl={e.url}
+              >
+                <div className="py-1 px-2 rounded text-sm">
+                  <span className="text-slate-300 line-clamp-2">
+                    {e.experimentDescription || e.experimentType || 'Experiment'}
+                  </span>
+                  {e.species && (
+                    <span className="block text-[10px] text-slate-500 mt-0.5">{e.species}</span>
+                  )}
+                </div>
+              </DataPoint>
+            ))}
+          </div>
         </div>
       )}
       {(!gtexExps || gtexExps.length === 0) && (!bgeeExps || bgeeExps.length === 0) && (!atlasData || atlasData.length === 0) && (
@@ -229,78 +376,132 @@ function GeneExpressionPanel({ data }: { data: Record<string, unknown> | null })
   )
 }
 
-function TargetedDrugsPanel({ data }: { data: Record<string, unknown> | null }) {
+function TargetedDrugsPanel({
+  data,
+  fetchedAt,
+}: {
+  data: Record<string, unknown> | null
+  fetchedAt?: Date | null
+}) {
   const drugs = (data?.geneDrugs as Array<{ drugName?: string; interactionType?: string; sources?: string[]; score?: number }>) ?? []
 
   if (drugs.length === 0) return <div className="text-slate-500 text-sm py-4">No targeted drug data found.</div>
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <h3 className="text-sm font-semibold text-slate-200 mb-3">Drugs targeting this gene ({drugs.length})</h3>
+      <h3 className="text-sm font-semibold text-slate-200 mb-1">Drugs targeting this gene ({drugs.length})</h3>
+      <p className="text-[10px] text-slate-600 mb-3">Click a row for API source, timestamp, and endpoint.</p>
       <div className="space-y-2 max-h-96 overflow-y-auto">
         {drugs.map((d, i) => (
-          <div key={`${d.drugName}-${i}`} className="flex items-center justify-between py-1.5 px-2 rounded hover:bg-slate-700/50 text-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              {d.drugName && /^\d+$/.test(String(d.drugName)) === false && (
-                <Link
-                  href={`/molecule/name/${encodeURIComponent(String(d.drugName))}`}
-                  className="text-indigo-400 hover:underline truncate"
-                >
-                  {d.drugName}
-                </Link>
-              )}
-              {d.drugName && /^\d+$/.test(String(d.drugName)) && (
-                <Link
-                  href={`/molecule/${String(d.drugName)}`}
-                  className="text-indigo-400 hover:underline truncate font-mono"
-                >
-                  CID {d.drugName}
-                </Link>
-              )}
-              {!d.drugName && <span className="text-slate-500">Unknown</span>}
+          <DataPoint
+            key={`${d.drugName}-${i}`}
+            sourceKey="dgidb"
+            fetchedAt={fetchedAt}
+            label={d.drugName || 'DGIdb interaction'}
+            recordUrl={
+              d.drugName
+                ? `https://www.dgidb.org/results?searchType=drug&searchTerms=${encodeURIComponent(String(d.drugName))}`
+                : 'https://www.dgidb.org/'
+            }
+          >
+            <div className="flex items-center justify-between py-1.5 px-2 rounded text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                {d.drugName && /^\d+$/.test(String(d.drugName)) === false && (
+                  <Link
+                    href={`/molecule/name/${encodeURIComponent(String(d.drugName))}`}
+                    className="text-indigo-400 hover:underline truncate"
+                  >
+                    {d.drugName}
+                  </Link>
+                )}
+                {d.drugName && /^\d+$/.test(String(d.drugName)) && (
+                  <Link
+                    href={`/molecule/${String(d.drugName)}`}
+                    className="text-indigo-400 hover:underline truncate font-mono"
+                  >
+                    CID {d.drugName}
+                  </Link>
+                )}
+                {!d.drugName && <span className="text-slate-500">Unknown</span>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {d.interactionType && (
+                  <span className="text-[10px] px-2 py-0.5 rounded bg-violet-900/40 text-violet-300 border border-violet-800/50">{d.interactionType}</span>
+                )}
+                {Array.isArray(d.sources) && d.sources.length > 0 && (
+                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-400">{d.sources.slice(0, 2).join(', ')}</span>
+                )}
+              </div>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
-              {d.interactionType && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-violet-900/40 text-violet-300 border border-violet-800/50">{d.interactionType}</span>
-              )}
-              {Array.isArray(d.sources) && d.sources.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-400">{d.sources.slice(0, 2).join(', ')}</span>
-              )}
-            </div>
-          </div>
+          </DataPoint>
         ))}
       </div>
     </div>
   )
 }
 
-function GenePathwaysPanel({ data }: { data: Record<string, unknown> | null }) {
+function GenePathwaysPanel({
+  data,
+  fetchedAt,
+}: {
+  data: Record<string, unknown> | null
+  fetchedAt?: Date | null
+}) {
   const reactome = (data?.genePathways as Record<string, unknown>)?.reactomePathways as Array<{ name?: string; stId?: string; url?: string }> | undefined
   const wikipathways = (data?.genePathways as Record<string, unknown>)?.wikiPathways as Array<{ name?: string; id?: string; url?: string }> | undefined
-  const goTerms = (data?.genePathways as Record<string, unknown>)?.goTerms as Array<unknown> | undefined
+  const goTerms = (data?.genePathways as Record<string, unknown>)?.goTerms as Array<{ id?: string; name?: string; url?: string } | string> | undefined
 
   return (
     <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+      <p className="text-[10px] text-slate-600 mb-3">Click a row for API source, timestamp, and endpoint.</p>
       {reactome && reactome.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Reactome Pathways</h3>
+          <h3 className="text-sm font-semibold text-slate-200 mb-3">Reactome Pathways ({reactome.length})</h3>
           <div className="space-y-1.5">
-            {reactome.slice(0, 10).map((p, i) => (
-              <div key={p.stId || i} className="py-1 px-2 rounded hover:bg-slate-700/50 text-sm text-slate-300">
-                {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-400">{p.name}</a> : p.name}
-              </div>
+            {reactome.slice(0, 15).map((p, i) => (
+              <DataPoint
+                key={p.stId || i}
+                sourceKey="reactome"
+                fetchedAt={fetchedAt}
+                label={p.name || p.stId || 'Reactome'}
+                recordUrl={p.url || (p.stId ? `https://reactome.org/content/detail/${p.stId}` : undefined)}
+              >
+                <div className="py-1 px-2 rounded text-sm text-slate-300">
+                  {p.url ? (
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-400">
+                      {p.name}
+                    </a>
+                  ) : (
+                    p.name
+                  )}
+                </div>
+              </DataPoint>
             ))}
           </div>
         </div>
       )}
       {wikipathways && wikipathways.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">WikiPathways</h3>
+          <h3 className="text-sm font-semibold text-slate-200 mb-3">WikiPathways ({wikipathways.length})</h3>
           <div className="space-y-1.5">
-            {wikipathways.slice(0, 10).map((p, i) => (
-              <div key={p.id || i} className="py-1 px-2 rounded hover:bg-slate-700/50 text-sm text-slate-300">
-                {p.url ? <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-400">{p.name}</a> : p.name}
-              </div>
+            {wikipathways.slice(0, 15).map((p, i) => (
+              <DataPoint
+                key={p.id || i}
+                sourceKey="wikipathways"
+                fetchedAt={fetchedAt}
+                label={p.name || p.id || 'WikiPathways'}
+                recordUrl={p.url || (p.id ? `https://www.wikipathways.org/pathways/${p.id}` : undefined)}
+              >
+                <div className="py-1 px-2 rounded text-sm text-slate-300">
+                  {p.url ? (
+                    <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-400">
+                      {p.name}
+                    </a>
+                  ) : (
+                    p.name
+                  )}
+                </div>
+              </DataPoint>
             ))}
           </div>
         </div>
@@ -308,6 +509,29 @@ function GenePathwaysPanel({ data }: { data: Record<string, unknown> | null }) {
       {goTerms && goTerms.length > 0 && (
         <div>
           <h3 className="text-sm font-semibold text-slate-200 mb-3">Gene Ontology Terms ({goTerms.length})</h3>
+          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+            {goTerms.slice(0, 20).map((t, i) => {
+              const term = typeof t === 'string' ? { name: t } : t
+              const id = term.id
+              const url =
+                term.url ||
+                (id ? `https://www.ebi.ac.uk/QuickGO/term/${encodeURIComponent(id)}` : undefined)
+              return (
+                <DataPoint
+                  key={id || i}
+                  sourceKey="go"
+                  fetchedAt={fetchedAt}
+                  label={term.name || id || 'GO term'}
+                  recordUrl={url}
+                >
+                  <div className="py-1 px-2 rounded text-sm text-slate-300">
+                    {id && <span className="font-mono text-[10px] text-slate-500 mr-2">{id}</span>}
+                    {term.name || '—'}
+                  </div>
+                </DataPoint>
+              )
+            })}
+          </div>
         </div>
       )}
       {(!reactome || reactome.length === 0) && (!wikipathways || wikipathways.length === 0) && (!goTerms || goTerms.length === 0) && (
@@ -352,10 +576,11 @@ function GeneDetailPageClientInner({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
+  const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
 
   const categoryDataMap: Partial<Record<CategoryId, Record<string, unknown>>> = loaded ? { gene: categoryData } : {}
   const categoryStatusMap = buildFullStatus('gene', loaded ? 'loaded' : loading ? 'loading' : 'error')
-  const fetchedAtMap: Partial<Record<CategoryId, Date>> = loaded ? { gene: new Date() } : {}
+  const fetchedAtMap: Partial<Record<CategoryId, Date>> = fetchedAt ? { gene: fetchedAt } : {}
 
   const geneIdParam = `${geneId}-${symbol}`
 
@@ -370,6 +595,7 @@ function GeneDetailPageClientInner({
       }
       const data = await res.json()
       setCategoryData(data)
+      setFetchedAt(new Date())
       setLoaded(true)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to load gene data')
@@ -417,10 +643,18 @@ function GeneDetailPageClientInner({
     (categoryData?.geneVariants as { dbsnpVariants?: unknown[] } | undefined)?.dbsnpVariants ?? []
   ).length
   const variantCount = clinvarCount + dbsnpCount
-  const gtexCount = (
-    (categoryData?.geneExpressionData as { gtexExpressions?: unknown[] } | undefined)
-      ?.gtexExpressions ?? []
-  ).length
+  const exprBundle = categoryData?.geneExpressionData as
+    | {
+        gtexExpressions?: unknown[]
+        bgeeExpressions?: unknown[]
+        expressionAtlasData?: unknown[]
+      }
+    | undefined
+  const gtexCount = exprBundle?.gtexExpressions?.length ?? 0
+  const bgeeCount = exprBundle?.bgeeExpressions?.length ?? 0
+  const atlasCount = exprBundle?.expressionAtlasData?.length ?? 0
+  /** Align glance strip with all expression panels (was GTEx-only — caused 0 vs 30/20). */
+  const expressionCount = gtexCount + bgeeCount + atlasCount
   const pathwayBundle = categoryData?.genePathways as
     | {
         reactomePathways?: unknown[]
@@ -460,8 +694,11 @@ function GeneDetailPageClientInner({
     {
       id: 'gene-expression',
       label: 'Expression',
-      count: loaded ? gtexCount : null,
-      hint: 'GTEx tissues',
+      count: loaded ? expressionCount : null,
+      hint:
+        loaded && expressionCount > 0
+          ? `GTEx ${gtexCount} · Bgee ${bgeeCount} · Atlas ${atlasCount}`
+          : 'GTEx + Bgee + Expression Atlas',
     },
     {
       id: 'gene-pathways',
@@ -581,7 +818,7 @@ function GeneDetailPageClientInner({
                   {p.id === 'gene_drugs' && drugCount > 0 ? drugCount : ''}
                   {p.id === 'gene-diseases' && diseaseCount > 0 ? diseaseCount : ''}
                   {p.id === 'gene-variants' && variantCount > 0 ? variantCount : ''}
-                  {p.id === 'gene-expression' && gtexCount > 0 ? gtexCount : ''}
+                  {p.id === 'gene-expression' && expressionCount > 0 ? expressionCount : ''}
                   {p.id === 'gene-pathways' && pathwayCount > 0 ? pathwayCount : ''}
                 </span>
               )}
@@ -608,14 +845,29 @@ function GeneDetailPageClientInner({
 
         {loaded && (
           <div>
-            {activePanel === 'gene-overview' && <GeneOverview overview={overview} />}
-            {activePanel === 'gene_drugs' && <TargetedDrugsPanel data={categoryData} />}
-            {activePanel === 'gene-diseases' && (
-              <GeneDiseasesPanel data={categoryData} status={sectionStatus.diseases} geneSymbol={displaySymbol} />
+            {activePanel === 'gene-overview' && (
+              <GeneOverview overview={overview} fetchedAt={fetchedAt} />
             )}
-            {activePanel === 'gene-variants' && <GeneVariantsPanel data={categoryData} />}
-            {activePanel === 'gene-expression' && <GeneExpressionPanel data={categoryData} />}
-            {activePanel === 'gene-pathways' && <GenePathwaysPanel data={categoryData} />}
+            {activePanel === 'gene_drugs' && (
+              <TargetedDrugsPanel data={categoryData} fetchedAt={fetchedAt} />
+            )}
+            {activePanel === 'gene-diseases' && (
+              <GeneDiseasesPanel
+                data={categoryData}
+                status={sectionStatus.diseases}
+                geneSymbol={displaySymbol}
+                fetchedAt={fetchedAt}
+              />
+            )}
+            {activePanel === 'gene-variants' && (
+              <GeneVariantsPanel data={categoryData} fetchedAt={fetchedAt} />
+            )}
+            {activePanel === 'gene-expression' && (
+              <GeneExpressionPanel data={categoryData} fetchedAt={fetchedAt} />
+            )}
+            {activePanel === 'gene-pathways' && (
+              <GenePathwaysPanel data={categoryData} fetchedAt={fetchedAt} />
+            )}
           </div>
         )}
         <AICopilot
