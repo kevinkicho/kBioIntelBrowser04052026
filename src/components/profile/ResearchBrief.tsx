@@ -87,7 +87,7 @@ export function ResearchBrief({ data, moleculeName }: Props) {
       {expanded && (
         <div className="mt-2 bg-slate-900/40 border border-slate-800 rounded-xl p-5 space-y-4 animate-[fadeSlideIn_0.2s_ease-out]">
           {/* Headline */}
-          <p className="text-sm font-medium text-slate-200">{brief.headline}</p>
+          <p className="text-sm font-medium leading-snug text-slate-100">{brief.headline}</p>
 
           {/* AI Summary Section */}
           {aiSummary ? (
@@ -136,11 +136,17 @@ export function ResearchBrief({ data, moleculeName }: Props) {
                     {section.title}
                   </span>
                 </div>
-                <ul className="space-y-1">
+                <ul className="space-y-1.5">
                   {section.bullets.map((bullet, j) => (
-                    <li key={j} className="text-xs text-slate-400 leading-relaxed flex items-start gap-1.5">
-                      <span className="text-slate-600 mt-0.5 shrink-0">•</span>
-                      <span>{bullet}</span>
+                    <li
+                      key={j}
+                      className="flex items-start gap-1.5 text-xs leading-relaxed text-slate-300"
+                    >
+                      <span className="mt-0.5 shrink-0 text-slate-600" aria-hidden>
+                        •
+                      </span>
+                      {/* Plain text only — HTML stripped in contextBuilder.safeStr */}
+                      <span className="min-w-0 break-words whitespace-pre-wrap">{bullet}</span>
                     </li>
                   ))}
                 </ul>

@@ -100,8 +100,22 @@ export function buildStructuredBrief(
   if (ndcProducts > 0) regBullets.push(`${ndcProducts} NDC codes`)
   if (orangeBook > 0) regBullets.push(`${orangeBook} Orange Book entries`)
   if (drugLabels > 0) regBullets.push(`${drugLabels} FDA drug labels`)
-  if (rich.indicationDetails.length > 0) regBullets.push(`Indications: ${rich.indicationDetails.slice(0, 5).map(i => `${i.condition} (phase ${i.maxPhase === -1 ? '?' : i.maxPhase})`).join(', ')}`)
-  if (rich.atcClasses.length > 0) regBullets.push(`ATC: ${rich.atcClasses.join(', ')}`)
+  if (rich.indicationDetails.length > 0) {
+    const indParts = rich.indicationDetails
+      .slice(0, 5)
+      .map((i) => {
+        const label = i.condition || i.meshHeading
+        if (!label) return null
+        if (i.maxPhase == null || i.maxPhase < 0 || Number.isNaN(i.maxPhase)) return label
+        return `${label} (phase ${i.maxPhase})`
+      })
+      .filter((x): x is string => !!x)
+    if (indParts.length > 0) regBullets.push(`Indications: ${indParts.join(', ')}`)
+  }
+  if (rich.atcClasses.length > 0) {
+    const atcUnique = Array.from(new Set(rich.atcClasses.map((a) => a.trim()).filter(Boolean)))
+    if (atcUnique.length > 0) regBullets.push(`ATC: ${atcUnique.join(', ')}`)
+  }
   if (regBullets.length === 0) regBullets.push('No marketed products in FDA databases')
   sections.push({
     title: 'Regulatory Status',
@@ -115,7 +129,21 @@ export function buildStructuredBrief(
     if (phaseStr) clinBullets.push(`${trials} trials (${phaseStr})`)
     else clinBullets.push(`${trials} clinical trials`)
     if (trialCondStr) clinBullets.push(`Conditions: ${trialCondStr}`)
-    if (rich.trialDetails.length > 0) clinBullets.push(`Key trials: ${rich.trialDetails.slice(0, 3).map(t => `[${t.nctId}] ${t.phase} — ${t.conditions.join(', ')}`).join('; ')}`)
+    if (rich.trialDetails.length > 0) {
+      clinBullets.push(
+        `Key trials: ${rich.trialDetails
+          .slice(0, 3)
+          .map((t) => {
+            const phase =
+              !t.phase || t.phase === 'NA' || t.phase === 'N/A' || t.phase === 'Unknown'
+                ? 'phase n/a'
+                : t.phase
+            const conds = t.conditions.filter(Boolean).join(', ') || 'unspecified'
+            return `[${t.nctId}] ${phase} — ${conds}`
+          })
+          .join('; ')}`,
+      )
+    }
     sections.push({
       title: 'Clinical Pipeline',
       emoji: '🔬',
@@ -143,7 +171,18 @@ export function buildStructuredBrief(
   if (literature > 0 || patents > 0 || nihGrants > 0) {
     const resBullets: string[] = []
     if (literature > 0) resBullets.push(`${literature} publications`)
-    if (rich.publicationDetails.length > 0) resBullets.push(`Recent: ${rich.publicationDetails.slice(0, 3).map(p => `"${p.title.slice(0, 60)}" (${p.journal}, ${p.year})`).join('; ')}`)
+    if (rich.publicationDetails.length > 0) {
+      resBullets.push(
+        `Recent: ${rich.publicationDetails
+          .slice(0, 3)
+          .map((p) => {
+            const title = (p.title || 'Untitled').slice(0, 60)
+            const meta = [p.journal, p.year > 0 ? String(p.year) : ''].filter(Boolean).join(', ')
+            return meta ? `"${title}" (${meta})` : `"${title}"`
+          })
+          .join('; ')}`,
+      )
+    }
     if (patents > 0) {
       resBullets.push(`${patents} patents`)
       if (rich.patentDetails.length > 0) resBullets.push(`Key: ${rich.patentDetails.slice(0, 3).map(p => `${p.patentNumber} (${p.assignee}, exp ${p.expirationDate})`).join('; ')}`)

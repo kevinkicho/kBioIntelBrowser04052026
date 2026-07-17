@@ -270,8 +270,28 @@ function safeArr(val: unknown): Record<string, unknown>[] {
   return Array.isArray(val) ? val : []
 }
 
+/**
+ * Coerce to string and strip HTML/highlight markup from free-API payloads
+ * (e.g. Reactome returns <span class="highlighting">Lysine</span>).
+ * Always plain text for brief UI (never dangerouslySetInnerHTML).
+ */
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function safeStr(val: unknown): string {
-  return typeof val === 'string' ? val : ''
+  if (typeof val === 'string') return stripHtml(val)
+  if (typeof val === 'number' && Number.isFinite(val)) return String(val)
+  return ''
 }
 
 function uniqStrings(arr: unknown[], key: string, limit: number = 10): string[] {
@@ -582,11 +602,24 @@ export function extractRichData(d: Record<string, unknown>): RichDataContext {
   }))
 
   const indArr = safeArr(d.chemblIndications)
-  const indicationDetails = indArr.slice(0, 12).map(i => ({
-    condition: safeStr(i?.condition || i?.indication),
-    maxPhase: i?.maxPhase != null ? Number(i.maxPhase) : -1,
-    meshHeading: safeStr(i?.meshHeading),
-  }))
+  const indicationDetails = indArr
+    .slice(0, 20)
+    .map((i) => {
+      const meshHeading = safeStr(i?.meshHeading || i?.efoTerm)
+      const condition = safeStr(i?.condition || i?.indication || i?.meshHeading || i?.efoTerm)
+      const rawPhase =
+        i?.maxPhaseForIndication != null
+          ? Number(i.maxPhaseForIndication)
+          : i?.maxPhase != null
+            ? Number(i.maxPhase)
+            : -1
+      return {
+        condition,
+        maxPhase: Number.isFinite(rawPhase) ? rawPhase : -1,
+        meshHeading,
+      }
+    })
+    .filter((i) => i.condition.length > 0)
 
   const litArr = safeArr(d.literature).slice(0, 8)
   const semArr = safeArr(d.semanticPapers).slice(0, 5)
@@ -642,7 +675,15 @@ export function extractRichData(d: Record<string, unknown>): RichDataContext {
   }))
 
   const atcArr = safeArr(d.atcClassifications)
-  const atcClasses = atcArr.slice(0, 8).map(a => safeStr(a?.name)).filter(Boolean)
+  const atcSeen = new Set<string>()
+  const atcClasses: string[] = []
+  for (const a of atcArr) {
+    const n = safeStr(a?.name || a?.code)
+    if (!n || atcSeen.has(n)) continue
+    atcSeen.add(n)
+    atcClasses.push(n)
+    if (atcClasses.length >= 8) break
+  }
 
   const orphanetArr = safeArr(d.orphanetDiseases)
   const orphanDiseases = orphanetArr.slice(0, 8).map(o => safeStr(o?.diseaseName)).filter(Boolean)
