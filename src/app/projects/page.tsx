@@ -13,6 +13,7 @@ import {
   projectExportFilename,
 } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
+import { recordSearch } from '@/lib/searchHistory'
 
 const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
 
@@ -245,6 +246,13 @@ export default function ProjectsPage() {
                       } catch {
                         /* ignore */
                       }
+                      recordSearch({
+                        kind: 'project',
+                        query: p.name,
+                        title: p.name,
+                        href: `/projects/${p.id}`,
+                        meta: { projectId: p.id },
+                      })
                     }}
                     className="rounded-lg border border-emerald-800/40 bg-emerald-900/20 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-900/40"
                   >

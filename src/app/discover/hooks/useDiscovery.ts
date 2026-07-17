@@ -19,6 +19,13 @@ import {
   MAX_DISCOVER_TARGETS,
   mergeOrphanetGenesIntoTargets,
 } from '@/lib/discovery/discoverUrl'
+import {
+  clearCachedDiscoverRank,
+  discoverRankCacheKey,
+  getCachedDiscoverRank,
+  recordSearch,
+  setCachedDiscoverRank,
+} from '@/lib/searchHistory'
 import type { ScoreVector } from '@/lib/domain/score'
 import {
   emitDiscoverStagesFromTimingMs,
@@ -80,6 +87,8 @@ export interface SearchOptions {
   diseaseId?: string
   /** Gene symbols pinned from disease/gene CTAs (URL `targets=`). */
   targets?: string[]
+  /** Skip client rank cache and re-query engine. */
+  forceRefresh?: boolean
 }
 
 function extractDiseaseCandidates(data: RankResult): DiseaseEntity[] {
@@ -88,6 +97,19 @@ function extractDiseaseCandidates(data: RankResult): DiseaseEntity[] {
 
 function needsConfirmation(data: RankResult): boolean {
   return Boolean(data.v2?.needsDiseaseConfirmation)
+}
+
+function buildDiscoverHistoryHref(
+  query: string,
+  diseaseId?: string | null,
+  targets?: string[],
+): string {
+  const sp = new URLSearchParams()
+  if (query) sp.set('q', query)
+  if (diseaseId) sp.set('diseaseId', diseaseId)
+  if (targets && targets.length > 0) sp.set('targets', targets.join(','))
+  const qs = sp.toString()
+  return qs ? `/discover?${qs}` : '/discover'
 }
 
 export function useDiscovery() {
@@ -178,6 +200,7 @@ export function useDiscovery() {
     async (query: string, options?: SearchOptions) => {
       const trimmed = query.trim()
       const diseaseId = options?.diseaseId?.trim() || undefined
+      const forceRefresh = Boolean(options?.forceRefresh)
       const targets = (options?.targets ?? state.targets)
         .map((t) => t.trim())
         .filter(Boolean)
@@ -239,7 +262,55 @@ export function useDiscovery() {
         targetCount: targets.length,
       })
 
+      const cacheKey = discoverRankCacheKey({
+        q: trimmed.length >= 2 ? trimmed : diseaseId,
+        diseaseId,
+        targets,
+      })
+
       try {
+        // Client-side rank cache (warm reopen from history sidebar)
+        if (!forceRefresh) {
+          const cached = getCachedDiscoverRank(cacheKey) as RankResult | null
+          if (cached?.candidates && Array.isArray(cached.candidates)) {
+            if (progressRef.current) clearTimeout(progressRef.current)
+            emitProductEvent('discover_rank_completed', {
+              count: cached.candidates.length,
+              diseaseId: cached.diseaseId ?? diseaseId ?? null,
+              scorePhase: cached.v2?.scorePhase ?? 'cheap',
+              cached: true,
+            })
+            const href = buildDiscoverHistoryHref(effectiveQuery, diseaseId, targets)
+            recordSearch({
+              kind: 'discover',
+              query: effectiveQuery,
+              title: cached.diseaseName || effectiveQuery,
+              href,
+              meta: {
+                diseaseId: cached.diseaseId ?? diseaseId ?? null,
+                targetCount: targets.length,
+                candidateCount: cached.candidates.length,
+              },
+            })
+            setState((prev) => ({
+              ...prev,
+              status: 'success',
+              progress: 100,
+              progressLabel: `Cached: ${cached.candidates.length} candidates for "${cached.diseaseName || effectiveQuery}"`,
+              result: cached,
+              diseaseCandidates: [],
+              diseaseId: cached.diseaseId ?? diseaseId ?? null,
+              targets,
+              error: null,
+              harvestStatus: cached.v2?.scorePhase === 'full' ? 'done' : 'idle',
+              orphanetProvenance: null,
+            }))
+            return
+          }
+        } else {
+          clearCachedDiscoverRank(cacheKey)
+        }
+
         const rubric = scoreRubricFromPreferences(prefs)
         const body = {
           q: trimmed.length >= 2 ? trimmed : undefined,
@@ -265,6 +336,11 @@ export function useDiscovery() {
           throw new Error(data.error ?? data.message ?? `Request failed (${res.status})`)
         }
         const data: RankResult = await res.json()
+        try {
+          setCachedDiscoverRank(cacheKey, data)
+        } catch {
+          /* ignore */
+        }
 
         if (progressRef.current) clearTimeout(progressRef.current)
 
@@ -346,6 +422,24 @@ export function useDiscovery() {
           }
         }
 
+        const finalDiseaseId = data.diseaseId ?? diseaseId ?? null
+        const href = buildDiscoverHistoryHref(
+          data.diseaseName || effectiveQuery,
+          finalDiseaseId,
+          mergedTargets,
+        )
+        recordSearch({
+          kind: 'discover',
+          query: effectiveQuery,
+          title: data.diseaseName || effectiveQuery,
+          href,
+          meta: {
+            diseaseId: finalDiseaseId,
+            targetCount: mergedTargets.length,
+            candidateCount: data.candidates.length,
+          },
+        })
+
         setState((prev) => ({
           ...prev,
           status: 'success',
@@ -353,7 +447,7 @@ export function useDiscovery() {
           progressLabel: `Found ${data.candidates.length} candidates for "${data.diseaseName}"`,
           result: data,
           diseaseCandidates: [],
-          diseaseId: data.diseaseId ?? diseaseId ?? null,
+          diseaseId: finalDiseaseId,
           targets: mergedTargets,
           error: null,
           harvestStatus:

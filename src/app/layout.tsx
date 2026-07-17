@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import { AIProvider } from '@/lib/ai/useAI'
-import { AppHeader } from '@/components/layout/AppHeader'
+import { AppShell } from '@/components/layout/AppShell'
 import './globals.css'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -26,8 +26,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html lang="en" className="dark scroll-smooth">
       <body className={`${inter.className} bg-[#0f1117] text-slate-200 min-h-screen`}>
         <AIProvider>
-          <AppHeader />
-          {children}
+          <AppShell>{children}</AppShell>
         </AIProvider>
         <script
           dangerouslySetInnerHTML={{

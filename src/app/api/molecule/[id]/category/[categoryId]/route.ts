@@ -86,7 +86,10 @@ export async function GET(
   }
 
   const cacheKey = `category:${cid}:${categoryId}:v2${Object.keys(overrides).length > 0 ? `:${request.nextUrl.searchParams.get('overrides')}` : ''}${Object.keys(apiParams).length > 0 ? `:${request.nextUrl.searchParams.get('params')}` : ''}`
-  const cached = getCached<Record<string, unknown>>(cacheKey)
+  const forceRefresh =
+    request.nextUrl.searchParams.get('refresh') === '1' ||
+    request.nextUrl.searchParams.get('refresh') === 'true'
+  const cached = forceRefresh ? undefined : getCached<Record<string, unknown>>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
   }

@@ -25,6 +25,7 @@ Coding agents and human implementers: read this before changing product behavior
 - Projects / packs / RH: `src/lib/project/**`, `src/components/evidence/**`
 - Events: `src/lib/productEvents.ts`
 - Extractors: `src/lib/evidence/extractAll.ts`
+- Search history sidebar: `src/lib/searchHistory.ts`, `src/components/layout/SearchHistorySidebar.tsx`
 
 ## Commands
 

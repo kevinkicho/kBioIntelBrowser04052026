@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { clientFetch } from '@/lib/clientFetch'
 import { type SearchType, type ApiIdentifierType, type ApiParamValue } from '@/lib/apiIdentifiers'
+import { recordSearch } from '@/lib/searchHistory'
 
 interface SearchBarProps {
   onNavigating?: (navigating: boolean) => void
@@ -104,9 +105,17 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     }
   }, [])
 
-  function goToCid(cid: number) {
+  function goToCid(cid: number, title?: string) {
     setCandidates(null)
-    router.push(`/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+    const href = `/molecule/${cid}${buildSearchParams(searchType, apiOverrides, apiParams)}`
+    recordSearch({
+      kind: 'molecule',
+      query: title || String(cid),
+      title: title || `CID ${cid}`,
+      href,
+      meta: { cid },
+    })
+    router.push(href)
   }
 
   async function handleSelect(name: string) {
@@ -118,16 +127,19 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
     setCandidates(null)
 
     if (searchType === 'disease') {
-      router.push(`/disease?q=${encodeURIComponent(name)}`)
+      const href = `/disease?q=${encodeURIComponent(name)}`
+      recordSearch({ kind: 'disease', query: name, title: name, href })
+      router.push(href)
       return
     }
 
     if (searchType === 'gene') {
-      if (name.includes('-') && /^\d+-/.test(name)) {
-        router.push(`/gene/${encodeURIComponent(name)}`)
-      } else {
-        router.push(`/gene?q=${encodeURIComponent(name)}`)
-      }
+      const href =
+        name.includes('-') && /^\d+-/.test(name)
+          ? `/gene/${encodeURIComponent(name)}`
+          : `/gene?q=${encodeURIComponent(name)}`
+      recordSearch({ kind: 'gene', query: name, title: name, href })
+      router.push(href)
       return
     }
 
@@ -146,7 +158,14 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
 
         // Gene symbol without compound hit → gene explorer
         if (data.gene && data.geneSymbol) {
-          router.push(`/gene?q=${encodeURIComponent(data.geneSymbol)}`)
+          const href = `/gene?q=${encodeURIComponent(data.geneSymbol)}`
+          recordSearch({
+            kind: 'gene',
+            query: data.geneSymbol,
+            title: data.geneSymbol,
+            href,
+          })
+          router.push(href)
           return
         }
 
@@ -158,7 +177,7 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
         }
 
         if (data.cid) {
-          goToCid(data.cid)
+          goToCid(data.cid, data.name || name)
           return
         }
       }
@@ -172,7 +191,9 @@ export function SearchBar({ onNavigating, searchType = 'name', apiOverrides, api
       }
     }
 
-    router.push(`/molecule/name/${encodeURIComponent(name)}${buildSearchParams(searchType, apiOverrides, apiParams)}`)
+    const href = `/molecule/name/${encodeURIComponent(name)}${buildSearchParams(searchType, apiOverrides, apiParams)}`
+    recordSearch({ kind: 'molecule', query: name, title: name, href })
+    router.push(href)
   }
 
   function handleKeyDown(e: React.KeyboardEvent) {

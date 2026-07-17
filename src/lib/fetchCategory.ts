@@ -15,6 +15,7 @@ export async function fetchCategoryData(
   categoryId: CategoryId,
   apiOverrides?: Record<string, ApiIdentifierType>,
   apiParams?: Record<string, ApiParamValue>,
+  opts?: { refresh?: boolean },
 ): Promise<Record<string, unknown>> {
   let url = `/api/molecule/${cid}/category/${categoryId}`
   const params = new URLSearchParams()
@@ -29,6 +30,9 @@ export async function fetchCategoryData(
     if (Object.keys(filtered).length > 0) {
       params.set('params', JSON.stringify(filtered))
     }
+  }
+  if (opts?.refresh) {
+    params.set('refresh', '1')
   }
   const qs = params.toString()
   if (qs) url += `?${qs}`

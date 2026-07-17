@@ -37,6 +37,7 @@ import { NextStepsPanel, DiscoverBreadcrumb } from '@/components/profile/NextSte
 import { PipelinePanel } from '@/components/profile/PipelinePanel'
 import { VendorsPanel } from '@/components/profile/VendorsPanel'
 import { sessionHistory } from '@/lib/sessionHistory'
+import { recordSearch } from '@/lib/searchHistory'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import type { ScoreVector } from '@/lib/domain'
 import {
@@ -205,8 +206,23 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   } | null>(null)
 
   const snapshotId = searchParams.get('snapshot')
+  const forceRefresh =
+    searchParams.get('refresh') === '1' || searchParams.get('refresh') === 'true'
   const [snapshotMeta, setSnapshotMeta] = useState<{ createdAt: string } | null>(null)
   const [snapshotError, setSnapshotError] = useState<string | null>(null)
+  const refreshKickoff = useRef(false)
+
+  // Record in search history sidebar (open = warm cache path)
+  useEffect(() => {
+    if (isEmbed) return
+    recordSearch({
+      kind: 'molecule',
+      query: moleculeName,
+      title: moleculeName,
+      href: `/molecule/${cid}`,
+      meta: { cid },
+    })
+  }, [cid, moleculeName, isEmbed])
 
   const isBusy = useMemo(() =>
     ALL_CATEGORY_IDS.some(id => categoryStatus[id] === 'loading'),
@@ -292,14 +308,16 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
 
 
-  const loadCategory = useCallback(async (catId: CategoryId, opts?: { force?: boolean }) => {
-    if (pendingRef.current.has(catId)) return
+  const loadCategory = useCallback(async (catId: CategoryId, opts?: { force?: boolean; refresh?: boolean }) => {
+    if (pendingRef.current.has(catId) && !opts?.force) return
     const cur = categoryStatusRef.current[catId]
-    if (!opts?.force && (cur === 'loaded' || cur === 'loading')) return
+    if (!opts?.force && !opts?.refresh && (cur === 'loaded' || cur === 'loading')) return
     pendingRef.current.add(catId)
     setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
     try {
-      const data = await fetchCategoryData(cid, catId, apiOverrides, apiParams)
+      const data = await fetchCategoryData(cid, catId, apiOverrides, apiParams, {
+        refresh: opts?.refresh || forceRefresh,
+      })
       setCategoryData(prev => ({ ...prev, [catId]: data }))
       setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
       setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
@@ -308,7 +326,26 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     } finally {
       pendingRef.current.delete(catId)
     }
-  }, [cid, apiOverrides, apiParams])
+  }, [cid, apiOverrides, apiParams, forceRefresh])
+
+  // Sidebar "Refresh" → force re-query all categories (bust server process cache)
+  useEffect(() => {
+    if (!forceRefresh || isEmbed) return
+    if (refreshKickoff.current) return
+    refreshKickoff.current = true
+    pendingRef.current.clear()
+    setCategoryStatus(initStatus())
+    setCategoryData({})
+    for (const id of ALL_CATEGORY_IDS) {
+      void loadCategory(id, { force: true, refresh: true })
+    }
+    // Strip refresh params from URL so a normal reload doesn't re-force
+    const next = new URLSearchParams(searchParams.toString())
+    next.delete('refresh')
+    next.delete('_t')
+    const qs = next.toString()
+    router.replace(qs ? `?${qs}` : '?', { scroll: false })
+  }, [forceRefresh, isEmbed, loadCategory, router, searchParams])
 
   // Scroll to category section
   const scrollToCategory = useCallback((catId: CategoryId | 'all') => {

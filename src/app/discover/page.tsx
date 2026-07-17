@@ -54,16 +54,29 @@ export default function DiscoverPage() {
     setSessions(listDiscoverSessions())
   }, [state.status, state.targets.length])
 
+  const forceRefresh =
+    searchParams.get('refresh') === '1' || searchParams.get('refresh') === 'true'
+
   // Deep link: /discover?q=&diseaseId=&targets= — diseaseId skips picker; targets pin genes
+  // refresh=1 from history sidebar forces engine re-query (skips client rank cache)
   useEffect(() => {
-    if (bootstrapped.current) return
+    if (bootstrapped.current && !forceRefresh) return
     if (!initialQuery && !initialDiseaseId && initialTargets.length === 0) return
     bootstrapped.current = true
     void search(initialQuery || initialDiseaseId || '', {
       diseaseId: initialDiseaseId,
       targets: initialTargets,
+      forceRefresh,
+    }).then(() => {
+      if (forceRefresh) {
+        const next = new URLSearchParams(searchParams.toString())
+        next.delete('refresh')
+        next.delete('_t')
+        const qs = next.toString()
+        router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
+      }
     })
-  }, [initialQuery, initialDiseaseId, initialTargets, search])
+  }, [initialQuery, initialDiseaseId, initialTargets, search, forceRefresh, router, searchParams])
 
   const scorePhase = state.result?.v2?.scorePhase ?? 'cheap'
   const showLoadSafety =

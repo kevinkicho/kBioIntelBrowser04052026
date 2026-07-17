@@ -7,6 +7,8 @@
   --foreground: #e2e8f0;
   /* AppHeader outer height (h-12). Secondary stickies use top-[var(--app-header-height)]. */
   --app-header-height: 3rem;
+  /* Search history sidebar (expanded). Collapsed uses 2.5rem via utility pl-10. */
+  --search-history-sidebar-width: 18rem;
 }
 
 html {
