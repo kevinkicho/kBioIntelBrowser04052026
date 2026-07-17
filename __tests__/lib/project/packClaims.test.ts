@@ -107,6 +107,38 @@ describe('buildBoardPackClaims', () => {
     expect(res.warnings[0]).toMatch(/PubChem CID/)
   })
 
+  it('uses rich golden fixture panels for claim density', async () => {
+    const rich = await import('../../fixtures/discovery/core-panels-rich.json')
+    const empty = await import('../../fixtures/discovery/core-panels-empty.json')
+    ;(fetchCategory.fetchCategoryData as jest.Mock).mockImplementation(
+      async (cid: number, cat: string) => {
+        if (cid === 999) return empty as unknown as Record<string, unknown>
+        if (cat === 'bioactivity-targets') {
+          return {
+            chemblMechanisms: rich.chemblMechanisms,
+            chemblActivities: rich.chemblActivities,
+          }
+        }
+        if (cat === 'pharmaceutical') {
+          return { clinicalTrials: rich.clinicalTrials, openTargets: rich.openTargets }
+        }
+        if (cat === 'clinical-safety') {
+          return { adverseEvents: rich.adverseEvents }
+        }
+        return {}
+      },
+    )
+
+    const res = await buildBoardPackClaims(
+      makeProject([
+        makeCand('tafamidis', 'promote', 208901),
+        makeCand('empty', 'watching', 999),
+      ]),
+    )
+    expect(res.claims.length).toBeGreaterThan(0)
+    expect(res.claims.some((c) => c.subjectCandidateId === 'tafamidis')).toBe(true)
+  })
+
   it('extracts per-candidate claims with subject attribution (not merged re-extract)', async () => {
     ;(fetchCategory.fetchCategoryData as jest.Mock).mockImplementation(
       async (_cid: number, cat: string) => {

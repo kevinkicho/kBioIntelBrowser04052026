@@ -5,6 +5,8 @@
  * @see docs/design/discovery-workbench-v2.md §6.10
  */
 
+import { logAgentActivity } from './agentActivityLog'
+
 export type ProductEventName =
   | 'discover_started'
   | 'discover_disease_confirmed'
@@ -149,7 +151,8 @@ export function summarizeProductEvents(
 export const PRODUCT_EVENT_ALIASES: Partial<Record<ProductEventName, ProductEventName>> = {}
 
 const QUEUE_KEY = 'biointel-product-events-v1'
-const MAX_QUEUED = 100
+/** Raised from 100 so M1 joins survive longer solo sessions (v2.1 residual). */
+const MAX_QUEUED = 250
 
 function canSend(): boolean {
   return typeof window !== 'undefined' && typeof fetch === 'function'
@@ -193,6 +196,11 @@ function postOnce(name: ProductEventName, props?: ProductEvent['props']): void {
     props: withSession,
   }
   if (typeof window !== 'undefined') enqueue(ev)
+  // Durable agent-readable JSONL (dev / opt-in) — see logs/README.md
+  logAgentActivity(`product.${name}`, (withSession ?? {}) as Record<string, unknown>, {
+    source: 'product',
+    level: 'info',
+  })
   if (!canSend()) return
 
   try {

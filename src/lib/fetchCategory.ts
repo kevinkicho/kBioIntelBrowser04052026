@@ -7,6 +7,7 @@ import {
   profileCacheKey,
   setProfileClientCache,
 } from './profileClientCache'
+import { logAgentActivity } from './agentActivityLog'
 
 export type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -68,7 +69,11 @@ export async function fetchCategoryData(
   // History / SPA / hard-reload: L1 memory then L2 IDB without network.
   if (!opts?.refresh) {
     const cached = await getProfileClientCacheAsync<Record<string, unknown>>(cacheKey)
-    if (cached) return cached
+    if (cached) {
+      logAgentActivity('profile.cache.hit', { cid, categoryId, layer: 'l1_or_l2' }, { source: 'profile' })
+      return cached
+    }
+    logAgentActivity('profile.cache.miss', { cid, categoryId }, { source: 'profile' })
   }
 
   let url = `/api/molecule/${cid}/category/${categoryId}`

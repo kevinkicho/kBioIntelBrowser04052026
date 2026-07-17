@@ -39,9 +39,17 @@ npm run test:gate                        # tsc + key jest suites (v2.1)
 npm run test:e2e:fixture                 # north-star e2e (needs npm run dev, E2E_FIXTURE=1)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
 npm run test:e2e:live                    # north-star e2e against live APIs (optional)
+npm run logs:tail                        # last lines of today's agent activity JSONL
 npm run lint
 npm run build
 ```
+
+## Agent activity logs (local)
+
+- Written to `logs/agent-activity-YYYY-MM-DD.jsonl` (gitignored; see `logs/README.md`)
+- Product events, fetch outcomes (dev), profile cache hit/miss
+- Disable: `NEXT_PUBLIC_AGENT_LOG=0` and/or `AGENT_ACTIVITY_LOG=0`
+- Force: `NEXT_PUBLIC_AGENT_LOG=1` + `AGENT_ACTIVITY_LOG=1`
 
 PowerShell note: chain sequential commands with `;` when the harness does not support `&&`. Prefer `rg` / repo search tools over PowerShell brace globs.
 

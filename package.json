@@ -14,7 +14,8 @@
     "test:e2e:fixture": "cross-env E2E_FIXTURE=1 playwright test e2e/north-star-loop.spec.ts",
     "test:e2e:fixture:auto": "cross-env E2E_FIXTURE=1 E2E_WEBSERVER=1 playwright test e2e/north-star-loop.spec.ts",
     "test:e2e:live": "playwright test e2e/north-star-loop.spec.ts",
-    "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences|searchHistory|profileRevisitCache|pubchem|localSession|PackBuilder.share\" --passWithNoTests",
+    "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences|searchHistory|profileRevisitCache|pubchem|localSession|PackBuilder.share|agentActivity\" --passWithNoTests",
+    "logs:tail": "node -e \"const fs=require('fs');const d=new Date().toISOString().slice(0,10);const f='logs/agent-activity-'+d+'.jsonl';if(!fs.existsSync(f)){console.log('No log yet: '+f);process.exit(0)}const lines=fs.readFileSync(f,'utf8').trim().split(/\\n/);console.log(lines.slice(-40).join('\\n'))\"",
     "test:live": "node scripts/test-live.js",
     "tune-timeouts": "node scripts/tune-timeouts.js"
   },

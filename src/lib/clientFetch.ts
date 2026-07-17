@@ -1,5 +1,27 @@
 const IS_DEV = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
 
+function logFetchOutcome(
+  url: string,
+  method: string,
+  status: number,
+  duration: number,
+  ok: boolean,
+): void {
+  if (!IS_DEV) return
+  try {
+    // Lazy to keep clientFetch usable in edge cases without circular init
+    void import('./agentActivityLog').then(({ logAgentActivity }) => {
+      logAgentActivity(
+        ok ? 'fetch.ok' : 'fetch.err',
+        { url: url.slice(0, 200), method, status, ms: duration },
+        { source: 'clientFetch', level: ok ? 'debug' : 'warn' },
+      )
+    })
+  } catch {
+    /* ignore */
+  }
+}
+
 const LOG_STYLE = 'color: #60a5fa; font-weight: bold'
 const OK_STYLE = 'color: #34d399'
 const ERR_STYLE = 'color: #f87171'
@@ -178,6 +200,7 @@ export async function clientFetch(
       })
     }
 
+    logFetchOutcome(url, method, response.status, duration, response.ok)
     if (response.ok) {
       if (IS_DEV) console.log(
         `%c← ${response.status} %c${ms(duration)}%c${sizeStr}`,
@@ -207,6 +230,7 @@ export async function clientFetch(
       })
     }
 
+    logFetchOutcome(url, method, 0, duration, false)
     if (IS_DEV) console.error(
       `%c✗ Network error %c${ms(duration)}`,
       ERR_STYLE, TIME_STYLE,

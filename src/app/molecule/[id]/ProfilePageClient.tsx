@@ -47,6 +47,7 @@ import {
   hydrateProfileRevisitFromIdb,
   invalidateProfileClientCache,
 } from '@/lib/profileClientCache'
+import { logAgentActivity } from '@/lib/agentActivityLog'
 import { categoryForPanel, type CategoryApiTrace } from '@/lib/panelApiTrace'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import type { ScoreVector } from '@/lib/domain'
@@ -370,8 +371,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     setCacheReady(false)
     void hydrateProfileRevisitFromIdb(cid)
       .catch(() => 0)
-      .then(() => {
+      .then((n) => {
         if (cancelled) return
+        logAgentActivity('profile.hydrate.done', { cid, promoted: n }, { source: 'profile' })
         setCacheReady(true)
         for (const id of ALL_CATEGORY_IDS) {
           if (categoryStatusRef.current[id] !== 'idle') continue
@@ -531,17 +533,45 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     'nih-high-impact',
   ]
 
-  // Decision mode: prefer Core six panels' categories first (design §4.3)
-  // Full mode: legacy Tier-1 (pharma-first). Wait for cacheReady so IDB hits win.
+  // Cold-open perf: paint active tab first, then stagger remaining tiers.
+  // Wait for cacheReady so IDB hits win before network.
   useEffect(() => {
     if (snapshotId || !cacheReady) return
-    const firstPaint: CategoryId[] = isDecisionMode
-      ? [...DECISION_CATEGORY_IDS]
-      : [...TIER1]
-    for (const id of firstPaint) loadCategory(id)
-  }, [loadCategory, snapshotId, isDecisionMode, cacheReady]) // eslint-disable-line react-hooks/exhaustive-deps
+    let cancelled = false
 
-  // When arriving from discover (any mode), ensure decision categories are in flight
+    // 1) Active category (or decision default) immediately
+    const first: CategoryId =
+      activeCategory !== 'all' && ALL_CATEGORY_IDS.includes(activeCategory as CategoryId)
+        ? (activeCategory as CategoryId)
+        : isDecisionMode
+          ? 'clinical-safety'
+          : 'pharmaceutical'
+    void loadCategory(first)
+
+    // 2) Rest of first-paint set after a short yield (reduces concurrent free-API storm)
+    const rest: CategoryId[] = isDecisionMode
+      ? DECISION_CATEGORY_IDS.filter((id) => id !== first)
+      : TIER1.filter((id) => id !== first)
+
+    const t1 = window.setTimeout(() => {
+      if (cancelled) return
+      for (const id of rest) void loadCategory(id)
+    }, 120)
+
+    // 3) Tier-2 after further delay (full mode only)
+    const t2 = window.setTimeout(() => {
+      if (cancelled || isDecisionMode) return
+      for (const id of TIER2) void loadCategory(id)
+    }, 900)
+
+    return () => {
+      cancelled = true
+      window.clearTimeout(t1)
+      window.clearTimeout(t2)
+    }
+  }, [loadCategory, snapshotId, isDecisionMode, cacheReady, activeCategory]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When arriving from discover (any mode), ensure decision categories are in flight (staggered)
   const discoverLoadedRef = useRef(false)
   useEffect(() => {
     discoverLoadedRef.current = false
@@ -553,9 +583,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       ...DECISION_CATEGORY_IDS,
       ...TIER1.filter(id => !DECISION_CATEGORY_IDS.includes(id)),
     ]
-    for (const catId of priorityCategories) {
-      loadCategory(catId)
+    let i = 0
+    const tick = () => {
+      if (i >= priorityCategories.length) return
+      void loadCategory(priorityCategories[i]!)
+      i += 1
+      if (i < priorityCategories.length) window.setTimeout(tick, 80)
     }
+    tick()
   }, [fromDiscover, loadCategory, cacheReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When hideEmpty is toggled on, load remaining idle categories so we can evaluate them

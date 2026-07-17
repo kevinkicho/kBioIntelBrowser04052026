@@ -125,6 +125,16 @@ Agents should read these before changing related behavior.
 | Design (Phase A shipped, Phase B IDB) | `docs/design/profile-revisit-cache.md` |
 | Pack IDB (separate — RH packs only) | `src/lib/project/packCache.ts` |
 
+### 2.4.2 Agent activity JSONL logs
+
+| Concern | Path |
+|---|---|
+| Client logger | `src/lib/agentActivityLog.ts` |
+| Append API | `src/app/api/agent-log/route.ts` |
+| Log files (gitignored) | `logs/agent-activity-YYYY-MM-DD.jsonl` |
+| How to review | `logs/README.md`, `npm run logs:tail` |
+| Disable | `NEXT_PUBLIC_AGENT_LOG=0` / `AGENT_ACTIVITY_LOG=0` |
+
 ### 2.5 Tests
 
 | Concern | Path |

@@ -30,3 +30,8 @@
 
 - Cache pressure → compress or lower IDB TTL  
 - Cross-tab stale L1 → BroadcastChannel already invalidates L1 on clear/refresh  
+
+## Agent activity logs (2026-07-16+)
+
+Local JSONL under `logs/agent-activity-YYYY-MM-DD.jsonl` (gitignored).  
+See `logs/README.md`. Review with `npm run logs:tail`. 
