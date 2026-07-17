@@ -1,9 +1,8 @@
 'use client'
 
 /**
- * Optional Firebase Auth context.
- * Local workspace (localStorage) remains the default identity when Auth is off
- * or the user has not signed in — product law: solo + file export default.
+ * Firebase Auth + cloud profile context.
+ * App still runs without sign-in; cloud features require Auth.
  */
 
 import {
@@ -23,16 +22,22 @@ import {
   type User,
 } from 'firebase/auth'
 import { getFirebaseAuth, isFirebaseConfigured } from './client'
-import { writeLocalSession } from '@/lib/localSession'
+import {
+  ensureUserProfile,
+  setUserPresenceOffline,
+  setUserPresenceOnline,
+  type CloudUserProfile,
+} from './userProfile'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
 export type FirebaseAuthState = {
   configured: boolean
   ready: boolean
   user: User | null
+  profile: CloudUserProfile | null
   error: string | null
   signInWithGoogle: () => Promise<void>
-  signOutCloud: () => Promise<void>
+  signOut: () => Promise<void>
 }
 
 const FirebaseAuthContext = createContext<FirebaseAuthState | null>(null)
@@ -41,6 +46,7 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   const configured = isFirebaseConfigured()
   const [ready, setReady] = useState(!configured)
   const [user, setUser] = useState<User | null>(null)
+  const [profile, setProfile] = useState<CloudUserProfile | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -53,28 +59,53 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       setReady(true)
       return
     }
+
+    let cancelled = false
     const unsub = onAuthStateChanged(auth, (u) => {
-      setUser(u)
-      setReady(true)
-      if (u) {
-        // Mirror display name into local workspace label (optional sync)
-        const name = u.displayName || u.email || 'Cloud user'
-        writeLocalSession({ displayName: name.slice(0, 48) })
-        logAgentActivity(
-          'firebase.auth.signed_in',
-          { uid: u.uid, provider: u.providerData[0]?.providerId ?? 'unknown' },
-          { source: 'firebase' },
-        )
-      }
+      void (async () => {
+        if (cancelled) return
+        setUser(u)
+        if (!u) {
+          setProfile(null)
+          setReady(true)
+          return
+        }
+        try {
+          const p = await ensureUserProfile(u)
+          if (!cancelled) setProfile(p)
+          await setUserPresenceOnline(u.uid)
+          logAgentActivity(
+            'firebase.auth.signed_in',
+            { uid: u.uid, provider: u.providerData[0]?.providerId ?? 'unknown' },
+            { source: 'firebase' },
+          )
+        } catch (err) {
+          if (!cancelled) {
+            setProfile({
+              uid: u.uid,
+              email: u.email,
+              displayName: u.displayName,
+              photoURL: u.photoURL,
+            })
+            setError(err instanceof Error ? err.message : 'Failed to load profile')
+          }
+        } finally {
+          if (!cancelled) setReady(true)
+        }
+      })()
     })
-    return () => unsub()
+
+    return () => {
+      cancelled = true
+      unsub()
+    }
   }, [configured])
 
   const signInWithGoogle = useCallback(async () => {
     setError(null)
     const auth = getFirebaseAuth()
     if (!auth) {
-      setError('Firebase is not configured (missing NEXT_PUBLIC_FIREBASE_* env).')
+      setError('Firebase is not configured. Set NEXT_PUBLIC_FIREBASE_* in .env and restart dev.')
       return
     }
     try {
@@ -88,12 +119,15 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const signOutCloud = useCallback(async () => {
+  const signOut = useCallback(async () => {
     setError(null)
     const auth = getFirebaseAuth()
     if (!auth) return
+    const uid = auth.currentUser?.uid
     try {
+      if (uid) await setUserPresenceOffline(uid)
       await firebaseSignOut(auth)
+      setProfile(null)
       logAgentActivity('firebase.auth.signed_out', {}, { source: 'firebase' })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Sign-out failed')
@@ -105,11 +139,12 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       configured,
       ready,
       user,
+      profile,
       error,
       signInWithGoogle,
-      signOutCloud,
+      signOut,
     }),
-    [configured, ready, user, error, signInWithGoogle, signOutCloud],
+    [configured, ready, user, profile, error, signInWithGoogle, signOut],
   )
 
   return (
@@ -124,9 +159,10 @@ export function useFirebaseAuth(): FirebaseAuthState {
       configured: false,
       ready: true,
       user: null,
+      profile: null,
       error: null,
       signInWithGoogle: async () => {},
-      signOutCloud: async () => {},
+      signOut: async () => {},
     }
   }
   return ctx

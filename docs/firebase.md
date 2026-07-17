@@ -44,11 +44,19 @@ Admin key JSON is **gitignored** (`*-firebase-adminsdk-*.json`).
 | `src/lib/firebase/config.ts` | Read web config from env |
 | `src/lib/firebase/client.ts` | Browser Auth / Firestore / RTDB / Storage |
 | `src/lib/firebase/admin.ts` | Server Admin SDK (`server-only`) |
-| `src/lib/firebase/FirebaseProvider.tsx` | Auth state + Google popup |
+| `src/lib/firebase/FirebaseProvider.tsx` | Auth state + Google popup + profile ensure |
+| `src/lib/firebase/userProfile.ts` | Firestore `users/{uid}` + RTDB presence |
 | `src/lib/firebase/paths.ts` | Owner-scoped collection paths |
+| `src/components/layout/UserMenu.tsx` | Top-bar account menu (Firebase only) |
 | `apphosting.yaml` | App Hosting env for deploys |
 | `firebase.json` | Product wiring |
 | `firestore.rules` / `database.rules.json` / `storage.rules` | Owner-only security |
+
+## Top-bar account menu
+
+- **Signed out:** Sign in with Google (Firebase Auth popup).
+- **Signed in:** Photo, display name, email, uid; cloud project count from Firestore; Sign out.
+- No local mock identity, personas, or placeholder nav chips in this menu.
 
 ## Deploy commands
 
