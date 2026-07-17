@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { UserMenu } from './UserMenu'
+import { AIStatusIndicator } from '@/components/ai/AIStatusIndicator'
 
 const NAV = [
   { href: '/', label: 'Home', match: (p: string) => p === '/' },
@@ -12,6 +14,7 @@ const NAV = [
 /**
  * Global app shell navigation (KD15).
  * Hidden on embed routes so widgets stay chrome-free.
+ * Top-right: search + AI chip + local workspace menu (solo session / logout).
  */
 export function AppHeader() {
   const pathname = usePathname() ?? ''
@@ -23,8 +26,8 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0f1117]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-[var(--app-header-height)] max-w-7xl items-center justify-between gap-4 px-4 sm:px-6">
-        <div className="flex items-center gap-4 min-w-0">
+      <div className="mx-auto flex h-[var(--app-header-height)] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <Link
             href="/"
             className="shrink-0 text-sm font-semibold tracking-tight text-slate-100 hover:text-white"
@@ -52,21 +55,33 @@ export function AppHeader() {
           </nav>
         </div>
 
-        <Link
-          href="/?focus=search"
-          className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200"
-          title="Search molecules, diseases, genes"
-        >
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" aria-hidden>
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
-            />
-          </svg>
-          <span className="hidden sm:inline">Search</span>
-        </Link>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+          <div className="hidden md:block">
+            <AIStatusIndicator />
+          </div>
+          <Link
+            href="/?focus=search"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200"
+            title="Search molecules, diseases, genes"
+          >
+            <svg
+              className="h-3.5 w-3.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              aria-hidden
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
+              />
+            </svg>
+            <span className="hidden sm:inline">Search</span>
+          </Link>
+          <UserMenu />
+        </div>
       </div>
     </header>
   )
