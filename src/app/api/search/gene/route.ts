@@ -21,7 +21,12 @@ export async function GET(request: NextRequest) {
       summary: g.summary?.slice(0, 200) || '',
       chromosome: g.mapLocation || '',
       typeOfGene: g.typeOfGene || '',
-      aliases: (g.aliases || []).slice(0, 5),
+      aliases: (Array.isArray(g.aliases)
+        ? g.aliases
+        : typeof g.aliases === 'string' && g.aliases
+          ? [g.aliases]
+          : []
+      ).slice(0, 5),
     }))
 
     return NextResponse.json({ results, searchType: 'gene' })

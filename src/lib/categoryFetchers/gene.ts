@@ -124,7 +124,11 @@ export async function fetchGene(
     chromosome: ncbiGene?.chromosome || '',
     mapLocation: myGeneData.mapLocation || ncbiGene?.mapLocation || '',
     typeOfGene: myGeneData.typeOfGene || '',
-    aliases: myGeneData.aliases || [],
+    aliases: Array.isArray(myGeneData.aliases)
+      ? myGeneData.aliases
+      : typeof myGeneData.aliases === 'string' && myGeneData.aliases
+        ? [myGeneData.aliases]
+        : [],
     ensemblId: myGeneData.ensemblId || '',
     uniprotId: myGeneData.uniprotId || '',
     pathways: myGeneData.pathways || [],

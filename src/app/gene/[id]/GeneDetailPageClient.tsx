@@ -12,6 +12,21 @@ import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
+/** MyGene / overview may send alias as string | string[] */
+function normalizeAliases(value: unknown): string[] {
+  if (value == null) return []
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => (typeof v === 'string' ? v : v != null ? String(v) : ''))
+      .filter(Boolean)
+  }
+  if (typeof value === 'string') {
+    const t = value.trim()
+    return t ? [t] : []
+  }
+  return []
+}
+
 /** Alias / synonym chip → gene search for that name */
 function GeneAliasChip({
   alias,
@@ -84,14 +99,18 @@ function GeneOverview({ overview }: { overview: GeneOverviewType | null }) {
         {overview.uniprotId && <div><span className="text-slate-500">UniProt:</span> <a href={`https://www.uniprot.org/uniprot/${overview.uniprotId}`} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">{overview.uniprotId}</a></div>}
       </div>
 
-      {overview.aliases && overview.aliases.length > 0 && (
+      {(() => {
+        const list = normalizeAliases(overview.aliases)
+        if (list.length === 0) return null
+        return (
         <div className="mt-3 flex flex-wrap items-center gap-1">
           <span className="text-xs text-slate-500 mr-1">Aliases:</span>
-          {overview.aliases.map(a => (
+          {list.map((a) => (
             <GeneAliasChip key={a} alias={a} size="xs" />
           ))}
         </div>
-      )}
+        )
+      })()}
     </div>
   )
 }
@@ -370,7 +389,7 @@ function GeneDetailPageClientInner({ geneId, symbol, name, summary, chromosome, 
   const displaySummary = overview?.summary || summary
   const displayChromosome = overview?.chromosome || chromosome
   const displayType = overview?.typeOfGene || typeOfGene
-  const displayAliases = overview?.aliases || aliases
+  const displayAliases = normalizeAliases(overview?.aliases ?? aliases)
   const displayEnsemblId = overview?.ensemblId || ensemblId
   const displayUniprotId = overview?.uniprotId || uniprotId
   const displayUrl = overview?.url || `https://www.ncbi.nlm.nih.gov/gene/${geneId}`

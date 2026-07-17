@@ -25,7 +25,11 @@ export default async function GenePage({ params }: { params: { id: string } }) {
       summary={geneData.summary || ''}
       chromosome={geneData.mapLocation || ''}
       typeOfGene={geneData.typeOfGene || ''}
-      aliases={geneData.aliases || []}
+      aliases={Array.isArray(geneData.aliases)
+        ? geneData.aliases
+        : typeof geneData.aliases === 'string' && geneData.aliases
+          ? [geneData.aliases]
+          : []}
       ensemblId={geneData.ensemblId || ''}
       uniprotId={geneData.uniprotId || ''}
     />

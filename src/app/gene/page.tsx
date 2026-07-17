@@ -139,9 +139,16 @@ export default function GeneSearchPage() {
                   <p className="text-sm text-slate-400 mb-2 line-clamp-2">{g.summary}</p>
                 )}
 
-                {g.aliases && g.aliases.length > 0 && (
+                {(() => {
+                  const aliasList = Array.isArray(g.aliases)
+                    ? g.aliases
+                    : typeof g.aliases === 'string' && g.aliases
+                      ? [g.aliases]
+                      : []
+                  if (aliasList.length === 0) return null
+                  return (
                   <div className="flex flex-wrap gap-1">
-                    {g.aliases.map(a => (
+                    {aliasList.map((a) => (
                       <span
                         key={a}
                         role="link"
@@ -165,7 +172,8 @@ export default function GeneSearchPage() {
                       </span>
                     ))}
                   </div>
-                )}
+                  )
+                })()}
               </Link>
             ))}
           </div>

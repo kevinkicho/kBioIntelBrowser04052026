@@ -4,6 +4,71 @@ const BASE_URL = 'https://mygene.info/v3'
 const fetchOptions: RequestInit = { next: { revalidate: 604800 } } // 7 days
 
 /**
+ * MyGene returns scalar-or-array for alias, pathway.name, go.*.name, etc.
+ * Always coerce to string[] for UI .map() safety.
+ */
+export function asStringList(value: unknown): string[] {
+  if (value == null) return []
+  if (Array.isArray(value)) {
+    return value
+      .map((v) => (typeof v === 'string' ? v : v != null ? String(v) : ''))
+      .filter((s) => s.length > 0)
+  }
+  if (typeof value === 'string') {
+    const t = value.trim()
+    return t ? [t] : []
+  }
+  if (typeof value === 'number' || typeof value === 'boolean') {
+    return [String(value)]
+  }
+  return []
+}
+
+function mapMyGeneHit(hit: Record<string, unknown>): MyGeneAnnotation {
+  const ensembl = hit.ensembl as Record<string, unknown> | undefined
+  const uniprot = hit.uniprot as Record<string, unknown> | undefined
+  const pathway = hit.pathway as Record<string, unknown> | undefined
+  const go = hit.go as Record<string, unknown> | undefined
+  const goBP = go?.BP as Record<string, unknown> | undefined
+  const goMF = go?.MF as Record<string, unknown> | undefined
+  const goCC = go?.CC as Record<string, unknown> | undefined
+
+  // uniprot Swiss-Prot can also be string | string[]
+  const swiss = uniprot?.['Swiss-Prot']
+  const uniprotId = Array.isArray(swiss)
+    ? String(swiss[0] ?? '')
+    : typeof swiss === 'string'
+      ? swiss
+      : ''
+
+  const ensemblGene = ensembl?.gene
+  const ensemblId = Array.isArray(ensemblGene)
+    ? String(ensemblGene[0] ?? '')
+    : typeof ensemblGene === 'string'
+      ? ensemblGene
+      : ''
+
+  return {
+    geneId: hit.entrezgene?.toString() ?? '',
+    symbol: (hit.symbol as string) ?? '',
+    name: (hit.name as string) ?? '',
+    taxid: (hit.taxid as number) ?? 9606,
+    ensemblId,
+    uniprotId,
+    summary: (hit.summary as string) ?? '',
+    aliases: asStringList(hit.alias),
+    typeOfGene: (hit.type_of_gene as string) ?? '',
+    mapLocation: (hit.map_location as string) ?? '',
+    pathways: asStringList(pathway?.name),
+    goAnnotations: {
+      biologicalProcess: asStringList(goBP?.name),
+      molecularFunction: asStringList(goMF?.name),
+      cellularComponent: asStringList(goCC?.name),
+    },
+  }
+}
+
+/**
  * Search genes by symbol or name
  */
 export async function searchGenes(query: string): Promise<MyGeneAnnotation[]> {
@@ -13,34 +78,7 @@ export async function searchGenes(query: string): Promise<MyGeneAnnotation[]> {
     if (!res.ok) return []
     const data = await res.json()
 
-    return (data.hits ?? []).map((hit: Record<string, unknown>) => {
-      const ensembl = hit.ensembl as Record<string, unknown> | undefined
-      const uniprot = hit.uniprot as Record<string, unknown> | undefined
-      const pathway = hit.pathway as Record<string, unknown> | undefined
-      const go = hit.go as Record<string, unknown> | undefined
-      const goBP = go?.BP as Record<string, unknown> | undefined
-      const goMF = go?.MF as Record<string, unknown> | undefined
-      const goCC = go?.CC as Record<string, unknown> | undefined
-
-      return {
-        geneId: hit.entrezgene?.toString() ?? '',
-        symbol: hit.symbol as string ?? '',
-        name: hit.name as string ?? '',
-        taxid: hit.taxid as number ?? 9606,
-        ensemblId: ensembl?.gene as string ?? '',
-        uniprotId: uniprot?.['Swiss-Prot'] as string ?? '',
-        summary: hit.summary as string ?? '',
-        aliases: (hit.alias ?? []) as string[],
-        typeOfGene: hit.type_of_gene as string ?? '',
-        mapLocation: hit.map_location as string ?? '',
-        pathways: (pathway?.name ?? []) as string[],
-        goAnnotations: {
-          biologicalProcess: (goBP?.name ?? []) as string[],
-          molecularFunction: (goMF?.name ?? []) as string[],
-          cellularComponent: (goCC?.name ?? []) as string[]
-        }
-      }
-    })
+    return (data.hits ?? []).map((hit: Record<string, unknown>) => mapMyGeneHit(hit))
   } catch {
     return []
   }
@@ -55,33 +93,7 @@ export async function getGeneById(geneId: string): Promise<MyGeneAnnotation | nu
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return null
     const hit = await res.json()
-
-    const ensembl = hit.ensembl as Record<string, unknown> | undefined
-    const uniprot = hit.uniprot as Record<string, unknown> | undefined
-    const pathway = hit.pathway as Record<string, unknown> | undefined
-    const go = hit.go as Record<string, unknown> | undefined
-    const goBP = go?.BP as Record<string, unknown> | undefined
-    const goMF = go?.MF as Record<string, unknown> | undefined
-    const goCC = go?.CC as Record<string, unknown> | undefined
-
-    return {
-      geneId: hit.entrezgene?.toString() ?? '',
-      symbol: hit.symbol as string ?? '',
-      name: hit.name as string ?? '',
-      taxid: hit.taxid as number ?? 9606,
-      ensemblId: ensembl?.gene as string ?? '',
-      uniprotId: uniprot?.['Swiss-Prot'] as string ?? '',
-      summary: hit.summary as string ?? '',
-      aliases: (hit.alias ?? []) as string[],
-      typeOfGene: hit.type_of_gene as string ?? '',
-      mapLocation: hit.map_location as string ?? '',
-      pathways: (pathway?.name ?? []) as string[],
-      goAnnotations: {
-        biologicalProcess: (goBP?.name ?? []) as string[],
-        molecularFunction: (goMF?.name ?? []) as string[],
-        cellularComponent: (goCC?.name ?? []) as string[]
-      }
-    }
+    return mapMyGeneHit(hit as Record<string, unknown>)
   } catch {
     return null
   }
