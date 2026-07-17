@@ -158,10 +158,15 @@ export function TTDPanel({
   const hasData = hasTargets || hasDrugs
 
   if (!hasData) {
+    // Panel auto-marks loadStatus disabled via sourceAvailability (next work target tooltip)
     return (
-      <Panel panelId={panelId} title="Therapeutic Target Database" lastFetched={lastFetched}>
-        <p className="text-gray-500 text-sm">No TTD target or drug data available. TTD requires API access.</p>
-      </Panel>
+      <Panel
+        panelId={panelId}
+        title="Therapeutic Target Database"
+        lastFetched={lastFetched}
+        loadStatus="disabled"
+        empty="No live public TTD API — panel kept visible as next work target."
+      />
     )
   }
 

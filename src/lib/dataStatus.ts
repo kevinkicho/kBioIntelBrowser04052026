@@ -44,7 +44,7 @@ export function emptyMessageForStatus(status: DataLoadStatus | undefined, fallba
     case 'error':
       return 'Unable to load from this source (network or API error).'
     case 'disabled':
-      return 'This source is currently disabled (endpoint unavailable).'
+      return 'Disabled for now — no live public endpoint. Marked as a next work target (not hidden).'
     case 'empty':
       return fallback
     default:

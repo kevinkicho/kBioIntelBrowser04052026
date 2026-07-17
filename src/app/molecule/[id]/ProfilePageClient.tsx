@@ -8,6 +8,8 @@ import { ProfileModeToggle } from '@/components/profile/ProfileModeToggle'
 import { DecisionStrip } from '@/components/profile/DecisionStrip'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
+import { Panel } from '@/components/ui/Panel'
+import { isPanelSourceDisabled } from '@/lib/api/sourceAvailability'
 import { CategorySection } from '@/components/profile/CategorySection'
 import { PanelSearch } from '@/components/profile/PanelSearch'
 import { CATEGORIES, getCategoryDataCounts, type CategoryId } from '@/lib/categoryConfig'
@@ -832,6 +834,15 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'unichem': (panelId, lastFetched) => <LazyPanels.LazyUniChemPanel mappings={d('unichemMappings')} panelId={panelId} lastFetched={lastFetched} />,
       'foodb': (panelId, lastFetched) => <LazyPanels.LazyFooDBPanel compounds={d('foodbCompounds')} panelId={panelId} lastFetched={lastFetched} />,
       'lincs': (panelId, lastFetched) => <LazyPanels.LazyLINCSPanel signatures={d('lincsSignatures')} panelId={panelId} lastFetched={lastFetched} />,
+      // Disabled source (no public API) — still visible as next work target
+      'ttd': (panelId, lastFetched) => (
+        <LazyPanels.LazyTTDPanel
+          targets={d('ttdTargets') ?? []}
+          drugs={d('ttdDrugs') ?? []}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'uniprot-extended': (panelId, lastFetched) => <LazyPanels.LazyUniProtExtendedPanel proteins={d('uniprotProteins')} panelId={panelId} lastFetched={lastFetched} />,
       'ebi-proteomics': (panelId, lastFetched) => <LazyPanels.LazyEbiProteinsPanel variations={d('ebiProteinVariations')} proteomics={d('ebiProteomicsData')} crossReferences={d('ebiCrossReferences')} panelId={panelId} lastFetched={lastFetched} />,
       'human-protein-atlas': (panelId, lastFetched) => <LazyPanels.LazyHumanProteinAtlasPanel data={d('humanProteinAtlas')} panelId={panelId} lastFetched={lastFetched} />,
@@ -842,35 +853,80 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'biomodels': (panelId, lastFetched) => <LazyPanels.LazyBioModelsPanel models={d('bioModelsModels')} panelId={panelId} lastFetched={lastFetched} />,
       'biosamples': (panelId, lastFetched) => <LazyPanels.LazyBioSamplesPanel samples={d('bioSamples')} panelId={panelId} lastFetched={lastFetched} />,
       'massive': (panelId, lastFetched) => <LazyPanels.LazyMassivePanel datasets={d('massiveDatasets')} panelId={panelId} lastFetched={lastFetched} />,
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      // Disabled / incomplete public APIs — always visible as “Next work” (not hidden)
       'nci-cadsr': (panelId, lastFetched) => {
+        if (isPanelSourceDisabled('nci-cadsr')) {
+          return (
+            <Panel
+              panelId={panelId}
+              title="NCI caDSR"
+              lastFetched={lastFetched}
+              loadStatus="disabled"
+              empty="No live public caDSR endpoint configured."
+            />
+          )
+        }
         const raw = d('cadsrData')
         const concepts = (raw?.data?.concepts ?? (Array.isArray(raw) ? raw : [])) as CadsrConcept[]
-        return <LazyPanels.LazyNciCadsrPanel data={concepts} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
+        return (
+          <LazyPanels.LazyNciCadsrPanel
+            data={concepts}
+            isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+          />
+        )
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'ncats-translator': (panelId, lastFetched) => {
         const raw = d('translatorData')
-        const associations = (raw?.data?.associations ?? (Array.isArray(raw) ? raw : [])) as TranslatorAssociation[]
-        return <LazyPanels.LazyNcatsTranslatorPanel data={associations} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
+        const associations = (raw?.data?.associations ??
+          (Array.isArray(raw) ? raw : [])) as TranslatorAssociation[]
+        return (
+          <LazyPanels.LazyNcatsTranslatorPanel
+            data={associations}
+            isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+          />
+        )
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'nhgri-anvil': (panelId, lastFetched) => {
         const raw = d('anvilData')
         const datasets = (raw?.data?.datasets ?? (Array.isArray(raw) ? raw : [])) as AnvilDataset[]
-        return <LazyPanels.LazyNhgriAnvilPanel data={datasets} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
+        return (
+          <LazyPanels.LazyNhgriAnvilPanel
+            data={datasets}
+            isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+          />
+        )
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'niaid-immport': (panelId, lastFetched) => {
+        if (isPanelSourceDisabled('niaid-immport')) {
+          return (
+            <Panel
+              panelId={panelId}
+              title="NIAID ImmPort"
+              lastFetched={lastFetched}
+              loadStatus="disabled"
+              empty="No live public ImmPort JSON search endpoint configured."
+            />
+          )
+        }
         const raw = d('immPortData')
         const studies = (raw?.data?.studies ?? (Array.isArray(raw) ? raw : [])) as ImmPortStudy[]
-        return <LazyPanels.LazyNiaidImmportPanel data={studies} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
+        return (
+          <LazyPanels.LazyNiaidImmportPanel
+            data={studies}
+            isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+          />
+        )
       },
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       'ninds-neurommsig': (panelId, lastFetched) => {
         const raw = d('neuroMMSigData')
-        const signatures = (raw?.data?.signatures ?? (Array.isArray(raw) ? raw : [])) as NeuroMMSigSignature[]
-        return <LazyPanels.LazyNindsNeurommsigPanel data={signatures} isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'} />
+        const signatures = (raw?.data?.signatures ??
+          (Array.isArray(raw) ? raw : [])) as NeuroMMSigSignature[]
+        return (
+          <LazyPanels.LazyNindsNeurommsigPanel
+            data={signatures}
+            isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+          />
+        )
       },
     } as Record<string, PanelRenderer>
   }, [d, molecularWeight, moleculeName, searchParams])

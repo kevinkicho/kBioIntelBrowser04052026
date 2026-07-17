@@ -7,6 +7,10 @@ import type { DataLoadStatus } from '@/lib/dataStatus'
 import { emptyMessageForStatus } from '@/lib/dataStatus'
 import { getPanelTier, TIER_BADGE_CLASS, TIER_LABEL } from '@/lib/panelTiers'
 import {
+  getPanelDisabledReason,
+  isPanelSourceDisabled,
+} from '@/lib/api/sourceAvailability'
+import {
   isCategoryLoading,
   useProfilePanelContext,
 } from '@/components/profile/ProfilePanelContext'
@@ -78,19 +82,35 @@ export function Panel({
 
   const freshness = panelId && lastFetched ? getFreshnessStatus(panelId, lastFetched) : null
   const sourceInfo = panelId ? getPanelSource(panelId) : null
-  const statusBadge = loadStatus ? LOAD_STATUS_BADGE[loadStatus] : undefined
+  const disabledReason = panelId ? getPanelDisabledReason(panelId) : undefined
+  const sourceDisabled = panelId ? isPanelSourceDisabled(panelId) : false
+  const effectiveLoadStatus: DataLoadStatus | undefined = sourceDisabled
+    ? 'disabled'
+    : loadStatus
+  const statusBadge = effectiveLoadStatus ? LOAD_STATUS_BADGE[effectiveLoadStatus] : undefined
   const tier = panelId ? getPanelTier(panelId) : null
   const showTierBadge = tier === 'supporting' || tier === 'experimental'
   const emptyText = empty
-    ? emptyMessageForStatus(loadStatus, empty)
-    : loadStatus && loadStatus !== 'loaded'
-      ? emptyMessageForStatus(loadStatus, 'No data for this molecule')
+    ? emptyMessageForStatus(effectiveLoadStatus, empty)
+    : effectiveLoadStatus && effectiveLoadStatus !== 'loaded'
+      ? emptyMessageForStatus(effectiveLoadStatus, 'No data for this molecule')
       : null
+  const nextWorkTitle =
+    disabledReason ||
+    (sourceDisabled
+      ? 'Next work target: enable a verified free public JSON endpoint for this source'
+      : undefined)
 
   return (
     <div
-      className={`bg-slate-800/50 border border-slate-700 rounded-xl p-5 ${className}`}
+      className={`bg-slate-800/50 border rounded-xl p-5 ${
+        sourceDisabled
+          ? 'border-amber-900/40 opacity-90'
+          : 'border-slate-700'
+      } ${className}`}
       data-testid={panelId ? `panel-${panelId}` : undefined}
+      data-source-disabled={sourceDisabled ? 'true' : undefined}
+      title={nextWorkTitle}
     >
       <div className="flex justify-between items-start mb-4 gap-2">
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
@@ -104,8 +124,20 @@ export function Panel({
               {TIER_LABEL[tier]}
             </span>
           )}
+          {sourceDisabled && (
+            <span
+              className="text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide bg-amber-950/50 text-amber-300/90 border border-amber-800/40 cursor-help"
+              title={nextWorkTitle}
+              data-testid={panelId ? `panel-next-work-${panelId}` : 'panel-next-work'}
+            >
+              Next work
+            </span>
+          )}
           {statusBadge && (
-            <span className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide ${statusBadge.className}`}>
+            <span
+              className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide ${statusBadge.className}`}
+              title={sourceDisabled ? nextWorkTitle : undefined}
+            >
               {statusBadge.text}
             </span>
           )}
@@ -162,12 +194,19 @@ export function Panel({
           )}
         </div>
       </div>
-      {emptyText ? (
+      {emptyText || sourceDisabled ? (
         <div>
-          <p className="text-slate-500 text-sm">{emptyText}</p>
-          {loadError && (
-            <p className="text-[10px] text-slate-600 mt-1 font-mono truncate" title={loadError}>
-              {loadError}
+          <p className="text-slate-500 text-sm">
+            {sourceDisabled
+              ? emptyMessageForStatus('disabled', empty || 'No live public endpoint yet.')
+              : emptyText}
+          </p>
+          {(loadError || disabledReason) && (
+            <p
+              className="text-[10px] text-amber-500/80 mt-1.5 leading-relaxed"
+              title={disabledReason || loadError}
+            >
+              {disabledReason || loadError}
             </p>
           )}
         </div>
