@@ -266,11 +266,11 @@ export async function GET(
     }
 
     // Surface extra SBURL deep links not already covered by SourceName chips
-    for (const [name, url] of sburlByName) {
-      if (seen.has(name)) continue
+    sburlByName.forEach((url, name) => {
+      if (seen.has(name)) return
       seen.add(name)
       databases.push({ name, url, sourceType: 'database' })
-    }
+    })
 
     return NextResponse.json(
       {
