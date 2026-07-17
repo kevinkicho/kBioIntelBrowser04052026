@@ -8,25 +8,34 @@ import {
   productEventLabel,
   readQueuedProductEvents,
   summarizeProductEvents,
+  type ProductEvent,
 } from '@/lib/productEvents'
+import {
+  computeM1FunnelFromEvents,
+  funnelSnapshotToCsv,
+  funnelSnapshotToJson,
+  type M1FunnelSnapshot,
+} from '@/lib/analytics/m1Funnel'
+import { downloadFile } from '@/lib/exportData'
 
 interface ServerCall {
   endpoint?: string
   timestamp?: string
   source?: string
+  error?: string | null
 }
 
 /**
  * Product funnel panel for /analytics — local queue + optional server product source detail.
- * Labels use canonical v2 event names (post dual-emit clean-cut).
+ * M1 temporal join + M3/M7 aggregates (v2.1 §5).
  */
 export function ProductFunnelPanel() {
-  const [localCounts, setLocalCounts] = useState<ProductEventCount[]>([])
+  const [localEvents, setLocalEvents] = useState<ProductEvent[]>([])
   const [serverCounts, setServerCounts] = useState<ProductEventCount[]>([])
   const [loadingServer, setLoadingServer] = useState(false)
 
   const refreshLocal = useCallback(() => {
-    setLocalCounts(summarizeProductEvents(readQueuedProductEvents()))
+    setLocalEvents(readQueuedProductEvents())
   }, [])
 
   const refreshServer = useCallback(() => {
@@ -57,7 +66,20 @@ export function ProductFunnelPanel() {
     refreshServer()
   }, [refreshLocal, refreshServer])
 
-  /** Prefer server aggregates when present; else local queue. */
+  const funnel: M1FunnelSnapshot = useMemo(
+    () =>
+      computeM1FunnelFromEvents(
+        localEvents.map((e) => ({ name: e.name, ts: e.ts, props: e.props })),
+        { windowDays: 7 },
+      ),
+    [localEvents],
+  )
+
+  const localCounts = useMemo(
+    () => summarizeProductEvents(localEvents),
+    [localEvents],
+  )
+
   const rows = useMemo(() => {
     if (serverCounts.length > 0) return serverCounts
     return localCounts
@@ -66,7 +88,7 @@ export function ProductFunnelPanel() {
   const sourceNote =
     serverCounts.length > 0
       ? 'Server (product source, last 30d sample)'
-      : 'Local browser queue (this device)'
+      : 'Local browser queue (this device, 7d window for M1 join)'
 
   const byMetric = useMemo(() => {
     const m = new Map<ProductMetricId, number>()
@@ -78,14 +100,21 @@ export function ProductFunnelPanel() {
       .sort((a, b) => a[0].localeCompare(b[0]))
   }, [rows])
 
-  const m1Loop = useMemo(() => {
-    const get = (n: string) => rows.find((r) => r.name === n)?.count ?? 0
-    return {
-      started: get('discover_started'),
-      boarded: get('board_candidate_added'),
-      packOrRh: get('pack_opened') + get('research_hypothesis_opened'),
-    }
-  }, [rows])
+  const handleExportJson = () => {
+    downloadFile(
+      funnelSnapshotToJson(funnel),
+      `biointel-m1-funnel-${new Date().toISOString().slice(0, 10)}.json`,
+      'application/json',
+    )
+  }
+
+  const handleExportCsv = () => {
+    downloadFile(
+      funnelSnapshotToCsv(funnel),
+      `biointel-m1-funnel-${new Date().toISOString().slice(0, 10)}.csv`,
+      'text/csv',
+    )
+  }
 
   return (
     <section
@@ -96,29 +125,46 @@ export function ProductFunnelPanel() {
         <div>
           <h2 className="text-lg font-semibold text-indigo-100">Product funnel</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            Canonical discovery events (M1–M9) · {sourceNote}
+            M1 temporal join · M3 citation density · M7 rank ms · {sourceNote}
             {loadingServer && ' · loading server…'}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => {
-            refreshLocal()
-            refreshServer()
-          }}
-          className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
-        >
-          Refresh funnel
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={handleExportJson}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+          >
+            Export JSON
+          </button>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              refreshLocal()
+              refreshServer()
+            }}
+            className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+          >
+            Refresh funnel
+          </button>
+        </div>
       </div>
 
-      {/* M1 north-star strip */}
-      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+      {/* M1 north-star strip with completedLoops */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(
           [
-            ['Discover started', m1Loop.started, 'M1'],
-            ['Board candidate added', m1Loop.boarded, 'M1'],
-            ['Pack / RH opened', m1Loop.packOrRh, 'M1'],
+            ['Discover started', funnel.startedCount, 'M1'],
+            ['Rank completed', funnel.rankedCount, 'M1'],
+            ['Board added', funnel.boardedCount, 'M1'],
+            ['Completed loops', funnel.completedLoops, 'M1'],
           ] as const
         ).map(([label, count, metric]) => (
           <div
@@ -132,6 +178,36 @@ export function ProductFunnelPanel() {
             <div className="text-[11px] text-slate-500">{label}</div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs">
+          <div className="text-[10px] uppercase text-slate-500">Pack / RH events</div>
+          <div className="text-lg font-semibold text-slate-100">{funnel.packOrRhCount}</div>
+          <div className="text-[10px] text-slate-600">
+            includes pack_exported · rate {(funnel.packOrRhRate * 100).toFixed(0)}% of board
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs">
+          <div className="text-[10px] uppercase text-slate-500">M3 median citable</div>
+          <div className="text-lg font-semibold text-slate-100">
+            {funnel.medianCitable != null ? funnel.medianCitable : '—'}
+          </div>
+          <div className="text-[10px] text-slate-600">
+            target ≥5 · mean claims{' '}
+            {funnel.meanClaimCount != null ? funnel.meanClaimCount.toFixed(1) : '—'}
+          </div>
+        </div>
+        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs">
+          <div className="text-[10px] uppercase text-slate-500">M7 shortlist (rank ms)</div>
+          <div className="text-lg font-semibold text-slate-100">
+            P50 {funnel.m7.p50 != null ? `${Math.round(funnel.m7.p50)}ms` : '—'} · P95{' '}
+            {funnel.m7.p95 != null ? `${Math.round(funnel.m7.p95)}ms` : '—'}
+          </div>
+          <div className="text-[10px] text-slate-600">
+            {funnel.m7.samples} samples · harvest excluded
+          </div>
+        </div>
       </div>
 
       {byMetric.length > 0 && (

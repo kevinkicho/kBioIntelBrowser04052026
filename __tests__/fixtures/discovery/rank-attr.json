@@ -1,0 +1,21 @@
+{
+  "diseaseName": "ATTR amyloidosis",
+  "diseaseId": "EFO_FIXTURE_ATTR",
+  "candidates": [
+    {
+      "name": "Tafamidis",
+      "compositeScore": 0.82,
+      "clinicalPhase": 4,
+      "confidence": "high"
+    }
+  ],
+  "genes": [{ "symbol": "TTR", "score": 0.9 }],
+  "therapeuticAreas": ["rare"],
+  "sourceStatuses": [],
+  "v2": {
+    "scorePhase": "cheap",
+    "needsDiseaseConfirmation": false,
+    "timingMs": { "disease": 10, "cheapScore": 20, "total": 100 },
+    "candidates": []
+  }
+}

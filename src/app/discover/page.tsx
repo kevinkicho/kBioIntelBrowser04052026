@@ -13,6 +13,7 @@ import { GeneTable } from './components/GeneTable'
 import { SourceStatusStrip } from './components/SourceStatusStrip'
 import { TargetPinPanel } from '@/components/discover/TargetPinPanel'
 import { DiscoverySettingsDrawer } from '@/components/discovery/DiscoverySettingsDrawer'
+import { OrphanetPinProvenanceStrip } from '@/components/discovery/OrphanetPinProvenanceStrip'
 import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
 import type { DiseaseEntity } from '@/lib/domain/entities'
 import { MAX_DISCOVER_TARGETS, parseTargetsParam } from '@/lib/discovery/discoverUrl'
@@ -22,6 +23,12 @@ import {
   scoreRubricFromPreferences,
   snapshotDiscoveryPreferences,
 } from '@/lib/discovery/preferences'
+import {
+  listDiscoverSessions,
+  saveDiscoverSession,
+  deleteDiscoverSession,
+  type DiscoverSessionSnapshot,
+} from '@/lib/discovery/discoverSessions'
 
 export default function DiscoverPage() {
   const searchParams = useSearchParams()
@@ -38,9 +45,15 @@ export default function DiscoverPage() {
     resetPrefs,
     harvestSafety,
     setTargets,
+    rerankWithCurrentPins,
   } = useDiscovery()
   const bootstrapped = useRef(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [sessions, setSessions] = useState<DiscoverSessionSnapshot[]>([])
+
+  useEffect(() => {
+    setSessions(listDiscoverSessions())
+  }, [state.status, state.targets.length])
 
   // Deep link: /discover?q=&diseaseId=&targets= — diseaseId skips picker; targets pin genes
   useEffect(() => {
@@ -177,6 +190,65 @@ export default function DiscoverPage() {
           onClear={handleClearTargets}
         />
 
+        {/* Local saved sessions (v2.1) — restore does not auto-rank */}
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px]" data-testid="discover-sessions">
+          <button
+            type="button"
+            onClick={() => {
+              const s = saveDiscoverSession({
+                label: state.query || state.diseaseId || 'Session',
+                q: state.query,
+                diseaseId: state.diseaseId,
+                targets: state.targets,
+                orphanet: state.orphanetProvenance
+                  ? {
+                      orphaCode: state.orphanetProvenance.orphaCode,
+                      diseaseName: state.orphanetProvenance.diseaseName,
+                      genes: state.orphanetProvenance.genes,
+                    }
+                  : null,
+              })
+              setSessions(listDiscoverSessions())
+              void s
+            }}
+            disabled={!state.query && !state.diseaseId && state.targets.length === 0}
+            className="rounded border border-slate-700 px-2 py-1 text-slate-400 hover:text-slate-200 disabled:opacity-40"
+          >
+            Save session
+          </button>
+          {sessions.slice(0, 5).map((s) => (
+            <span key={s.id} className="inline-flex items-center gap-1 rounded border border-slate-800 bg-slate-900/50 px-2 py-1 text-slate-500">
+              <button
+                type="button"
+                className="hover:text-indigo-300"
+                title="Restore URL fields only (does not auto-rank)"
+                onClick={() => {
+                  const params = new URLSearchParams()
+                  if (s.q) params.set('q', s.q)
+                  if (s.diseaseId) params.set('diseaseId', s.diseaseId)
+                  if (s.targets.length) params.set('targets', s.targets.join(','))
+                  const qs = params.toString()
+                  router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
+                  setTargets(s.targets)
+                }}
+              >
+                {s.label.slice(0, 28)}
+              </button>
+              <button
+                type="button"
+                className="text-slate-600 hover:text-red-400"
+                aria-label={`Delete session ${s.label}`}
+                onClick={() => {
+                  deleteDiscoverSession(s.id)
+                  setSessions(listDiscoverSessions())
+                }}
+              >
+                ×
+              </button>
+            </span>
+          ))}
+        </div>
+
         <DiscoveryProgress state={state} />
 
         {state.status === 'confirm_disease' && state.diseaseCandidates.length > 0 && (
@@ -265,6 +337,16 @@ export default function DiscoverPage() {
                 {(state.result.sourceStatuses?.length ?? 0) > 0 && (
                   <SourceStatusStrip sourceStatuses={state.result.sourceStatuses ?? []} />
                 )}
+
+                <OrphanetPinProvenanceStrip
+                  provenance={state.orphanetProvenance}
+                  onRerank={() => void rerankWithCurrentPins()}
+                />
+
+                <p className="mb-3 text-[10px] text-slate-600" data-testid="score-trust-banner">
+                  Scores are multi-axis investigation priority (not clinical predictions). Missing
+                  axes are never invented — expand a card for weight breakdown.
+                </p>
 
                 <GeneTable
                   genes={state.result.genes}

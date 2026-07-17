@@ -81,6 +81,7 @@ export {
   PACK_PANEL_CONCURRENCY,
   PACK_PANEL_TIMEOUT_MS,
   PACK_CATEGORIES,
+  richnessProxy,
   selectPackCandidates,
   fetchCorePanelsForCid,
   buildBoardPackClaims,

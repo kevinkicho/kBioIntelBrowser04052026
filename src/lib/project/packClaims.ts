@@ -35,18 +35,79 @@ export const PACK_CATEGORIES: readonly CategoryId[] = [
   'molecular-chemical',
 ] as const
 
+/**
+ * Heuristic richness for multi-partition fill (v2.1 §7.3.3).
+ * Prefer identity + evidence breadth + scores when choosing among same status.
+ */
+export function richnessProxy(c: MoleculeCandidate): number {
+  let score = 0
+  if (c.identity.pubchemCid != null && c.identity.pubchemCid > 0) score += 1
+  if (c.identity.chemblId) score += 2
+  if (c.identity.inchiKey) score += 2
+  if (c.scores?.scorePhase === 'full') score += 3
+  else if (c.scores) score += 1
+  score += Math.min(5, c.evidenceBreadthSources?.length ?? 0)
+  const axes = c.scores?.axes
+  const axisStatus = c.scores?.axisStatus
+  if (axes) {
+    for (const k of ['efficacy', 'clinicalStage', 'safety', 'novelty', 'identityTrust'] as const) {
+      if (typeof axes[k] === 'number' && axisStatus?.[k] !== 'not-retrieved') score += 0.5
+    }
+  }
+  return score
+}
+
+/**
+ * Multi-partition fill (v2.1): promote (richness-sorted) then watching then other,
+ * still max `max`, CID-only. Replaces exclusive tier fallback.
+ */
 export function selectPackCandidates(
   project: Project,
   max: number = PACK_MAX_CANDIDATES,
 ): MoleculeCandidate[] {
-  const promote = project.candidates.filter((c) => c.boardStatus === 'promote')
-  const watching = project.candidates.filter((c) => c.boardStatus === 'watching')
   const withCid = (list: MoleculeCandidate[]) =>
     list.filter((c) => c.identity.pubchemCid != null && c.identity.pubchemCid > 0)
-  let pick = withCid(promote)
-  if (pick.length === 0) pick = withCid(watching)
-  if (pick.length === 0) pick = withCid(project.candidates)
-  return pick.slice(0, max)
+
+  const byRichness = (a: MoleculeCandidate, b: MoleculeCandidate) =>
+    richnessProxy(b) - richnessProxy(a)
+
+  const promote = withCid(
+    project.candidates.filter((c) => c.boardStatus === 'promote'),
+  ).sort(byRichness)
+  const watching = withCid(
+    project.candidates.filter((c) => c.boardStatus === 'watching'),
+  ).sort(byRichness)
+  const other = withCid(
+    project.candidates.filter(
+      (c) => c.boardStatus !== 'promote' && c.boardStatus !== 'watching',
+    ),
+  ).sort(byRichness)
+
+  const seen = new Set<string>()
+  const out: MoleculeCandidate[] = []
+  for (const c of [...promote, ...watching, ...other]) {
+    if (seen.has(c.candidateId)) continue
+    seen.add(c.candidateId)
+    out.push(c)
+    if (out.length >= max) break
+  }
+  return out
+}
+
+function emptyPanelKeys(panels: CorePanelEvidenceInput): string[] {
+  const keys: (keyof CorePanelEvidenceInput)[] = [
+    'chemblMechanisms',
+    'chemblActivities',
+    'clinicalTrials',
+    'adverseEvents',
+    'diseaseAssociations',
+  ]
+  const empty: string[] = []
+  for (const k of keys) {
+    const v = panels[k]
+    if (!v || (Array.isArray(v) && v.length === 0)) empty.push(k)
+  }
+  return empty
 }
 
 async function fetchCategorySoft(
@@ -146,11 +207,18 @@ export async function buildBoardPackClaims(
 
   const results = await mapPool(candidatesUsed, concurrency, async (c) => {
     if (opts?.signal?.aborted) {
-      return { panels: {} as CorePanelEvidenceInput, claims: [] as EvidenceClaim[], warn: null as string | null }
+      return {
+        panels: {} as CorePanelEvidenceInput,
+        claims: [] as EvidenceClaim[],
+        warn: null as string | null,
+        empty: [] as string[],
+        name: c.identity.name,
+      }
     }
     const cid = c.identity.pubchemCid!
     try {
       const p = await fetchCorePanelsForCid(cid, opts?.signal)
+      const empty = emptyPanelKeys(p)
       const ctx: ClaimExtractorContext = {
         retrievedAt,
         subjectCandidateId: c.candidateId,
@@ -161,12 +229,20 @@ export async function buildBoardPackClaims(
         totalCap: DEFAULT_CLAIM_TOTAL_CAP,
         preferFacetOrder: true,
       })
-      return { panels: p, claims: extracted, warn: null as string | null }
+      return {
+        panels: p,
+        claims: extracted,
+        warn: null as string | null,
+        empty,
+        name: c.identity.name,
+      }
     } catch (err) {
       return {
         panels: {} as CorePanelEvidenceInput,
         claims: [] as EvidenceClaim[],
         warn: `${c.identity.name}: ${err instanceof Error ? err.message : 'panel fetch failed'}`,
+        empty: [] as string[],
+        name: c.identity.name,
       }
     }
   })
@@ -175,6 +251,14 @@ export async function buildBoardPackClaims(
   const allClaims: EvidenceClaim[] = []
   for (const r of results) {
     if (r.warn) warnings.push(r.warn)
+    if (r.empty.length > 0) {
+      warnings.push(
+        `${r.name}: empty extractor panels — ${r.empty.join(', ')} (claims may be thin)`,
+      )
+    }
+    if (r.claims.length === 0 && !r.warn) {
+      warnings.push(`${r.name}: no claims extracted from Core panels`)
+    }
     panels = mergeCorePanels(panels, r.panels)
     allClaims.push(...r.claims)
   }

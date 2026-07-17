@@ -51,6 +51,7 @@ export default function ProjectBoardPage() {
   const [harvestBusy, setHarvestBusy] = useState(false)
   const [boardPanels, setBoardPanels] = useState<CorePanelEvidenceInput>({})
   const [boardClaims, setBoardClaims] = useState<EvidenceClaim[]>([])
+  const [packWarnings, setPackWarnings] = useState<string[]>([])
   const [panelsLoading, setPanelsLoading] = useState(false)
   const signalsLoadedFor = useRef<string | null>(null)
   const harvestGen = useRef(0)
@@ -80,6 +81,7 @@ export default function ProjectBoardPage() {
     if (!project || project.candidates.length === 0) {
       setBoardPanels({})
       setBoardClaims([])
+      setPackWarnings([])
       return
     }
     const key = `${project.id}:${project.candidates
@@ -94,14 +96,13 @@ export default function ProjectBoardPage() {
         if (cancelled) return
         setBoardPanels(res.panels)
         setBoardClaims(res.claims)
-        if (res.warnings.length && res.claims.length === 0) {
-          // non-blocking; user can still download empty pack
-        }
+        setPackWarnings(res.warnings)
       })
       .catch(() => {
         if (!cancelled) {
           setBoardPanels({})
           setBoardClaims([])
+          setPackWarnings(['Failed to fetch Core panels for board pack'])
         }
       })
       .finally(() => {
@@ -530,6 +531,7 @@ export default function ProjectBoardPage() {
             panels={boardPanels}
             claims={boardClaims}
             panelsLoading={panelsLoading}
+            densityWarnings={packWarnings}
             candidates={project.candidates}
             disease={project.disease ?? null}
             projectId={project.id}

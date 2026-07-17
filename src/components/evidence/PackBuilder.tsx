@@ -47,6 +47,8 @@ export interface PackBuilderProps {
   className?: string
   /** When true and panels empty, show loading hint (board auto-fetch parent-owned). */
   panelsLoading?: boolean
+  /** Density / empty-panel warnings from board fetch (v2.1). */
+  densityWarnings?: string[]
   /** Called after a successful download + index register */
   onExported?: (pack: EvidencePack, format: 'json' | 'md') => void
 }
@@ -71,6 +73,7 @@ export function PackBuilder({
   preferencesSnapshot: prefsProp,
   className = '',
   panelsLoading = false,
+  densityWarnings = [],
   onExported,
 }: PackBuilderProps) {
   const [title, setTitle] = useState(
@@ -160,10 +163,13 @@ export function PackBuilder({
     if (panelsLoading) return
     if (!preClaims && !panelsProp && !profileData) return
     openedEmitted.current = true
+    const citable = preClaims ? countCitableClaims(preClaims) : 0
+    const claimCount = preClaims?.length ?? 0
     emitProductEvent('pack_opened', {
       projectId: projectId ?? null,
-      claimCount: preClaims?.length ?? 0,
-      citable: preClaims ? countCitableClaims(preClaims) : 0,
+      claimCount,
+      citable,
+      citableCount: citable,
     })
   }, [panelsLoading, preClaims, panelsProp, profileData, projectId])
 
@@ -199,8 +205,13 @@ export function PackBuilder({
       const citable = countCitableClaims(pack.claims)
       emitProductEvent('pack_exported', {
         format,
+        // Dual-key props: historical count/citable + design claimCount/citableCount (v2.1 §5.2)
         count: pack.claimCount,
+        claimCount: pack.claimCount,
         citable,
+        citableCount: citable,
+        candidateCount: pack.candidates.length,
+        projectId: pack.projectId ?? null,
       })
       flash(
         'ok',
@@ -227,6 +238,7 @@ export function PackBuilder({
     try {
       const pack = build()
       setLastPack(pack)
+      // IDB still written so RH rehydrate works even if share API fails
       registerSideEffects(pack)
       const res = await fetch('/api/snapshot', {
         method: 'POST',
@@ -242,7 +254,10 @@ export function PackBuilder({
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Share failed (${res.status})`)
+        throw new Error(
+          (err as { error?: string }).error ??
+            `Share failed (${res.status}). Pack remains downloadable; cached in browser for RH rehydrate.`,
+        )
       }
       const data = (await res.json()) as { id: string }
       const url = `${window.location.origin}/pack/${data.id}`
@@ -255,7 +270,13 @@ export function PackBuilder({
       emitProductEvent('pack_share', { packId: pack.id })
       flash('ok', 'Share link created (30-day TTL). Copied to clipboard when available.')
     } catch (err) {
-      flash('err', err instanceof Error ? err.message : 'Share failed')
+      setShareUrl(null)
+      flash(
+        'err',
+        err instanceof Error
+          ? err.message
+          : 'Share failed. Use Download JSON/MD — pack was still cached for rehydrate when possible.',
+      )
     } finally {
       setShareBusy(false)
     }
@@ -279,11 +300,29 @@ export function PackBuilder({
               <>
                 {' '}
                 · {preClaims.length} pre-extracted · {countCitableClaims(preClaims)} citable
+                {countCitableClaims(preClaims) < 5 && preClaims.length > 0
+                  ? ' · below M3 target (≥5 citable)'
+                  : ''}
               </>
             )}
           </p>
         </div>
       </div>
+
+      {densityWarnings.length > 0 && (
+        <div
+          className="mb-3 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-200/90"
+          data-testid="pack-density-warnings"
+          role="status"
+        >
+          <div className="font-medium text-amber-100">Pack density notes</div>
+          <ul className="mt-1 list-inside list-disc space-y-0.5 text-amber-200/80">
+            {densityWarnings.slice(0, 8).map((w) => (
+              <li key={w}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       <label className="mb-3 block">
         <span className="mb-1 block text-[11px] font-medium text-slate-400">Title</span>

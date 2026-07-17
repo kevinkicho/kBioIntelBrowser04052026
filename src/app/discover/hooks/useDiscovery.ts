@@ -48,6 +48,14 @@ export type DiscoveryStatus =
   | 'success'
   | 'error'
 
+/** Orphanet pin merge provenance (rareDiseaseBoost). */
+export interface OrphanetPinProvenance {
+  orphaCode: string | null
+  diseaseName: string | null
+  genes: string[]
+  added: number
+}
+
 export interface DiscoveryState {
   query: string
   /** Hard-pinned disease id when set (URL or picker selection). */
@@ -64,6 +72,8 @@ export interface DiscoveryState {
   prefs: DiscoveryPreferences
   harvestStatus: 'idle' | 'loading' | 'done' | 'error'
   harvestError: string | null
+  /** Last Orphanet pin merge (null if boost off or no fetch). */
+  orphanetProvenance: OrphanetPinProvenance | null
 }
 
 export interface SearchOptions {
@@ -94,6 +104,7 @@ export function useDiscovery() {
     prefs: DEFAULT_DISCOVERY_PREFERENCES,
     harvestStatus: 'idle',
     harvestError: null,
+    orphanetProvenance: null,
   })
 
   const progressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -219,6 +230,7 @@ export function useDiscovery() {
         error: null,
         harvestStatus: 'idle',
         harvestError: null,
+        orphanetProvenance: null,
       }))
 
       advanceProgress(stages, 0)
@@ -276,16 +288,26 @@ export function useDiscovery() {
           return
         }
 
+        const timingTotal =
+          typeof data.v2?.timingMs?.total === 'number' ? data.v2.timingMs.total : undefined
         emitProductEvent('discover_rank_completed', {
           count: data.candidates.length,
           diseaseId: data.diseaseId ?? diseaseId ?? null,
           scorePhase: data.v2?.scorePhase ?? 'cheap',
+          // M7 SSOT: cheap shortlist wall time (v2.1 §5.3)
+          ...(timingTotal != null ? { ms: timingTotal } : {}),
         })
         // Post-hoc stages from real engine timingMs only (never fake timer labels)
         emitDiscoverStagesFromTimingMs(data.v2?.timingMs)
 
         // Rare-disease boost: merge Orphanet genes into pins (opt-in; free Orphadata)
         let mergedTargets = targets
+        let orphanetProvenance: {
+          orphaCode: string | null
+          diseaseName: string | null
+          genes: string[]
+          added: number
+        } | null = null
         if (prefs.rareDiseaseBoost && data.diseaseName) {
           try {
             const geneRes = await clientFetch(
@@ -293,15 +315,28 @@ export function useDiscovery() {
               { signal: controller.signal },
             )
             if (geneRes.ok) {
-              const body = (await geneRes.json()) as { genes?: unknown }
+              const body = (await geneRes.json()) as {
+                genes?: unknown
+                orphaCode?: string | null
+                diseaseName?: string
+                error?: string
+              }
               const genes = Array.isArray(body.genes)
                 ? body.genes.filter((g): g is string => typeof g === 'string')
                 : []
               mergedTargets = mergeOrphanetGenesIntoTargets(targets, genes, MAX_DISCOVER_TARGETS)
-              if (mergedTargets.length > targets.length) {
+              const added = mergedTargets.length - targets.length
+              orphanetProvenance = {
+                orphaCode: body.orphaCode ?? null,
+                diseaseName: body.diseaseName ?? data.diseaseName ?? null,
+                genes,
+                added: Math.max(0, added),
+              }
+              if (added > 0) {
                 emitProductEvent('discover_orphanet_genes', {
                   diseaseName: data.diseaseName,
-                  added: mergedTargets.length - targets.length,
+                  orphaCode: body.orphaCode ?? null,
+                  added,
                   total: mergedTargets.length,
                 })
               }
@@ -323,6 +358,7 @@ export function useDiscovery() {
           error: null,
           harvestStatus:
             data.v2?.scorePhase === 'full' ? 'done' : flags.runSafetyHarvest ? 'done' : 'idle',
+          orphanetProvenance,
         }))
       } catch (err) {
         if (progressRef.current) clearTimeout(progressRef.current)
@@ -337,6 +373,7 @@ export function useDiscovery() {
           diseaseCandidates: [],
           targets,
           error: err instanceof Error ? err.message : 'Search failed',
+          orphanetProvenance: null,
         }))
       }
     },
@@ -472,8 +509,18 @@ export function useDiscovery() {
       prefs: prev.prefs,
       harvestStatus: 'idle',
       harvestError: null,
+      orphanetProvenance: null,
     }))
   }, [])
+
+  /** User-triggered re-rank with current pins (after Orphanet merge). Never auto. */
+  const rerankWithCurrentPins = useCallback(() => {
+    if (!state.query && !state.diseaseId) return
+    return search(state.query || state.diseaseId || '', {
+      diseaseId: state.diseaseId ?? undefined,
+      targets: state.targets,
+    })
+  }, [search, state.query, state.diseaseId, state.targets])
 
   return {
     state,
@@ -484,5 +531,6 @@ export function useDiscovery() {
     resetPrefs,
     harvestSafety,
     setTargets,
+    rerankWithCurrentPins,
   }
 }

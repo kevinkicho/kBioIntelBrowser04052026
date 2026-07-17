@@ -11,6 +11,9 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:e2e": "playwright test",
+    "test:e2e:fixture": "cross-env E2E_FIXTURE=1 playwright test e2e/north-star-loop.spec.ts",
+    "test:e2e:live": "playwright test e2e/north-star-loop.spec.ts",
+    "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences\" --passWithNoTests",
     "test:live": "node scripts/test-live.js",
     "tune-timeouts": "node scripts/tune-timeouts.js"
   },
@@ -37,6 +40,7 @@
     "@types/react": "^18",
     "@types/react-dom": "^18",
     "babel-jest": "^30.3.0",
+    "cross-env": "^10.1.0",
     "eslint": "^8",
     "eslint-config-next": "14.2.35",
     "jest": "^30.3.0",

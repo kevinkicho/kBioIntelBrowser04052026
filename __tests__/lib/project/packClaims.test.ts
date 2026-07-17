@@ -52,34 +52,44 @@ describe('packClaims budgets', () => {
     expect(PACK_PANEL_TIMEOUT_MS).toBe(8000)
   })
 
-  it('selectPackCandidates prefers promote with CID, caps at 5', () => {
+  it('multi-partition fill: promote first then watching up to 5', () => {
     const cands = [
       makeCand('a', 'hold', 1),
       makeCand('b', 'promote', 2),
       makeCand('c', 'promote', null),
       makeCand('d', 'watching', 3),
       makeCand('e', 'promote', 4),
+    ]
+    const pick = selectPackCandidates(makeProject(cands))
+    expect(pick.every((c) => c.identity.pubchemCid)).toBe(true)
+    // promote b,e first; then fill watching d and hold a
+    expect(pick.map((c) => c.candidateId)).toEqual(['b', 'e', 'd', 'a'])
+    expect(pick).toHaveLength(4)
+  })
+
+  it('fills from watching when fewer than 5 promotes', () => {
+    const pick = selectPackCandidates(
+      makeProject([
+        makeCand('p1', 'promote', 1),
+        makeCand('w1', 'watching', 2),
+        makeCand('w2', 'watching', 3),
+      ]),
+    )
+    expect(pick.map((c) => c.candidateId)).toEqual(['p1', 'w1', 'w2'])
+  })
+
+  it('caps at 5 with promote-first multi-partition', () => {
+    const cands = [
+      makeCand('b', 'promote', 2),
+      makeCand('e', 'promote', 4),
       makeCand('f', 'promote', 5),
       makeCand('g', 'promote', 6),
       makeCand('h', 'promote', 7),
+      makeCand('d', 'watching', 3),
     ]
     const pick = selectPackCandidates(makeProject(cands))
-    expect(pick.every((c) => c.boardStatus === 'promote')).toBe(true)
-    expect(pick.every((c) => c.identity.pubchemCid)).toBe(true)
     expect(pick).toHaveLength(PACK_MAX_CANDIDATES)
-    expect(pick.map((c) => c.candidateId)).toEqual(['b', 'e', 'f', 'g', 'h'])
-  })
-
-  it('falls back to watching then any with CID', () => {
-    const watchingOnly = selectPackCandidates(
-      makeProject([makeCand('w', 'watching', 9), makeCand('h', 'hold', 10)]),
-    )
-    expect(watchingOnly.map((c) => c.candidateId)).toEqual(['w'])
-
-    const anyCid = selectPackCandidates(
-      makeProject([makeCand('h', 'hold', 11), makeCand('k', 'kill', 12)]),
-    )
-    expect(anyCid).toHaveLength(2)
+    expect(pick.every((c) => c.boardStatus === 'promote')).toBe(true)
   })
 })
 
