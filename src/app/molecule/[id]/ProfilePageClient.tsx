@@ -36,8 +36,10 @@ import { AICopilot } from '@/components/ai/AICopilot'
 import { NextStepsPanel, DiscoverBreadcrumb } from '@/components/profile/NextStepsPanel'
 import { PipelinePanel } from '@/components/profile/PipelinePanel'
 import { VendorsPanel } from '@/components/profile/VendorsPanel'
+import { ProfilePanelProvider } from '@/components/profile/ProfilePanelContext'
 import { sessionHistory } from '@/lib/sessionHistory'
 import { recordSearch } from '@/lib/searchHistory'
+import { categoryForPanel, type CategoryApiTrace } from '@/lib/panelApiTrace'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import type { ScoreVector } from '@/lib/domain'
 import {
@@ -194,6 +196,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const [searchQuery, setSearchQuery] = useState('')
   const [categoryData, setCategoryData] = useState<CategoriesData>({})
   const [categoryStatus, setCategoryStatus] = useState<CategoriesStatus>(initStatus)
+  const [categoryTraces, setCategoryTraces] = useState<Partial<Record<CategoryId, CategoryApiTrace>>>({})
   const categoryStatusRef = useRef(categoryStatus)
   categoryStatusRef.current = categoryStatus
   const [quickViewPanel, setQuickViewPanel] = useState<{ categoryId: CategoryId, panelId: string } | null>(null)
@@ -321,12 +324,38 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       setCategoryData(prev => ({ ...prev, [catId]: data }))
       setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
       setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
+      const trace = (data as Record<string, unknown>)?._apiTrace as CategoryApiTrace | undefined
+      if (trace) {
+        setCategoryTraces((prev) => ({ ...prev, [catId]: trace }))
+      }
     } catch {
       setCategoryStatus(prev => ({ ...prev, [catId]: 'error' }))
     } finally {
       pendingRef.current.delete(catId)
     }
   }, [cid, apiOverrides, apiParams, forceRefresh])
+
+  const loadingCategories = useMemo(() => {
+    const s = new Set<CategoryId>()
+    for (const id of ALL_CATEGORY_IDS) {
+      if (categoryStatus[id] === 'loading') s.add(id)
+    }
+    return s
+  }, [categoryStatus])
+
+  const panelContextValue = useMemo(
+    () => ({
+      cid,
+      moleculeName,
+      refreshCategory: (catId: CategoryId) => {
+        void loadCategory(catId, { force: true, refresh: true })
+      },
+      loadingCategories,
+      categoryTraces,
+      getCategoryForPanel: categoryForPanel,
+    }),
+    [cid, moleculeName, loadCategory, loadingCategories, categoryTraces],
+  )
 
   // Sidebar "Refresh" → force re-query all categories (bust server process cache)
   useEffect(() => {
@@ -904,6 +933,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   }
 
   return (
+    <ProfilePanelProvider value={panelContextValue}>
     <div className="relative">
       {showLoadingOverlay && (
         <LoadingOverlay categoryStatus={categoryStatus} dataCounts={dataCounts} />
@@ -1187,5 +1217,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           </a>
         )}
     </div>
+    </ProfilePanelProvider>
   )
 }

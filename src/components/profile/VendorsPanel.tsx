@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { PanelApiDetailModal } from '@/components/ui/PanelApiDetailModal'
+import type { CategoryApiTrace } from '@/lib/panelApiTrace'
 
 interface VendorResult {
   name: string
@@ -21,28 +23,63 @@ export function VendorsPanel({ cid }: { cid: number }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [showAll, setShowAll] = useState(false)
+  const [detailOpen, setDetailOpen] = useState(false)
+  const [trace, setTrace] = useState<CategoryApiTrace | null>(null)
 
-  useEffect(() => {
-    let cancelled = false
-    async function fetchVendors() {
-      setLoading(true)
-      setError(null)
-      try {
-        const res = await fetch(`/api/molecule/${cid}/vendors`)
-        if (!res.ok) throw new Error(`Failed to fetch vendors (${res.status})`)
-        const json: VendorsData = await res.json()
-        if (!cancelled) setData(json)
-      } catch (err) {
-        if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load vendor data')
-      } finally {
-        if (!cancelled) setLoading(false)
-      }
-    }
-    fetchVendors()
-    return () => {
-      cancelled = true
+  const fetchVendors = useCallback(async (refresh = false) => {
+    setLoading(true)
+    setError(null)
+    const startedAt = new Date().toISOString()
+    const path = `/api/molecule/${cid}/vendors${refresh ? '?refresh=1' : ''}`
+    try {
+      const res = await fetch(path)
+      const finishedAt = new Date().toISOString()
+      if (!res.ok) throw new Error(`Failed to fetch vendors (${res.status})`)
+      const json: VendorsData = await res.json()
+      setData(json)
+      setTrace({
+        categoryId: 'vendors',
+        cid,
+        moleculeName: json.moleculeName,
+        requestPath: path,
+        method: 'GET',
+        startedAt,
+        finishedAt,
+        duration_ms: Date.parse(finishedAt) - Date.parse(startedAt),
+        fromCache: false,
+        forceRefresh: refresh,
+        sources: [
+          {
+            source: 'pubchem-xrefs',
+            status: res.status,
+            loadStatus: 'loaded',
+            duration_ms: Date.parse(finishedAt) - Date.parse(startedAt),
+            has_data: (json.suppliers?.length ?? 0) + (json.databases?.length ?? 0) > 0,
+            endpoint: 'https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/{cid}/xrefs/SourceName/JSON',
+            docs: 'https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest',
+            apiLabel: 'PubChem PUG REST (SourceName + SBURL)',
+            organization: 'NCBI (NIH)',
+          },
+        ],
+        responseSummary: {
+          keys: ['suppliers', 'databases', 'total'],
+          sourceCount: 1,
+          withData: (json.suppliers?.length ?? 0) + (json.databases?.length ?? 0) > 0 ? 1 : 0,
+          empty: 0,
+          errors: 0,
+          timeouts: 0,
+        },
+      })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load vendor data')
+    } finally {
+      setLoading(false)
     }
   }, [cid])
+
+  useEffect(() => {
+    void fetchVendors(false)
+  }, [fetchVendors])
 
   if (loading) {
     return (
@@ -78,13 +115,40 @@ export function VendorsPanel({ cid }: { cid: number }) {
 
   return (
     <div id="suppliers" className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-5 mb-2">
-      <h3 className="text-sm font-semibold text-slate-300 mb-3 flex items-center gap-2">
-        <span>🛒</span> Chemical Suppliers
-        <span className="text-xs text-slate-500 font-normal">
-          ({data.total} sources on PubChem
-          {data.moleculeName ? ` · ${data.moleculeName}` : ''})
-        </span>
-      </h3>
+      <div className="mb-3 flex items-start justify-between gap-2">
+        <h3 className="text-sm font-semibold text-slate-300 flex items-center gap-2">
+          <span>🛒</span> Chemical Suppliers
+          <span className="text-xs text-slate-500 font-normal">
+            ({data.total} sources on PubChem
+            {data.moleculeName ? ` · ${data.moleculeName}` : ''})
+          </span>
+        </h3>
+        <div className="flex items-center gap-1 shrink-0">
+          <button
+            type="button"
+            onClick={() => setDetailOpen(true)}
+            className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-slate-300"
+            title="API request details"
+            aria-label="API details for Chemical Suppliers"
+          >
+            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            onClick={() => void fetchVendors(true)}
+            disabled={loading}
+            className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-amber-300 disabled:opacity-40"
+            title="Refresh suppliers"
+            aria-label="Refresh Chemical Suppliers"
+          >
+            <svg className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-amber-400' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+          </button>
+        </div>
+      </div>
 
       {data.suppliers.length > 0 && (
         <div className="mb-3">
@@ -175,6 +239,13 @@ export function VendorsPanel({ cid }: { cid: number }) {
           not bare vendor homepages. Order status and pricing are not available through PubChem.
         </p>
       </div>
+      <PanelApiDetailModal
+        open={detailOpen}
+        onClose={() => setDetailOpen(false)}
+        panelTitle="Chemical Suppliers"
+        panelId="suppliers"
+        trace={trace}
+      />
     </div>
   )
 }

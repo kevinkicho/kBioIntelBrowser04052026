@@ -4,6 +4,7 @@ import { getCached, setCache } from '@/lib/cache'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
 import { flushApiMetrics, metricsToSourceStatus } from '@/lib/api-tracker'
 import { recordMetric } from '@/lib/analytics/db'
+import { buildCategoryApiTrace } from '@/lib/panelApiTrace'
 
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import { getMoleculeIdentifiers, resolveApiQuery } from '@/lib/resolveApiQuery'
@@ -89,9 +90,37 @@ export async function GET(
   const forceRefresh =
     request.nextUrl.searchParams.get('refresh') === '1' ||
     request.nextUrl.searchParams.get('refresh') === 'true'
+  const requestPath = `/api/molecule/${cid}/category/${categoryId}${request.nextUrl.search || ''}`
+  const startedAt = new Date().toISOString()
   const cached = forceRefresh ? undefined : getCached<Record<string, unknown>>(cacheKey)
   if (cached) {
-    return NextResponse.json(cached)
+    const finishedAt = new Date().toISOString()
+    const existingTrace = cached._apiTrace as ReturnType<typeof buildCategoryApiTrace> | undefined
+    const payload = {
+      ...cached,
+      _apiTrace: existingTrace
+        ? {
+            ...existingTrace,
+            fromCache: true,
+            forceRefresh: false,
+            finishedAt,
+            // Keep original source metrics; note cache hit at category level
+            requestPath,
+          }
+        : buildCategoryApiTrace({
+            categoryId,
+            cid,
+            moleculeName: name,
+            requestPath,
+            startedAt,
+            finishedAt,
+            fromCache: true,
+            forceRefresh: false,
+            metrics: [],
+            dataKeys: Object.keys(cached),
+          }),
+    }
+    return NextResponse.json(payload)
   }
 
   const categoryTimeout = getCategoryTimeout(categoryId)
@@ -160,10 +189,33 @@ export async function GET(
     }, { status: 500 })
   }
 
+  const finishedAt = new Date().toISOString()
+  // sourceStatus already built from flushApiMetrics() in try block
+  const metricsForTrace = Object.entries(sourceStatus).map(([source, v]) => ({
+    source,
+    status: v.status === 'timeout' ? 408 : v.status === 'error' ? 500 : v.status === 'disabled' ? 503 : 200,
+    duration_ms: v.duration_ms ?? 0,
+    error: v.error,
+    has_data: v.has_data,
+    loadStatus: v.status,
+  }))
+
   // Attach per-source status for UI honesty (data vs empty vs timeout vs error vs disabled)
   const payload = {
     ...data,
     _sourceStatus: sourceStatus,
+    _apiTrace: buildCategoryApiTrace({
+      categoryId,
+      cid,
+      moleculeName: name,
+      requestPath,
+      startedAt,
+      finishedAt,
+      fromCache: false,
+      forceRefresh,
+      metrics: metricsForTrace,
+      dataKeys: Object.keys(data ?? {}),
+    }),
     _identifiers: identifiers
       ? {
           cid: identifiers.cid,
