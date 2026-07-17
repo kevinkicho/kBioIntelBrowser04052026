@@ -108,9 +108,9 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
               : 'Not configured'
 
   return (
-    <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 sm:p-6">
+    <div className="fixed inset-0 z-[60] flex items-end justify-center overflow-y-auto p-0 sm:items-center sm:p-4">
       <div
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden
       />
@@ -118,9 +118,10 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="ai-config-title"
-        className="relative w-full max-w-lg overflow-hidden rounded-2xl border border-slate-700/60 bg-[#0f1117] shadow-2xl shadow-black/50"
+        className="relative z-[1] flex w-full max-w-lg max-h-[min(100dvh,100vh)] sm:max-h-[min(100dvh-2rem,100vh-2rem)] flex-col overflow-hidden rounded-t-2xl border border-slate-700/60 bg-[#0f1117] shadow-2xl shadow-black/50 sm:my-auto sm:rounded-2xl"
       >
-        <div className="flex items-center justify-between border-b border-slate-800/60 bg-slate-900/40 px-5 py-3.5">
+        {/* Sticky header so close stays reachable when body scrolls */}
+        <div className="flex shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-900/95 px-5 py-3.5 backdrop-blur-sm">
           <h2 id="ai-config-title" className="text-base font-semibold text-slate-100">
             Configure AI
           </h2>
@@ -140,7 +141,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           </button>
         </div>
 
-        <div className="max-h-[min(70vh,32rem)] space-y-4 overflow-y-auto p-5">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           <div>
             <p className="text-xs text-slate-400">
               <strong className="text-slate-300">Hosted site:</strong> use{' '}
