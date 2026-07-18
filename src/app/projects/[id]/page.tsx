@@ -15,6 +15,7 @@ import {
   harvestTimingIsBoardPromote,
   deleteEmptyClaimResearchHypotheses,
   deleteResearchHypothesis,
+  generateAndSavePromotedResearchHypothesis,
   listResearchHypothesesForProject,
   projectExportFilename,
   removeCandidateFromProject,
@@ -25,17 +26,15 @@ import {
   saveResearchHypothesis,
   seedResearchHypothesisFromPack,
   seedRhFromPaste,
-  seedRhFromPromoted,
-  seedRhFromTemplate,
   setBoardStatusAndSave,
-  type RhTemplateId,
 } from '@/lib/project'
+import { useAI } from '@/lib/ai/useAI'
+import { emitProductEvent } from '@/lib/productEvents'
 import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
 import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
-import { emitProductEvent } from '@/lib/productEvents'
 import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
@@ -51,6 +50,7 @@ const STATUS_STYLES: Record<BoardStatus, string> = {
 export default function ProjectBoardPage() {
   const params = useParams()
   const id = typeof params?.id === 'string' ? params.id : Array.isArray(params?.id) ? params.id[0] : ''
+  const ai = useAI()
   const [project, setProject] = useState<Project | null | undefined>(undefined)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [signalRows, setSignalRows] = useState<CandidateSignalRow[] | null>(null)
@@ -59,6 +59,7 @@ export default function ProjectBoardPage() {
   const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([])
   const [pasteThesis, setPasteThesis] = useState('')
   const [showPaste, setShowPaste] = useState(false)
+  const [promotedRhBusy, setPromotedRhBusy] = useState(false)
   const [harvestingIds, setHarvestingIds] = useState<string[]>([])
   const [harvestBusy, setHarvestBusy] = useState(false)
   const [boardPanels, setBoardPanels] = useState<CorePanelEvidenceInput>({})
@@ -654,90 +655,85 @@ export default function ProjectBoardPage() {
             exports.
           </p>
 
-          {/* Guided path chooser */}
+          {/* Start RH — pack seed (best) or AI from promoted board claims */}
           <div
             className="rounded-xl border border-slate-800 bg-slate-900/40 p-3"
             data-testid="rh-path-chooser"
           >
             <p className="text-[11px] font-medium text-slate-300">Start a hypothesis</p>
+            <p className="mt-1 text-[10px] text-slate-500 leading-relaxed">
+              Prefer <strong className="font-medium text-slate-400">Seed research hypothesis</strong> on
+              a downloaded pack above. Or generate a claim-bound thesis from{' '}
+              <strong className="font-medium text-slate-400">promoted</strong> board candidates using
+              RH AI (Ollama Cloud) grounded in Core-panel claims — not boilerplate templates.
+            </p>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
                 data-testid="rh-seed-promoted"
-                className="rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-2.5 py-1.5 text-[10px] text-emerald-200 hover:bg-emerald-900/40"
+                disabled={promotedRhBusy || panelsLoading}
+                className="rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-2.5 py-1.5 text-[10px] text-emerald-200 hover:bg-emerald-900/40 disabled:opacity-50"
                 onClick={() => {
-                  const promoted = project.candidates.filter((c) => c.boardStatus === 'promote')
-                  if (promoted.length === 0) {
-                    showBanner('err', 'Promote at least one board candidate first.')
-                    return
-                  }
-                  const pack = project.packIndex?.[0]
-                  const hyp = seedRhFromPromoted({
-                    projectId: project.id,
-                    project,
-                    claimIds: pack?.claimIds ?? [],
-                    packId: pack?.id,
-                  })
-                  const saved = saveResearchHypothesis(hyp)
-                  if (!saved.ok) {
-                    showBanner('err', saved.message)
-                    return
-                  }
-                  refresh()
-                  showBanner('ok', `Seeded from ${promoted.length} promoted candidate(s)`)
+                  void (async () => {
+                    const promoted = project.candidates.filter((c) => c.boardStatus === 'promote')
+                    if (promoted.length === 0) {
+                      showBanner('err', 'Promote at least one board candidate first.')
+                      return
+                    }
+                    if (!ai.hasUserApiKey || !ai.model) {
+                      showBanner(
+                        'err',
+                        'Connect Ollama Cloud (top-bar AI) and pick a model. Promoted RH seed is claim-bound live AI — not a static template.',
+                      )
+                      return
+                    }
+                    if (boardClaims.length < 3 && !panelsLoading) {
+                      showBanner(
+                        'err',
+                        `Need board evidence claims first (have ${boardClaims.length}). Wait for Core panels, or download an evidence pack, then retry.`,
+                      )
+                      return
+                    }
+                    setPromotedRhBusy(true)
+                    try {
+                      const pack = project.packIndex?.[0]
+                      const res = await generateAndSavePromotedResearchHypothesis({
+                        project,
+                        boardClaims,
+                        packId: pack?.id,
+                        packClaimIds: pack?.claimIds,
+                        model: ai.model,
+                        ollamaUrl: ai.ollamaUrl,
+                        ollamaApiKey: ai.ollamaApiKey,
+                      })
+                      emitProductEvent('ai_response', {
+                        mode: 'rh_thesis_draft',
+                        ok: res.ok,
+                        refused: Boolean(res.refused),
+                        claimCount: res.claimCount,
+                        surface: 'promoted_rh_seed',
+                      })
+                      if (!res.ok) {
+                        showBanner('err', res.error ?? 'Promoted RH AI failed')
+                        return
+                      }
+                      refresh()
+                      showBanner(
+                        'ok',
+                        `AI thesis saved for ${promoted.length} promoted candidate(s) · ${res.claimCount} claims · open Edit to refine`,
+                      )
+                    } finally {
+                      setPromotedRhBusy(false)
+                    }
+                  })()
                 }}
               >
-                From promoted candidates
+                {promotedRhBusy
+                  ? 'Generating claim-bound thesis…'
+                  : panelsLoading
+                    ? 'Loading board claims…'
+                    : 'From promoted candidates (AI)'}
               </button>
-              {(
-                [
-                  ['repurposing', 'Scaffold: repurposing'],
-                  ['target-validation', 'Scaffold: target validation'],
-                  ['safety-first-kill', 'Scaffold: safety-first'],
-                ] as [RhTemplateId, string][]
-              ).map(([tid, label]) => (
-                <button
-                  key={tid}
-                  type="button"
-                  data-testid={`rh-template-${tid}`}
-                  title="Creates a draft outline only. Prefer Seed from a downloaded pack for claim-bound AI."
-                  className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] text-slate-300 hover:border-indigo-700/50 hover:text-indigo-200"
-                  onClick={() => {
-                    const pack = project.packIndex?.[0]
-                    const nClaims = pack?.claimIds?.length ?? 0
-                    if (
-                      !window.confirm(
-                        nClaims
-                          ? `Create ${label} draft? It will attach ${nClaims} claim id(s) from your latest pack index.`
-                          : `Create ${label} draft?\n\nWarning: no pack index yet — this will be a 0-claim scaffold (not real evidence). Download an evidence pack first for claim-bound work.`,
-                      )
-                    ) {
-                      return
-                    }
-                    const hyp = seedRhFromTemplate({
-                      projectId: project.id,
-                      templateId: tid,
-                      project,
-                      claimIds: pack?.claimIds ?? [],
-                      packId: pack?.id,
-                    })
-                    const saved = saveResearchHypothesis(hyp)
-                    if (!saved.ok) {
-                      showBanner('err', saved.message)
-                      return
-                    }
-                    refresh()
-                    showBanner(
-                      'ok',
-                      nClaims
-                        ? `Created ${label} with ${nClaims} claim id(s)`
-                        : `Created ${label} scaffold (0 claims — download a pack to bind evidence)`,
-                    )
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
               <button
                 type="button"
                 data-testid="rh-paste-toggle"
@@ -749,12 +745,14 @@ export default function ProjectBoardPage() {
             </div>
             {project.packIndex?.length ? (
               <p className="mt-2 text-[10px] text-slate-600">
-                Or use <strong className="font-medium text-slate-400">Seed research hypothesis</strong>{' '}
-                on a pack index entry above (best claim binding).
+                Pack index ready — use{' '}
+                <strong className="font-medium text-slate-400">Seed research hypothesis</strong> on a
+                pack entry above for the strongest claim binding.
               </p>
             ) : (
               <p className="mt-2 text-[10px] text-amber-500/80">
-                No pack index yet — download an evidence pack so claim ids can bind AI modes.
+                No pack index yet — download an evidence pack (or wait for board claims) so AI can
+                cite real evidence.
               </p>
             )}
             {showPaste && (
@@ -763,7 +761,7 @@ export default function ProjectBoardPage() {
                   value={pasteThesis}
                   onChange={(e) => setPasteThesis(e.target.value)}
                   rows={4}
-                  placeholder="Paste a draft thesis. Later: open the editor and run adversarial review / thesis draft to bind claims."
+                  placeholder="Paste your own thesis (your words). Prefer pack seed or promoted AI when you want claim-bound structure."
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200"
                 />
                 <button
@@ -775,7 +773,10 @@ export default function ProjectBoardPage() {
                       projectId: project.id,
                       project,
                       thesis: pasteThesis,
-                      claimIds: project.packIndex?.[0]?.claimIds ?? [],
+                      claimIds:
+                        boardClaims.length > 0
+                          ? boardClaims.map((c) => c.id).slice(0, 50)
+                          : project.packIndex?.[0]?.claimIds ?? [],
                     })
                     const saved = saveResearchHypothesis(hyp)
                     if (!saved.ok) {
@@ -785,7 +786,7 @@ export default function ProjectBoardPage() {
                     setPasteThesis('')
                     setShowPaste(false)
                     refresh()
-                    showBanner('ok', 'Saved pasted draft — open editor to claim-bind with RH AI')
+                    showBanner('ok', 'Saved your draft thesis')
                   }}
                 >
                   Save draft hypothesis
@@ -801,7 +802,7 @@ export default function ProjectBoardPage() {
             >
               <p className="text-[11px] text-amber-200/90">
                 {hypotheses.filter((h) => !h.claimIds?.length).length} draft(s) have{' '}
-                <strong>0 claims</strong> (template scaffolds, not pack-bound evidence).
+                <strong>0 claims</strong> (not evidence-bound — safe to remove).
               </p>
               <button
                 type="button"
@@ -855,7 +856,7 @@ export default function ProjectBoardPage() {
                         </span>
                         {emptyClaims && (
                           <span className="rounded border border-amber-800/40 px-1.5 py-0.5 text-[9px] text-amber-300/90">
-                            scaffold · no claims
+                            no claims
                           </span>
                         )}
                         {h.role && h.role !== 'primary' && (

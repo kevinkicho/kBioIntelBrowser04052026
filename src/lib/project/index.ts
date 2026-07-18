@@ -71,9 +71,6 @@ export {
   RH_STATUS_STYLES,
   buildEvidenceGapMap,
   buildMechanismStoryboard,
-  rhTemplateThesis,
-  seedRhFromTemplate,
-  seedRhFromPromoted,
   seedRhFromPaste,
   sectionsToThesis,
   researchHypothesisToLabMeetingMd,
@@ -83,8 +80,17 @@ export {
   type EvidenceGapItem,
   type StoryboardNode,
   type StoryboardEdge,
-  type RhTemplateId,
 } from './rhHelpers'
+
+export {
+  promotedCandidates,
+  selectClaimsForPromoted,
+  buildPromotedHypothesisShell,
+  applyRhAiInsightToHypothesis,
+  generateAndSavePromotedResearchHypothesis,
+  type GeneratePromotedRhInput,
+  type GeneratePromotedRhResult,
+} from './rhAiSeed'
 
 export {
   signalTouchesThesis,

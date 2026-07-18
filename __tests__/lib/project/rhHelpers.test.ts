@@ -1,11 +1,9 @@
 import {
   buildEvidenceGapMap,
   buildMechanismStoryboard,
-  rhTemplateThesis,
   sectionsToThesis,
   researchHypothesisToLabMeetingMd,
-  seedRhFromTemplate,
-  seedRhFromPromoted,
+  seedRhFromPaste,
 } from '@/lib/project/rhHelpers'
 import { createProject } from '@/lib/project/store'
 import type { EvidenceClaim, MoleculeCandidate } from '@/lib/domain'
@@ -77,50 +75,18 @@ describe('buildMechanismStoryboard', () => {
   })
 })
 
-describe('templates and seeds', () => {
-  it('rhTemplateThesis repurposing includes working claim', () => {
-    const t = rhTemplateThesis('repurposing', {
-      diseaseName: 'T2D',
-      candidateName: 'Aspirin',
-      targetSymbol: 'PTGS1',
-    })
-    expect(t.thesis).toContain('Aspirin')
-    expect(t.sections?.workingClaim).toBeTruthy()
-  })
-
-  it('seedRhFromPromoted uses promote board status', () => {
-    const project = createProject({
-      name: 'P',
-      disease: {
-        id: 'd1',
-        idNamespace: 'name',
-        name: 'pain',
-        synonyms: [],
-        therapeuticAreas: [],
-        xrefs: [],
-        identityTrust: 'medium',
-      },
-    })
-    project.candidates = [cand('A', 'promote'), cand('B', 'hold')]
-    const hyp = seedRhFromPromoted({ projectId: project.id, project })
-    expect(hyp.candidateIds).toEqual(['ch:A'])
-    expect(hyp.status).toBe('draft')
-  })
-
-  it('seedRhFromTemplate sets sections', () => {
+describe('seedRhFromPaste / sections / export', () => {
+  it('seedRhFromPaste stores user thesis as-is', () => {
     const project = createProject({ name: 'P' })
-    project.candidates = [cand('Aspirin', 'promote')]
-    project.targetIds = ['PTGS1']
-    const hyp = seedRhFromTemplate({
+    const hyp = seedRhFromPaste({
       projectId: project.id,
-      templateId: 'safety-first-kill',
       project,
+      thesis: 'My real working claim about candidate X.',
     })
-    expect(hyp.sections?.killCriteria?.length).toBeGreaterThan(0)
+    expect(hyp.thesis).toContain('My real working claim')
+    expect(hyp.title).toMatch(/Pasted|draft/i)
   })
-})
 
-describe('sectionsToThesis / export', () => {
   it('sectionsToThesis formats blocks', () => {
     const t = sectionsToThesis({
       workingClaim: 'X modulates Y',
