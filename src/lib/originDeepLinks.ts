@@ -1,5 +1,6 @@
 /**
- * Deep links for Discover/board origin chips → source search or record pages.
+ * Deep links for Discover/board origin chips and Evidence Pack chips
+ * → source search or record pages.
  * Prefer molecule-specific URLs (CID / name / ChEMBL) over bare homepages.
  */
 
@@ -23,6 +24,14 @@ export interface OriginDeepLink {
   href: string | null
   /** Tooltip */
   title: string
+}
+
+/** Minimal disease shape for pack/board disease chips. */
+export interface DiseaseLinkInput {
+  name?: string | null
+  id?: string | null
+  idNamespace?: string | null
+  xrefs?: Array<{ system: string; id: string }> | null
 }
 
 function enc(s: string): string {
@@ -318,4 +327,184 @@ export function originSourceDeepLink(
     href: null,
     title: `${label} — no molecule context for a deep link`,
   }
+}
+
+/**
+ * Deep link for a disease chip (pack header / project disease).
+ * Prefers Open Targets disease page when an EFO/OT id is available.
+ */
+export function diseaseDeepLink(disease: DiseaseLinkInput): OriginDeepLink {
+  const name = disease.name?.trim() || ''
+  const label = name || disease.id?.trim() || 'disease'
+  const ns = (disease.idNamespace || '').toLowerCase()
+  const id = disease.id?.trim() || ''
+
+  const otXref = disease.xrefs?.find(
+    (x) =>
+      x.system &&
+      x.id &&
+      ['ot', 'efo', 'mondo', 'open targets', 'opentargets'].includes(x.system.toLowerCase()),
+  )
+  const otId =
+    otXref?.id ||
+    (ns === 'ot' || ns === 'efo' || ns === 'mondo' ? id : null) ||
+    (id && /^(EFO|MONDO|Orphanet|OTAR)[_:]/i.test(id) ? id : null)
+
+  if (otId) {
+    return {
+      label,
+      href: `https://platform.opentargets.org/disease/${enc(otId)}`,
+      title: `Open Targets disease: ${otId}`,
+    }
+  }
+
+  if (ns === 'orphanet' && id) {
+    return {
+      label,
+      href: `https://www.orpha.net/en/disease/list/name/${enc(id)}`,
+      title: `Orphanet: ${id}`,
+    }
+  }
+
+  if (name) {
+    return {
+      label,
+      href: `https://platform.opentargets.org/search?q=${enc(name)}&page=1`,
+      title: `Open Targets search: ${name}`,
+    }
+  }
+
+  return {
+    label,
+    href: null,
+    title: 'No disease context for a deep link',
+  }
+}
+
+/**
+ * Deep link for EvidenceClaimType chips in pack view.
+ * Routes each facet to a representative free public source search/page.
+ */
+export function claimTypeDeepLink(
+  claimType: string,
+  ctx: OriginLinkContext = {},
+): OriginDeepLink {
+  const type = claimType.trim().toLowerCase()
+  const label = claimType
+  const name = ctx.name?.trim() || ''
+  const disease = ctx.diseaseName?.trim() || ''
+  const gene = ctx.geneSymbol?.trim() || ''
+  const cid = ctx.cid != null && ctx.cid > 0 ? ctx.cid : null
+
+  switch (type) {
+    case 'binds-target':
+    case 'mechanism': {
+      const chembl = chemblSearch(ctx)
+      if (chembl) {
+        return {
+          label,
+          href: chembl,
+          title: `ChEMBL (${type}): ${name || ctx.chemblId || cid || 'search'}`,
+        }
+      }
+      break
+    }
+    case 'trial': {
+      const term = [name, disease].filter(Boolean).join(' ')
+      if (term) {
+        return {
+          label,
+          href: `https://clinicaltrials.gov/search?term=${enc(term)}&aggFilters=status:rec%20act%20not`,
+          title: `ClinicalTrials.gov: ${term}`,
+        }
+      }
+      return {
+        label,
+        href: 'https://clinicaltrials.gov/',
+        title: 'ClinicalTrials.gov',
+      }
+    }
+    case 'safety': {
+      if (name) {
+        return {
+          label,
+          href: `https://dailymed.nlm.nih.gov/dailymed/search.cfm?labeltype=all&query=${enc(name)}`,
+          title: `DailyMed / labels: ${name}`,
+        }
+      }
+      break
+    }
+    case 'indicated-for': {
+      const term = disease || name
+      if (term) {
+        return {
+          label,
+          href: `https://platform.opentargets.org/search?q=${enc(term)}&page=1`,
+          title: `Open Targets: ${term}`,
+        }
+      }
+      break
+    }
+    case 'literature': {
+      const term = [name, disease, gene].filter(Boolean).join(' ')
+      if (term) {
+        return {
+          label,
+          href: `https://europepmc.org/search?query=${enc(term)}`,
+          title: `Europe PMC: ${term}`,
+        }
+      }
+      break
+    }
+    case 'property':
+    case 'other': {
+      if (cid) {
+        return {
+          label,
+          href: `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`,
+          title: `PubChem CID ${cid}`,
+        }
+      }
+      if (name) {
+        return {
+          label,
+          href: `https://pubchem.ncbi.nlm.nih.gov/#query=${enc(name)}`,
+          title: `PubChem search: ${name}`,
+        }
+      }
+      break
+    }
+    default:
+      break
+  }
+
+  // Fallback: reuse source mapper with claim type as a soft key
+  const viaSource = originSourceDeepLink(claimType, ctx)
+  if (viaSource.href) {
+    return { label, href: viaSource.href, title: viaSource.title }
+  }
+
+  return {
+    label,
+    href: null,
+    title: `${label} — no context for a deep link`,
+  }
+}
+
+/**
+ * Prefer explicit claim provenance URL; otherwise map provenance.source via origin mapper.
+ */
+export function claimProvenanceDeepLink(
+  provenance: { source: string; sourceUrl?: string | null },
+  ctx: OriginLinkContext = {},
+): OriginDeepLink {
+  const label = provenance.source
+  if (provenance.sourceUrl?.trim()) {
+    return {
+      label,
+      href: provenance.sourceUrl.trim(),
+      title: `Open source: ${label}`,
+    }
+  }
+  return originSourceDeepLink(provenance.source, ctx)
 }

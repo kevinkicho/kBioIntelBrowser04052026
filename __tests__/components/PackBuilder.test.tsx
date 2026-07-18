@@ -28,6 +28,10 @@ jest.mock('@/lib/evidence/packIndex', () => ({
   })),
 }))
 
+jest.mock('@/components/evidence/PackAiPanel', () => ({
+  PackAiPanel: () => null,
+}))
+
 describe('PackView', () => {
   it('renders pack title and claim count', () => {
     const pack = buildEvidencePack({
@@ -41,6 +45,83 @@ describe('PackView', () => {
     expect(screen.getByTestId('pack-view')).toBeInTheDocument()
     expect(screen.getByText('View me')).toBeInTheDocument()
     expect(screen.getByText(/9\/200 claims/)).toBeInTheDocument()
+  })
+
+  it('deep-links source, disease, and claim-type chips', () => {
+    const pack = buildEvidencePack({
+      title: 'Linked pack',
+      panels: FIXTURE_CORE_PANELS,
+      extractOptions: FIXTURE_CTX,
+      id: 'pack_links',
+      createdAt: FIXTURE_CTX.retrievedAt,
+      disease: {
+        id: 'EFO_0001360',
+        idNamespace: 'efo',
+        name: 'type 2 diabetes mellitus',
+        synonyms: [],
+        therapeuticAreas: [],
+        xrefs: [],
+        identityTrust: 'medium',
+      },
+      candidates: [
+        {
+          candidateId: 'ch:CHEMBL25',
+          identity: {
+            name: 'Aspirin',
+            pubchemCid: 2244,
+            chemblId: 'CHEMBL25',
+            synonyms: [],
+            identityTrust: 'high',
+          },
+          origins: ['chembl-activity'],
+          evidenceBreadthSources: ['ChEMBL'],
+          links: [],
+        },
+      ],
+    })
+    render(<PackView pack={pack} />)
+
+    const disease = screen.getByTestId('pack-disease-chip')
+    expect(disease.tagName).toBe('A')
+    expect(disease).toHaveAttribute(
+      'href',
+      expect.stringContaining('platform.opentargets.org/disease/'),
+    )
+
+    const sourceChips = screen.getAllByTestId('pack-source-chip')
+    expect(sourceChips.length).toBeGreaterThan(0)
+    expect(sourceChips.some((el) => el.tagName === 'A' && el.getAttribute('href'))).toBe(true)
+
+    const typeChips = screen.getAllByTestId('pack-claim-type-chip')
+    expect(typeChips.length).toBeGreaterThan(0)
+    expect(typeChips.some((el) => el.tagName === 'A' && el.getAttribute('href'))).toBe(true)
+  })
+
+  it('compact mode deep-links claim-type summary chips', () => {
+    const pack = buildEvidencePack({
+      title: 'Compact',
+      panels: FIXTURE_CORE_PANELS,
+      extractOptions: FIXTURE_CTX,
+      candidates: [
+        {
+          candidateId: 'ch:CHEMBL25',
+          identity: {
+            name: 'Aspirin',
+            pubchemCid: 2244,
+            chemblId: 'CHEMBL25',
+            synonyms: [],
+            identityTrust: 'high',
+          },
+          origins: [],
+          evidenceBreadthSources: [],
+          links: [],
+        },
+      ],
+    })
+    render(<PackView pack={pack} compact />)
+    const chips = screen.getAllByTestId('pack-claim-type-summary-chip')
+    expect(chips.length).toBeGreaterThan(0)
+    expect(chips.some((el) => el.tagName === 'A')).toBe(true)
   })
 })
 
