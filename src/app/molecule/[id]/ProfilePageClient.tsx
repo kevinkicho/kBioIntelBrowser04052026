@@ -184,6 +184,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const projectParam = searchParams.get('project')
   const rankParam = parseInt(searchParams.get('rank') ?? '0', 10) || 0
   const pendingRef = useRef<Set<CategoryId>>(new Set())
+  /** In-place re-fetch: keep panels mounted (no skeleton) so scroll position stays put. */
+  const softRefreshingRef = useRef<Set<CategoryId>>(new Set())
+  const [softRefreshTick, setSoftRefreshTick] = useState(0)
 
   const apiOverrides = useMemo<Record<string, ApiIdentifierType>>(() => {
     try {
@@ -263,6 +266,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     })
   }, [cid, moleculeName, isEmbed])
 
+  // Full-page busy only for cold loads (skeleton path) — not soft card refresh
   const isBusy = useMemo(() =>
     ALL_CATEGORY_IDS.some(id => categoryStatus[id] === 'loading'),
     [categoryStatus]
@@ -352,6 +356,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     const cur = categoryStatusRef.current[catId]
     if (!opts?.force && !opts?.refresh && (cur === 'loaded' || cur === 'loading')) return
     const doRefresh = opts?.refresh || forceRefresh
+    /**
+     * Soft refresh: re-hit API while keeping status `loaded` so panels stay mounted.
+     * Avoids skeleton collapse + scroll jump when user clicks “Refresh this card”.
+     */
+    const softRefresh = Boolean(doRefresh && cur === 'loaded')
 
     // Phase A.1: sync L1 hit → no loading flash / overlay
     if (!doRefresh) {
@@ -374,7 +383,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
 
     pendingRef.current.add(catId)
-    setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
+    const scrollY =
+      typeof window !== 'undefined' && softRefresh ? window.scrollY : null
+    if (softRefresh) {
+      softRefreshingRef.current.add(catId)
+      setSoftRefreshTick((n) => n + 1)
+    } else {
+      setCategoryStatus(prev => ({ ...prev, [catId]: 'loading' }))
+    }
     try {
       const data = await fetchCategoryData(cid, catId, apiOverrides, apiParams, {
         refresh: doRefresh,
@@ -393,10 +409,25 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load category'
-      setCategoryStatus(prev => ({ ...prev, [catId]: 'error' }))
-      setCategoryErrors(prev => ({ ...prev, [catId]: msg }))
+      // Soft refresh failure: keep previous data mounted; only surface error if we had no data
+      if (!softRefresh) {
+        setCategoryStatus(prev => ({ ...prev, [catId]: 'error' }))
+        setCategoryErrors(prev => ({ ...prev, [catId]: msg }))
+      } else {
+        setCategoryErrors(prev => ({ ...prev, [catId]: msg }))
+      }
     } finally {
       pendingRef.current.delete(catId)
+      if (softRefresh) {
+        softRefreshingRef.current.delete(catId)
+        setSoftRefreshTick((n) => n + 1)
+        if (scrollY != null && typeof window !== 'undefined') {
+          // Restore exact viewport after any layout from data swap
+          requestAnimationFrame(() => {
+            window.scrollTo({ top: scrollY, left: 0, behavior: 'instant' as ScrollBehavior })
+          })
+        }
+      }
     }
   }, [cid, apiOverrides, apiParams, forceRefresh])
 
@@ -430,15 +461,18 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     const s = new Set<CategoryId>()
     for (const id of ALL_CATEGORY_IDS) {
       if (categoryStatus[id] === 'loading') s.add(id)
+      if (softRefreshingRef.current.has(id)) s.add(id)
     }
     return s
-  }, [categoryStatus])
+    // softRefreshTick forces recompute when soft-refresh set mutates
+  }, [categoryStatus, softRefreshTick])
 
   const panelContextValue = useMemo(
     () => ({
       cid,
       moleculeName,
       refreshCategory: (catId: CategoryId) => {
+        // Soft in-place refresh — keep scroll and existing panels
         void loadCategory(catId, { force: true, refresh: true })
       },
       loadingCategories,
@@ -480,7 +514,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
   }, [loadCategory])
 
-  // After active tab changes, scroll to that section (DOM may not exist until re-render)
+  // After active *tab* changes only — do not re-scroll when a category soft-refreshes
+  // (categoryStatus used to be a dep and jumped the viewport on every card refresh).
   useEffect(() => {
     if (activeCategory === 'all' || isEmbed) return
     let attempts = 0
@@ -494,7 +529,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
     const t = window.setTimeout(tryScroll, 30)
     return () => window.clearTimeout(t)
-  }, [activeCategory, isEmbed, categoryStatus])
+  }, [activeCategory, isEmbed])
 
   /** Scroll to a panel anchor (hash deep-link from board signal badges). */
   const scrollToPanel = useCallback((panelId: string) => {

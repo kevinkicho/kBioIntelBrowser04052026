@@ -192,10 +192,15 @@ export function Panel({
           {onRefresh && (
             <button
               type="button"
-              onClick={() => onRefresh()}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                // Keep focus/scroll where the user is — only re-fetch category data
+                onRefresh()
+              }}
               disabled={Boolean(refreshing)}
               className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-amber-300 transition-colors disabled:opacity-40"
-              title="Refresh this card (re-query category sources)"
+              title="Refresh this card (re-query category sources — stays on this view)"
               aria-label={`Refresh ${title}`}
               data-testid={panelId ? `panel-refresh-${panelId}` : 'panel-refresh'}
             >
