@@ -11,6 +11,7 @@ import type { SectionStatus } from '@/lib/dataStatus'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { DataPoint } from '@/components/ui/DataPoint'
 import type { BgeeExpression, GeneExpression, dbSNPVariant } from '@/lib/types'
+import { BgeeExpressionRow } from '@/components/expression/BgeeExpressionRow'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -315,66 +316,34 @@ function GeneExpressionPanel({
         </div>
       )}
       {bgeeExps && bgeeExps.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">
+        <div className="mb-4" data-testid="gene-bgee-expression">
+          <h3 className="text-sm font-semibold text-slate-200 mb-1">
             Bgee Expression ({bgeeExps.length})
           </h3>
-          <div className="space-y-1.5 max-h-72 overflow-y-auto">
-            {bgeeExps.slice(0, 40).map((e, i) => {
-              const anatId = e.anatomicalEntityId?.replace(/^UBERON_/, 'UBERON:') || ''
-              const recordUrl = e.geneId
-                ? `https://www.bgee.org/gene/${encodeURIComponent(e.geneId)}`
-                : e.geneSymbol
-                  ? `https://www.bgee.org/?page=gene&gene_id=${encodeURIComponent(e.geneSymbol)}`
-                  : 'https://www.bgee.org/'
-              return (
-                <DataPoint
-                  key={`${e.anatomicalEntityId}-${e.developmentalStageId}-${i}`}
-                  sourceKey="bgee"
-                  fetchedAt={fetchedAt}
-                  label={e.anatomicalEntityName || 'Bgee'}
-                  recordUrl={recordUrl}
-                >
-                  <div className="py-1.5 px-2 rounded text-sm">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <span className="text-slate-200 font-medium block truncate">
-                          {e.anatomicalEntityName || '—'}
-                        </span>
-                        {e.developmentalStageName && (
-                          <span className="block text-[10px] text-slate-400 mt-0.5">
-                            Stage: {e.developmentalStageName}
-                          </span>
-                        )}
-                        <span className="block text-[9px] font-mono text-slate-600 mt-0.5 truncate">
-                          {[e.species, anatId, e.geneSymbol].filter(Boolean).join(' · ')}
-                        </span>
-                      </div>
-                      <div className="shrink-0 text-right text-[10px] text-slate-400 space-y-0.5">
-                        {e.expressionLevel && (
-                          <span className="block text-emerald-300/90">{e.expressionLevel}</span>
-                        )}
-                        {typeof e.expressionScore === 'number' && e.expressionScore > 0 && (
-                          <span className="block tabular-nums">score {e.expressionScore.toFixed(2)}</span>
-                        )}
-                        {typeof e.confidenceScore === 'number' && e.confidenceScore > 0 && (
-                          <span className="block tabular-nums text-slate-500">
-                            conf {e.confidenceScore.toFixed(2)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                </DataPoint>
-              )
-            })}
+          <p className="text-[10px] text-slate-600 mb-2">
+            Anatomy · ontology id · stage · presence/score · links (not tissue name alone).
+          </p>
+          <div className="space-y-0 max-h-80 overflow-y-auto rounded-lg border border-slate-700/50 divide-y divide-slate-800/80">
+            {bgeeExps.slice(0, 40).map((e, i) => (
+              <BgeeExpressionRow
+                key={`${e.anatomicalEntityId}-${e.developmentalStageId}-${i}`}
+                expr={e}
+                fetchedAt={fetchedAt}
+                compact
+              />
+            ))}
           </div>
         </div>
       )}
       {atlasData && atlasData.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Expression Atlas ({atlasData.length})</h3>
-          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+        <div data-testid="gene-expression-atlas">
+          <h3 className="text-sm font-semibold text-slate-200 mb-1">
+            Expression Atlas ({atlasData.length})
+          </h3>
+          <p className="text-[10px] text-slate-600 mb-2">
+            Experiment · type · tissue/condition · level when available.
+          </p>
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
             {atlasData.slice(0, 30).map((e, i) => (
               <DataPoint
                 key={i}
@@ -383,12 +352,35 @@ function GeneExpressionPanel({
                 label={e.experimentDescription || e.experimentType || 'Expression Atlas'}
                 recordUrl={e.url}
               >
-                <div className="py-1 px-2 rounded text-sm">
-                  <span className="text-slate-300 line-clamp-2">
+                <div className="py-1.5 px-2 rounded text-sm">
+                  <span className="text-slate-200 font-medium line-clamp-2 block">
                     {e.experimentDescription || e.experimentType || 'Experiment'}
                   </span>
-                  {e.species && (
-                    <span className="block text-[10px] text-slate-500 mt-0.5">{e.species}</span>
+                  <div className="mt-1 flex flex-wrap gap-x-2 gap-y-0.5 text-[10px] text-slate-500">
+                    {e.experimentType && (
+                      <span className="rounded border border-slate-700 px-1 py-0.5 text-slate-400">
+                        {e.experimentType}
+                      </span>
+                    )}
+                    {e.tissueName && <span>Tissue: {e.tissueName}</span>}
+                    {e.condition && <span>Condition: {e.condition}</span>}
+                    {typeof e.expressionLevel === 'number' && Number.isFinite(e.expressionLevel) && (
+                      <span className="tabular-nums text-indigo-300/90">
+                        {e.expressionLevel}
+                        {e.unit ? ` ${e.unit}` : ''}
+                      </span>
+                    )}
+                    {e.species && <span className="text-slate-600">{e.species}</span>}
+                  </div>
+                  {e.url && (
+                    <a
+                      href={e.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="mt-1 inline-block text-[10px] text-indigo-400/90 hover:underline"
+                    >
+                      Open experiment ↗
+                    </a>
                   )}
                 </div>
               </DataPoint>
