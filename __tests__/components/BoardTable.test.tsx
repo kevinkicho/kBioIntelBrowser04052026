@@ -71,8 +71,10 @@ describe('BoardTable', () => {
     expect(screen.getByText('Aspirin')).toBeInTheDocument()
     const badge = screen.getByTestId('identity-trust-badge')
     expect(badge).toHaveAttribute('data-identity-trust', 'high')
+    expect(badge.textContent).not.toMatch(/medium|unresolved|high|low/i)
+    expect(screen.getByTestId('identity-id-cid')).toHaveTextContent('CID 2244')
     expect(screen.getByTestId('alternate-cids').textContent).toMatch(/999/)
-    expect(screen.getByText(/BSYNRYMUTXBXSQ/)).toBeInTheDocument()
+    expect(screen.getByTestId('identity-id-inchikey').textContent).toMatch(/BSYNRYMUTXBXSQ/)
   })
 
   it('calls status and remove handlers', () => {

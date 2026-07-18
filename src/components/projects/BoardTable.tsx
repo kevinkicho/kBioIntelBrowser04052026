@@ -118,19 +118,8 @@ export function BoardTable({
                     <IdentityTrustBadge
                       level={c.identity.identityTrust}
                       keys={identityKeysFromCandidate(c)}
-                      compact
                     />
                   </div>
-                  {cid != null && <div>CID {cid}</div>}
-                  {c.identity.chemblId && <div>{c.identity.chemblId}</div>}
-                  {c.identity.inchiKey && (
-                    <div
-                      className="mt-0.5 max-w-[14rem] truncate font-mono text-[10px] text-slate-600"
-                      title={c.identity.inchiKey}
-                    >
-                      {c.identity.inchiKey}
-                    </div>
-                  )}
                   <AlternateCids
                     primaryCid={cid}
                     alternateCids={c.identity.alternateCids}
