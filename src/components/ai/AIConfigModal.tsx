@@ -1,11 +1,14 @@
 'use client'
 
+/**
+ * Configure AI — Ollama Cloud + user API key only.
+ * No local host/port / 11434 UI.
+ */
+
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { useAI } from '@/lib/ai/useAI'
-import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
 import { maskApiKey } from '@/lib/ai/userApiKey'
-import { canBrowserCallLocalHttp, isLocalOrLanOllamaUrl } from '@/lib/ai/localTransport'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 
 interface AIConfigModalProps {
@@ -13,58 +16,28 @@ interface AIConfigModalProps {
   onClose: () => void
 }
 
-/** Local Ollama form defaults — always port 11434 (Ollama standard). */
-function localFormDefaults(ollamaUrl?: string): { host: string; port: string } {
-  if (ollamaUrl && isLocalOrLanOllamaUrl(ollamaUrl)) {
-    try {
-      const raw = ollamaUrl.includes('://') ? ollamaUrl : `http://${ollamaUrl}`
-      const u = new URL(raw)
-      return {
-        host: u.hostname || '127.0.0.1',
-        // Ollama listens on 11434 when port omitted
-        port: u.port || String(OLLAMA_DEFAULT_PORT),
-      }
-    } catch {
-      /* fall through */
-    }
-  }
-  // Cloud / empty / invalid → local defaults (never ollama.com:11434)
-  return { host: '127.0.0.1', port: String(OLLAMA_DEFAULT_PORT) }
-}
-
-/**
- * Modal for Ollama / Ollama Cloud connection (replaces homepage AIBanner card).
- */
 export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
   const ai = useAI()
   const auth = useFirebaseAuth()
-  const initial = localFormDefaults(ai.ollamaUrl)
-  const [hostInput, setHostInput] = useState(initial.host)
-  const [portInput, setPortInput] = useState(initial.port)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [showApiKey, setShowApiKey] = useState(false)
   const [keySaving, setKeySaving] = useState(false)
   const [keyHint, setKeyHint] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
   const [validationHint, setValidationHint] = useState<string | null>(null)
-  /** Flash animation when connection becomes available */
   const [celebrateConnect, setCelebrateConnect] = useState(false)
   const prevStatusRef = useRef(ai.status)
 
   useEffect(() => {
     if (!isOpen) return
-    const d = localFormDefaults(ai.ollamaUrl)
-    setHostInput(d.host)
-    setPortInput(d.port)
-    // Do not prefill raw key into the input; show blank until user pastes a new one
     setApiKeyInput('')
     setKeyHint(null)
     setShowApiKey(false)
     setCelebrateConnect(false)
+    setValidationHint(null)
     prevStatusRef.current = ai.status
-  }, [isOpen, ai.ollamaUrl])
+  }, [isOpen, ai.status])
 
-  // Celebrate transition → available (fresh connect / reconnect)
   useEffect(() => {
     if (!isOpen) return
     const prev = prevStatusRef.current
@@ -89,71 +62,10 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
     }
   }, [isOpen, onClose])
 
-  const handleConnect = async () => {
-    const hostRaw = hostInput.trim() || '127.0.0.1'
-    // Full URL paste (https tunnel or http://127.0.0.1:11434)
-    let candidate: string
-    if (/^https?:\/\//i.test(hostRaw)) {
-      candidate = hostRaw
-    } else {
-      // Empty / invalid port → Ollama default 11434
-      const trimmedPort = portInput.trim()
-      const portNum = trimmedPort === '' ? OLLAMA_DEFAULT_PORT : parseInt(trimmedPort, 10)
-      const port =
-        isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
-      if (String(port) !== portInput) setPortInput(String(port))
-      candidate = `${hostRaw}:${port}`
-    }
-    const validation = validateOllamaUrl(candidate)
-    if (!validation.valid) {
-      setValidationHint(validation.error || 'Invalid URL')
-      return
-    }
-    const normalized = validation.normalized || candidate
-    // HTTPS hosted: never attempt browser→http://127.0.0.1 (CORS / mixed content)
-    if (isLocalOrLanOllamaUrl(normalized) && !pageAllowsLocalHttp) {
-      setValidationHint(
-        'Cannot use local Ollama from this HTTPS site. Click “Use Cloud” (with API key) or paste an https:// tunnel URL.',
-      )
-      return
-    }
-    if (validation.warning === 'lan-warning') {
-      setValidationHint(
-        'LAN Ollama: browser will call this host directly. Ensure Ollama allows CORS (OLLAMA_ORIGINS=*) on that machine.',
-      )
-    } else {
-      setValidationHint(null)
-    }
-    setConnecting(true)
-    await ai.connect(normalized)
-    setConnecting(false)
-  }
-
-  const handleConnectCloud = async () => {
-    setValidationHint(null)
-    let hasKey = ai.hasUserApiKey
-    // Persist key from input first if user typed one this session
-    if (apiKeyInput.trim()) {
-      setKeySaving(true)
-      await ai.setOllamaApiKey(apiKeyInput.trim())
-      setKeySaving(false)
-      setApiKeyInput('')
-      hasKey = true
-    }
-    if (!hasKey) {
-      setValidationHint(
-        'Paste your Ollama Cloud API key above (from ollama.com), save it, then click Use Cloud. Without a key, the server may use a shared app key if configured.',
-      )
-    }
-    setConnecting(true)
-    await ai.connect('https://ollama.com')
-    setConnecting(false)
-  }
-
   const handleSaveApiKey = async () => {
     const t = apiKeyInput.trim()
     if (!t) {
-      setKeyHint('Paste a non-empty API key')
+      setKeyHint('Paste a non-empty API key from ollama.com')
       return
     }
     setKeySaving(true)
@@ -163,8 +75,8 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       setApiKeyInput('')
       setKeyHint(
         auth.user
-          ? 'Saved under your account (Firestore) and this browser.'
-          : 'Saved in this browser. Sign in to store it under your user in the cloud.',
+          ? 'Saved under your account and this browser.'
+          : 'Saved in this browser. Sign in to store it under your account.',
       )
     } finally {
       setKeySaving(false)
@@ -177,13 +89,35 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
     try {
       await ai.clearOllamaApiKey()
       setApiKeyInput('')
-      setKeyHint('Your Ollama API key was removed from this browser and your cloud settings.')
+      setKeyHint('API key cleared.')
     } finally {
       setKeySaving(false)
     }
   }
 
-  const statusColor =
+  const handleConnect = async () => {
+    setValidationHint(null)
+    // Persist key from input first if user typed one this session
+    if (apiKeyInput.trim()) {
+      setKeySaving(true)
+      await ai.setOllamaApiKey(apiKeyInput.trim())
+      setKeySaving(false)
+      setApiKeyInput('')
+    }
+    if (!ai.hasUserApiKey && !apiKeyInput.trim()) {
+      setValidationHint(
+        'Paste your Ollama Cloud API key above, save it, then connect. Get a key at ollama.com.',
+      )
+      // Still allow connect — server may have app-level OLLAMA_API_KEY
+    }
+    setConnecting(true)
+    await ai.connect()
+    setConnecting(false)
+  }
+
+  if (!isOpen || typeof document === 'undefined') return null
+
+  const statusDot =
     ai.status === 'available'
       ? 'bg-emerald-400'
       : ai.status === 'checking' || ai.status === 'downloading'
@@ -192,12 +126,11 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           ? 'bg-red-400'
           : 'bg-slate-500'
 
-  const pageAllowsLocalHttp = typeof window !== 'undefined' ? canBrowserCallLocalHttp() : true
   const statusLabel =
     ai.status === 'available'
-      ? `Connected to ${ai.ollamaUrl}${ai.transport === 'browser' ? ' · browser' : ai.ollamaUrl.includes('ollama.com') ? ' · cloud' : ''}`
+      ? `Connected to Ollama Cloud${ai.model ? ` · ${ai.model}` : ''}`
       : ai.status === 'checking'
-        ? 'Connecting…'
+        ? 'Connecting to Ollama Cloud…'
         : ai.status === 'downloading'
           ? 'Downloading model…'
           : ai.status === 'unavailable'
@@ -213,31 +146,11 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         ? 'text-red-300'
         : 'text-slate-400'
 
-  const handleConnectLocal = async () => {
-    setValidationHint(null)
-    // HTTPS App Hosting cannot reach the user's PC (mixed content + server isolation).
-    if (!pageAllowsLocalHttp) {
-      setValidationHint(
-        'This site is HTTPS — the browser cannot call http://127.0.0.1:11434. Use “Use Cloud” with your Ollama API key, or paste an https:// tunnel URL. Local 11434 works with npm run dev (http://localhost).',
-      )
-      return
-    }
-    setHostInput('127.0.0.1')
-    setPortInput(String(OLLAMA_DEFAULT_PORT))
-    setConnecting(true)
-    await ai.connect(`127.0.0.1:${OLLAMA_DEFAULT_PORT}`)
-    setConnecting(false)
-  }
-
-  // Portal to body so sticky header z-40 stacking does not bury the overlay
-  if (!isOpen || typeof document === 'undefined') return null
-
   const modal = (
     <div
       className="fixed inset-0 z-[200] flex items-end justify-center sm:items-center p-0 sm:p-4"
       data-testid="ai-config-modal-root"
     >
-      {/* Full-viewport dim + blur; click away closes */}
       <button
         type="button"
         className="absolute inset-0 z-0 cursor-default border-0 bg-slate-950/75 backdrop-blur-md"
@@ -253,7 +166,6 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
       >
-        {/* Sticky header so close stays reachable when body scrolls */}
         <div className="flex shrink-0 items-center justify-between border-b border-slate-800/60 bg-slate-900 px-5 py-3.5">
           <h2 id="ai-config-title" className="text-base font-semibold text-slate-100">
             Configure AI
@@ -276,109 +188,39 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain p-5">
           <div>
-            <p className="text-xs text-slate-400">
-              <strong className="text-slate-300">Your Ollama (this PC):</strong> traffic goes{' '}
-              <em>browser → port {OLLAMA_DEFAULT_PORT}</em> on your machine — not through App Hosting.
-              Default host <code className="rounded bg-slate-800 px-1 text-slate-400">127.0.0.1</code>,
-              port <code className="rounded bg-slate-800 px-1 text-slate-400">{OLLAMA_DEFAULT_PORT}</code>.
+            <p className="text-xs text-slate-400 leading-relaxed">
+              BioIntel uses <strong className="text-slate-300">Ollama Cloud</strong> only. Your
+              browser talks to this site’s server, which calls{' '}
+              <code className="rounded bg-slate-800 px-1 text-slate-400">ollama.com</code> with{' '}
+              <strong className="text-slate-300">your API key</strong>. Local Ollama (port 11434)
+              is not configured in this app.
             </p>
-            {pageAllowsLocalHttp ? (
-              <p className="mt-1.5 text-xs text-slate-500 leading-relaxed">
-                If Connect fails, allow CORS:{' '}
-                <code className="text-slate-400">$env:OLLAMA_ORIGINS=&quot;*&quot;; ollama serve</code>
-              </p>
-            ) : (
-              <p className="mt-1.5 text-xs text-amber-400/90 leading-relaxed">
-                This page is <strong>HTTPS</strong>, so the browser blocks plain{' '}
-                <code className="text-amber-200">http://127.0.0.1:{OLLAMA_DEFAULT_PORT}</code> (mixed
-                content). On this hosted site use <strong>Ollama Cloud + your API key</strong>, or paste an{' '}
-                <code className="text-amber-200">https://</code> tunnel URL that points at your{' '}
-                {OLLAMA_DEFAULT_PORT} Ollama (host field accepts full https:// URLs). CORS:{' '}
-                <code className="text-amber-200">OLLAMA_ORIGINS=*</code>.
-              </p>
-            )}
           </div>
 
-          {ai.status === 'available' ? (
-            <div
-              role="status"
-              aria-live="polite"
-              data-testid="ai-connected-banner"
-              className={`relative overflow-hidden rounded-xl border px-3.5 py-3 transition-all duration-500 ${
-                celebrateConnect
-                  ? 'border-emerald-400/70 bg-gradient-to-r from-emerald-950/90 via-emerald-900/50 to-emerald-950/80 shadow-lg shadow-emerald-500/25 ring-2 ring-emerald-400/40 scale-[1.02]'
-                  : 'border-emerald-800/50 bg-emerald-950/40 shadow-md shadow-emerald-900/20'
-              }`}
-            >
-              {celebrateConnect && (
-                <span
-                  className="pointer-events-none absolute inset-0 animate-pulse bg-emerald-400/10"
-                  aria-hidden
-                />
+          <div
+            className={`flex items-center gap-2 rounded-lg border px-3 py-2 ${
+              celebrateConnect
+                ? 'border-emerald-600/50 bg-emerald-950/30'
+                : 'border-slate-800 bg-slate-900/50'
+            }`}
+          >
+            <span className={`h-2 w-2 shrink-0 rounded-full ${statusDot}`} aria-hidden />
+            <div className="min-w-0 flex-1">
+              <p className={`text-xs font-medium ${statusTextClass}`}>{statusLabel}</p>
+              {ai.statusNote && (
+                <p className="text-[10px] text-slate-500 mt-0.5">{ai.statusNote}</p>
               )}
-              <div className="relative flex items-start gap-3">
-                <span className="relative mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center">
-                  <span
-                    className={`absolute inline-flex h-full w-full rounded-full bg-emerald-400/40 ${
-                      celebrateConnect ? 'animate-ping' : ''
-                    }`}
-                    aria-hidden
-                  />
-                  <span className="relative flex h-5 w-5 items-center justify-center rounded-full bg-emerald-500 text-white shadow-sm shadow-emerald-500/50">
-                    <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                    </svg>
-                  </span>
-                </span>
-                <div className="min-w-0 flex-1">
-                  <p
-                    className={`text-sm font-semibold tracking-tight text-emerald-200 ${
-                      celebrateConnect ? 'animate-[pulse_1.2s_ease-in-out_2]' : ''
-                    }`}
-                  >
-                    Connected
-                  </p>
-                  <p className="mt-0.5 truncate font-mono text-[11px] text-emerald-300/80" title={ai.ollamaUrl}>
-                    {statusLabel.replace(/^Connected to /, '')}
-                  </p>
-                  {ai.statusNote && (
-                    <p
-                      className={`mt-1.5 text-xs font-medium text-emerald-300 ${
-                        celebrateConnect ? 'animate-[pulse_1.2s_ease-in-out_2]' : ''
-                      }`}
-                      data-testid="ai-status-note"
-                    >
-                      {ai.statusNote}
-                    </p>
-                  )}
-                  {ai.model && (
-                    <p className="mt-1 text-[10px] text-emerald-500/80">
-                      Model: <span className="font-mono text-emerald-400/90">{ai.model}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
+              {ai.error && ai.status !== 'available' && (
+                <p className="text-[10px] text-red-400/90 mt-0.5 leading-relaxed">{ai.error}</p>
+              )}
             </div>
-          ) : (
-            <div className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2">
-              <span className={`h-2 w-2 shrink-0 rounded-full ${statusColor}`} />
-              <span className={`truncate text-[11px] ${statusTextClass}`}>{statusLabel}</span>
-            </div>
-          )}
+          </div>
 
-          {/* Per-user Ollama Cloud API key */}
-          <div className="rounded-lg border border-cyan-900/40 bg-cyan-950/20 p-3 space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[10px] font-semibold uppercase tracking-wider text-cyan-300/90">
-                Your Ollama Cloud API key
-              </p>
-              {ai.hasUserApiKey && (
-                <span className="font-mono text-[10px] text-slate-500" title="Key is stored">
-                  saved {maskApiKey(ai.ollamaApiKey)}
-                </span>
-              )}
-            </div>
-            <p className="text-[10px] text-slate-500 leading-relaxed">
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-300">
+              Ollama Cloud API key
+            </label>
+            <p className="mb-2 text-[10px] text-slate-500 leading-relaxed">
               Create a key at{' '}
               <a
                 href="https://ollama.com"
@@ -388,41 +230,43 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
               >
                 ollama.com
               </a>
-              . It is sent only to our AI proxy for your requests, preferred over any app default key.
-              Sign in to store it under{' '}
-              <code className="text-slate-400">users/…/settings/ai</code> (owner-only).
+              . Stored in this browser
+              {auth.user ? ' and under your signed-in account' : ''} — never logged.
             </p>
             <div className="flex gap-2">
-              <input
-                type={showApiKey ? 'text' : 'password'}
-                value={apiKeyInput}
-                onChange={(e) => {
-                  setApiKeyInput(e.target.value)
-                  setKeyHint(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleSaveApiKey()
-                }}
-                placeholder={ai.hasUserApiKey ? 'Paste new key to replace…' : 'Paste API key…'}
-                autoComplete="off"
-                spellCheck={false}
-                className="min-w-0 flex-1 rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-300 placeholder-slate-500 focus:border-cyan-500 focus:outline-none"
-                data-testid="ai-api-key-input"
-              />
+              <div className="relative flex-1">
+                <input
+                  type={showApiKey ? 'text' : 'password'}
+                  value={apiKeyInput}
+                  onChange={(e) => {
+                    setApiKeyInput(e.target.value)
+                    setKeyHint(null)
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') void handleSaveApiKey()
+                  }}
+                  placeholder={
+                    ai.hasUserApiKey ? `Saved: ${maskApiKey(ai.ollamaApiKey)}` : 'Paste API key…'
+                  }
+                  autoComplete="off"
+                  data-testid="ai-api-key-input"
+                  className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-200 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => setShowApiKey((v) => !v)}
-                className="shrink-0 rounded-lg border border-slate-700 px-2 py-2 text-[10px] text-slate-400 hover:text-slate-200"
+                className="rounded-lg border border-slate-700 px-2 text-[10px] text-slate-400 hover:text-slate-200"
               >
                 {showApiKey ? 'Hide' : 'Show'}
               </button>
             </div>
-            <div className="flex flex-wrap gap-2">
+            <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => void handleSaveApiKey()}
                 disabled={keySaving || !apiKeyInput.trim()}
-                className="rounded-lg bg-cyan-800/80 px-3 py-1.5 text-xs font-medium text-cyan-50 hover:bg-cyan-700 disabled:bg-slate-700 disabled:text-slate-500"
+                className="rounded-lg bg-slate-700 px-3 py-1.5 text-xs text-slate-100 hover:bg-slate-600 disabled:opacity-40"
                 data-testid="ai-api-key-save"
               >
                 {keySaving ? 'Saving…' : 'Save key'}
@@ -432,167 +276,52 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
                   type="button"
                   onClick={() => void handleClearApiKey()}
                   disabled={keySaving}
-                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:border-red-800 hover:text-red-300 disabled:opacity-50"
-                  data-testid="ai-api-key-clear"
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-red-300"
                 >
-                  Remove key
+                  Clear key
                 </button>
               )}
             </div>
-            {keyHint && <p className="text-[10px] text-cyan-300/80">{keyHint}</p>}
-            {!auth.user && (
-              <p className="text-[10px] text-amber-400/80">
-                Not signed in — key stays on this device only until you sign in.
-              </p>
-            )}
+            {keyHint && <p className="mt-1.5 text-[10px] text-slate-400">{keyHint}</p>}
           </div>
 
-          {ai.status === 'downloading' && ai.pullProgress && ai.pullProgress.progress >= 0 && (
-            <div>
-              <div className="h-1.5 w-full rounded-full bg-slate-700">
-                <div
-                  className="h-1.5 rounded-full bg-indigo-500 transition-all"
-                  style={{ width: `${ai.pullProgress.progress}%` }}
-                />
-              </div>
-              <p className="mt-1 text-[10px] text-slate-500">
-                {ai.pullProgress.status} — {ai.pullProgress.progress}%
-              </p>
-            </div>
+          {validationHint && (
+            <p className="text-[11px] text-amber-400/90 leading-relaxed">{validationHint}</p>
           )}
-
-          <div className="flex gap-2">
-            <div className="flex-1">
-              <label className="mb-1 block text-[10px] text-slate-500">Host</label>
-              <input
-                type="text"
-                value={hostInput}
-                onChange={(e) => {
-                  setHostInput(e.target.value)
-                  setValidationHint(null)
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleConnect()
-                }}
-                placeholder="127.0.0.1 or https://tunnel…"
-                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
-            <div className="w-28">
-              <label className="mb-1 block text-[10px] text-slate-500">
-                Port <span className="text-slate-600">(default {OLLAMA_DEFAULT_PORT})</span>
-              </label>
-              <input
-                type="text"
-                inputMode="numeric"
-                value={portInput}
-                onChange={(e) => {
-                  setPortInput(e.target.value)
-                  setValidationHint(null)
-                }}
-                onBlur={() => {
-                  if (!portInput.trim()) setPortInput(String(OLLAMA_DEFAULT_PORT))
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') void handleConnect()
-                }}
-                placeholder={String(OLLAMA_DEFAULT_PORT)}
-                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 font-mono text-xs text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
-              />
-            </div>
-          </div>
 
           <div className="flex flex-wrap gap-2">
             <button
               type="button"
-              onClick={() => void handleConnectLocal()}
-              disabled={connecting || !pageAllowsLocalHttp}
-              className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500"
-              title={
-                pageAllowsLocalHttp
-                  ? 'Connect to Ollama on this computer at 127.0.0.1:11434'
-                  : 'Disabled on HTTPS hosted site — use Use Cloud or an https tunnel'
-              }
-              data-testid="ai-connect-local"
-            >
-              {connecting ? 'Connecting…' : 'Use my Ollama (11434)'}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                // Prefer re-checking saved URL (e.g. ollama.com) over form defaults (127.0.0.1)
-                if (ai.ollamaUrl && !isLocalOrLanOllamaUrl(ai.ollamaUrl)) {
-                  void (async () => {
-                    setConnecting(true)
-                    await ai.connect(ai.ollamaUrl)
-                    setConnecting(false)
-                  })()
-                  return
-                }
-                void handleConnect()
-              }}
-              disabled={connecting || (!hostInput.trim() && !ai.ollamaUrl)}
-              className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500"
-            >
-              {connecting ? 'Connecting…' : ai.ollamaUrl ? 'Reconnect' : 'Connect'}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleConnectCloud()}
+              onClick={() => void handleConnect()}
               disabled={connecting}
-              className="rounded-lg border border-cyan-800/50 bg-cyan-950/40 px-3 py-2 text-xs font-medium text-cyan-300 transition-colors hover:bg-cyan-900/40 disabled:opacity-50"
-              title="Connect to Ollama Cloud using your saved API key (or app fallback)"
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500"
+              data-testid="ai-connect-cloud"
             >
-              Use Cloud
+              {connecting
+                ? 'Connecting…'
+                : ai.status === 'available'
+                  ? 'Reconnect to Cloud'
+                  : 'Connect to Ollama Cloud'}
             </button>
-          </div>
-
-          {validationHint && (
-            <p
-              className={`text-[10px] ${
-                validationHint.includes('LAN') ? 'text-amber-400' : 'text-red-400'
-              }`}
-            >
-              {validationHint}
-            </p>
-          )}
-
-          {ai.error && !validationHint && (
-            <p
-              className={`text-[10px] ${
-                ai.status === 'available' ? 'text-emerald-400' : 'text-red-400'
-              }`}
-            >
-              {ai.error}
-            </p>
-          )}
-
-          {ai.status === 'unavailable' &&
-            ai.availableModels.length === 0 &&
-            !ai.error?.includes('CORS') && (
-              <p className="text-[10px] text-slate-600">
-                Make sure Ollama is running: <code className="text-slate-500">ollama serve</code>
-              </p>
+            {ai.status === 'available' && (
+              <button
+                type="button"
+                onClick={() => ai.disconnect()}
+                className="rounded-lg border border-slate-700 px-3 py-2 text-xs text-slate-400 hover:text-slate-200"
+              >
+                Disconnect
+              </button>
             )}
-
-          {ai.error?.includes('CORS') && (
-            <div className="rounded-lg border border-amber-800/30 bg-amber-900/20 p-2">
-              <p className="text-[10px] font-medium text-amber-300">CORS fix required</p>
-              <code className="mt-1 block rounded bg-amber-950/40 px-2 py-1 font-mono text-[10px] text-amber-200/80">
-                OLLAMA_ORIGINS=* ollama serve
-              </code>
-            </div>
-          )}
+          </div>
 
           {ai.availableModels.length > 0 && (
             <div>
-              <label className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-                Model
-              </label>
+              <label className="mb-1.5 block text-xs font-medium text-slate-300">Model</label>
               <select
                 value={ai.model}
                 onChange={(e) => ai.selectModel(e.target.value)}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-300 focus:border-indigo-500 focus:outline-none"
+                className="w-full rounded-lg border border-slate-600 bg-slate-800 px-3 py-2 text-xs text-slate-200 focus:border-indigo-500 focus:outline-none"
+                data-testid="ai-model-select"
               >
                 {ai.availableModels.map((m) => (
                   <option key={m} value={m}>
@@ -600,23 +329,19 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
                   </option>
                 ))}
               </select>
+              {ai.modelInfo && (
+                <p className="mt-1.5 text-[10px] text-slate-500">
+                  {[
+                    ai.modelInfo.parameterSize,
+                    ai.modelInfo.family,
+                    ai.modelInfo.quantizationLevel,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+              )}
             </div>
           )}
-
-          {ai.ollamaUrl && ai.status !== 'unknown' && (
-            <button
-              type="button"
-              onClick={() => ai.disconnect()}
-              className="text-[10px] text-slate-500 transition-colors hover:text-red-400"
-            >
-              Disconnect AI
-            </button>
-          )}
-
-          <p className="text-[10px] text-slate-600">
-            Your API key and AI outputs are stored under your signed-in account in Firestore (private,
-            owner-only). Delete all cloud data from the user menu if you want them wiped.
-          </p>
         </div>
       </div>
     </div>

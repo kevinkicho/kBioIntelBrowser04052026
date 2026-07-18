@@ -37,7 +37,7 @@ export function AIStatusIndicator() {
           ? `AI error: ${ai.error ?? 'unknown'} — click to configure`
           : connected
             ? `AI unavailable — click to configure`
-            : 'Configure AI (Ollama / Cloud)'
+            : 'Configure AI (Ollama Cloud)'
 
   return (
     <>

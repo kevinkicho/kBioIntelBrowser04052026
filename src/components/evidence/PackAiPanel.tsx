@@ -3,14 +3,7 @@
 import { useState } from 'react'
 import type { EvidencePack } from '@/lib/evidence/pack'
 import type { PackAiMode, StructuredInsight } from '@/lib/ai/contracts'
-import {
-  buildPackAiContext,
-  minClaimsForPackMode,
-  packModeSystemPrompt,
-  packModeUserPrompt,
-} from '@/lib/ai/contracts'
-import { validatePackAiOutput } from '@/lib/ai/validateOutput'
-import { clientGenerateChatOnce } from '@/lib/ai/clientOllama'
+import { minClaimsForPackMode } from '@/lib/ai/contracts'
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
 import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
@@ -41,73 +34,14 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
 
   const run = async () => {
     if (!pack || gated) return
-    if (!ai.enabled || !ai.ollamaUrl || !ai.model) {
-      setError('Connect Ollama (AI button) to run pack analysis.')
+    if (!ai.enabled || !ai.model) {
+      setError('Connect Ollama Cloud (AI button) with your API key to run pack analysis.')
       return
     }
     setBusy(true)
     setError(null)
     setInsight(null)
     try {
-      // Local Ollama via browser — generate on-device, validate claimIds in-client
-      if (ai.transport === 'browser') {
-        const ctx = buildPackAiContext({
-          title: pack.title,
-          claims: pack.claims,
-          candidates: pack.candidates,
-          disease: pack.disease,
-        })
-        const messages = [
-          { role: 'system' as const, content: packModeSystemPrompt(mode) },
-          { role: 'user' as const, content: packModeUserPrompt(ctx, mode) },
-        ]
-        const gen = await clientGenerateChatOnce(ai.ollamaUrl, ai.model, messages)
-        if (!gen.success) {
-          setError(gen.error)
-          emitProductEvent('ai_response', { mode, ok: false, claimCount })
-          return
-        }
-        const validated = validatePackAiOutput(gen.content, ctx.claimIdAllowlist, mode)
-        emitProductEvent('ai_response', {
-          mode,
-          ok: Boolean(validated.ok && validated.insight),
-          refused: Boolean(validated.refused),
-          claimCount,
-        })
-        if (validated.refused || !validated.insight) {
-          setError(
-            validated.refuseReason ??
-              (validated.errors.length ? validated.errors.join('; ') : 'Refused or empty response'),
-          )
-          void saveAiGeneratedData({
-            kind: 'pack',
-            mode,
-            content: validated.refuseReason ?? 'refused',
-            context: { packId: pack.id, name: pack.title },
-            model: ai.model,
-            ollamaUrl: ai.ollamaUrl,
-            error: validated.refuseReason,
-          })
-          return
-        }
-        setInsight(validated.insight)
-        onInsight?.(mode, validated.insight)
-        void saveAiGeneratedData({
-          kind: 'pack',
-          mode,
-          content: JSON.stringify(validated.insight),
-          context: {
-            packId: pack.id,
-            name: pack.title,
-            diseaseId: pack.disease?.id,
-          },
-          model: ai.model,
-          ollamaUrl: ai.ollamaUrl,
-          task: validated.insight,
-        })
-        return
-      }
-
       const res = await fetch('/api/ai/pack', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -180,7 +114,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-slate-300">Pack AI</span>
-        <span className="text-[10px] text-slate-600">claim-id validated · free local models</span>
+        <span className="text-[10px] text-slate-600">claim-id validated · Ollama Cloud</span>
       </div>
       <div className="mb-2 flex flex-wrap gap-1">
         {MODES.map((m) => (

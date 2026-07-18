@@ -9,8 +9,6 @@ import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
-import { validateOllamaUrl, OLLAMA_DEFAULT_PORT } from '@/lib/ai/config'
-
 interface Props {
   categoryData: Partial<Record<CategoryId, Record<string, unknown>>>
   categoryStatus: Record<CategoryId, CategoryLoadState>
@@ -30,14 +28,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
   const ai = useAI()
   const [isOpen, setIsOpen] = useState(false)
   const [inputValue, setInputValue] = useState('')
-  const [hostInput, setHostInput] = useState(() => {
-    try { return new URL(ai.ollamaUrl || 'http://localhost:11434').hostname } catch { return 'localhost' }
-  })
-  const [portInput, setPortInput] = useState(() => {
-    try { return String(new URL(ai.ollamaUrl || 'http://localhost:11434').port || OLLAMA_DEFAULT_PORT) } catch { return String(OLLAMA_DEFAULT_PORT) }
-  })
   const [connecting, setConnecting] = useState(false)
-  const [validationHint, setValidationHint] = useState<string | null>(null)
   const [compareCount, setCompareCount] = useState(sessionHistory.getCount())
   const chatEndRef = useRef<HTMLDivElement>(null)
 
@@ -47,30 +38,12 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
   }, [copilot.messages])
 
   useEffect(() => {
-    try {
-      const url = new URL(ai.ollamaUrl || 'http://localhost:11434')
-      setHostInput(url.hostname)
-      setPortInput(url.port || String(OLLAMA_DEFAULT_PORT))
-    } catch {}
     setCompareCount(sessionHistory.getCount())
   }, [ai.ollamaUrl])
 
   const handleConnect = async () => {
-    const portNum = parseInt(portInput, 10)
-    const port = isNaN(portNum) || portNum < 1 || portNum > 65535 ? OLLAMA_DEFAULT_PORT : portNum
-    const fullUrl = `${hostInput.trim() || 'localhost'}:${port}`
-    const validation = validateOllamaUrl(fullUrl)
-    if (!validation.valid) {
-      setValidationHint(validation.error || 'Invalid URL')
-      return
-    }
-    if (validation.warning === 'lan-warning') {
-      setValidationHint('LAN Ollama requires OLLAMA_ALLOW_LAN=1 on the Next.js server. Ensure this host is trusted and on your network.')
-    } else {
-      setValidationHint(null)
-    }
     setConnecting(true)
-    await ai.connect(validation.normalized || fullUrl)
+    await ai.connect()
     setConnecting(false)
   }
 
@@ -189,11 +162,6 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
             {copilot.activeTab === 'settings' && (
               <SettingsTab
                 ai={ai}
-                hostInput={hostInput}
-                setHostInput={setHostInput}
-                portInput={portInput}
-                setPortInput={setPortInput}
-                validationHint={validationHint}
                 connecting={connecting}
                 onConnect={handleConnect}
               />
@@ -219,7 +187,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
                     : copilot.isGeneContext
                       ? `Ask about gene ${identity.geneSymbol}...`
                       : 'Ask about this molecule...'
-                  : 'Connect Ollama in Settings first'}
+                  : 'Connect Ollama Cloud in Settings first'}
                 className="flex-1 text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none"
                 disabled={!copilot.aiAvailable || copilot.isStreaming}
               />
@@ -805,67 +773,28 @@ function InsightButton({ label, onClick, disabled, icon }: { label: string; onCl
 
 function SettingsTab({
   ai,
-  hostInput,
-  setHostInput,
-  portInput,
-  setPortInput,
-  validationHint,
   connecting,
   onConnect,
 }: {
   ai: ReturnType<typeof useAI>
-  hostInput: string
-  setHostInput: (v: string) => void
-  portInput: string
-  setPortInput: (v: string) => void
-  validationHint: string | null
   connecting: boolean
   onConnect: () => void
 }) {
   return (
     <div className="space-y-4">
       <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Ollama Connection</p>
+        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Ollama Cloud</p>
         <p className="text-[10px] text-slate-500 mb-3">
-          Connect to your local Ollama server. All AI processing stays on your machine.
+          Uses Ollama Cloud with your API key (configure via the header AI button). No local host or port.
         </p>
-
-        <div className="flex gap-2 mb-1">
-          <div className="flex-1">
-            <label className="text-[10px] text-slate-500 mb-1 block">Host</label>
-            <input
-              type="text"
-              value={hostInput}
-              onChange={(e) => { setHostInput(e.target.value) }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && hostInput.trim()) onConnect() }}
-              placeholder="localhost"
-              className="w-full text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none font-mono"
-            />
-          </div>
-          <div className="w-20">
-            <label className="text-[10px] text-slate-500 mb-1 block">Port</label>
-            <input
-              type="text"
-              value={portInput}
-              onChange={(e) => { setPortInput(e.target.value) }}
-              onKeyDown={(e) => { if (e.key === 'Enter' && hostInput.trim()) onConnect() }}
-              placeholder={String(OLLAMA_DEFAULT_PORT)}
-              className="w-full text-xs px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 placeholder-slate-500 focus:border-indigo-500 focus:outline-none font-mono"
-            />
-          </div>
-        </div>
 
         <button
           onClick={onConnect}
-          disabled={connecting || !hostInput.trim()}
+          disabled={connecting}
           className="w-full mt-2 px-4 py-2 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 text-white transition-colors"
         >
-          {connecting ? 'Connecting...' : ai.ollamaUrl ? 'Reconnect' : 'Connect'}
+          {connecting ? 'Connecting…' : ai.status === 'available' ? 'Reconnect to Cloud' : 'Connect to Ollama Cloud'}
         </button>
-
-        {validationHint && (
-          <p className={`text-[10px] mt-2 ${validationHint.includes('non-localhost') ? 'text-amber-400' : 'text-red-400'}`}>{validationHint}</p>
-        )}
 
         <div className="flex items-center gap-2 mt-3">
           <span className={`w-2 h-2 rounded-full ${
@@ -875,9 +804,9 @@ function SettingsTab({
             'bg-red-400'
           }`} />
           <span className="text-[10px] text-slate-400">
-            {ai.status === 'available' ? `Connected to ${ai.ollamaUrl}` :
-             ai.status === 'checking' ? 'Connecting...' :
-             ai.status === 'downloading' ? 'Downloading model...' :
+            {ai.status === 'available' ? `Connected to Ollama Cloud` :
+             ai.status === 'checking' ? 'Connecting…' :
+             ai.status === 'downloading' ? 'Downloading model…' :
              ai.status === 'unavailable' ? 'Not connected' :
              ai.status === 'error' ? `Error: ${ai.error || 'unknown'}` :
              'Not configured'}
@@ -887,7 +816,7 @@ function SettingsTab({
         {ai.statusNote && ai.status === 'available' && (
           <p className="text-[10px] text-emerald-400 mt-1">{ai.statusNote}</p>
         )}
-        {ai.error && ai.status !== 'error' && ai.status !== 'available' && !validationHint && (
+        {ai.error && ai.status !== 'error' && ai.status !== 'available' && (
           <p className="text-[10px] text-red-400 mt-1">{ai.error}</p>
         )}
 
@@ -956,11 +885,9 @@ function SettingsTab({
       <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30">
         <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">About</p>
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          BioIntel Copilot uses Ollama for 100% local AI processing. No data leaves your machine.
-          Install Ollama from <span className="text-cyan-400">ollama.com</span>, then run <code className="text-slate-400 bg-slate-800 px-1 rounded">ollama serve</code> and connect above.
-        </p>
-        <p className="text-[10px] text-slate-600 mt-1.5">
-          Default port is {OLLAMA_DEFAULT_PORT}. You can also connect to Ollama on another machine on your network (e.g., <code className="text-slate-500 bg-slate-800 px-1 rounded">192.168.1.50</code>).
+          BioIntel Copilot uses <span className="text-cyan-400">Ollama Cloud</span> with your API key.
+          Configure the key via the header <strong className="text-slate-400">AI</strong> button, then connect.
+          Traffic goes browser → this app’s server → ollama.com (not local port 11434).
         </p>
       </div>
     </div>

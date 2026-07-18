@@ -16,7 +16,8 @@ export const AI_DEFAULTS: AIConfig = {
   enabled: false,
   status: 'unknown',
   model: '',
-  ollamaUrl: '',
+  /** Product default: Ollama Cloud only (local 11434 removed from UI). */
+  ollamaUrl: 'https://ollama.com',
   availableModels: [],
 }
 
