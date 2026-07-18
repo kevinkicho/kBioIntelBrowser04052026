@@ -210,7 +210,7 @@ export function DataPoint({
           aria-haspopup="dialog"
           title="API provenance — source, timestamp, endpoint"
           data-testid="datapoint-provenance-btn"
-          className="shrink-0 mt-0.5 rounded border border-slate-700/80 bg-slate-800/80 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-slate-400 hover:border-cyan-700/50 hover:bg-cyan-950/40 hover:text-cyan-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-cyan-500 transition-colors"
+          className="shrink-0 mt-0.5 px-0.5 py-0 text-[9px] font-normal text-slate-500 opacity-30 hover:opacity-100 hover:text-cyan-400/90 focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cyan-500/50 rounded transition-opacity"
         >
           API
         </button>
