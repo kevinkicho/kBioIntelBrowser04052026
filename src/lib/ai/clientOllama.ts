@@ -36,6 +36,13 @@ function classifyBrowserError(err: unknown): string {
 }
 
 export async function clientCheckHealth(ollamaUrl: string): Promise<ClientHealthResponse> {
+  // Fail fast on HTTPS pages — never trigger mixed-content / CORS to 127.0.0.1
+  if (!canBrowserCallLocalHttp()) {
+    const error = localOllamaMixedContentHint()
+    console.warn('[ai-local] Skipping browser→loopback on HTTPS page')
+    return { available: false, models: [], error }
+  }
+
   const base = ollamaUrl.replace(/\/+$/, '')
   console.log(`[ai-local] Browser health ${base}/api/tags`)
   try {

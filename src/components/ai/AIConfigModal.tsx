@@ -109,6 +109,14 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       setValidationHint(validation.error || 'Invalid URL')
       return
     }
+    const normalized = validation.normalized || candidate
+    // HTTPS hosted: never attempt browser→http://127.0.0.1 (CORS / mixed content)
+    if (isLocalOrLanOllamaUrl(normalized) && !pageAllowsLocalHttp) {
+      setValidationHint(
+        'Cannot use local Ollama from this HTTPS site. Click “Use Cloud” (with API key) or paste an https:// tunnel URL.',
+      )
+      return
+    }
     if (validation.warning === 'lan-warning') {
       setValidationHint(
         'LAN Ollama: browser will call this host directly. Ensure Ollama allows CORS (OLLAMA_ORIGINS=*) on that machine.',
@@ -117,7 +125,7 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       setValidationHint(null)
     }
     setConnecting(true)
-    await ai.connect(validation.normalized || candidate)
+    await ai.connect(normalized)
     setConnecting(false)
   }
 
@@ -207,6 +215,13 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
 
   const handleConnectLocal = async () => {
     setValidationHint(null)
+    // HTTPS App Hosting cannot reach the user's PC (mixed content + server isolation).
+    if (!pageAllowsLocalHttp) {
+      setValidationHint(
+        'This site is HTTPS — the browser cannot call http://127.0.0.1:11434. Use “Use Cloud” with your Ollama API key, or paste an https:// tunnel URL. Local 11434 works with npm run dev (http://localhost).',
+      )
+      return
+    }
     setHostInput('127.0.0.1')
     setPortInput(String(OLLAMA_DEFAULT_PORT))
     setConnecting(true)
@@ -491,17 +506,32 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
             <button
               type="button"
               onClick={() => void handleConnectLocal()}
-              disabled={connecting}
+              disabled={connecting || !pageAllowsLocalHttp}
               className="rounded-lg bg-emerald-700 px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-emerald-600 disabled:bg-slate-700 disabled:text-slate-500"
-              title="Connect to Ollama on this computer at 127.0.0.1:11434"
+              title={
+                pageAllowsLocalHttp
+                  ? 'Connect to Ollama on this computer at 127.0.0.1:11434'
+                  : 'Disabled on HTTPS hosted site — use Use Cloud or an https tunnel'
+              }
               data-testid="ai-connect-local"
             >
               {connecting ? 'Connecting…' : 'Use my Ollama (11434)'}
             </button>
             <button
               type="button"
-              onClick={() => void handleConnect()}
-              disabled={connecting || !hostInput.trim()}
+              onClick={() => {
+                // Prefer re-checking saved URL (e.g. ollama.com) over form defaults (127.0.0.1)
+                if (ai.ollamaUrl && !isLocalOrLanOllamaUrl(ai.ollamaUrl)) {
+                  void (async () => {
+                    setConnecting(true)
+                    await ai.connect(ai.ollamaUrl)
+                    setConnecting(false)
+                  })()
+                  return
+                }
+                void handleConnect()
+              }}
+              disabled={connecting || (!hostInput.trim() && !ai.ollamaUrl)}
               className="rounded-lg bg-indigo-600 px-4 py-2 text-xs font-medium text-white transition-colors hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500"
             >
               {connecting ? 'Connecting…' : ai.ollamaUrl ? 'Reconnect' : 'Connect'}

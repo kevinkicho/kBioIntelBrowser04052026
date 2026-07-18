@@ -14,7 +14,10 @@ import {
   clientShowModel,
 } from './clientOllama'
 import {
+  canBrowserCallLocalHttp,
   isLocalOrLanOllamaUrl,
+  localOllamaMixedContentHint,
+  mustUseServerOllamaProxy,
   shouldUseBrowserOllama,
 } from './localTransport'
 import { getSignedInUid } from '@/lib/firebase/aiDataSync'
@@ -77,7 +80,7 @@ async function checkOllama(
 }> {
   const local = isLocalOrLanOllamaUrl(ollamaUrl)
 
-  // Prefer browser → user's Ollama so App Hosting never talks to "its" localhost
+  // Prefer browser → user's Ollama only when the page can reach loopback (HTTP dev)
   if (shouldUseBrowserOllama(ollamaUrl)) {
     const browser = await clientCheckHealth(ollamaUrl)
     if (browser.available) {
@@ -89,15 +92,14 @@ async function checkOllama(
         effectiveUrl: ollamaUrl,
       }
     }
-    // On the user's machine with npm run dev, server proxy can still reach loopback
-    // without CORS. Try server only when page is local-ish (not pure cloud fallback).
+    // On npm run dev (HTTP localhost), Next can still proxy to machine Ollama
     const pageIsLocal =
       typeof window !== 'undefined' &&
       (window.location.hostname === 'localhost' ||
         window.location.hostname === '127.0.0.1' ||
         window.location.hostname === '[::1]')
 
-    if (pageIsLocal) {
+    if (pageIsLocal && canBrowserCallLocalHttp()) {
       try {
         const res = await fetch('/api/ai/health', {
           method: 'POST',
@@ -136,14 +138,27 @@ async function checkOllama(
     }
   }
 
-  // Cloud / remote via server proxy
+  // HTTPS App Hosting + loopback/LAN: browser cannot call 127.0.0.1 (mixed content)
+  // and the server cannot reach the user's PC either. Use same-origin proxy → Cloud.
+  let serverUrl = ollamaUrl
+  let forceCloud = false
+  if (local && !canBrowserCallLocalHttp()) {
+    forceCloud = true
+    serverUrl = 'https://ollama.com'
+  } else if (mustUseServerOllamaProxy(ollamaUrl) && !ollamaUrl?.trim()) {
+    serverUrl = 'https://ollama.com'
+    forceCloud = true
+  }
+
+  // Cloud / remote via App Hosting `/api/ai/*` (not a separate Firebase Functions proxy)
   try {
     const res = await fetch('/api/ai/health', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        ollamaUrl,
-        noCloudFallback: local,
+        ollamaUrl: serverUrl,
+        // Never block cloud fallback when we rewrote away from unreachable loopback
+        noCloudFallback: local && !forceCloud,
         ...(ollamaApiKey ? { ollamaApiKey } : {}),
       }),
     })
@@ -156,17 +171,30 @@ async function checkOllama(
       }
     }
     const data = await res.json()
+    if (!data.available && forceCloud) {
+      return {
+        available: false,
+        models: [],
+        transport: 'server',
+        viaCloud: true,
+        error:
+          (typeof data.error === 'string' && data.error) ||
+          localOllamaMixedContentHint(),
+      }
+    }
     return {
       available: data.available,
       models: data.models ?? [],
       error: data.error,
-      viaCloud: Boolean(data.viaCloud),
+      viaCloud: Boolean(data.viaCloud) || forceCloud,
       usingUserKey: Boolean(data.usingUserKey),
       transport: 'server',
       effectiveUrl:
         typeof data.ollamaUrl === 'string' && data.ollamaUrl.length > 0
           ? data.ollamaUrl
-          : undefined,
+          : forceCloud
+            ? 'https://ollama.com'
+            : undefined,
     }
   } catch (err) {
     return {

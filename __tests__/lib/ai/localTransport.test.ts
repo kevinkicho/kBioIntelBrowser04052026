@@ -5,6 +5,7 @@ import {
   isBrowserTunnelOllamaUrl,
   isLocalOrLanOllamaUrl,
   isLoopbackHostname,
+  mustUseServerOllamaProxy,
   shouldUseBrowserOllama,
 } from '@/lib/ai/localTransport'
 
@@ -23,10 +24,25 @@ describe('localTransport', () => {
     expect(isLocalOrLanOllamaUrl('https://ollama.com')).toBe(false)
   })
 
-  test('browser transport preferred for local and tunnel URLs', () => {
-    expect(shouldUseBrowserOllama('http://127.0.0.1:11434')).toBe(true)
+  test('cloud never uses browser transport', () => {
     expect(shouldUseBrowserOllama('https://ollama.com')).toBe(false)
+    expect(mustUseServerOllamaProxy('https://ollama.com')).toBe(true)
+  })
+
+  test('HTTPS tunnel uses browser transport', () => {
     expect(isBrowserTunnelOllamaUrl('https://abc.trycloudflare.com')).toBe(true)
     expect(shouldUseBrowserOllama('https://abc.trycloudflare.com')).toBe(true)
+  })
+
+  test('loopback browser transport follows page protocol (jsdom is typically http)', () => {
+    // jsdom default location is http://localhost — browser local allowed
+    const isHttpPage = window.location.protocol === 'http:'
+    if (isHttpPage) {
+      expect(shouldUseBrowserOllama('http://127.0.0.1:11434')).toBe(true)
+      expect(mustUseServerOllamaProxy('http://127.0.0.1:11434')).toBe(false)
+    } else {
+      expect(shouldUseBrowserOllama('http://127.0.0.1:11434')).toBe(false)
+      expect(mustUseServerOllamaProxy('http://127.0.0.1:11434')).toBe(true)
+    }
   })
 })

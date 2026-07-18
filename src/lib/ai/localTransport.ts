@@ -1,11 +1,14 @@
 /**
  * Decide whether Ollama should be reached from the browser (user's machine)
- * vs the Next.js server (App Hosting / SSR proxy).
+ * vs the Next.js App Hosting server proxy (`/api/ai/*`).
  *
- * Hosted HTTPS pages cannot fetch http://127.0.0.1 (mixed content). Workarounds:
- * - Browser → local Ollama when the *page* is HTTP (e.g. local dev)
- * - Browser → https:// tunnel pointing at the user's :11434 (works on hosted site)
- * - Ollama Cloud via server proxy + user API key
+ * Architecture (hosted HTTPS):
+ *   Browser → same-origin `/api/ai/*` → Ollama Cloud (or HTTPS tunnel URL)
+ *
+ * Hosted HTTPS pages **cannot** fetch http://127.0.0.1 (mixed content).
+ * App Hosting / Firebase Functions also **cannot** reach the user's PC loopback.
+ * So "local Ollama" only works when the *page* is HTTP (npm run dev) or the user
+ * pastes an HTTPS tunnel URL.
  */
 
 import { isPrivateHostname, normalizeOllamaUrl } from './config'
@@ -53,23 +56,42 @@ export function canBrowserCallLocalHttp(): boolean {
 }
 
 /**
- * Reach Ollama from the browser (not App Hosting) for:
- * - loopback / LAN
- * - user HTTPS tunnels to their machine
+ * Reach Ollama from the browser (not App Hosting server) only when the
+ * browser can actually complete the request:
+ * - HTTPS page + loopback/LAN → **false** (mixed content / private network)
+ * - HTTP local dev + loopback/LAN → true
+ * - User HTTPS tunnel → true (browser CORS to tunnel)
+ * - ollama.com → **false** (always server proxy + API key)
  */
 export function shouldUseBrowserOllama(url: string): boolean {
   if (typeof window === 'undefined') return false
   if (isOllamaCloudUrl(url)) return false
-  return isLocalOrLanOllamaUrl(url) || isBrowserTunnelOllamaUrl(url)
+  if (isBrowserTunnelOllamaUrl(url)) return true
+  if (isLocalOrLanOllamaUrl(url)) {
+    // Critical: never attempt browser→http://127.0.0.1 from HTTPS App Hosting
+    return canBrowserCallLocalHttp()
+  }
+  return false
+}
+
+/**
+ * True when the only viable path is App Hosting `/api/ai/*` → Ollama Cloud
+ * (or when local URL was requested on HTTPS and we should not dial loopback).
+ */
+export function mustUseServerOllamaProxy(url: string): boolean {
+  if (isOllamaCloudUrl(url)) return true
+  if (!url?.trim()) return true
+  if (isLocalOrLanOllamaUrl(url) && !canBrowserCallLocalHttp()) return true
+  return false
 }
 
 export function localOllamaMixedContentHint(): string {
   return (
     'This site is HTTPS, so the browser blocks http://127.0.0.1:11434 and http://localhost:11434 ' +
-    '(mixed content — 127.0.0.1 is not a special case). ' +
-    'To use models on your PC from this site: either (1) Use Cloud with your Ollama API key, or ' +
-    '(2) expose Ollama with an HTTPS tunnel to port 11434 (e.g. cloudflared) and paste that https:// URL as host. ' +
-    'Set OLLAMA_ORIGINS=* so the browser is allowed to call it.'
+    '(mixed content). App Hosting also cannot reach your PC. ' +
+    'Use (1) Ollama Cloud + API key via this site’s server (Use Cloud), or ' +
+    '(2) an HTTPS tunnel to your Ollama (e.g. cloudflared) and paste the https:// URL. ' +
+    'Local 11434 only works on http://localhost when you run npm run dev.'
   )
 }
 
