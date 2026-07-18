@@ -16,6 +16,7 @@ import {
   listResearchHypothesesForProject,
   projectExportFilename,
   removeCandidateFromProject,
+  renameProjectAndSave,
   saveProject,
   saveResearchHypothesis,
   seedResearchHypothesisFromPack,
@@ -53,6 +54,8 @@ export default function ProjectBoardPage() {
   const [boardClaims, setBoardClaims] = useState<EvidenceClaim[]>([])
   const [packWarnings, setPackWarnings] = useState<string[]>([])
   const [panelsLoading, setPanelsLoading] = useState(false)
+  const [renaming, setRenaming] = useState(false)
+  const [nameDraft, setNameDraft] = useState('')
   const signalsLoadedFor = useRef<string | null>(null)
   const harvestGen = useRef(0)
   const harvestAbort = useRef<AbortController | null>(null)
@@ -345,8 +348,67 @@ export default function ProjectBoardPage() {
         </div>
 
         <div className="mb-6 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100 sm:text-3xl">{project.name}</h1>
+          <div className="min-w-0 flex-1">
+            {renaming ? (
+              <form
+                className="flex flex-wrap items-center gap-2"
+                onSubmit={(e) => {
+                  e.preventDefault()
+                  const res = renameProjectAndSave(project.id, nameDraft)
+                  if (!res.ok) {
+                    setBanner({ type: 'err', text: res.message || 'Could not rename project' })
+                    return
+                  }
+                  setProject(res.value)
+                  setRenaming(false)
+                  setBanner({ type: 'ok', text: 'Project renamed' })
+                }}
+              >
+                <input
+                  type="text"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value)}
+                  maxLength={200}
+                  autoFocus
+                  className="min-w-[12rem] flex-1 rounded-lg border border-indigo-700/50 bg-slate-900 px-3 py-1.5 text-xl font-bold text-slate-100 focus:border-indigo-500 focus:outline-none sm:text-2xl"
+                  data-testid="project-rename-input"
+                  aria-label="Project name"
+                />
+                <button
+                  type="submit"
+                  className="rounded-lg bg-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-indigo-500"
+                  data-testid="project-rename-save"
+                >
+                  Save
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRenaming(false)
+                    setNameDraft(project.name)
+                  }}
+                  className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+                >
+                  Cancel
+                </button>
+              </form>
+            ) : (
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-bold text-slate-100 sm:text-3xl">{project.name}</h1>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNameDraft(project.name)
+                    setRenaming(true)
+                  }}
+                  className="rounded-lg border border-slate-700 px-2 py-1 text-[11px] text-slate-400 hover:border-slate-500 hover:text-slate-200"
+                  data-testid="project-rename-btn"
+                  title="Rename project"
+                >
+                  Rename
+                </button>
+              </div>
+            )}
             {project.description && (
               <p className="mt-1 text-sm text-slate-400">{project.description}</p>
             )}

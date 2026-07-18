@@ -390,6 +390,40 @@ export function createAndSaveProject(
   return saveProject(project, storage)
 }
 
+/** Rename a project (pure). Empty / whitespace falls back to “Untitled project”. */
+export function renameProject(project: Project, name: string): StoreResult<Project> {
+  if (!project?.id) {
+    return { ok: false, error: 'invalid', message: 'Invalid project.' }
+  }
+  const nextName = (name.trim() || 'Untitled project').slice(0, 200)
+  if (nextName === project.name) {
+    return { ok: true, value: project }
+  }
+  return {
+    ok: true,
+    value: {
+      ...project,
+      name: nextName,
+      updatedAt: nowIso(),
+    },
+  }
+}
+
+/** Rename and persist. */
+export function renameProjectAndSave(
+  projectId: string,
+  name: string,
+  storage?: ProjectStorage | null,
+): StoreResult<Project> {
+  const project = getProject(projectId, storage)
+  if (!project) {
+    return { ok: false, error: 'not_found', message: `Project ${projectId} not found.` }
+  }
+  const next = renameProject(project, name)
+  if (!next.ok) return next
+  return saveProject(next.value, storage)
+}
+
 /**
  * Add candidate and persist. Returns quota/cap errors without silent drop.
  */

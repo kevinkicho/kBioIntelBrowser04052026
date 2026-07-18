@@ -11,6 +11,7 @@ import {
   importProjectsFromJson,
   listProjects,
   projectExportFilename,
+  renameProjectAndSave,
 } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { recordSearch } from '@/lib/searchHistory'
@@ -116,6 +117,18 @@ export default function ProjectsPage() {
     }
     refresh()
     showBanner('ok', 'Project deleted')
+  }
+
+  const handleRename = (id: string, currentName: string) => {
+    const next = window.prompt('Rename project', currentName)
+    if (next == null) return
+    const result = renameProjectAndSave(id, next)
+    if (!result.ok) {
+      showBanner('err', result.message)
+      return
+    }
+    refresh()
+    showBanner('ok', `Renamed to “${result.value.name}”`)
   }
 
   const handleExportAll = () => {
@@ -451,6 +464,14 @@ export default function ProjectsPage() {
                   >
                     Open board
                   </Link>
+                  <button
+                    type="button"
+                    onClick={() => handleRename(p.id, p.name)}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:border-slate-500 hover:text-slate-200"
+                    data-testid={`project-rename-${p.id}`}
+                  >
+                    Rename
+                  </button>
                   <button
                     type="button"
                     onClick={() => handleDelete(p.id, p.name)}

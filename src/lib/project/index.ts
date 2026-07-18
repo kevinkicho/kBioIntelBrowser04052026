@@ -22,6 +22,8 @@ export {
   saveProject,
   deleteProject,
   createAndSaveProject,
+  renameProject,
+  renameProjectAndSave,
   registerProjectMutateHook,
   type ProjectMutateHook,
   addCandidateAndSave,
