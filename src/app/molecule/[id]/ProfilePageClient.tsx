@@ -1154,54 +1154,85 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     if (allowedVisible.length === 0 && !focused) {
       if (hideEmpty || (isDecisionMode && !fullForCat)) return null
     }
-    if (allowedVisible.length === 0 && focused) {
-      return (
-        <div className="col-span-2 py-6 text-center text-sm text-slate-500" data-testid={`category-empty-${catId}`}>
-          {status === 'loaded'
-            ? 'No panel data returned for this category (empty sources, not missing UI).'
-            : 'No panels to show yet.'}
-        </div>
-      )
-    }
 
     // Category-level honesty: count timeouts/errors/disabled from server metrics
     const statusEntries = sourceStatusMap ? Object.entries(sourceStatusMap) : []
     const nTimeout = statusEntries.filter(([, v]) => v.status === 'timeout').length
     const nError = statusEntries.filter(([, v]) => v.status === 'error').length
     const nDisabled = statusEntries.filter(([, v]) => v.status === 'disabled').length
+    const hasActionableStatus = nTimeout > 0 || nError > 0 || nDisabled > 0
+
+    if (allowedVisible.length === 0) {
+      // Compact empty — no full-width “Source status” card that looks like blank UI
+      return (
+        <div
+          className="rounded-lg border border-slate-800/80 bg-slate-900/30 px-3 py-2.5 text-[11px] text-slate-500"
+          data-testid={`category-empty-${catId}`}
+        >
+          <p>
+            {status === 'loaded'
+              ? 'No panel data to show for this category (sources empty or timed out — not a missing layout).'
+              : 'No panels to show yet.'}
+          </p>
+          {(hasActionableStatus || fromCache) && (
+            <p className="mt-1 text-[10px] text-slate-600 flex flex-wrap gap-x-2 gap-y-0.5">
+              {fromCache && (
+                <span className="text-cyan-500/80">
+                  cache
+                  {categoryFetchedAt
+                    ? ` · ${categoryFetchedAt.toLocaleString()}`
+                    : ''}
+                </span>
+              )}
+              {nTimeout > 0 && <span className="text-amber-400/80">{nTimeout} timed out</span>}
+              {nError > 0 && <span className="text-red-400/80">{nError} errors</span>}
+              {nDisabled > 0 && <span>{nDisabled} disabled</span>}
+            </p>
+          )}
+        </div>
+      )
+    }
 
     return (
-      <>
-        {(nTimeout > 0 || nError > 0 || nDisabled > 0 || fromCache) && (
-          <div className="col-span-2 text-[10px] text-slate-500 bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2 flex flex-wrap gap-3">
-            <span className="text-slate-400 font-medium">Source status:</span>
-            {fromCache && (
-              <span className="text-cyan-400/90" title="Served from local profile cache (memory or IndexedDB)">
-                local cache
-                {categoryFetchedAt
-                  ? ` · fetched ${categoryFetchedAt.toLocaleString()}`
-                  : ''}
-              </span>
+      <div className="space-y-2" data-testid={`category-panels-${catId}`}>
+        {/* Compact strip only when there is something actionable — not a tall empty grid cell */}
+        {hasActionableStatus && (
+          <div className="text-[10px] text-slate-500 px-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">
+            <span className="text-slate-500 font-medium">Sources:</span>
+            {nTimeout > 0 && (
+              <span className="text-amber-400/90">{nTimeout} timed out</span>
             )}
-            {nTimeout > 0 && <span className="text-amber-400/90">{nTimeout} timed out</span>}
             {nError > 0 && <span className="text-red-400/90">{nError} errors</span>}
             {nDisabled > 0 && <span className="text-slate-500">{nDisabled} disabled</span>}
-            <span className="text-slate-600">Empty ≠ absence of biology — only “not retrieved”</span>
+            {fromCache && (
+              <span className="text-cyan-500/80" title="Served from local profile cache">
+                · cache
+                {categoryFetchedAt ? ` ${categoryFetchedAt.toLocaleString()}` : ''}
+              </span>
+            )}
           </div>
         )}
-        {allowedVisible.map(p => (
-          <div
-            key={p.id}
-            id={p.id}
-            data-panel-id={p.id}
-            className="scroll-mt-28 rounded-xl"
-          >
-            <ErrorBoundary>
-              {panelRegistry[p.id]?.(p.id, categoryFetchedAt) ?? null}
-            </ErrorBoundary>
-          </div>
-        ))}
-      </>
+        {!hasActionableStatus && fromCache && (
+          <p className="text-[9px] text-slate-600 px-0.5" title="Served from local profile cache">
+            Local cache
+            {categoryFetchedAt ? ` · fetched ${categoryFetchedAt.toLocaleString()}` : ''}
+          </p>
+        )}
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {allowedVisible.map((p) => (
+            <div
+              key={p.id}
+              id={p.id}
+              data-panel-id={p.id}
+              className="scroll-mt-28 rounded-xl min-w-0"
+            >
+              <ErrorBoundary>
+                {panelRegistry[p.id]?.(p.id, categoryFetchedAt) ?? null}
+              </ErrorBoundary>
+            </div>
+          ))}
+        </div>
+      </div>
     )
   }
 

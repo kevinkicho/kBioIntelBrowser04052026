@@ -49,9 +49,10 @@ export function CategorySection({
         </span>
       </button>
       {!collapsed && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mt-3">
-          {children}
-        </div>
+        // Children own their own layout (panel grid + optional status strip).
+        // Do not put banners and cards in one CSS grid row — that stretches empty
+        // "Source status" strips to panel height and creates large blank regions.
+        <div className="mt-3 space-y-3">{children}</div>
       )}
     </div>
   )
