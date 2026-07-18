@@ -14,11 +14,15 @@ describe('GET /api/nci-thesaurus/[id]', () => {
       synonyms: [],
     })
     ;(nciThesaurus.getNciConceptsByName as jest.Mock).mockResolvedValue([{
+      conceptId: 'C61948',
       code: 'C61948',
       name: 'Aspirin',
-      terminology: 'ncit',
+      definition: 'A non-steroidal anti-inflammatory drug.',
+      semanticType: 'Pharmacologic Substance',
       conceptStatus: 'Retired_Concept',
       leaf: true,
+      synonyms: [],
+      parents: [],
       url: 'https://ncit.nci.nih.gov/ncitbrowser/ConceptReport.jsp?dictionary=NCI_Thesaurus&code=C61948',
     }])
 

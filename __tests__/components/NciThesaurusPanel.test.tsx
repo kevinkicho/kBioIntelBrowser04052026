@@ -45,10 +45,13 @@ describe('NciThesaurusPanel', () => {
     expect(screen.getByText('Retired_Concept')).toBeInTheDocument()
   })
 
-  test('renders leaf indicator', () => {
+  test('renders definition text on list items', () => {
     render(<NciThesaurusPanel concepts={mockConcepts} />)
-    expect(screen.getByText('leaf')).toBeInTheDocument()
-    expect(screen.getByText('branch')).toBeInTheDocument()
+    const defs = screen.getAllByTestId('nci-concept-definition')
+    expect(defs.length).toBeGreaterThanOrEqual(1)
+    expect(defs[0]).toHaveTextContent(/anti-inflammatory/i)
+    // Full definition available on hover
+    expect(defs[0].getAttribute('title')).toMatch(/anti-inflammatory/i)
   })
 
   test('renders link to NCI Thesaurus', () => {
@@ -62,3 +65,4 @@ describe('NciThesaurusPanel', () => {
     expect(screen.getByText(/no nci thesaurus concepts found/i)).toBeInTheDocument()
   })
 })
+
