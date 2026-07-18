@@ -1,10 +1,13 @@
 /** NIAID ImmPort immunology studies. */
 
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import type { ImmPortStudy } from '@/lib/types'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface NiaidImmportPanelProps {
   data: ImmPortStudy[]
@@ -27,6 +30,22 @@ export const NiaidImmportPanel = memo(function NiaidImmportPanel({
   const list = Array.isArray(data) ? data : []
   const isEmpty = !isLoading && list.length === 0
 
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<ImmPortStudy>((s) => s.title || ''),
+      ...numberSortOptions<ImmPortStudy>((s) => s.participantCount ?? 0, {
+        high: 'Most participants',
+        low: 'Fewest participants',
+      }),
+      ...alphaSortOptions<ImmPortStudy>((s) => s.conditionStudied || '').map((o) => ({
+        ...o,
+        id: `condition-${o.id}`,
+        label: o.id.includes('asc') ? 'Condition A–Z' : 'Condition Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'NIAID ImmPort Studies' : `NIAID ImmPort Studies (${list.length})`}
@@ -41,12 +60,29 @@ export const NiaidImmportPanel = memo(function NiaidImmportPanel({
       }
     >
       {!isEmpty && !isLoading && (
-        <PaginatedList className="space-y-1">
-          {list.map((s, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(s) =>
+            [
+              s.title,
+              s.studyId,
+              s.studyType,
+              s.description,
+              s.conditionStudied,
+              s.intervention,
+              ...(s.arms || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter studies (title, condition, ID…)"
+          getKey={(s, i) => `${s.studyId}-${i}`}
+          renderItem={(s) => {
             const href = studyUrl(s.studyId)
             return (
               <DataPoint
-                key={`${s.studyId}-${i}`}
                 sourceKey="niaid-immport"
                 label={s.title}
                 recordUrl={href}
@@ -116,8 +152,8 @@ export const NiaidImmportPanel = memo(function NiaidImmportPanel({
                 </div>
               </DataPoint>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

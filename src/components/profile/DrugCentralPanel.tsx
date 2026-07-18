@@ -1,7 +1,15 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { DrugCentralDrug, DrugCentralTarget, DrugCentralEnhanced } from '@/lib/types'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import type {
+  DrugCentralDrug,
+  DrugCentralTarget,
+  DrugCentralEnhanced,
+  DrugCentralProduct,
+} from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 interface DrugCentralPanelProps {
   data?: {
@@ -23,6 +31,44 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
   const products = enhancedData?.products ?? []
 
   const isEmpty = !drug
+
+  const productSortOptions = useMemo(
+    () => [
+      ...dateSortOptions<DrugCentralProduct>((p) => p.marketingStartDate, {
+        newest: 'Newest marketed',
+        oldest: 'Oldest marketed',
+      }),
+      ...alphaSortOptions<DrugCentralProduct>((p) => p.name || ''),
+      ...alphaSortOptions<DrugCentralProduct>((p) => p.form || '').map((o) => ({
+        ...o,
+        id: `form-${o.id}`,
+        label: o.id === 'name-asc' ? 'Form A–Z' : 'Form Z–A',
+      })),
+      ...alphaSortOptions<DrugCentralProduct>((p) => p.route || '').map((o) => ({
+        ...o,
+        id: `route-${o.id}`,
+        label: o.id === 'name-asc' ? 'Route A–Z' : 'Route Z–A',
+      })),
+    ],
+    [],
+  )
+
+  const targetSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<DrugCentralTarget>((t) => t.targetName || ''),
+      ...alphaSortOptions<DrugCentralTarget>((t) => t.geneSymbol || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id === 'name-asc' ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+      ...alphaSortOptions<DrugCentralTarget>((t) => t.actionCode || '').map((o) => ({
+        ...o,
+        id: `action-${o.id}`,
+        label: o.id === 'name-asc' ? 'Action A–Z' : 'Action Z–A',
+      })),
+    ],
+    [],
+  )
 
   return (
     <Panel
@@ -61,14 +107,24 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
             Products ({products.length})
           </h3>
-          <PaginatedList className="space-y-2">
-            {products.slice(0, 10).map((product) => (
-              <div key={product.id} className="p-2 rounded-lg bg-slate-800/30 border border-slate-700">
+          <FilterablePaginatedList
+            items={products}
+            getSearchText={(product) =>
+              [product.name, product.form, product.route].filter(Boolean).join(' ')
+            }
+            sortOptions={productSortOptions}
+            defaultSortId="date-desc"
+            filterPlaceholder="Filter products…"
+            getKey={(product) => product.id}
+            pageSize={5}
+            className="space-y-2"
+            renderItem={(product) => (
+              <div className="p-2 rounded-lg bg-slate-800/30 border border-slate-700">
                 <p className="font-medium text-slate-100 text-sm">{product.name}</p>
                 <p className="text-xs text-slate-400">{product.form} - {product.route}</p>
               </div>
-            ))}
-          </PaginatedList>
+            )}
+          />
         </div>
       )}
 
@@ -77,9 +133,21 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
           <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
             Targets ({targets.length})
           </h3>
-          <PaginatedList className="space-y-2">
-            {targets.map((target) => (
-              <div key={target.targetId} className="p-2 rounded-lg bg-slate-800/30 border border-slate-700">
+          <FilterablePaginatedList
+            items={targets}
+            getSearchText={(target) =>
+              [target.targetName, target.geneSymbol, target.actionCode, target.uniprotId]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={targetSortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter targets…"
+            getKey={(target) => target.targetId}
+            pageSize={5}
+            className="space-y-2"
+            renderItem={(target) => (
+              <div className="p-2 rounded-lg bg-slate-800/30 border border-slate-700">
                 <div className="flex items-start justify-between gap-2">
                   <div>
                     <p className="font-medium text-slate-100 text-sm">{target.targetName}</p>
@@ -100,8 +168,8 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
                   </a>
                 )}
               </div>
-            ))}
-          </PaginatedList>
+            )}
+          />
         </div>
       )}
 

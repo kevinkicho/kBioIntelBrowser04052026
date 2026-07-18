@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { IRISAssessment } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 function AssessmentItem({ assessment }: { assessment: IRISAssessment }) {
   const statusColors = {
@@ -35,7 +38,9 @@ function AssessmentItem({ assessment }: { assessment: IRISAssessment }) {
           {assessment.oralRfD && (
             <div className="bg-slate-800/50 rounded p-2">
               <span className="text-slate-400">Oral RfD:</span>
-              <span className="text-cyan-300 ml-1">{assessment.oralRfD} {assessment.oralRfDUnits}</span>
+              <span className="text-cyan-300 ml-1">
+                {assessment.oralRfD} {assessment.oralRfDUnits}
+              </span>
               {assessment.oralRfDConfidence && (
                 <span className="text-slate-500 ml-1">({assessment.oralRfDConfidence} confidence)</span>
               )}
@@ -44,7 +49,9 @@ function AssessmentItem({ assessment }: { assessment: IRISAssessment }) {
           {assessment.inhalationRfC && (
             <div className="bg-slate-800/50 rounded p-2">
               <span className="text-slate-400">Inhalation RfC:</span>
-              <span className="text-cyan-300 ml-1">{assessment.inhalationRfC} {assessment.inhalationRfCUnits}</span>
+              <span className="text-cyan-300 ml-1">
+                {assessment.inhalationRfC} {assessment.inhalationRfCUnits}
+              </span>
               {assessment.inhalationRfCConfidence && (
                 <span className="text-slate-500 ml-1">({assessment.inhalationRfCConfidence})</span>
               )}
@@ -96,25 +103,63 @@ function AssessmentItem({ assessment }: { assessment: IRISAssessment }) {
   )
 }
 
-export const IRISPanel = memo(function IRISPanel({ assessments, panelId, lastFetched }: { assessments: IRISAssessment[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = assessments.length === 0
+export const IRISPanel = memo(function IRISPanel({
+  assessments,
+  panelId,
+  lastFetched,
+}: {
+  assessments: IRISAssessment[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(assessments) ? assessments : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<IRISAssessment>((a) => a.lastUpdated, {
+        newest: 'Newest update',
+        oldest: 'Oldest update',
+      }),
+      ...alphaSortOptions<IRISAssessment>((a) => a.chemicalName || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="EPA IRIS"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No EPA IRIS toxicological assessments found for this molecule." : undefined}
+      empty={isEmpty ? 'No EPA IRIS toxicological assessments found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">
-            Integrated Risk Information System — {assessments.length} assessment{assessments.length !== 1 ? 's' : ''}
+            Integrated Risk Information System — {list.length} assessment
+            {list.length !== 1 ? 's' : ''}
           </p>
-          <PaginatedList className="space-y-2">
-            {assessments.map((assessment, i) => (
-              <AssessmentItem key={`${assessment.id}-${i}`} assessment={assessment} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(a) =>
+              [
+                a.chemicalName,
+                a.casNumber,
+                a.assessmentStatus,
+                a.cancerClassification,
+                a.lastUpdated,
+                ...(a.criticalEffects || []),
+                ...(a.organsAffected || []),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="date-desc"
+            filterPlaceholder="Filter assessments…"
+            getKey={(assessment, i) => `${assessment.id}-${i}`}
+            renderItem={(assessment) => <AssessmentItem assessment={assessment} />}
+          />
         </>
       )}
     </Panel>

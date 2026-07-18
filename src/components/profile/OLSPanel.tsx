@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OLSTerm } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function ontologyBadge(ontologyId: string): string {
   const colors: Record<string, string> = {
@@ -27,6 +30,24 @@ export const OLSPanel = memo(function OLSPanel({
 }) {
   const list = Array.isArray(terms) ? terms : []
   const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<OLSTerm>((t) => t.label || ''),
+      ...alphaSortOptions<OLSTerm>((t) => t.ontologyId || '').map((o) => ({
+        ...o,
+        id: `ont-${o.id}`,
+        label: o.id.includes('asc') ? 'Ontology A–Z' : 'Ontology Z–A',
+      })),
+      ...alphaSortOptions<OLSTerm>((t) => t.id || '').map((o) => ({
+        ...o,
+        id: `termid-${o.id}`,
+        label: o.id.includes('asc') ? 'Term ID A–Z' : 'Term ID Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'Ontology Lookup Service' : `Ontology Lookup Service (${list.length})`}
@@ -35,9 +56,25 @@ export const OLSPanel = memo(function OLSPanel({
       empty={isEmpty ? 'No ontology terms found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((term, i) => (
-            <div key={`${term.id}-${i}`} className="py-2 border-b border-slate-700/60 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(term) =>
+            [
+              term.label,
+              term.id,
+              term.ontologyId,
+              term.description,
+              ...(term.synonyms || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter terms (label, ID, ontology…)"
+          getKey={(term, i) => `${term.id}-${i}`}
+          renderItem={(term) => (
+            <div className="py-2 border-b border-slate-700/60 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -100,8 +137,8 @@ export const OLSPanel = memo(function OLSPanel({
                 </a>
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

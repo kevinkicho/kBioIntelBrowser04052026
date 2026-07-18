@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ProteinDomain } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 const typeBadgeColors: Record<string, string> = {
   family: 'bg-cyan-900/40 text-cyan-300 border-cyan-700/30',
@@ -12,22 +15,49 @@ const typeBadgeColors: Record<string, string> = {
 
 const defaultBadge = 'bg-slate-700/60 text-slate-300 border-slate-600/30'
 
-export const InterProPanel = memo(function InterProPanel({ domains, panelId, lastFetched }: { domains: ProteinDomain[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = domains.length === 0
+export const InterProPanel = memo(function InterProPanel({
+  domains,
+  panelId,
+  lastFetched,
+}: {
+  domains: ProteinDomain[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(domains) ? domains : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => alphaSortOptions<ProteinDomain>((d) => d.name || d.domainName || ''),
+    [],
+  )
+
   return (
     <Panel
       title="Protein Domains (InterPro)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No protein domain data found for this molecule." : undefined}
+      empty={isEmpty ? 'No protein domain data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {domains.map((domain, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(d) =>
+            [d.name, d.domainName, d.type, d.description, d.domainId, d.source]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter domains…"
+          getKey={(domain, i) => `${domain.domainId || domain.name}-${i}`}
+          renderItem={(domain) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
-                  <span className={`text-xs border px-2 py-0.5 rounded ${typeBadgeColors[domain.type.toLowerCase()] ?? defaultBadge}`}>
+                  <span
+                    className={`text-xs border px-2 py-0.5 rounded ${typeBadgeColors[domain.type.toLowerCase()] ?? defaultBadge}`}
+                  >
                     {domain.type}
                   </span>
                   <p className="font-semibold text-slate-100 text-sm">{domain.name}</p>
@@ -46,8 +76,8 @@ export const InterProPanel = memo(function InterProPanel({ domains, panelId, las
                 <p className="text-xs text-slate-400 mt-2 line-clamp-2">{domain.description}</p>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

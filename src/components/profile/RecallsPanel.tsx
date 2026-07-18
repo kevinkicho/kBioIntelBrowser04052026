@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { DrugRecall } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 const classificationColors: Record<string, string> = {
   'Class I': 'bg-red-900/40 text-red-300 border-red-700/30',
@@ -10,20 +13,56 @@ const classificationColors: Record<string, string> = {
 }
 
 export const RecallsPanel = memo(function RecallsPanel({ recalls, panelId, lastFetched }: { recalls: DrugRecall[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = recalls.length === 0
+  const list = Array.isArray(recalls) ? recalls : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<DrugRecall>((r) => r.reportDate, {
+        newest: 'Newest report',
+        oldest: 'Oldest report',
+      }),
+      ...alphaSortOptions<DrugRecall>((r) => r.classification || '').map((o) => ({
+        ...o,
+        id: `class-${o.id}`,
+        label: o.id.includes('asc') ? 'Class A–Z' : 'Class Z–A',
+      })),
+      ...alphaSortOptions<DrugRecall>((r) => r.reason || r.recallingFirm || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="FDA Drug Recalls"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No recalls found for this molecule in the past 2 years." : undefined}
+      empty={isEmpty ? 'No recalls found for this molecule in the past 2 years.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {recalls.map((recall, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(recall) =>
+            [
+              recall.reason,
+              recall.classification,
+              recall.recallingFirm,
+              recall.reportDate,
+              recall.city,
+              recall.state,
+              recall.status,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="date-desc"
+          filterPlaceholder="Filter recalls (reason, firm, class…)"
+          getKey={(recall, i) => `${recall.reportDate}-${recall.reason}-${i}`}
+          renderItem={(recall) => {
             const colors = classificationColors[recall.classification] ?? classificationColors['Class III']
             return (
-              <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+              <div className="py-3 border-b border-slate-700 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <p className="font-semibold text-slate-100 text-sm">{recall.reason}</p>
                   <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${colors}`}>
@@ -40,8 +79,8 @@ export const RecallsPanel = memo(function RecallsPanel({ recalls, panelId, lastF
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

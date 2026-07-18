@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CPICGuideline } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 function GuidelineItem({ guideline }: { guideline: CPICGuideline }) {
   return (
@@ -53,6 +56,21 @@ function GuidelineItem({ guideline }: { guideline: CPICGuideline }) {
 
 export const CPICPanel = memo(function CPICPanel({ guidelines, panelId, lastFetched }: { guidelines: CPICGuideline[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = guidelines.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<CPICGuideline>((g) => g.lastUpdated),
+      ...alphaSortOptions<CPICGuideline>((g) => g.drugName || g.gene),
+      ...alphaSortOptions<CPICGuideline>((g) => g.gene || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id.includes('asc') ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+    ],
+    [],
+  )
+
+  const uniqueGenes = useMemo(() => new Set(guidelines.map((g) => g.gene)), [guidelines])
+  const uniqueDrugs = useMemo(() => new Set(guidelines.map((g) => g.drugName)), [guidelines])
 
   return (
     <Panel
@@ -61,22 +79,37 @@ export const CPICPanel = memo(function CPICPanel({ guidelines, panelId, lastFetc
       lastFetched={lastFetched}
       empty={isEmpty ? "No clinical pharmacogenetic guidelines found for this molecule." : undefined}
     >
-      {!isEmpty && (() => {
-        const uniqueGenes = new Set(guidelines.map(g => g.gene))
-        const uniqueDrugs = new Set(guidelines.map(g => g.drugName))
-        return (
-          <>
-            <p className="text-xs text-slate-400 mb-3">
-              Clinical Pharmacogenetics Implementation Consortium — {uniqueDrugs.size} drug{uniqueDrugs.size !== 1 ? 's' : ''}, {uniqueGenes.size} gene{uniqueGenes.size !== 1 ? 's' : ''}
-            </p>
-            <PaginatedList className="space-y-2">
-              {guidelines.map((guideline, i) => (
-                <GuidelineItem key={`${guideline.id}-${i}`} guideline={guideline} />
-              ))}
-            </PaginatedList>
-          </>
-        )
-      })()}
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Clinical Pharmacogenetics Implementation Consortium — {uniqueDrugs.size} drug{uniqueDrugs.size !== 1 ? 's' : ''}, {uniqueGenes.size} gene{uniqueGenes.size !== 1 ? 's' : ''}
+          </p>
+          <FilterablePaginatedList
+            items={guidelines}
+            getSearchText={(g) =>
+              [
+                g.drugName,
+                g.drugClass,
+                g.gene,
+                g.guidelineId,
+                ...(g.recommendations ?? []).flatMap((r) => [
+                  r.phenotype,
+                  r.therapeuticRecommendation,
+                  r.implication,
+                ]),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="date-desc"
+            filterPlaceholder="Filter guidelines…"
+            getKey={(g, i) => `${g.id}-${i}`}
+            className="space-y-2"
+            renderItem={(guideline) => <GuidelineItem guideline={guideline} />}
+          />
+        </>
+      )}
     </Panel>
   )
 })

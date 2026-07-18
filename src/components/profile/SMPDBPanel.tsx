@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SMPDBPathway } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function PathwayItem({ pathway }: { pathway: SMPDBPathway }) {
   const getTypeColor = (type: string) => {
@@ -52,22 +55,57 @@ function PathwayItem({ pathway }: { pathway: SMPDBPathway }) {
 }
 
 export const SMPDBPanel = memo(function SMPDBPanel({ pathways, panelId, lastFetched }: { pathways: SMPDBPathway[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = pathways.length === 0
+  const list = Array.isArray(pathways) ? pathways : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<SMPDBPathway>((p) => p.name || ''),
+      ...alphaSortOptions<SMPDBPathway>((p) => p.pathwayType || '').map((o) => ({
+        ...o,
+        id: `type-${o.id}`,
+        label: o.id.includes('asc') ? 'Type A–Z' : 'Type Z–A',
+      })),
+      ...alphaSortOptions<SMPDBPathway>((p) => p.organism || '').map((o) => ({
+        ...o,
+        id: `org-${o.id}`,
+        label: o.id.includes('asc') ? 'Organism A–Z' : 'Organism Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="SMPDB"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No SMPDB pathways found for this molecule." : undefined}
+      empty={isEmpty ? 'No SMPDB pathways found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">Small molecule pathways from SMPDB</p>
-          <PaginatedList className="space-y-3">
-            {pathways.map((pathway, i) => (
-              <PathwayItem key={`${pathway.smpdbId}-${i}`} pathway={pathway} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(pathway) =>
+              [
+                pathway.name,
+                pathway.pathwayType,
+                pathway.organism,
+                pathway.description,
+                pathway.smpdbId,
+                ...(pathway.metabolites || []),
+                ...(pathway.enzymes || []),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter pathways (name, type, metabolite…)"
+            getKey={(pathway, i) => `${pathway.smpdbId}-${i}`}
+            renderItem={(pathway) => <PathwayItem pathway={pathway} />}
+          />
         </>
       )}
     </Panel>

@@ -1,13 +1,18 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ToxCastData } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface ToxCastPanelProps {
   data?: ToxCastData | null
   panelId?: string
   lastFetched?: Date
 }
+
+type ToxCastAssay = NonNullable<ToxCastData['assays']>[number]
 
 function OutcomeBadge({ outcome }: { outcome: string }) {
   const colors = {
@@ -25,7 +30,28 @@ function OutcomeBadge({ outcome }: { outcome: string }) {
 }
 
 export const ToxCastPanel = memo(function ToxCastPanel({ data, panelId, lastFetched }: ToxCastPanelProps) {
-  const isEmpty = !data || !data.assays || data.assays.length === 0
+  const assays = useMemo(
+    () => (data?.assays ? data.assays.slice(0, 50) : []),
+    [data],
+  )
+  const isEmpty = !data || assays.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<ToxCastAssay>((a) => a.assayName || ''),
+      ...alphaSortOptions<ToxCastAssay>((a) => a.outcome || '').map((o) => ({
+        ...o,
+        id: `outcome-${o.id}`,
+        label: o.id.includes('asc') ? 'Outcome A–Z' : 'Outcome Z–A',
+      })),
+      ...numberSortOptions<ToxCastAssay>((a) => a.potencyValue ?? 0, {
+        high: 'Highest potency',
+        low: 'Lowest potency',
+        idPrefix: 'potency',
+      }),
+    ],
+    [],
+  )
 
   return (
     <Panel
@@ -33,13 +59,12 @@ export const ToxCastPanel = memo(function ToxCastPanel({ data, panelId, lastFetc
       panelId={panelId}
       lastFetched={lastFetched}
       className="space-y-4"
-      empty={isEmpty ? "No ToxCast toxicity data found for this chemical." : undefined}
+      empty={isEmpty ? 'No ToxCast toxicity data found for this chemical.' : undefined}
     >
       {!isEmpty && data && (() => {
-        const assays = data.assays
-        const activeCount = assays.filter(a => a.outcome === 'active').length
-        const inactiveCount = data.assays.filter(a => a.outcome === 'inactive').length
-        const inconclusiveCount = data.assays.filter(a => a.outcome === 'inconclusive').length
+        const activeCount = assays.filter((a) => a.outcome === 'active').length
+        const inactiveCount = assays.filter((a) => a.outcome === 'inactive').length
+        const inconclusiveCount = assays.filter((a) => a.outcome === 'inconclusive').length
         return (
           <>
             <div className="space-y-2">
@@ -85,9 +110,19 @@ export const ToxCastPanel = memo(function ToxCastPanel({ data, panelId, lastFetc
                 <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
                   Assay Results ({assays.length})
                 </h3>
-                <PaginatedList className="space-y-2">
-                  {assays.slice(0, 50).map((assay, i) => (
-                    <div key={i} className="p-3 rounded-lg bg-slate-800/30 border border-slate-700">
+                <FilterablePaginatedList
+                  items={assays}
+                  getSearchText={(assay) =>
+                    [assay.assayName, assay.endpoint, assay.outcome]
+                      .filter(Boolean)
+                      .join(' ')
+                  }
+                  sortOptions={sortOptions}
+                  defaultSortId="name-asc"
+                  filterPlaceholder="Filter assays (name, endpoint, outcome…)"
+                  getKey={(assay, i) => `${assay.assayName}-${i}`}
+                  renderItem={(assay) => (
+                    <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
                           <p className="font-medium text-slate-100 text-sm">{assay.assayName}</p>
@@ -107,8 +142,8 @@ export const ToxCastPanel = memo(function ToxCastPanel({ data, panelId, lastFetc
                         </span>
                       </div>
                     </div>
-                  ))}
-                </PaginatedList>
+                  )}
+                />
               </div>
             )}
 

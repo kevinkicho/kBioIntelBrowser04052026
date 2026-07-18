@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GSRSSubstance } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 interface GSRSPanelProps {
   substances?: GSRSSubstance[]
@@ -10,7 +13,25 @@ interface GSRSPanelProps {
 }
 
 export const GSRSPanel = memo(function GSRSPanel({ substances, panelId, lastFetched }: GSRSPanelProps) {
-  const isEmpty = !substances || substances.length === 0
+  const list = substances ?? []
+  const isEmpty = list.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<GSRSSubstance>((s) => s.name || ''),
+      ...alphaSortOptions<GSRSSubstance>((s) => s.unii || '').map((o) => ({
+        ...o,
+        id: `unii-${o.id}`,
+        label: o.id === 'name-asc' ? 'UNII A–Z' : 'UNII Z–A',
+      })),
+      ...alphaSortOptions<GSRSSubstance>((s) => s.type || '').map((o) => ({
+        ...o,
+        id: `type-${o.id}`,
+        label: o.id === 'name-asc' ? 'Type A–Z' : 'Type Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="GSRS - FDA UNII Registry"
@@ -19,7 +40,7 @@ export const GSRSPanel = memo(function GSRSPanel({ substances, panelId, lastFetc
       className="space-y-4"
       empty={isEmpty ? "No UNII substances found. GSRS is the FDA's Global Substance Registration System." : undefined}
     >
-      {!isEmpty && substances && (
+      {!isEmpty && (
         <>
           <p className="text-sm text-slate-400">
             Substances from the FDA&apos;s Global Substance Registration System with UNII identifiers.
@@ -27,14 +48,29 @@ export const GSRSPanel = memo(function GSRSPanel({ substances, panelId, lastFetc
 
           <div className="space-y-2">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-              UNII Substances ({substances.length})
+              UNII Substances ({list.length})
             </h3>
-            <PaginatedList pageSize={5}>
-              {substances.map((substance) => (
-                <div
-                  key={substance.unii}
-                  className="p-4 rounded-lg bg-slate-800/30 border border-slate-700"
-                >
+            <FilterablePaginatedList
+              items={list}
+              getSearchText={(substance) =>
+                [
+                  substance.name,
+                  substance.unii,
+                  substance.type,
+                  substance.structure?.smiles,
+                  substance.structure?.formula,
+                  ...(substance.synonyms ?? []),
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+              }
+              sortOptions={sortOptions}
+              defaultSortId="name-asc"
+              filterPlaceholder="Filter substances…"
+              getKey={(substance) => substance.unii}
+              pageSize={5}
+              renderItem={(substance) => (
+                <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1">
                       <h4 className="font-semibold text-slate-100">{substance.name}</h4>
@@ -89,8 +125,8 @@ export const GSRSPanel = memo(function GSRSPanel({ substances, panelId, lastFetc
                     </div>
                   )}
                 </div>
-              ))}
-            </PaginatedList>
+              )}
+            />
           </div>
         </>
       )}

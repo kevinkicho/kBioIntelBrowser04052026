@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ClinGenGeneDisease, ClinGenVariant } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface ClinGenData {
   geneDiseases: ClinGenGeneDisease[]
@@ -75,6 +78,24 @@ export const ClinGenPanel = memo(function ClinGenPanel({ data, panelId, lastFetc
   const hasData = data.geneDiseases.length > 0 || data.variants.length > 0
   const isEmpty = !hasData
 
+  const geneDiseaseSortOptions = useMemo(
+    () => [
+      ...dateSortOptions<ClinGenGeneDisease>((g) => g.assertionDate),
+      ...numberSortOptions<ClinGenGeneDisease>((g) => g.validityScore ?? 0, {
+        high: 'Highest validity',
+        low: 'Lowest validity',
+        idPrefix: 'score',
+      }),
+      ...alphaSortOptions<ClinGenGeneDisease>((g) => `${g.geneSymbol} ${g.diseaseName}`),
+    ],
+    [],
+  )
+
+  const variantSortOptions = useMemo(
+    () => alphaSortOptions<ClinGenVariant>((v) => v.variantName || v.geneSymbol),
+    [],
+  )
+
   return (
     <Panel
       title="ClinGen"
@@ -88,21 +109,39 @@ export const ClinGenPanel = memo(function ClinGenPanel({ data, panelId, lastFetc
           {data.geneDiseases.length > 0 && (
             <div className="mb-4">
               <h4 className="text-sm font-semibold text-slate-300 mb-2">Gene-Disease Associations</h4>
-              <PaginatedList className="space-y-3">
-                {data.geneDiseases.map((item, i) => (
-                  <GeneDiseaseItem key={`${item.geneDiseaseId}-${i}`} item={item} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={data.geneDiseases}
+                getSearchText={(g) =>
+                  [g.geneSymbol, g.diseaseName, g.validityClassification, g.modeOfInheritance, g.expertPanel, g.geneDiseaseId]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={geneDiseaseSortOptions}
+                defaultSortId="date-desc"
+                filterPlaceholder="Filter gene–disease…"
+                getKey={(g, i) => `${g.geneDiseaseId}-${i}`}
+                className="space-y-3"
+                renderItem={(item) => <GeneDiseaseItem item={item} />}
+              />
             </div>
           )}
           {data.variants.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold text-slate-300 mb-2">Variants</h4>
-              <PaginatedList className="space-y-3">
-                {data.variants.map((variant, i) => (
-                  <VariantItem key={`${variant.variantId}-${i}`} variant={variant} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={data.variants}
+                getSearchText={(v) =>
+                  [v.variantName, v.geneSymbol, v.clinicalSignificance, v.condition, v.reviewStatus]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={variantSortOptions}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter variants…"
+                getKey={(v, i) => `${v.variantId}-${i}`}
+                className="space-y-3"
+                renderItem={(variant) => <VariantItem variant={variant} />}
+              />
             </div>
           )}
         </>

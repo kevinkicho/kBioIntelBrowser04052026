@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CrossRefWork } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function WorkItem({ work }: { work: CrossRefWork }) {
   return (
@@ -48,6 +51,23 @@ function WorkItem({ work }: { work: CrossRefWork }) {
 
 export const CrossRefPanel = memo(function CrossRefPanel({ works, panelId, lastFetched }: { works: CrossRefWork[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = works.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<CrossRefWork>((w) => w.year || w.publicationDate, {
+        newest: 'Newest first',
+        oldest: 'Oldest first',
+        idPrefix: 'year',
+      }),
+      ...numberSortOptions<CrossRefWork>((w) => w.isReferencedByCount ?? 0, {
+        high: 'Most cited',
+        low: 'Least cited',
+        idPrefix: 'cites',
+      }),
+      ...alphaSortOptions<CrossRefWork>((w) => w.title),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="CrossRef"
@@ -58,11 +78,20 @@ export const CrossRefPanel = memo(function CrossRefPanel({ works, panelId, lastF
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">DOI metadata from CrossRef</p>
-          <PaginatedList className="space-y-3">
-            {works.map((work, i) => (
-              <WorkItem key={`${work.doi}-${i}`} work={work} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={works}
+            getSearchText={(w) =>
+              [w.title, w.doi, w.journal, w.type, w.publisher, ...(w.authors ?? []), String(w.year ?? '')]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="year-desc"
+            filterPlaceholder="Filter publications…"
+            getKey={(w, i) => `${w.doi}-${i}`}
+            className="space-y-3"
+            renderItem={(work) => <WorkItem work={work} />}
+          />
         </>
       )}
     </Panel>

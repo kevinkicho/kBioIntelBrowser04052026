@@ -1,10 +1,14 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CTDInteraction, CTDDiseaseAssociation } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 interface CTDPanelProps {
   interactions?: CTDInteraction[]
@@ -19,6 +23,29 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
   const diseases = diseaseAssociations ?? []
   const isEmpty = items.length === 0 && diseases.length === 0
   const title = isEmpty ? "CTD" : "CTD Chemical-Gene-Disease Interactions"
+
+  const interactionSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<CTDInteraction>((x) => x.geneSymbol || ''),
+      ...alphaSortOptions<CTDInteraction>((x) => x.interaction || '').map((o) => ({
+        ...o,
+        id: `interaction-${o.id}`,
+        label: o.id === 'name-asc' ? 'Interaction A–Z' : 'Interaction Z–A',
+      })),
+    ],
+    [],
+  )
+
+  const diseaseSortOptions = useMemo(
+    () => [
+      ...numberSortOptions<CTDDiseaseAssociation>((x) => x.inferenceScore ?? 0, {
+        high: 'Highest score',
+        low: 'Lowest score',
+      }),
+      ...alphaSortOptions<CTDDiseaseAssociation>((x) => x.diseaseName || ''),
+    ],
+    [],
+  )
 
   return (
     <Panel
@@ -55,9 +82,25 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
 
       {/* Content */}
       {activeTab === 'interactions' && (
-        <PaginatedList className="space-y-1">
-          {items.map((interaction, idx) => (
-            <div key={idx} className="py-1.5 border-b border-slate-700/50 last:border-0">
+        <FilterablePaginatedList
+          items={items}
+          getSearchText={(interaction) =>
+            [
+              interaction.geneSymbol,
+              interaction.interaction,
+              ...(interaction.interactionActions ?? []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={interactionSortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter gene interactions…"
+          getKey={(_, idx) => idx}
+          pageSize={5}
+          className="space-y-1"
+          renderItem={(interaction) => (
+            <div className="py-1.5 border-b border-slate-700/50 last:border-0">
               <div className="flex items-center justify-between">
                 <span className="text-sm font-medium text-slate-200">{interaction.geneSymbol}</span>
                 <span className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded">
@@ -70,14 +113,26 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
                 </p>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
 
       {activeTab === 'diseases' && (
-        <PaginatedList className="space-y-1">
-          {diseases.map((disease, idx) => (
-            <div key={idx} className="py-1.5 border-b border-slate-700/50 last:border-0">
+        <FilterablePaginatedList
+          items={diseases}
+          getSearchText={(disease) =>
+            [disease.diseaseName, disease.diseaseId, String(disease.inferenceScore)]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={diseaseSortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter diseases…"
+          getKey={(_, idx) => idx}
+          pageSize={5}
+          className="space-y-1"
+          renderItem={(disease) => (
+            <div className="py-1.5 border-b border-slate-700/50 last:border-0">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-1.5">
                   <Link
@@ -118,8 +173,8 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
                 </p>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
         </>
       )}

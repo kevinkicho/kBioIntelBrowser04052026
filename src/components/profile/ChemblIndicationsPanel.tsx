@@ -2,9 +2,10 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { isMatch } from '@/hooks/useDiseaseContext'
 import type { ChemblIndication } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 const phaseColors: Record<number, { bg: string; label: string }> = {
   4: { bg: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30', label: 'Phase 4' },
@@ -27,6 +28,18 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({ ind
     return [...matched, ...nonMatched]
   }, [indications, diseaseName])
 
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<ChemblIndication>((ind) => ind.maxPhaseForIndication ?? ind.maxPhase ?? 0, {
+        high: 'Highest phase',
+        low: 'Lowest phase',
+        idPrefix: 'phase',
+      }),
+      ...alphaSortOptions<ChemblIndication>((ind) => ind.meshHeading || ind.efoTerm || ind.condition || ''),
+    ],
+    [],
+  )
+
   const isEmpty = indications.length === 0
 
   const matchCount = !isEmpty && diseaseName ? sortedIndications.filter(ind => {
@@ -47,15 +60,26 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({ ind
       empty={isEmpty ? "No drug indication data found for this molecule." : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {sortedIndications.map((ind, i) => {
+        <FilterablePaginatedList
+          items={sortedIndications}
+          getSearchText={(ind) =>
+            [ind.meshHeading, ind.efoTerm, ind.condition, ind.meshId, ind.efoId, ind.moleculeName]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="phase-desc"
+          filterPlaceholder="Filter indications…"
+          getKey={(ind, i) => `${ind.indicationId || ind.meshId || ind.efoId}-${i}`}
+          className="space-y-3"
+          renderItem={(ind) => {
             const phase = phaseColors[ind.maxPhaseForIndication] ?? phaseColors[1]
             const displayName = ind.meshHeading || ind.efoTerm || 'Unknown indication'
             const displayId = ind.meshId || ind.efoId || ''
             const text = [ind.meshHeading, ind.efoTerm, ind.condition].join(' ')
             const diseaseMatch = diseaseName ? isMatch(text, diseaseName) : false
             return (
-              <div key={i} className={`py-3 border-b border-slate-700 last:border-0 ${diseaseMatch ? 'bg-amber-950/20 -mx-4 px-4 rounded-md' : ''}`}>
+              <div className={`py-3 border-b border-slate-700 last:border-0 ${diseaseMatch ? 'bg-amber-950/20 -mx-4 px-4 rounded-md' : ''}`}>
                 <div className="flex items-start justify-between gap-2">
                   <a
                     href={ind.url}
@@ -81,8 +105,8 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({ ind
                 )}
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

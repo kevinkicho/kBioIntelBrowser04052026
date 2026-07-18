@@ -1,7 +1,13 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { dbSNPVariant } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 function VariantItem({ variant }: { variant: dbSNPVariant }) {
   const getClinicalBadge = () => {
@@ -53,6 +59,27 @@ function VariantItem({ variant }: { variant: dbSNPVariant }) {
 
 export const DbSNPPanel = memo(function DbSNPPanel({ variants, panelId, lastFetched }: { variants: dbSNPVariant[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = variants.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<dbSNPVariant>((v) => v.rsId || ''),
+      ...numberSortOptions<dbSNPVariant>((v) => v.frequency ?? 0, {
+        high: 'Highest frequency',
+        low: 'Lowest frequency',
+      }),
+      ...numberSortOptions<dbSNPVariant>((v) => Number(v.position) || 0, {
+        high: 'Position high',
+        low: 'Position low',
+        idPrefix: 'pos',
+      }),
+      ...alphaSortOptions<dbSNPVariant>((v) => v.clinicalSignificance || '').map((o) => ({
+        ...o,
+        id: `clin-${o.id}`,
+        label: o.id === 'name-asc' ? 'Clinical A–Z' : 'Clinical Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="dbSNP"
@@ -63,11 +90,28 @@ export const DbSNPPanel = memo(function DbSNPPanel({ variants, panelId, lastFetc
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">Genetic variants from NCBI dbSNP</p>
-          <PaginatedList className="space-y-3">
-            {variants.map((variant, i) => (
-              <VariantItem key={`${variant.rsId}-${i}`} variant={variant} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={variants}
+            getSearchText={(v) =>
+              [
+                v.rsId,
+                v.chromosome,
+                String(v.position),
+                v.alleles,
+                v.clinicalSignificance,
+                ...(v.genes ?? []),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter variants…"
+            getKey={(v, i) => `${v.rsId}-${i}`}
+            pageSize={5}
+            className="space-y-3"
+            renderItem={(variant) => <VariantItem variant={variant} />}
+          />
         </>
       )}
     </Panel>

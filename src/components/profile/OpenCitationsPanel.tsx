@@ -1,8 +1,13 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CitationMetric } from '@/lib/types'
 import { DataPoint } from '@/components/ui/DataPoint'
+import {
+  alphaSortOptions,
+  dateSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 function shortDoi(doi: string): string {
   if (doi.length <= 36) return doi
@@ -242,11 +247,42 @@ export const OpenCitationsPanel = memo(function OpenCitationsPanel({
               Science.
             </span>
           </div>
-          <PaginatedList className="space-y-1">
-            {list.map((metric, i) => (
-              <MetricRow key={`${metric.doi}-${i}`} metric={metric} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(m) =>
+              [
+                m.title,
+                m.doi,
+                m.authors,
+                m.venue,
+                m.year,
+                m.type,
+                String(m.citationCount),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={[
+              ...numberSortOptions<CitationMetric>((m) => m.citationCount, {
+                high: 'Most cited (OC)',
+                low: 'Least cited (OC)',
+              }),
+              ...dateSortOptions<CitationMetric>((m) => m.year, {
+                newest: 'Newest year',
+                oldest: 'Oldest year',
+              }),
+              ...alphaSortOptions<CitationMetric>((m) => m.title || m.doi),
+              ...numberSortOptions<CitationMetric>((m) => m.referenceCount ?? 0, {
+                high: 'Most references',
+                low: 'Fewest references',
+              }).map((o) => ({ ...o, id: `ref-${o.id}` })),
+            ]}
+            defaultSortId="num-desc"
+            filterPlaceholder="Filter papers (title, author, DOI, venue…)"
+            getKey={(m, i) => `${m.doi}-${i}`}
+            pageSize={5}
+            renderItem={(metric) => <MetricRow metric={metric} />}
+          />
         </>
       )}
     </Panel>

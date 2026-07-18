@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { BioCycPathway } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function PathwayItem({ pathway }: { pathway: BioCycPathway }) {
   return (
@@ -31,6 +34,11 @@ function PathwayItem({ pathway }: { pathway: BioCycPathway }) {
 
 export const BioCycPanel = memo(function BioCycPanel({ pathways, panelId, lastFetched }: { pathways: BioCycPathway[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = pathways.length === 0
+  const sortOptions = useMemo(
+    () => alphaSortOptions<BioCycPathway>((p) => p.name || p.pathwayId),
+    [],
+  )
+
   return (
     <Panel
       title="BioCyc"
@@ -41,11 +49,18 @@ export const BioCycPanel = memo(function BioCycPanel({ pathways, panelId, lastFe
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">Metabolic pathways from BioCyc</p>
-          <PaginatedList className="space-y-3">
-            {pathways.map((pathway, i) => (
-              <PathwayItem key={`${pathway.pathwayId}-${i}`} pathway={pathway} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={pathways}
+            getSearchText={(p) =>
+              [p.name, p.pathwayId, p.description, p.organism].filter(Boolean).join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter pathways…"
+            getKey={(p, i) => `${p.pathwayId}-${i}`}
+            className="space-y-3"
+            renderItem={(pathway) => <PathwayItem pathway={pathway} />}
+          />
         </>
       )}
     </Panel>

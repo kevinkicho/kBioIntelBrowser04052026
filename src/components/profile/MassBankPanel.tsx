@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MassBankSpectrum } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function SpectrumItem({ spectrum }: { spectrum: MassBankSpectrum }) {
   return (
@@ -43,23 +46,59 @@ function SpectrumItem({ spectrum }: { spectrum: MassBankSpectrum }) {
   )
 }
 
-export const MassBankPanel = memo(function MassBankPanel({ spectra, panelId, lastFetched }: { spectra: MassBankSpectrum[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = spectra.length === 0
+export const MassBankPanel = memo(function MassBankPanel({
+  spectra,
+  panelId,
+  lastFetched,
+}: {
+  spectra: MassBankSpectrum[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(spectra) ? spectra : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<MassBankSpectrum>((s) => s.name || s.accession || ''),
+      ...numberSortOptions<MassBankSpectrum>((s) => s.mass ?? 0, {
+        high: 'Highest mass',
+        low: 'Lowest mass',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="MassBank"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No mass spectrometry spectra found for this molecule." : undefined}
+      empty={isEmpty ? 'No mass spectrometry spectra found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">Mass spectrometry reference spectra</p>
-          <PaginatedList className="space-y-3">
-            {spectra.map((spectrum, i) => (
-              <SpectrumItem key={`${spectrum.accession}-${i}`} spectrum={spectrum} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(s) =>
+              [
+                s.name,
+                s.accession,
+                s.formula,
+                s.ionMode,
+                s.instrument,
+                s.msLevel,
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter spectra…"
+            getKey={(spectrum, i) => `${spectrum.accession}-${i}`}
+            renderItem={(spectrum) => <SpectrumItem spectrum={spectrum} />}
+          />
         </>
       )}
     </Panel>

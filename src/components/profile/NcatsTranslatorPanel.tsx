@@ -1,10 +1,13 @@
 /** NCATS Biomedical Translator associations. */
 
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import type { TranslatorAssociation } from '@/lib/types'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { alphaSortOptions } from '@/lib/listControls'
 
 interface NcatsTranslatorPanelProps {
   data: TranslatorAssociation[]
@@ -26,6 +29,25 @@ export const NcatsTranslatorPanel = memo(function NcatsTranslatorPanel({
   const list = Array.isArray(data) ? data : []
   const isEmpty = !isLoading && list.length === 0
 
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<TranslatorAssociation>((a) => a.subject || ''),
+      ...alphaSortOptions<TranslatorAssociation>((a) => a.object || '').map((o) => ({
+        ...o,
+        id: `object-${o.id}`,
+        label: o.id.includes('asc') ? 'Object A–Z' : 'Object Z–A',
+      })),
+      ...alphaSortOptions<TranslatorAssociation>(
+        (a) => a.edgeLabel || a.predicate || '',
+      ).map((o) => ({
+        ...o,
+        id: `pred-${o.id}`,
+        label: o.id.includes('asc') ? 'Predicate A–Z' : 'Predicate Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={
@@ -44,12 +66,28 @@ export const NcatsTranslatorPanel = memo(function NcatsTranslatorPanel({
       }
     >
       {!isEmpty && !isLoading && (
-        <PaginatedList className="space-y-1">
-          {list.map((a, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(a) =>
+            [
+              a.subject,
+              a.object,
+              a.edgeLabel,
+              a.predicate,
+              a.source,
+              ...(a.publications || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter associations (subject, object, predicate…)"
+          getKey={(a, i) => `${a.subject}-${a.object}-${i}`}
+          renderItem={(a) => {
             const label = a.edgeLabel || a.predicate || 'association'
             return (
               <DataPoint
-                key={`${a.subject}-${a.object}-${i}`}
                 sourceKey="ncats-translator"
                 label={`${a.subject} → ${a.object}`}
                 recordUrl="https://ncats.nih.gov/translator"
@@ -121,8 +159,8 @@ export const NcatsTranslatorPanel = memo(function NcatsTranslatorPanel({
                 </div>
               </DataPoint>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

@@ -1,11 +1,14 @@
 /** NINDS NeuroMMSig molecular signatures. */
 
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import type { NeuroMMSigSignature } from '@/lib/types'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { alphaSortOptions } from '@/lib/listControls'
 
 interface NindsNeurommsigPanelProps {
   data: NeuroMMSigSignature[]
@@ -22,6 +25,23 @@ export const NindsNeurommsigPanel = memo(function NindsNeurommsigPanel({
 }: NindsNeurommsigPanelProps) {
   const list = Array.isArray(data) ? data : []
   const isEmpty = !isLoading && list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<NeuroMMSigSignature>((s) => s.name || ''),
+      ...alphaSortOptions<NeuroMMSigSignature>((s) => s.disease || '').map((o) => ({
+        ...o,
+        id: `disease-${o.id}`,
+        label: o.id.includes('asc') ? 'Disease A–Z' : 'Disease Z–A',
+      })),
+      ...alphaSortOptions<NeuroMMSigSignature>((s) => s.mechanism || '').map((o) => ({
+        ...o,
+        id: `mech-${o.id}`,
+        label: o.id.includes('asc') ? 'Mechanism A–Z' : 'Mechanism Z–A',
+      })),
+    ],
+    [],
+  )
 
   return (
     <Panel
@@ -41,8 +61,27 @@ export const NindsNeurommsigPanel = memo(function NindsNeurommsigPanel({
       }
     >
       {!isEmpty && !isLoading && (
-        <PaginatedList className="space-y-1">
-          {list.map((sig, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(sig) =>
+            [
+              sig.name,
+              sig.signatureId,
+              sig.disease,
+              sig.mechanism,
+              sig.evidence,
+              ...(sig.genes || []),
+              ...(sig.drugs || []),
+              ...(sig.publications || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter signatures (name, disease, gene…)"
+          getKey={(sig, i) => `${sig.signatureId}-${i}`}
+          renderItem={(sig) => {
             const diseaseHref = sig.disease
               ? `/disease?q=${encodeURIComponent(sig.disease)}`
               : undefined
@@ -51,7 +90,6 @@ export const NindsNeurommsigPanel = memo(function NindsNeurommsigPanel({
               : undefined
             return (
               <DataPoint
-                key={`${sig.signatureId}-${i}`}
                 sourceKey="ninds-neurommsig"
                 label={sig.name}
                 recordUrl="https://neurmmsig.scai.fraunhofer.de/"
@@ -162,8 +200,8 @@ export const NindsNeurommsigPanel = memo(function NindsNeurommsigPanel({
                 </div>
               </DataPoint>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

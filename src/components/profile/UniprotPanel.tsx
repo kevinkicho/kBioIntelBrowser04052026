@@ -1,21 +1,59 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { UniprotEntry } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const UniprotPanel = memo(function UniprotPanel({ entries, panelId, lastFetched }: { entries: UniprotEntry[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = entries.length === 0
+  const list = Array.isArray(entries) ? entries : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<UniprotEntry>((e) => e.proteinName || ''),
+      ...alphaSortOptions<UniprotEntry>((e) => e.geneName || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id.includes('asc') ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+      ...alphaSortOptions<UniprotEntry>((e) => e.organism || '').map((o) => ({
+        ...o,
+        id: `org-${o.id}`,
+        label: o.id.includes('asc') ? 'Organism A–Z' : 'Organism Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Gene & Protein (UniProt)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No protein/gene data found for this molecule." : undefined}
+      empty={isEmpty ? 'No protein/gene data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {entries.map((entry, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(entry) =>
+            [
+              entry.proteinName,
+              entry.geneName,
+              entry.organism,
+              entry.functionSummary,
+              entry.accession,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter proteins (name, gene, accession…)"
+          getKey={(entry, i) => `${entry.accession || i}`}
+          renderItem={(entry) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">{entry.proteinName}</p>
                 {entry.geneName && (
@@ -37,8 +75,8 @@ export const UniprotPanel = memo(function UniprotPanel({ entries, panelId, lastF
                 {entry.accession}
               </a>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

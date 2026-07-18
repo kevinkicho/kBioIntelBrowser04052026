@@ -1,10 +1,13 @@
 /** NCI EVS / caDSR-adjacent concepts — free public EVS REST. */
 
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import type { CadsrConcept } from '@/lib/types'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { alphaSortOptions } from '@/lib/listControls'
 
 interface NciCadsrPanelProps {
   data: CadsrConcept[]
@@ -30,6 +33,18 @@ export const NciCadsrPanel = memo(function NciCadsrPanel({
   const list = Array.isArray(data) ? data : []
   const isEmpty = !isLoading && list.length === 0
 
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<CadsrConcept>((c) => c.preferredName || ''),
+      ...alphaSortOptions<CadsrConcept>((c) => c.conceptId || '').map((o) => ({
+        ...o,
+        id: `id-${o.id}`,
+        label: o.id.includes('asc') ? 'Concept ID A–Z' : 'Concept ID Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={
@@ -48,12 +63,21 @@ export const NciCadsrPanel = memo(function NciCadsrPanel({
       }
     >
       {!isEmpty && !isLoading && (
-        <PaginatedList className="space-y-1">
-          {list.map((c, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(c) =>
+            [c.preferredName, c.conceptId, c.workflowStatus, c.context, c.evsSource, c.definition]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter concepts (name, ID, definition…)"
+          getKey={(c, i) => `${c.conceptId}-${i}`}
+          renderItem={(c) => {
             const href = conceptUrl(c)
             return (
               <DataPoint
-                key={`${c.conceptId}-${i}`}
                 sourceKey="nci-cadsr"
                 label={c.preferredName}
                 recordUrl={href}
@@ -105,8 +129,8 @@ export const NciCadsrPanel = memo(function NciCadsrPanel({
                 </div>
               </DataPoint>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

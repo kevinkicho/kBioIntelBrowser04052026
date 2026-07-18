@@ -1,10 +1,15 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { StructureViewer } from '@/components/charts/StructureViewer'
 import type { PdbStructure } from '@/lib/types'
+import {
+  alphaSortOptions,
+  dateSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 const methodColors: Record<string, string> = {
   'X-ray': 'bg-sky-900/40 text-sky-300 border-sky-700/30',
@@ -16,22 +21,54 @@ const methodColors: Record<string, string> = {
 
 export const PdbPanel = memo(function PdbPanel({ structures, panelId, lastFetched }: { structures: PdbStructure[], panelId?: string, lastFetched?: Date }) {
   const [activeViewer, setActiveViewer] = useState<string | null>(null)
-  const isEmpty = structures.length === 0
+  const list = Array.isArray(structures) ? structures : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<PdbStructure>((s) => s.depositionDate, {
+        newest: 'Newest deposition',
+        oldest: 'Oldest deposition',
+      }),
+      ...numberSortOptions<PdbStructure>((s) => s.resolution || 0, {
+        high: 'Highest resolution value',
+        low: 'Best resolution (lowest Å)',
+        idPrefix: 'res',
+      }),
+      ...alphaSortOptions<PdbStructure>((s) => s.pdbId || s.title || ''),
+    ],
+    [],
+  )
 
   return (
     <Panel
       title="PDB Structures"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No PDB structures found for this molecule." : undefined}
+      empty={isEmpty ? 'No PDB structures found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {structures.map((structure, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(structure) =>
+            [
+              structure.pdbId,
+              structure.title,
+              structure.method,
+              structure.depositionDate,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="date-desc"
+          filterPlaceholder="Filter structures (PDB ID, title, method…)"
+          getKey={(structure, i) => `${structure.pdbId || i}`}
+          renderItem={(structure) => {
             const colors = methodColors[structure.method] ?? 'bg-slate-700/40 text-slate-300 border-slate-600/30'
             const isViewerOpen = activeViewer === structure.pdbId
             return (
-              <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+              <div className="py-3 border-b border-slate-700 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2">
                     <a href={structure.url} target="_blank" rel="noopener noreferrer"
@@ -69,11 +106,9 @@ export const PdbPanel = memo(function PdbPanel({ structures, panelId, lastFetche
                 )}
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )
 })
-
-

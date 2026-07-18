@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { HPOTerm } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const HPOPanel = memo(function HPOPanel({
   terms,
@@ -15,6 +18,11 @@ export const HPOPanel = memo(function HPOPanel({
   const safeTerms = Array.isArray(terms) ? terms : []
   const isEmpty = safeTerms.length === 0
 
+  const sortOptions = useMemo(
+    () => alphaSortOptions<HPOTerm>((t) => t.name || ''),
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'Human Phenotype Ontology' : `Human Phenotype Ontology (${safeTerms.length})`}
@@ -23,11 +31,19 @@ export const HPOPanel = memo(function HPOPanel({
       empty={isEmpty ? 'No HPO terms found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {safeTerms.map((term, i) => {
+        <FilterablePaginatedList
+          items={safeTerms}
+          getSearchText={(t) =>
+            [t.name, t.id, t.definition, ...(t.synonyms || [])].filter(Boolean).join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter HPO terms…"
+          getKey={(term, i) => `${term.id || i}-${i}`}
+          renderItem={(term) => {
             const href = `https://hpo.jax.org/app/web/term/${term.id}`
             return (
-              <div key={`${term.id || i}-${i}`} className="py-2 border-b border-slate-700/60 last:border-0">
+              <div className="py-2 border-b border-slate-700/60 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -82,8 +98,8 @@ export const HPOPanel = memo(function HPOPanel({
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

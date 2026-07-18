@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { AlphaFoldPrediction } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function confidenceColor(score: number): string {
   if (score >= 90) return 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30'
@@ -11,6 +14,18 @@ function confidenceColor(score: number): string {
 
 export const AlphaFoldPanel = memo(function AlphaFoldPanel({ predictions, panelId, lastFetched }: { predictions: AlphaFoldPrediction[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = predictions.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<AlphaFoldPrediction>((p) => p.confidenceScore ?? 0, {
+        high: 'Highest confidence',
+        low: 'Lowest confidence',
+        idPrefix: 'conf',
+      }),
+      ...alphaSortOptions<AlphaFoldPrediction>((p) => p.geneName || p.uniprotAccession),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="AlphaFold Predicted Structures"
@@ -19,9 +34,20 @@ export const AlphaFoldPanel = memo(function AlphaFoldPanel({ predictions, panelI
       empty={isEmpty ? "No AlphaFold predictions found for this molecule." : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {predictions.map((pred, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={predictions}
+          getSearchText={(p) =>
+            [p.uniprotAccession, p.geneName, p.organismName, p.entryId]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="conf-desc"
+          filterPlaceholder="Filter structures…"
+          getKey={(p, i) => `${p.uniprotAccession || p.entryId}-${i}`}
+          className="space-y-3"
+          renderItem={(pred) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <span className="text-xs font-mono bg-slate-700/60 text-slate-300 border border-slate-600/40 px-2 py-0.5 rounded shrink-0">
                   {pred.uniprotAccession}
@@ -59,8 +85,8 @@ export const AlphaFoldPanel = memo(function AlphaFoldPanel({ predictions, panelI
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

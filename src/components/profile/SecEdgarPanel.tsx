@@ -1,21 +1,52 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SecFiling } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 export const SecEdgarPanel = memo(function SecEdgarPanel({ filings, panelId, lastFetched }: { filings: SecFiling[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = filings.length === 0
+  const list = Array.isArray(filings) ? filings : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<SecFiling>((f) => f.filingDate, {
+        newest: 'Newest filing',
+        oldest: 'Oldest filing',
+      }),
+      ...alphaSortOptions<SecFiling>((f) => f.companyName || ''),
+      ...alphaSortOptions<SecFiling>((f) => f.formType || '').map((o) => ({
+        ...o,
+        id: `form-${o.id}`,
+        label: o.id.includes('asc') ? 'Form A–Z' : 'Form Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="SEC Filings"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No SEC filings found for this molecule." : undefined}
+      empty={isEmpty ? 'No SEC filings found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {filings.map((filing, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(filing) =>
+            [filing.companyName, filing.formType, filing.filingDate, filing.description]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="date-desc"
+          filterPlaceholder="Filter filings (company, form, date…)"
+          getKey={(filing, i) => `${filing.companyName}-${filing.filingDate}-${i}`}
+          renderItem={(filing) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">{filing.companyName}</p>
                 <span className="text-xs bg-orange-900/40 text-orange-300 border border-orange-700/30 px-2 py-0.5 rounded shrink-0">
@@ -37,8 +68,8 @@ export const SecEdgarPanel = memo(function SecEdgarPanel({ filings, panelId, las
                 </a>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

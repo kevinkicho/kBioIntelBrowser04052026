@@ -1,10 +1,10 @@
-import { memo } from 'react'
-import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import { PaginatedVirtualizedList } from '@/components/ui/VirtualizedList'
-import type { ChemblActivity } from '@/lib/types'
+'use client'
 
-const VIRTUALIZATION_THRESHOLD = 20
+import { memo, useMemo } from 'react'
+import { Panel } from '@/components/ui/Panel'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import type { ChemblActivity } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 const ASSAY_TYPE_LABELS: Record<string, string> = {
   B: 'Binding',
@@ -24,7 +24,9 @@ function ChemblActivityItem({ activity }: { activity: ChemblActivity }) {
         </span>
       </div>
       <div className="flex items-center gap-3 mt-1">
-        <span className="text-sm text-slate-300">{activity.activityValue} {activity.activityUnits}</span>
+        <span className="text-sm text-slate-300">
+          {activity.activityValue} {activity.activityUnits}
+        </span>
         <span className="text-xs text-slate-500">
           {ASSAY_TYPE_LABELS[activity.assayType] ?? activity.assayType}
         </span>
@@ -33,8 +35,29 @@ function ChemblActivityItem({ activity }: { activity: ChemblActivity }) {
   )
 }
 
-export const ChemblPanel = memo(function ChemblPanel({ activities, panelId, lastFetched }: { activities: ChemblActivity[], panelId?: string, lastFetched?: Date }) {
-  if (activities.length === 0) {
+export const ChemblPanel = memo(function ChemblPanel({
+  activities,
+  panelId,
+  lastFetched,
+}: {
+  activities: ChemblActivity[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(activities) ? activities : []
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<ChemblActivity>((a) => a.activityValue ?? a.pchemblValue ?? 0, {
+        high: 'Highest activity',
+        low: 'Lowest activity',
+        idPrefix: 'activity',
+      }),
+      ...alphaSortOptions<ChemblActivity>((a) => a.targetName || a.activityType),
+    ],
+    [],
+  )
+
+  if (list.length === 0) {
     return (
       <Panel title="Bioactivity (ChEMBL)" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No bioactivity data found for this molecule.</p>
@@ -42,28 +65,33 @@ export const ChemblPanel = memo(function ChemblPanel({ activities, panelId, last
     )
   }
 
-  // Use virtualization for large datasets
-  if (activities.length > VIRTUALIZATION_THRESHOLD) {
-    return (
-      <Panel title="Bioactivity (ChEMBL)" panelId={panelId} lastFetched={lastFetched}>
-        <PaginatedVirtualizedList
-          items={activities}
-          renderItem={(activity, i) => <ChemblActivityItem key={`${activity.targetName}-${activity.activityType}-${i}`} activity={activity} />}
-          initialCount={10}
-          estimateSize={80}
-          emptyMessage="No bioactivity data found for this molecule."
-        />
-      </Panel>
-    )
-  }
-
   return (
-    <Panel title="Bioactivity (ChEMBL)" panelId={panelId} lastFetched={lastFetched}>
-      <PaginatedList className="space-y-3">
-        {activities.map((activity, i) => (
-          <ChemblActivityItem key={`${activity.targetName}-${activity.activityType}-${i}`} activity={activity} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title={`Bioactivity (ChEMBL) (${list.length})`}
+      panelId={panelId}
+      lastFetched={lastFetched}
+    >
+      <FilterablePaginatedList
+        items={list}
+        getSearchText={(a) =>
+          [
+            a.targetName,
+            a.activityType,
+            a.assayType,
+            a.chemblId,
+            String(a.activityValue),
+            a.activityUnits,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        }
+        sortOptions={sortOptions}
+        defaultSortId="activity-desc"
+        filterPlaceholder="Filter activities (target, type…)"
+        getKey={(a, i) => `${a.targetName}-${a.activityType}-${i}`}
+        className="space-y-3"
+        renderItem={(activity) => <ChemblActivityItem activity={activity} />}
+      />
     </Panel>
   )
 })

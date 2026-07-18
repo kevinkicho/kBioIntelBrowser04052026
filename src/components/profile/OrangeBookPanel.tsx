@@ -1,21 +1,60 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OrangeBookEntry } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 export const OrangeBookPanel = memo(function OrangeBookPanel({ entries, panelId, lastFetched }: { entries: OrangeBookEntry[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = entries.length === 0
+  const list = Array.isArray(entries) ? entries : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<OrangeBookEntry>((e) => e.approvalDate, {
+        newest: 'Newest approval',
+        oldest: 'Oldest approval',
+      }),
+      ...alphaSortOptions<OrangeBookEntry>((e) => e.sponsorName || ''),
+      ...alphaSortOptions<OrangeBookEntry>((e) => e.applicationNumber || '').map((o) => ({
+        ...o,
+        id: `app-${o.id}`,
+        label: o.id.includes('asc') ? 'Application A–Z' : 'Application Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="FDA Orange Book"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No Orange Book entries found for this molecule." : undefined}
+      empty={isEmpty ? 'No Orange Book entries found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {entries.map((entry, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(entry) =>
+            [
+              entry.sponsorName,
+              entry.applicationNumber,
+              entry.dosageForm,
+              entry.teCode,
+              entry.approvalDate,
+              ...(entry.patents?.map((p) => `${p.patentNumber} ${p.expiryDate}`) || []),
+              ...(entry.exclusivities?.map((e) => `${e.code} ${e.expiryDate}`) || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="date-desc"
+          filterPlaceholder="Filter entries (sponsor, application, TE…)"
+          getKey={(entry, i) => `${entry.applicationNumber}-${i}`}
+          renderItem={(entry) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">{entry.sponsorName}</p>
                 <span className="text-xs bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-2 py-0.5 rounded shrink-0">
@@ -52,8 +91,8 @@ export const OrangeBookPanel = memo(function OrangeBookPanel({ entries, panelId,
                 </div>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

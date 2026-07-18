@@ -1,6 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SIDERSideEffect } from '@/lib/types'
+import { alphaSortOptions, compareText } from '@/lib/listControls'
 
 interface SIDERPanelProps {
   sideEffects?: SIDERSideEffect[]
@@ -20,20 +24,53 @@ function frequencyBucket(raw: string | undefined): string {
   if (s.includes('very rare')) return 'Very rare'
   if (s.includes('rare')) return 'Rare'
   if (s.includes('unknown') || !raw) return 'Unknown'
-  // Keep custom label (e.g. "common (~12 reports)") as its own bucket if unmatched
   return raw!.trim() || 'Unknown'
 }
 
-const BUCKET_ORDER = [
-  'Very frequent',
-  'Common',
-  'Frequent',
-  'Infrequent',
-  'Occasional',
-  'Rare',
-  'Very rare',
-  'Unknown',
-]
+const BUCKET_RANK: Record<string, number> = {
+  'Very frequent': 0,
+  Common: 1,
+  Frequent: 2,
+  Infrequent: 3,
+  Occasional: 4,
+  Rare: 5,
+  'Very rare': 6,
+  Unknown: 7,
+}
+
+function SideEffectItem({ effect }: { effect: SIDERSideEffect }) {
+  const href =
+    effect.url ||
+    (effect.sideEffectName
+      ? `https://www.ncbi.nlm.nih.gov/medgen/?term=${encodeURIComponent(effect.sideEffectName)}`
+      : undefined)
+  const bucket = frequencyBucket(effect.frequency)
+
+  return (
+    <div className="py-1.5 border-b border-slate-700/50 last:border-0 flex items-start justify-between gap-2">
+      <div className="min-w-0">
+        {href ? (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-sm text-slate-200 hover:text-indigo-300 hover:underline"
+          >
+            {effect.sideEffectName}
+          </a>
+        ) : (
+          <span className="text-sm text-slate-200">{effect.sideEffectName}</span>
+        )}
+        {effect.frequency && (
+          <p className="text-[10px] text-slate-600 mt-0.5">{effect.frequency}</p>
+        )}
+      </div>
+      <span className="text-[10px] shrink-0 px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+        {bucket}
+      </span>
+    </div>
+  )
+}
 
 export const SIDERPanel = memo(function SIDERPanel({
   sideEffects,
@@ -43,6 +80,33 @@ export const SIDERPanel = memo(function SIDERPanel({
   const list = Array.isArray(sideEffects) ? sideEffects : []
   const isEmpty = list.length === 0
   const title = isEmpty ? 'SIDER' : `SIDER Side Effects (${list.length})`
+
+  const sortOptions = useMemo(
+    () => [
+      {
+        id: 'freq-asc',
+        label: 'Most frequent first',
+        compare: (a: SIDERSideEffect, b: SIDERSideEffect) => {
+          const ra = BUCKET_RANK[frequencyBucket(a.frequency)] ?? 99
+          const rb = BUCKET_RANK[frequencyBucket(b.frequency)] ?? 99
+          if (ra !== rb) return ra - rb
+          return compareText(a.sideEffectName || '', b.sideEffectName || '')
+        },
+      },
+      {
+        id: 'freq-desc',
+        label: 'Rarest first',
+        compare: (a: SIDERSideEffect, b: SIDERSideEffect) => {
+          const ra = BUCKET_RANK[frequencyBucket(a.frequency)] ?? 99
+          const rb = BUCKET_RANK[frequencyBucket(b.frequency)] ?? 99
+          if (ra !== rb) return rb - ra
+          return compareText(a.sideEffectName || '', b.sideEffectName || '')
+        },
+      },
+      ...alphaSortOptions<SIDERSideEffect>((e) => e.sideEffectName || ''),
+    ],
+    [],
+  )
 
   return (
     <Panel
@@ -55,82 +119,20 @@ export const SIDERPanel = memo(function SIDERPanel({
           : undefined
       }
     >
-      {!isEmpty &&
-        (() => {
-          const groupedByFrequency = list.reduce(
-            (acc, effect) => {
-              const freq = frequencyBucket(effect.frequency)
-              if (!acc[freq]) acc[freq] = []
-              acc[freq].push(effect)
-              return acc
-            },
-            {} as Record<string, SIDERSideEffect[]>,
-          )
-
-          // Known buckets first, then any leftover keys alphabetically
-          const keys = [
-            ...BUCKET_ORDER.filter((k) => (groupedByFrequency[k]?.length ?? 0) > 0),
-            ...Object.keys(groupedByFrequency)
-              .filter((k) => !BUCKET_ORDER.includes(k))
-              .sort(),
-          ]
-
-          return (
-            <div className="space-y-3 max-h-72 overflow-y-auto">
-              {keys.map((freq) => {
-                const effects = groupedByFrequency[freq]
-                if (!effects?.length) return null
-
-                return (
-                  <div key={freq}>
-                    <h4 className="text-xs font-medium text-slate-300 mb-1 flex items-center gap-2">
-                      {freq}
-                      <span className="text-xs px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded">
-                        {effects.length}
-                      </span>
-                    </h4>
-                    <ul className="space-y-0.5 pl-2">
-                      {effects.slice(0, 15).map((effect, idx) => {
-                        const href =
-                          effect.url ||
-                          (effect.sideEffectName
-                            ? `https://www.ncbi.nlm.nih.gov/medgen/?term=${encodeURIComponent(effect.sideEffectName)}`
-                            : undefined)
-                        return (
-                          <li key={`${effect.sideEffectName}-${idx}`} className="text-xs text-slate-400">
-                            <span className="text-slate-500">• </span>
-                            {href ? (
-                              <a
-                                href={href}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="text-slate-300 hover:text-indigo-300 hover:underline"
-                              >
-                                {effect.sideEffectName}
-                              </a>
-                            ) : (
-                              effect.sideEffectName
-                            )}
-                            {effect.frequency && (
-                              <span className="text-slate-600 ml-1 text-[10px]">
-                                ({effect.frequency})
-                              </span>
-                            )}
-                          </li>
-                        )
-                      })}
-                      {effects.length > 15 && (
-                        <li className="text-xs text-slate-500">
-                          +{effects.length - 15} more in this bucket
-                        </li>
-                      )}
-                    </ul>
-                  </div>
-                )
-              })}
-            </div>
-          )
-        })()}
+      {!isEmpty && (
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(e) =>
+            [e.sideEffectName, e.frequency, frequencyBucket(e.frequency)].filter(Boolean).join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="freq-asc"
+          filterPlaceholder="Filter side effects…"
+          getKey={(e, i) => `${e.sideEffectName}-${i}`}
+          pageSize={10}
+          renderItem={(effect) => <SideEffectItem effect={effect} />}
+        />
+      )}
     </Panel>
   )
 })

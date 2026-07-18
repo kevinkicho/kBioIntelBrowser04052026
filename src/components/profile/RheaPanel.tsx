@@ -1,21 +1,54 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SynthesisRoute } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const RheaPanel = memo(function RheaPanel({ routes, panelId, lastFetched }: { routes: SynthesisRoute[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = routes.length === 0
+  const list = Array.isArray(routes) ? routes : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<SynthesisRoute>((r) => r.method || ''),
+      ...alphaSortOptions<SynthesisRoute>((r) => r.source || '').map((o) => ({
+        ...o,
+        id: `src-${o.id}`,
+        label: o.id.includes('asc') ? 'Source A–Z' : 'Source Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Biochemical Reactions"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No biochemical reactions found." : undefined}
+      empty={isEmpty ? 'No biochemical reactions found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {routes.map((route, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(route) =>
+            [
+              route.method,
+              route.source,
+              route.description,
+              ...(route.precursors || []),
+              ...(route.enzymesInvolved || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter reactions (method, enzyme, precursor…)"
+          getKey={(route, i) => `${route.method}-${i}`}
+          renderItem={(route) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <span className="text-sm font-medium text-slate-200">{route.method}</span>
                 <span className="text-xs bg-blue-900/40 text-blue-300 px-2 py-0.5 rounded">
@@ -46,8 +79,8 @@ export const RheaPanel = memo(function RheaPanel({ routes, panelId, lastFetched 
                 </div>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

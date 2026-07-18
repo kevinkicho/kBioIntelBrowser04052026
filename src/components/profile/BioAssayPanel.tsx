@@ -1,10 +1,10 @@
-import { memo } from 'react'
-import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import { PaginatedVirtualizedList } from '@/components/ui/VirtualizedList'
-import type { BioAssayResult } from '@/lib/types'
+'use client'
 
-const VIRTUALIZATION_THRESHOLD = 20
+import { memo, useMemo } from 'react'
+import { Panel } from '@/components/ui/Panel'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import type { BioAssayResult } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function outcomeBadgeClass(outcome: string): string {
   switch (outcome) {
@@ -21,11 +21,11 @@ function BioAssayItem({ assay }: { assay: BioAssayResult }) {
   return (
     <div className="py-3 border-b border-slate-700 last:border-0">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className={`text-xs px-2 py-0.5 rounded ${outcomeBadgeClass(assay.outcome)}`}>
+        <div className="flex items-center gap-2 min-w-0">
+          <span className={`text-xs px-2 py-0.5 rounded shrink-0 ${outcomeBadgeClass(assay.outcome)}`}>
             {assay.outcome}
           </span>
-          <p className="font-semibold text-slate-100 text-sm">{assay.assayName}</p>
+          <p className="font-semibold text-slate-100 text-sm truncate">{assay.assayName}</p>
         </div>
         <a
           href={assay.url}
@@ -38,14 +38,37 @@ function BioAssayItem({ assay }: { assay: BioAssayResult }) {
       </div>
       <div className="mt-2 flex gap-4 text-xs text-slate-400">
         {assay.targetName && <span>Target: {assay.targetName}</span>}
-        {assay.activityValue != null && assay.activityValue > 0 && <span>Activity: {assay.activityValue}</span>}
+        {assay.activityValue != null && assay.activityValue > 0 && (
+          <span>Activity: {assay.activityValue}</span>
+        )}
       </div>
     </div>
   )
 }
 
-export const BioAssayPanel = memo(function BioAssayPanel({ assays, panelId, lastFetched }: { assays: BioAssayResult[], panelId?: string, lastFetched?: Date }) {
-  if (assays.length === 0) {
+export const BioAssayPanel = memo(function BioAssayPanel({
+  assays,
+  panelId,
+  lastFetched,
+}: {
+  assays: BioAssayResult[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(assays) ? assays : []
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<BioAssayResult>((a) => a.assayName || a.assayId),
+      ...numberSortOptions<BioAssayResult>((a) => a.activityValue ?? 0, {
+        high: 'Highest activity',
+        low: 'Lowest activity',
+        idPrefix: 'activity',
+      }),
+    ],
+    [],
+  )
+
+  if (list.length === 0) {
     return (
       <Panel title="PubChem BioAssay" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No bioassay data found for this molecule.</p>
@@ -53,28 +76,26 @@ export const BioAssayPanel = memo(function BioAssayPanel({ assays, panelId, last
     )
   }
 
-  // Use virtualization for large datasets
-  if (assays.length > VIRTUALIZATION_THRESHOLD) {
-    return (
-      <Panel title="PubChem BioAssay" panelId={panelId} lastFetched={lastFetched}>
-        <PaginatedVirtualizedList
-          items={assays}
-          renderItem={(assay, i) => <BioAssayItem key={`${assay.assayName}-${i}`} assay={assay} />}
-          initialCount={10}
-          estimateSize={80}
-          emptyMessage="No bioassay data found for this molecule."
-        />
-      </Panel>
-    )
-  }
-
   return (
-    <Panel title="PubChem BioAssay" panelId={panelId} lastFetched={lastFetched}>
-      <PaginatedList className="space-y-3">
-        {assays.map((assay, i) => (
-          <BioAssayItem key={`${assay.assayName}-${i}`} assay={assay} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title={`PubChem BioAssay (${list.length})`}
+      panelId={panelId}
+      lastFetched={lastFetched}
+    >
+      <FilterablePaginatedList
+        items={list}
+        getSearchText={(a) =>
+          [a.assayName, a.assayId, a.outcome, a.targetName, a.description, a.type]
+            .filter(Boolean)
+            .join(' ')
+        }
+        sortOptions={sortOptions}
+        defaultSortId="name-asc"
+        filterPlaceholder="Filter assays (name, target, outcome…)"
+        getKey={(a, i) => `${a.assayName}-${i}`}
+        className="space-y-3"
+        renderItem={(assay) => <BioAssayItem assay={assay} />}
+      />
     </Panel>
   )
 })

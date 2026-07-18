@@ -28,8 +28,14 @@ describe('PatentsPanel', () => {
   })
 
   test('renders assignee', () => {
+    const { container } = render(<PatentsPanel patents={mockPatents} />)
+    expect(container.textContent).toMatch(/Novo Nordisk/)
+  })
+
+  test('defaults to newest filing sort control', () => {
     render(<PatentsPanel patents={mockPatents} />)
-    expect(screen.getByText('Novo Nordisk')).toBeInTheDocument()
+    const select = screen.getByTestId('list-sort-select') as HTMLSelectElement
+    expect(select.value).toBe('date-desc')
   })
 
   test('renders empty state when no patents', () => {

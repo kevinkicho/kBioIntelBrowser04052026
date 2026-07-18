@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { BindingAffinity } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 const AFFINITY_TYPE_COLORS: Record<string, string> = {
   Ki:   'bg-violet-900/40 text-violet-300 border-violet-700/30',
@@ -16,6 +19,18 @@ function affinityBadgeClass(type: string): string {
 
 export const BindingDbPanel = memo(function BindingDbPanel({ affinities, panelId, lastFetched }: { affinities: BindingAffinity[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = affinities.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<BindingAffinity>((a) => a.affinityValue ?? 0, {
+        high: 'Highest affinity value',
+        low: 'Lowest affinity value',
+        idPrefix: 'aff',
+      }),
+      ...alphaSortOptions<BindingAffinity>((a) => a.targetName || a.ligandName || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Binding Affinities (BindingDB)"
@@ -24,9 +39,20 @@ export const BindingDbPanel = memo(function BindingDbPanel({ affinities, panelId
       empty={isEmpty ? "No binding affinity data found for this molecule." : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {affinities.map((aff, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={affinities}
+          getSearchText={(a) =>
+            [a.targetName, a.ligandName, a.affinityType, a.source, a.doi, String(a.affinityValue)]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="aff-desc"
+          filterPlaceholder="Filter affinities…"
+          getKey={(a, i) => `${a.targetName}-${a.affinityType}-${i}`}
+          className="space-y-3"
+          renderItem={(aff) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">{aff.targetName}</p>
                 <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${affinityBadgeClass(aff.affinityType)}`}>
@@ -52,8 +78,8 @@ export const BindingDbPanel = memo(function BindingDbPanel({ affinities, panelId
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

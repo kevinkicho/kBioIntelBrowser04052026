@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ChemSpiderCompound } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function CompoundItem({ compound }: { compound: ChemSpiderCompound }) {
   return (
@@ -81,6 +84,18 @@ function CompoundItem({ compound }: { compound: ChemSpiderCompound }) {
 
 export const ChemSpiderPanel = memo(function ChemSpiderPanel({ compounds, panelId, lastFetched }: { compounds: ChemSpiderCompound[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = compounds.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<ChemSpiderCompound>((c) => c.name || c.csId),
+      ...numberSortOptions<ChemSpiderCompound>((c) => c.molecularWeight ?? 0, {
+        high: 'Highest MW',
+        low: 'Lowest MW',
+        idPrefix: 'mw',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="ChemSpider"
@@ -93,11 +108,20 @@ export const ChemSpiderPanel = memo(function ChemSpiderPanel({ compounds, panelI
           <p className="text-xs text-slate-400 mb-3">
             Royal Society of Chemistry Database — {compounds.length} compound{compounds.length !== 1 ? 's' : ''}
           </p>
-          <PaginatedList className="space-y-2">
-            {compounds.map((compound, i) => (
-              <CompoundItem key={`${compound.csId}-${i}`} compound={compound} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={compounds}
+            getSearchText={(c) =>
+              [c.name, c.csId, c.formula, c.inChIKey, c.smiles, ...(c.synonyms ?? []), ...(c.sources ?? [])]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter compounds…"
+            getKey={(c, i) => `${c.csId}-${i}`}
+            className="space-y-2"
+            renderItem={(compound) => <CompoundItem compound={compound} />}
+          />
         </>
       )}
     </Panel>

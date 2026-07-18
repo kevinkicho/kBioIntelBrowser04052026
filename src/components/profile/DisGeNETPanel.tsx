@@ -1,8 +1,11 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { DisGeNetAssociation } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface DisGeNETPanelProps {
   associations?: DisGeNetAssociation[]
@@ -21,6 +24,22 @@ export const DisGeNETPanel = memo(function DisGeNETPanel({
     ? 'DisGeNET'
     : `DisGeNET Gene-Disease Associations (${list.length})`
 
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<DisGeNetAssociation>((a) => a.score ?? 0, {
+        high: 'Highest score',
+        low: 'Lowest score',
+      }),
+      ...alphaSortOptions<DisGeNetAssociation>((a) => a.diseaseName),
+      ...alphaSortOptions<DisGeNetAssociation>((a) => a.geneSymbol || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id.includes('asc') ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={title}
@@ -29,17 +48,24 @@ export const DisGeNETPanel = memo(function DisGeNETPanel({
       empty={isEmpty ? 'No disease-gene associations found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((assoc, idx) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(a) =>
+            [a.diseaseName, a.geneSymbol, a.diseaseId, a.source, a.diseaseType, ...(a.pmids || [])]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter associations (disease, gene, source…)"
+          getKey={(a, idx) => `${a.diseaseId}-${a.geneSymbol}-${idx}`}
+          renderItem={(assoc) => {
             const discoverHref = `/discover?q=${encodeURIComponent(assoc.diseaseName)}`
             const disgenetUrl = assoc.diseaseId
               ? `https://www.disgenet.org/browser/0/1/${assoc.diseaseId}/`
               : `https://www.disgenet.org/search?q=${encodeURIComponent(assoc.diseaseName)}`
             return (
-              <div
-                key={`${assoc.diseaseId}-${assoc.geneSymbol}-${idx}`}
-                className="py-2 border-b border-slate-700/60 last:border-0"
-              >
+              <div className="py-2 border-b border-slate-700/60 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -124,8 +150,8 @@ export const DisGeNETPanel = memo(function DisGeNETPanel({
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

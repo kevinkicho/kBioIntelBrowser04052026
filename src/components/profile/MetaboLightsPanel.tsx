@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MetaboLightsStudy, MetaboLightsMetabolite } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function StudyItem({ study }: { study: MetaboLightsStudy }) {
   return (
@@ -83,7 +86,8 @@ function MetaboliteItem({ metabolite }: { metabolite: MetaboLightsMetabolite }) 
       )}
       {metabolite.inchiKey && (
         <p className="text-xs text-slate-400 mt-0.5">
-          <span className="text-slate-500">InChIKey:</span> <span className="font-mono text-xs">{metabolite.inchiKey}</span>
+          <span className="text-slate-500">InChIKey:</span>{' '}
+          <span className="font-mono text-xs">{metabolite.inchiKey}</span>
         </p>
       )}
       <div className="flex flex-wrap gap-1.5 mt-2">
@@ -110,7 +114,11 @@ function MetaboliteItem({ metabolite }: { metabolite: MetaboLightsMetabolite }) 
       </div>
       {metabolite.databaseLinks.length > 0 && (
         <p className="text-xs text-slate-500 mt-1">
-          <span className="text-slate-400">Cross-references:</span> {metabolite.databaseLinks.slice(0, 3).map(dl => dl.database).join(', ')}
+          <span className="text-slate-400">Cross-references:</span>{' '}
+          {metabolite.databaseLinks
+            .slice(0, 3)
+            .map((dl) => dl.database)
+            .join(', ')}
         </p>
       )}
       <a
@@ -130,22 +138,50 @@ type MetaboLightsData = {
   metabolites: MetaboLightsMetabolite[]
 }
 
-export const MetaboLightsPanel = memo(function MetaboLightsPanel({ data, panelId, lastFetched }: { data: MetaboLightsData, panelId?: string, lastFetched?: Date }) {
-  const { studies, metabolites } = data
+export const MetaboLightsPanel = memo(function MetaboLightsPanel({
+  data,
+  panelId,
+  lastFetched,
+}: {
+  data: MetaboLightsData
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const studies = Array.isArray(data?.studies) ? data.studies : []
+  const metabolites = Array.isArray(data?.metabolites) ? data.metabolites : []
   const isEmpty = studies.length === 0 && metabolites.length === 0
+
+  const studySort = useMemo(
+    () => [
+      ...dateSortOptions<MetaboLightsStudy>((s) => s.publicationDate, {
+        newest: 'Newest first',
+        oldest: 'Oldest first',
+      }),
+      ...alphaSortOptions<MetaboLightsStudy>((s) => s.title || ''),
+    ],
+    [],
+  )
+  const metaboliteSort = useMemo(
+    () => [
+      ...alphaSortOptions<MetaboLightsMetabolite>((m) => m.name || ''),
+      ...numberSortOptions<MetaboLightsMetabolite>((m) => m.mass ?? 0, {
+        high: 'Highest mass',
+        low: 'Lowest mass',
+      }),
+    ],
+    [],
+  )
 
   return (
     <Panel
       title="MetaboLights"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No metabolomics data found for this molecule." : undefined}
+      empty={isEmpty ? 'No metabolomics data found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
-          <p className="text-xs text-slate-400 mb-3">
-            Metabolomics Repository
-          </p>
+          <p className="text-xs text-slate-400 mb-3">Metabolomics Repository</p>
 
           {studies.length > 0 && (
             <div className="mb-4">
@@ -153,11 +189,29 @@ export const MetaboLightsPanel = memo(function MetaboLightsPanel({ data, panelId
                 <span className="text-green-400">Studies</span>
                 <span className="text-xs text-slate-500">({studies.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {studies.map((study, i) => (
-                  <StudyItem key={`${study.id}-${i}`} study={study} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={studies}
+                getSearchText={(s) =>
+                  [
+                    s.id,
+                    s.title,
+                    s.description,
+                    s.studyType,
+                    s.organism,
+                    s.organismPart,
+                    s.platform,
+                    s.publicationDate,
+                    ...(s.techniques || []),
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={studySort}
+                defaultSortId="date-desc"
+                filterPlaceholder="Filter studies…"
+                getKey={(study, i) => `${study.id}-${i}`}
+                renderItem={(study) => <StudyItem study={study} />}
+              />
             </div>
           )}
 
@@ -167,11 +221,26 @@ export const MetaboLightsPanel = memo(function MetaboLightsPanel({ data, panelId
                 <span className="text-cyan-400">Metabolites</span>
                 <span className="text-xs text-slate-500">({metabolites.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {metabolites.map((metabolite, i) => (
-                  <MetaboliteItem key={`${metabolite.id}-${i}`} metabolite={metabolite} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={metabolites}
+                getSearchText={(m) =>
+                  [
+                    m.name,
+                    m.id,
+                    m.formula,
+                    m.inchiKey,
+                    m.chebiId,
+                    m.hmdbId,
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={metaboliteSort}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter metabolites…"
+                getKey={(metabolite, i) => `${metabolite.id}-${i}`}
+                renderItem={(metabolite) => <MetaboliteItem metabolite={metabolite} />}
+              />
             </div>
           )}
         </>

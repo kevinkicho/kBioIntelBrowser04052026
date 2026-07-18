@@ -1,7 +1,13 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GNPSLibrarySpectrum, GNPSNetworkCluster } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 function SpectrumItem({ spectrum }: { spectrum: GNPSLibrarySpectrum }) {
   return (
@@ -125,6 +131,39 @@ export const GNPSPanel = memo(function GNPSPanel({ data, panelId, lastFetched }:
   const { spectra, clusters } = data
   const isEmpty = spectra.length === 0 && clusters.length === 0
 
+  const spectrumSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<GNPSLibrarySpectrum>((s) => s.name || ''),
+      ...numberSortOptions<GNPSLibrarySpectrum>((s) => s.precursorMz ?? 0, {
+        high: 'Highest m/z',
+        low: 'Lowest m/z',
+        idPrefix: 'mz',
+      }),
+      ...alphaSortOptions<GNPSLibrarySpectrum>((s) => s.library || '').map((o) => ({
+        ...o,
+        id: `lib-${o.id}`,
+        label: o.id === 'name-asc' ? 'Library A–Z' : 'Library Z–A',
+      })),
+    ],
+    [],
+  )
+
+  const clusterSortOptions = useMemo(
+    () => [
+      ...numberSortOptions<GNPSNetworkCluster>((c) => c.spectraCount ?? 0, {
+        high: 'Most spectra',
+        low: 'Fewest spectra',
+      }),
+      ...numberSortOptions<GNPSNetworkCluster>((c) => c.parentMass ?? 0, {
+        high: 'Highest mass',
+        low: 'Lowest mass',
+        idPrefix: 'mass',
+      }),
+      ...alphaSortOptions<GNPSNetworkCluster>((c) => c.bestMatch || c.clusterId || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="GNPS"
@@ -144,11 +183,29 @@ export const GNPSPanel = memo(function GNPSPanel({ data, panelId, lastFetched }:
                 <span className="text-cyan-400">Library Spectra</span>
                 <span className="text-xs text-slate-500">({spectra.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {spectra.map((spectrum, i) => (
-                  <SpectrumItem key={`${spectrum.id}-${i}`} spectrum={spectrum} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={spectra}
+                getSearchText={(spectrum) =>
+                  [
+                    spectrum.name,
+                    spectrum.id,
+                    spectrum.ionMode,
+                    spectrum.library,
+                    spectrum.organism,
+                    spectrum.smiles,
+                    ...(spectrum.sources ?? []),
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={spectrumSortOptions}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter spectra…"
+                getKey={(spectrum, i) => `${spectrum.id}-${i}`}
+                pageSize={5}
+                className="space-y-2"
+                renderItem={(spectrum) => <SpectrumItem spectrum={spectrum} />}
+              />
             </div>
           )}
 
@@ -158,11 +215,26 @@ export const GNPSPanel = memo(function GNPSPanel({ data, panelId, lastFetched }:
                 <span className="text-purple-400">Network Clusters</span>
                 <span className="text-xs text-slate-500">({clusters.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {clusters.map((cluster, i) => (
-                  <ClusterItem key={`${cluster.clusterId}-${i}`} cluster={cluster} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={clusters}
+                getSearchText={(cluster) =>
+                  [
+                    cluster.clusterId,
+                    cluster.bestMatch,
+                    cluster.ionMode,
+                    ...(cluster.libraryIdentifications ?? []),
+                  ]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={clusterSortOptions}
+                defaultSortId="num-desc"
+                filterPlaceholder="Filter clusters…"
+                getKey={(cluster, i) => `${cluster.clusterId}-${i}`}
+                pageSize={5}
+                className="space-y-2"
+                renderItem={(cluster) => <ClusterItem cluster={cluster} />}
+              />
             </div>
           )}
         </>

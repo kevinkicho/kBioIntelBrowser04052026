@@ -1,7 +1,13 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GeneExpression } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 function typeBadgeClass(experimentType: string): string {
   const t = (experimentType || '').toLowerCase()
@@ -21,6 +27,32 @@ export const ExpressionAtlasPanel = memo(function ExpressionAtlasPanel({
 }) {
   const list = Array.isArray(expressions) ? expressions : []
   const isEmpty = list.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<GeneExpression>(
+        (e) => e.experimentDescription || e.condition || '',
+      ),
+      ...alphaSortOptions<GeneExpression>((e) => e.geneSymbol || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id === 'name-asc' ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+      ...alphaSortOptions<GeneExpression>((e) => e.tissueName || '').map((o) => ({
+        ...o,
+        id: `tissue-${o.id}`,
+        label: o.id === 'name-asc' ? 'Tissue A–Z' : 'Tissue Z–A',
+      })),
+      ...numberSortOptions<GeneExpression>((e) => {
+        const n = Number(e.expressionLevel)
+        return Number.isFinite(n) ? n : 0
+      }, {
+        high: 'Highest expression',
+        low: 'Lowest expression',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={
@@ -33,9 +65,30 @@ export const ExpressionAtlasPanel = memo(function ExpressionAtlasPanel({
       empty={isEmpty ? 'No gene expression data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((expr, i) => (
-            <div key={i} className="py-2 border-b border-slate-700/60 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(expr) =>
+            [
+              expr.experimentType,
+              expr.geneSymbol,
+              expr.species,
+              expr.experimentDescription,
+              expr.condition,
+              expr.tissueName,
+              expr.expressionLevel,
+              expr.unit,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter experiments…"
+          getKey={(_, i) => i}
+          pageSize={5}
+          className="space-y-1"
+          renderItem={(expr) => (
+            <div className="py-2 border-b border-slate-700/60 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -89,8 +142,8 @@ export const ExpressionAtlasPanel = memo(function ExpressionAtlasPanel({
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

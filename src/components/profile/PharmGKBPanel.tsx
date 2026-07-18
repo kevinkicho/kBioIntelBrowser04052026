@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PharmGKBDrug } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function DrugItem({ drug }: { drug: PharmGKBDrug }) {
   const levelColors: Record<string, string> = {
@@ -69,33 +72,65 @@ function DrugItem({ drug }: { drug: PharmGKBDrug }) {
 }
 
 export const PharmGKBPanel = memo(function PharmGKBPanel({ drugs, panelId, lastFetched }: { drugs: PharmGKBDrug[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = drugs.length === 0
+  const list = Array.isArray(drugs) ? drugs : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<PharmGKBDrug>((d) => d.name || ''),
+      ...numberSortOptions<PharmGKBDrug>((d) => d.genes?.length || 0, {
+        high: 'Most genes',
+        low: 'Fewest genes',
+        idPrefix: 'genes',
+      }),
+      ...numberSortOptions<PharmGKBDrug>((d) => d.guidelines?.length || 0, {
+        high: 'Most guidelines',
+        low: 'Fewest guidelines',
+        idPrefix: 'guidelines',
+      }),
+    ],
+    [],
+  )
+
+  const totalGenes = list.reduce((sum, d) => sum + d.genes.length, 0)
+  const totalGuidelines = list.reduce((sum, d) => sum + d.guidelines.length, 0)
 
   return (
     <Panel
       title="PharmGKB"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No pharmacogenomic data found for this molecule." : undefined}
+      empty={isEmpty ? 'No pharmacogenomic data found for this molecule.' : undefined}
     >
-      {!isEmpty && (() => {
-        const totalGenes = drugs.reduce((sum, d) => sum + d.genes.length, 0)
-        const totalGuidelines = drugs.reduce((sum, d) => sum + d.guidelines.length, 0)
-        return (
-          <>
-            <p className="text-xs text-slate-400 mb-3">
-              Pharmacogenomics Knowledgebase — {drugs.length} drug{drugs.length !== 1 ? 's' : ''}
-              {totalGenes > 0 && <span className="text-purple-400 ml-2">{totalGenes} gene associations</span>}
-              {totalGuidelines > 0 && <span className="text-cyan-400 ml-2">{totalGuidelines} guidelines</span>}
-            </p>
-            <PaginatedList className="space-y-2">
-              {drugs.map((drug, i) => (
-                <DrugItem key={`${drug.id}-${i}`} drug={drug} />
-              ))}
-            </PaginatedList>
-          </>
-        )
-      })()}
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Pharmacogenomics Knowledgebase — {list.length} drug{list.length !== 1 ? 's' : ''}
+            {totalGenes > 0 && <span className="text-purple-400 ml-2">{totalGenes} gene associations</span>}
+            {totalGuidelines > 0 && <span className="text-cyan-400 ml-2">{totalGuidelines} guidelines</span>}
+          </p>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(drug) =>
+              [
+                drug.name,
+                drug.drugClass,
+                drug.id,
+                ...(drug.genericNames || []),
+                ...(drug.brandNames || []),
+                ...(drug.genes?.map((g) => g.geneSymbol) || []),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter drugs (name, gene, brand…)"
+            getKey={(drug, i) => `${drug.id}-${i}`}
+            renderItem={(drug) => <DrugItem drug={drug} />}
+          />
+        </>
+      )}
     </Panel>
   )
 })

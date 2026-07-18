@@ -1,8 +1,14 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { EnsemblGene } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 export const EnsemblPanel = memo(function EnsemblPanel({
   genes,
@@ -15,6 +21,23 @@ export const EnsemblPanel = memo(function EnsemblPanel({
 }) {
   const list = Array.isArray(genes) ? genes : []
   const isEmpty = list.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<EnsemblGene>((g) => g.displayName || g.symbol || g.geneId || ''),
+      ...alphaSortOptions<EnsemblGene>((g) => g.biotype || '').map((o) => ({
+        ...o,
+        id: `biotype-${o.id}`,
+        label: o.id === 'name-asc' ? 'Biotype A–Z' : 'Biotype Z–A',
+      })),
+      ...numberSortOptions<EnsemblGene>((g) => g.start ?? 0, {
+        high: 'Start high',
+        low: 'Start low',
+        idPrefix: 'start',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'Ensembl Genomics' : `Ensembl Genomics (${list.length})`}
@@ -23,12 +46,29 @@ export const EnsemblPanel = memo(function EnsemblPanel({
       empty={isEmpty ? 'No Ensembl gene data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((gene, i) => (
-            <div
-              key={`${gene.geneId || gene.symbol}-${i}`}
-              className="py-2 border-b border-slate-700/60 last:border-0"
-            >
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(gene) =>
+            [
+              gene.displayName,
+              gene.symbol,
+              gene.geneId,
+              gene.name,
+              gene.biotype,
+              gene.description,
+              gene.chromosome,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter genes…"
+          getKey={(gene, i) => `${gene.geneId || gene.symbol}-${i}`}
+          pageSize={5}
+          className="space-y-1"
+          renderItem={(gene) => (
+            <div className="py-2 border-b border-slate-700/60 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -73,8 +113,8 @@ export const EnsemblPanel = memo(function EnsemblPanel({
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

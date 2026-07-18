@@ -1,8 +1,11 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MonarchDisease } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 export const MonarchPanel = memo(function MonarchPanel({
   diseases,
@@ -15,23 +18,56 @@ export const MonarchPanel = memo(function MonarchPanel({
 }) {
   const list = Array.isArray(diseases) ? diseases : []
   const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<MonarchDisease>((d) => d.name || d.diseaseName || ''),
+      ...numberSortOptions<MonarchDisease>((d) => d.phenotypeCount ?? 0, {
+        high: 'Most phenotypes',
+        low: 'Fewest phenotypes',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
-      title={isEmpty ? 'Disease Associations (Monarch)' : `Disease Associations (Monarch) (${list.length})`}
+      title={
+        isEmpty
+          ? 'Disease Associations (Monarch)'
+          : `Disease Associations (Monarch) (${list.length})`
+      }
       panelId={panelId}
       lastFetched={lastFetched}
       empty={isEmpty ? 'No Monarch disease associations found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((disease, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(d) =>
+            [
+              d.name,
+              d.diseaseName,
+              d.id,
+              d.diseaseId,
+              d.geneSymbol,
+              d.evidence,
+              d.source,
+              d.description,
+              d.pubmedId,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter diseases…"
+          getKey={(disease, i) => `${disease.id || disease.diseaseId}-${i}`}
+          renderItem={(disease) => {
             const name = disease.name || disease.diseaseName
             const id = disease.id || disease.diseaseId
             return (
-              <div
-                key={`${id}-${i}`}
-                className="py-2 border-b border-slate-700/60 last:border-0"
-              >
+              <div className="py-2 border-b border-slate-700/60 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -102,8 +138,8 @@ export const MonarchPanel = memo(function MonarchPanel({
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

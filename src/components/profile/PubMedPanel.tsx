@@ -1,62 +1,48 @@
-import { memo } from 'react'
-import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import { PaginatedVirtualizedList } from '@/components/ui/VirtualizedList'
-import type { PubMedArticle } from '@/lib/types'
+'use client'
 
-const VIRTUALIZATION_THRESHOLD = 20
+import { memo, useMemo } from 'react'
+import { Panel } from '@/components/ui/Panel'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import type { PubMedArticle } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 function PubMedItem({ article }: { article: PubMedArticle }) {
   return (
-    <div className="py-3 border-b border-slate-700 last:border-0">
+    <div className="py-2 border-b border-slate-700/60 last:border-0">
       <div className="flex items-start justify-between gap-2">
         <a
           href={article.url}
           target="_blank"
           rel="noopener noreferrer"
-          className="font-semibold text-slate-100 text-sm hover:text-cyan-400 transition-colors line-clamp-2"
+          className="font-semibold text-slate-100 text-sm hover:text-cyan-400 line-clamp-2"
         >
           {article.title}
         </a>
-        <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/30 px-2 py-0.5 rounded shrink-0">
-          PMID: {article.pmid}
+        <span className="text-[10px] font-mono bg-blue-900/40 text-blue-300 border border-blue-700/30 px-1.5 py-0.5 rounded shrink-0">
+          {article.pmid}
         </span>
       </div>
-      <p className="text-sm text-slate-400 mt-1">
-        {article.authors.slice(0, 3).join(', ')}
-        {article.authors.length > 3 && ` et al.`}
+      <p className="text-[11px] text-slate-400 mt-0.5">
+        {(article.authors || []).slice(0, 3).join(', ')}
+        {(article.authors?.length || 0) > 3 && ' et al.'}
       </p>
-      <p className="text-xs text-slate-500 mt-1">
-        {article.journal}
-        {article.pubDate && ` • ${article.pubDate}`}
-        {article.volume && `; ${article.volume}`}
-        {article.issue && `(${article.issue})`}
-        {article.pages && `:${article.pages}`}
+      <p className="text-[10px] text-slate-500 mt-0.5">
+        {[article.journal, article.pubDate, article.volume && `vol ${article.volume}`]
+          .filter(Boolean)
+          .join(' · ')}
       </p>
       {article.abstract && (
-        <p className="text-xs text-slate-600 mt-2 line-clamp-2">{article.abstract}</p>
+        <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{article.abstract}</p>
       )}
-      {article.keywords.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {article.keywords.slice(0, 5).map((keyword, i) => (
-            <span
-              key={`${keyword}-${i}`}
-              className="text-xs bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded"
-            >
-              {keyword}
-            </span>
-          ))}
-        </div>
-      )}
-      <div className="flex gap-3 mt-2 text-xs">
-        {article.pmcid && (
+      <div className="flex gap-2 mt-1 text-[10px]">
+        {article.url && (
           <a
-            href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${article.pmcid}/`}
+            href={article.url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-emerald-400 hover:text-emerald-300"
+            className="text-blue-400 hover:text-blue-300"
           >
-            Full Text (PMC)
+            PubMed ↗
           </a>
         )}
         {article.doi && (
@@ -66,7 +52,17 @@ function PubMedItem({ article }: { article: PubMedArticle }) {
             rel="noopener noreferrer"
             className="text-cyan-400 hover:text-cyan-300"
           >
-            DOI
+            DOI ↗
+          </a>
+        )}
+        {article.pmcid && (
+          <a
+            href={`https://www.ncbi.nlm.nih.gov/pmc/articles/${article.pmcid}/`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-emerald-400 hover:text-emerald-300"
+          >
+            PMC ↗
           </a>
         )}
       </div>
@@ -74,8 +70,33 @@ function PubMedItem({ article }: { article: PubMedArticle }) {
   )
 }
 
-export const PubMedPanel = memo(function PubMedPanel({ articles, panelId, lastFetched }: { articles: PubMedArticle[], panelId?: string, lastFetched?: Date }) {
-  if (articles.length === 0) {
+export const PubMedPanel = memo(function PubMedPanel({
+  articles,
+  panelId,
+  lastFetched,
+}: {
+  articles: PubMedArticle[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(articles) ? articles : []
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<PubMedArticle>((a) => a.pubDate, {
+        newest: 'Newest first',
+        oldest: 'Oldest first',
+      }),
+      ...alphaSortOptions<PubMedArticle>((a) => a.title || ''),
+      ...alphaSortOptions<PubMedArticle>((a) => a.journal || '').map((o) => ({
+        ...o,
+        id: `journal-${o.id}`,
+        label: o.id.includes('asc') ? 'Journal A–Z' : 'Journal Z–A',
+      })),
+    ],
+    [],
+  )
+
+  if (list.length === 0) {
     return (
       <Panel title="PubMed" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No PubMed articles found for this molecule.</p>
@@ -83,28 +104,30 @@ export const PubMedPanel = memo(function PubMedPanel({ articles, panelId, lastFe
     )
   }
 
-  // Use virtualization for large datasets
-  if (articles.length > VIRTUALIZATION_THRESHOLD) {
-    return (
-      <Panel title="PubMed" panelId={panelId} lastFetched={lastFetched}>
-        <PaginatedVirtualizedList
-          items={articles}
-          renderItem={(article, i) => <PubMedItem key={`${article.pmid}-${i}`} article={article} />}
-          initialCount={10}
-          estimateSize={160}
-          emptyMessage="No PubMed articles found for this molecule."
-        />
-      </Panel>
-    )
-  }
-
   return (
-    <Panel title="PubMed" panelId={panelId} lastFetched={lastFetched}>
-      <PaginatedList className="space-y-3">
-        {articles.map((article, i) => (
-          <PubMedItem key={`${article.pmid}-${i}`} article={article} />
-        ))}
-      </PaginatedList>
+    <Panel title={`PubMed (${list.length})`} panelId={panelId} lastFetched={lastFetched}>
+      <FilterablePaginatedList
+        items={list}
+        getSearchText={(a) =>
+          [
+            a.title,
+            ...(a.authors || []),
+            a.journal,
+            a.pmid,
+            a.doi,
+            a.pubDate,
+            a.abstract,
+            ...(a.keywords || []),
+          ]
+            .filter(Boolean)
+            .join(' ')
+        }
+        sortOptions={sortOptions}
+        defaultSortId="date-desc"
+        filterPlaceholder="Filter articles (title, author, journal, PMID…)"
+        getKey={(a, i) => `${a.pmid}-${i}`}
+        renderItem={(article) => <PubMedItem article={article} />}
+      />
     </Panel>
   )
 })

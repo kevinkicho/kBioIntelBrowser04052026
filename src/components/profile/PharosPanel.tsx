@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PharosTarget } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function tdlBadgeColor(tdl: string): string {
   if (tdl === 'Tclin') return 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30'
@@ -11,18 +14,46 @@ function tdlBadgeColor(tdl: string): string {
 }
 
 export const PharosPanel = memo(function PharosPanel({ targets, panelId, lastFetched }: { targets: PharosTarget[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = targets.length === 0
+  const list = Array.isArray(targets) ? targets : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<PharosTarget>((t) => t.name || ''),
+      ...numberSortOptions<PharosTarget>((t) => t.novelty || 0, {
+        high: 'Highest novelty',
+        low: 'Lowest novelty',
+      }),
+      ...alphaSortOptions<PharosTarget>((t) => t.tdl || '').map((o) => ({
+        ...o,
+        id: `tdl-${o.id}`,
+        label: o.id.includes('asc') ? 'TDL A–Z' : 'TDL Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Pharos Target Development"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No Pharos target data found for this molecule." : undefined}
+      empty={isEmpty ? 'No Pharos target data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {targets.map((target, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(target) =>
+            [target.name, target.tdl, target.family, target.description]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter targets (name, TDL, family…)"
+          getKey={(target, i) => `${target.name}-${i}`}
+          renderItem={(target) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${tdlBadgeColor(target.tdl)}`}>
                   {target.tdl}
@@ -44,8 +75,8 @@ export const PharosPanel = memo(function PharosPanel({ targets, panelId, lastFet
                 View in Pharos →
               </a>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

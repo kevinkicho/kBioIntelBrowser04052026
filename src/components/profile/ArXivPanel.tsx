@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ArXivPaper } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 function PaperItem({ paper }: { paper: ArXivPaper }) {
   return (
@@ -66,6 +69,14 @@ function PaperItem({ paper }: { paper: ArXivPaper }) {
 
 export const ArXivPanel = memo(function ArXivPanel({ papers, panelId, lastFetched }: { papers: ArXivPaper[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = papers.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<ArXivPaper>((p) => p.publishedDate || p.updatedDate),
+      ...alphaSortOptions<ArXivPaper>((p) => p.title),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="arXiv"
@@ -76,11 +87,20 @@ export const ArXivPanel = memo(function ArXivPanel({ papers, panelId, lastFetche
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">Biology preprints from arXiv</p>
-          <PaginatedList className="space-y-3">
-            {papers.map((paper, i) => (
-              <PaperItem key={`${paper.arxivId}-${i}`} paper={paper} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={papers}
+            getSearchText={(p) =>
+              [p.title, p.arxivId, ...(p.authors ?? []), p.abstract, ...(p.categories ?? [])]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="date-desc"
+            filterPlaceholder="Filter papers…"
+            getKey={(p, i) => `${p.arxivId}-${i}`}
+            className="space-y-3"
+            renderItem={(paper) => <PaperItem paper={paper} />}
+          />
         </>
       )}
     </Panel>

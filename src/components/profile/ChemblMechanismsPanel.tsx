@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ChemblMechanism } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 const actionTypeColors: Record<string, string> = {
   INHIBITOR: 'bg-red-900/40 text-red-300 border-red-700/30',
@@ -13,6 +16,18 @@ const defaultColors = 'bg-slate-700/40 text-slate-300 border-slate-600/30'
 
 export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({ mechanisms, panelId, lastFetched }: { mechanisms: ChemblMechanism[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = mechanisms.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<ChemblMechanism>((m) => m.maxPhase ?? 0, {
+        high: 'Highest phase',
+        low: 'Lowest phase',
+        idPrefix: 'phase',
+      }),
+      ...alphaSortOptions<ChemblMechanism>((m) => m.mechanismOfAction || m.targetName || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Mechanisms of Action (ChEMBL)"
@@ -21,11 +36,22 @@ export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({ mecha
       empty={isEmpty ? "No mechanism of action data found for this molecule." : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {mechanisms.map((mech, i) => {
+        <FilterablePaginatedList
+          items={mechanisms}
+          getSearchText={(m) =>
+            [m.mechanismOfAction, m.actionType, m.targetName, m.moleculeName, m.targetChemblId]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="phase-desc"
+          filterPlaceholder="Filter mechanisms…"
+          getKey={(m, i) => `${m.mechanismId || m.mechanismOfAction}-${i}`}
+          className="space-y-3"
+          renderItem={(mech) => {
             const colors = actionTypeColors[mech.actionType?.toUpperCase()] ?? defaultColors
             return (
-              <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+              <div className="py-3 border-b border-slate-700 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <a
                     href={mech.url}
@@ -51,8 +77,8 @@ export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({ mecha
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

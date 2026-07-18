@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PRIDEProject } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function ProjectItem({ project }: { project: PRIDEProject }) {
   return (
@@ -44,22 +47,55 @@ function ProjectItem({ project }: { project: PRIDEProject }) {
 }
 
 export const PRIDEPanel = memo(function PRIDEPanel({ projects, panelId, lastFetched }: { projects: PRIDEProject[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = projects.length === 0
+  const list = Array.isArray(projects) ? projects : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<PRIDEProject>((p) => p.title || ''),
+      ...numberSortOptions<PRIDEProject>((p) => p.numProteins || 0, {
+        high: 'Most proteins',
+        low: 'Fewest proteins',
+        idPrefix: 'proteins',
+      }),
+      ...numberSortOptions<PRIDEProject>((p) => p.numPeptides || 0, {
+        high: 'Most peptides',
+        low: 'Fewest peptides',
+        idPrefix: 'peptides',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="PRIDE"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No PRIDE proteomics projects found for this molecule." : undefined}
+      empty={isEmpty ? 'No PRIDE proteomics projects found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-3">Proteomics data from PRIDE Archive</p>
-          <PaginatedList className="space-y-3">
-            {projects.map((project, i) => (
-              <ProjectItem key={`${project.accession}-${i}`} project={project} />
-            ))}
-          </PaginatedList>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(project) =>
+              [
+                project.title,
+                project.accession,
+                project.species,
+                project.description,
+                project.instrument,
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter projects (title, accession, species…)"
+            getKey={(project, i) => `${project.accession}-${i}`}
+            renderItem={(project) => <ProjectItem project={project} />}
+          />
         </>
       )}
     </Panel>

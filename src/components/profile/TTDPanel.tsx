@@ -1,9 +1,10 @@
 'use client'
 
-import React from 'react'
+import { useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { TTDTarget, TTDDrug } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface TTDPanelProps {
   targets?: TTDTarget[]
@@ -14,7 +15,7 @@ interface TTDPanelProps {
 
 function TargetItem({ target }: { target: TTDTarget }) {
   return (
-    <div key={target.id} className="p-4 border rounded-lg bg-gray-50">
+    <div className="p-4 border rounded-lg bg-gray-50">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1">
           <h4 className="font-semibold text-blue-700 mb-1">{target.name}</h4>
@@ -88,7 +89,7 @@ function TargetItem({ target }: { target: TTDTarget }) {
 
 function DrugItem({ drug }: { drug: TTDDrug }) {
   return (
-    <div key={drug.id} className="p-4 border rounded-lg bg-gray-50">
+    <div className="p-4 border rounded-lg bg-gray-50">
       <div className="flex items-start justify-between gap-2 mb-2">
         <div className="flex-1">
           <h4 className="font-semibold text-blue-700 mb-1">{drug.name}</h4>
@@ -153,9 +154,34 @@ export function TTDPanel({
   panelId,
   lastFetched,
 }: TTDPanelProps) {
-  const hasTargets = Boolean(targets?.length)
-  const hasDrugs = Boolean(drugs?.length)
+  const targetList = Array.isArray(targets) ? targets : []
+  const drugList = Array.isArray(drugs) ? drugs : []
+  const hasTargets = targetList.length > 0
+  const hasDrugs = drugList.length > 0
   const hasData = hasTargets || hasDrugs
+
+  const targetSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<TTDTarget>((t) => t.name || ''),
+      ...numberSortOptions<TTDTarget>((t) => t.drugCount || 0, {
+        high: 'Most drugs',
+        low: 'Fewest drugs',
+      }),
+    ],
+    [],
+  )
+
+  const drugSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<TTDDrug>((d) => d.name || ''),
+      ...alphaSortOptions<TTDDrug>((d) => d.type || '').map((o) => ({
+        ...o,
+        id: `type-${o.id}`,
+        label: o.id.includes('asc') ? 'Type A–Z' : 'Type Z–A',
+      })),
+    ],
+    [],
+  )
 
   if (!hasData) {
     return (
@@ -177,19 +203,55 @@ export function TTDPanel({
 
         {hasTargets && (
           <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Targets ({targets?.length ?? 0})</h4>
-            <PaginatedList pageSize={5}>
-              {(targets ?? []).map((target) => <TargetItem key={target.id} target={target} />)}
-            </PaginatedList>
+            <h4 className="font-semibold text-gray-800 mb-3">Targets ({targetList.length})</h4>
+            <FilterablePaginatedList
+              items={targetList}
+              getSearchText={(target) =>
+                [
+                  target.name,
+                  target.id,
+                  target.type,
+                  target.organism,
+                  target.function,
+                  ...(target.associatedDiseases || []),
+                  ...(target.pathway || []),
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+              }
+              sortOptions={targetSortOptions}
+              defaultSortId="name-asc"
+              filterPlaceholder="Filter targets (name, disease, pathway…)"
+              getKey={(target) => target.id}
+              pageSize={5}
+              renderItem={(target) => <TargetItem target={target} />}
+            />
           </div>
         )}
 
         {hasDrugs && (
           <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Drugs ({drugs?.length ?? 0})</h4>
-            <PaginatedList pageSize={5}>
-              {(drugs ?? []).map((drug) => <DrugItem key={drug.id} drug={drug} />)}
-            </PaginatedList>
+            <h4 className="font-semibold text-gray-800 mb-3">Drugs ({drugList.length})</h4>
+            <FilterablePaginatedList
+              items={drugList}
+              getSearchText={(drug) =>
+                [
+                  drug.name,
+                  drug.id,
+                  drug.type,
+                  ...(drug.indications || []),
+                  ...(drug.targets || []),
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+              }
+              sortOptions={drugSortOptions}
+              defaultSortId="name-asc"
+              filterPlaceholder="Filter drugs (name, indication, target…)"
+              getKey={(drug) => drug.id}
+              pageSize={5}
+              renderItem={(drug) => <DrugItem drug={drug} />}
+            />
           </div>
         )}
       </div>

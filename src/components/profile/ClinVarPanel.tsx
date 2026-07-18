@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ClinVarVariant } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function significanceBadgeColor(sig: string): string {
   const lower = sig.toLowerCase()
@@ -14,6 +17,23 @@ function significanceBadgeColor(sig: string): string {
 
 export const ClinVarPanel = memo(function ClinVarPanel({ variants, panelId, lastFetched }: { variants: ClinVarVariant[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = variants.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<ClinVarVariant>((v) => v.title || v.variantId),
+      ...alphaSortOptions<ClinVarVariant>((v) => v.clinicalSignificance || '').map((o) => ({
+        ...o,
+        id: `sig-${o.id}`,
+        label: o.id.includes('asc') ? 'Significance A–Z' : 'Significance Z–A',
+      })),
+      ...alphaSortOptions<ClinVarVariant>((v) => v.gene || v.geneSymbol || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id.includes('asc') ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="ClinVar Variants"
@@ -22,9 +42,20 @@ export const ClinVarPanel = memo(function ClinVarPanel({ variants, panelId, last
       empty={isEmpty ? "No ClinVar variants found for this molecule." : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {variants.map((variant, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={variants}
+          getSearchText={(v) =>
+            [v.title, v.variantId, v.clinicalSignificance, v.gene, v.geneSymbol, v.condition, v.conditionName, v.reviewStatus]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter variants…"
+          getKey={(v, i) => `${v.variantId || v.title}-${i}`}
+          className="space-y-3"
+          renderItem={(variant) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${significanceBadgeColor(variant.clinicalSignificance)}`}>
                   {variant.clinicalSignificance}
@@ -51,8 +82,8 @@ export const ClinVarPanel = memo(function ClinVarPanel({ variants, panelId, last
                 View in ClinVar →
               </a>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

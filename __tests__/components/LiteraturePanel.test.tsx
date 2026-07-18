@@ -42,8 +42,13 @@ describe('LiteraturePanel', () => {
 
   test('renders DOI as link', () => {
     render(<LiteraturePanel results={mockResults} />)
-    const link = screen.getByRole('link', { name: /10\.1038/ })
+    const link = screen.getByRole('link', { name: /doi/i })
     expect(link).toHaveAttribute('href', 'https://doi.org/10.1038/nrd.2021.12')
+  })
+
+  test('shows filter and sort controls', () => {
+    render(<LiteraturePanel results={mockResults} />)
+    expect(screen.getByTestId('list-filter-sort')).toBeInTheDocument()
   })
 
   test('renders empty state when no results', () => {

@@ -1,21 +1,61 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { UniProtProtein } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 export const UniProtExtendedPanel = memo(function UniProtExtendedPanel({ proteins, panelId, lastFetched }: { proteins: UniProtProtein[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = proteins.length === 0
+  const list = Array.isArray(proteins) ? proteins : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<UniProtProtein>((p) => p.proteinName || ''),
+      ...alphaSortOptions<UniProtProtein>((p) => p.geneName || '').map((o) => ({
+        ...o,
+        id: `gene-${o.id}`,
+        label: o.id.includes('asc') ? 'Gene A–Z' : 'Gene Z–A',
+      })),
+      ...numberSortOptions<UniProtProtein>((p) => p.length || 0, {
+        high: 'Longest sequence',
+        low: 'Shortest sequence',
+        idPrefix: 'len',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="UniProt Extended"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No extended UniProt data found." : undefined}
+      empty={isEmpty ? 'No extended UniProt data found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {proteins.map((protein, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(protein) =>
+            [
+              protein.proteinName,
+              protein.geneName,
+              protein.organism,
+              protein.function,
+              protein.subcellularLocation,
+              protein.accession,
+              ...(protein.pathways || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter proteins (name, gene, accession…)"
+          getKey={(protein, i) => `${protein.accession || i}`}
+          renderItem={(protein) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">{protein.proteinName}</p>
                 {protein.geneName && (
@@ -49,8 +89,8 @@ export const UniProtExtendedPanel = memo(function UniProtExtendedPanel({ protein
                 {protein.accession} →
               </a>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

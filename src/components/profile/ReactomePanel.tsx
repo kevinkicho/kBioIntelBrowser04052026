@@ -1,11 +1,12 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { PathwayMiniGraph } from '@/components/charts/PathwayMiniGraph'
 import type { ReactomePathway } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 interface Props {
   pathways: ReactomePathway[]
@@ -16,14 +17,32 @@ interface Props {
 
 export const ReactomePanel = memo(function ReactomePanel({ pathways, moleculeName, panelId, lastFetched }: Props) {
   const [view, setView] = useState<'list' | 'graph'>('list')
-  const isEmpty = pathways.length === 0
+  const list = Array.isArray(pathways) ? pathways : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<ReactomePathway>((p) => p.name || ''),
+      ...alphaSortOptions<ReactomePathway>((p) => p.stId || '').map((o) => ({
+        ...o,
+        id: `stid-${o.id}`,
+        label: o.id.includes('asc') ? 'ID A–Z' : 'ID Z–A',
+      })),
+      ...alphaSortOptions<ReactomePathway>((p) => p.species || '').map((o) => ({
+        ...o,
+        id: `species-${o.id}`,
+        label: o.id.includes('asc') ? 'Species A–Z' : 'Species Z–A',
+      })),
+    ],
+    [],
+  )
 
   return (
     <Panel
       title="Reactome Pathways"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No Reactome pathways found for this molecule." : undefined}
+      empty={isEmpty ? 'No Reactome pathways found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
@@ -47,16 +66,26 @@ export const ReactomePanel = memo(function ReactomePanel({ pathways, moleculeNam
               </button>
             </div>
             <div className="text-[10px] text-slate-500 italic">
-              {pathways.length} biological processes mapped
+              {list.length} biological processes mapped
             </div>
           </div>
 
           {view === 'graph' ? (
-            <PathwayMiniGraph pathways={pathways} moleculeName={moleculeName} />
+            <PathwayMiniGraph pathways={list} moleculeName={moleculeName} />
           ) : (
-            <PaginatedList className="space-y-3">
-              {pathways.map((pathway, i) => (
-                <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+            <FilterablePaginatedList
+              items={list}
+              getSearchText={(pathway) =>
+                [pathway.name, pathway.stId, pathway.species, pathway.summation]
+                  .filter(Boolean)
+                  .join(' ')
+              }
+              sortOptions={sortOptions}
+              defaultSortId="name-asc"
+              filterPlaceholder="Filter pathways (name, ID, species…)"
+              getKey={(pathway, i) => `${pathway.stId || i}`}
+              renderItem={(pathway) => (
+                <div className="py-3 border-b border-slate-700 last:border-0">
                   <a href={pathway.url} target="_blank" rel="noopener noreferrer"
                     className="font-semibold text-blue-400 hover:text-blue-300 text-sm">
                     {pathway.name}
@@ -87,8 +116,8 @@ export const ReactomePanel = memo(function ReactomePanel({ pathways, moleculeNam
                     </div>
                   </details>
                 </div>
-              ))}
-            </PaginatedList>
+              )}
+            />
           )}
         </>
       )}

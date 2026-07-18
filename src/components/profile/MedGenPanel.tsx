@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MedGenConcept } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function ConceptItem({ concept }: { concept: MedGenConcept }) {
   // Safeguard: ensure name is a string
@@ -65,34 +68,53 @@ function ConceptItem({ concept }: { concept: MedGenConcept }) {
   )
 }
 
-export const MedGenPanel = memo(function MedGenPanel({ 
-  concepts, 
-  panelId, 
-  lastFetched 
-}: { 
-  concepts: MedGenConcept[], 
-  panelId?: string, 
-  lastFetched?: Date 
+export const MedGenPanel = memo(function MedGenPanel({
+  concepts,
+  panelId,
+  lastFetched,
+}: {
+  concepts: MedGenConcept[]
+  panelId?: string
+  lastFetched?: Date
 }) {
-  // Safeguard: ensure concepts is an array
   const safeConcepts = Array.isArray(concepts) ? concepts : []
   const isEmpty = safeConcepts.length === 0
+
+  const sortOptions = useMemo(
+    () =>
+      alphaSortOptions<MedGenConcept>((c) =>
+        typeof c.name === 'string' ? c.name : String(c.name || ''),
+      ),
+    [],
+  )
 
   return (
     <Panel
       title="MedGen"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No MedGen concepts found for this molecule." : undefined}
+      empty={isEmpty ? 'No MedGen concepts found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <>
-          <PaginatedList className="space-y-1">
-            {safeConcepts.map((concept, i) => (
-              <ConceptItem key={`${concept.conceptId || i}-${i}`} concept={concept} />
-            ))}
-          </PaginatedList>
-        </>
+        <FilterablePaginatedList
+          items={safeConcepts}
+          getSearchText={(c) =>
+            [
+              typeof c.name === 'string' ? c.name : String(c.name || ''),
+              c.conceptId,
+              typeof c.definition === 'string' ? c.definition : '',
+              ...(Array.isArray(c.semanticTypes) ? c.semanticTypes : []),
+              ...(Array.isArray(c.omimIds) ? c.omimIds : []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter concepts…"
+          getKey={(concept, i) => `${concept.conceptId || i}-${i}`}
+          renderItem={(concept) => <ConceptItem concept={concept} />}
+        />
       )}
     </Panel>
   )

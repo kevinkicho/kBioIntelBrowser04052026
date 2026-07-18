@@ -1,10 +1,21 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { BioModelsModel } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
 export const BioModelsPanel = memo(function BioModelsPanel({ models, panelId, lastFetched }: { models: BioModelsModel[], panelId?: string, lastFetched?: Date }) {
   const isEmpty = models.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<BioModelsModel>((m) => m.lastUpdate || m.submitterDate),
+      ...alphaSortOptions<BioModelsModel>((m) => m.name || m.id),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="BioModels"
@@ -17,9 +28,20 @@ export const BioModelsPanel = memo(function BioModelsPanel({ models, panelId, la
           <div className="mb-3 text-xs text-slate-400">
             SBML/CellML computational biology models
           </div>
-          <PaginatedList className="space-y-3">
-            {models.map((model, i) => (
-              <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+          <FilterablePaginatedList
+            items={models}
+            getSearchText={(m) =>
+              [m.id, m.name, m.description, m.submitter, ...(m.organisms ?? []), ...(m.formats ?? [])]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="date-desc"
+            filterPlaceholder="Filter models…"
+            getKey={(m, i) => `${m.id}-${i}`}
+            className="space-y-3"
+            renderItem={(model) => (
+              <div className="py-3 border-b border-slate-700 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-xs font-mono bg-indigo-900/30 text-indigo-300 border border-indigo-700/30 px-2 py-0.5 rounded shrink-0">
                     {model.id}
@@ -50,8 +72,8 @@ export const BioModelsPanel = memo(function BioModelsPanel({ models, panelId, la
                   </a>
                 </div>
               </div>
-            ))}
-          </PaginatedList>
+            )}
+          />
         </>
       )}
     </Panel>

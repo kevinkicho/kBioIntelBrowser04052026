@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PharmacologyTarget } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function typeBadgeClass(type: string): string {
   const lower = type.toLowerCase()
@@ -28,6 +31,18 @@ export const IupharPanel = memo(function IupharPanel({
 }) {
   const list = Array.isArray(targets) ? targets.filter((t) => t?.targetName) : []
   const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<PharmacologyTarget>((t) => t.affinity ?? 0, {
+        high: 'Highest affinity',
+        low: 'Lowest affinity',
+      }),
+      ...alphaSortOptions<PharmacologyTarget>((t) => t.targetName || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={
@@ -44,8 +59,27 @@ export const IupharPanel = memo(function IupharPanel({
       }
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {list.map((target, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(t) =>
+            [
+              t.targetName,
+              t.targetId,
+              t.type,
+              t.actionType,
+              t.species,
+              t.ligandName,
+              t.affinity,
+              t.affinityUnit,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter targets…"
+          getKey={(target, i) => `${target.targetId}-${i}`}
+          renderItem={(target) => {
             const href =
               target.url ||
               (target.targetId
@@ -56,7 +90,7 @@ export const IupharPanel = memo(function IupharPanel({
                 ? `${target.affinityUnit ? `${target.affinityUnit} ` : ''}${target.affinity}`
                 : null
             return (
-              <div key={`${target.targetId}-${i}`} className="py-3 border-b border-slate-700 last:border-0">
+              <div className="py-3 border-b border-slate-700 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <a
                     href={href}
@@ -96,8 +130,8 @@ export const IupharPanel = memo(function IupharPanel({
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

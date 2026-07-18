@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { NciConcept } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const NciThesaurusPanel = memo(function NciThesaurusPanel({
   concepts,
@@ -14,6 +17,19 @@ export const NciThesaurusPanel = memo(function NciThesaurusPanel({
 }) {
   const list = Array.isArray(concepts) ? concepts : []
   const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<NciConcept>((c) => c.name || ''),
+      ...alphaSortOptions<NciConcept>((c) => c.code || c.conceptId || '').map((o) => ({
+        ...o,
+        id: `code-${o.id}`,
+        label: o.id.includes('asc') ? 'Code A–Z' : 'Code Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'NCI Thesaurus' : `NCI Thesaurus (${list.length})`}
@@ -22,12 +38,27 @@ export const NciThesaurusPanel = memo(function NciThesaurusPanel({
       empty={isEmpty ? 'No NCI Thesaurus concepts found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((concept, i) => (
-            <div
-              key={`${concept.code || concept.conceptId}-${i}`}
-              className="py-2 border-b border-slate-700/60 last:border-0"
-            >
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(concept) =>
+            [
+              concept.name,
+              concept.code,
+              concept.conceptId,
+              concept.semanticType,
+              concept.definition,
+              concept.conceptStatus,
+              ...(concept.synonyms || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter concepts (name, code, synonym…)"
+          getKey={(concept, i) => `${concept.code || concept.conceptId}-${i}`}
+          renderItem={(concept) => (
+            <div className="py-2 border-b border-slate-700/60 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -80,8 +111,8 @@ export const NciThesaurusPanel = memo(function NciThesaurusPanel({
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

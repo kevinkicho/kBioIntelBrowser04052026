@@ -1,18 +1,21 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ISRCTNTrial } from '@/lib/types'
+import { alphaSortOptions, dateSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function TrialItem({ trial }: { trial: ISRCTNTrial }) {
   const statusColors: Record<string, string> = {
-    'Completed': 'bg-green-900/40 text-green-300 border-green-700/30',
-    'Recruiting': 'bg-blue-900/40 text-blue-300 border-blue-700/30',
-    'Ongoing': 'bg-cyan-900/40 text-cyan-300 border-cyan-700/30',
-    'Suspended': 'bg-yellow-900/40 text-yellow-300 border-yellow-700/30',
-    'Terminated': 'bg-red-900/40 text-red-300 border-red-700/30',
-    'Withdrawn': 'bg-red-800/40 text-red-200 border-red-600/30',
+    Completed: 'bg-green-900/40 text-green-300 border-green-700/30',
+    Recruiting: 'bg-blue-900/40 text-blue-300 border-blue-700/30',
+    Ongoing: 'bg-cyan-900/40 text-cyan-300 border-cyan-700/30',
+    Suspended: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/30',
+    Terminated: 'bg-red-900/40 text-red-300 border-red-700/30',
+    Withdrawn: 'bg-red-800/40 text-red-200 border-red-600/30',
     'Not started': 'bg-slate-700/50 text-slate-300 border-slate-600/30',
-    'Unknown': 'bg-slate-700/50 text-slate-300 border-slate-600/30',
+    Unknown: 'bg-slate-700/50 text-slate-300 border-slate-600/30',
   }
 
   return (
@@ -65,32 +68,79 @@ function TrialItem({ trial }: { trial: ISRCTNTrial }) {
   )
 }
 
-export const ISRCTNPanel = memo(function ISRCTNPanel({ trials, panelId, lastFetched }: { trials: ISRCTNTrial[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = trials.length === 0
+export const ISRCTNPanel = memo(function ISRCTNPanel({
+  trials,
+  panelId,
+  lastFetched,
+}: {
+  trials: ISRCTNTrial[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(trials) ? trials : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<ISRCTNTrial>((t) => t.startDate, {
+        newest: 'Newest start',
+        oldest: 'Oldest start',
+      }),
+      ...numberSortOptions<ISRCTNTrial>((t) => t.targetEnrollment ?? 0, {
+        high: 'Largest enrollment',
+        low: 'Smallest enrollment',
+      }),
+      ...alphaSortOptions<ISRCTNTrial>((t) => t.title || ''),
+    ],
+    [],
+  )
+
+  const recruitingCount = list.filter(
+    (t) => t.status === 'Recruiting' || t.recruitmentStatus === 'Recruiting',
+  ).length
 
   return (
     <Panel
       title="ISRCTN"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No ISRCTN clinical trials found for this molecule." : undefined}
+      empty={isEmpty ? 'No ISRCTN clinical trials found for this molecule.' : undefined}
     >
-      {!isEmpty && (() => {
-        const recruitingCount = trials.filter(t => t.status === 'Recruiting' || t.recruitmentStatus === 'Recruiting').length
-        return (
-          <>
-            <p className="text-xs text-slate-400 mb-3">
-              UK Clinical Trials Registry — {trials.length} trial{trials.length !== 1 ? 's' : ''}
-              {recruitingCount > 0 && <span className="text-green-400 ml-2">{recruitingCount} recruiting</span>}
-            </p>
-            <PaginatedList className="space-y-2">
-              {trials.map((trial, i) => (
-                <TrialItem key={`${trial.isRCTN}-${i}`} trial={trial} />
-              ))}
-            </PaginatedList>
-          </>
-        )
-      })()}
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            UK Clinical Trials Registry — {list.length} trial{list.length !== 1 ? 's' : ''}
+            {recruitingCount > 0 && (
+              <span className="text-green-400 ml-2">{recruitingCount} recruiting</span>
+            )}
+          </p>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(t) =>
+              [
+                t.title,
+                t.isRCTN,
+                t.status,
+                t.phase,
+                t.recruitmentStatus,
+                t.sponsor,
+                t.country,
+                t.startDate,
+                t.endDate,
+                ...(t.conditions || []),
+                ...(t.interventions || []),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="date-desc"
+            filterPlaceholder="Filter trials…"
+            getKey={(trial, i) => `${trial.isRCTN}-${i}`}
+            renderItem={(trial) => <TrialItem trial={trial} />}
+          />
+        </>
+      )}
     </Panel>
   )
 })

@@ -1,21 +1,48 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ProteinAtlasEntry } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const ProteinAtlasPanel = memo(function ProteinAtlasPanel({ entries, panelId, lastFetched }: { entries: ProteinAtlasEntry[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = entries.length === 0
+  const list = Array.isArray(entries) ? entries : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<ProteinAtlasEntry>((e) => e.gene || ''),
+      ...alphaSortOptions<ProteinAtlasEntry>((e) => e.uniprotId || '').map((o) => ({
+        ...o,
+        id: `uniprot-${o.id}`,
+        label: o.id.includes('asc') ? 'UniProt A–Z' : 'UniProt Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Human Protein Atlas"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No Human Protein Atlas data found for this molecule." : undefined}
+      empty={isEmpty ? 'No Human Protein Atlas data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {entries.map((entry, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(entry) =>
+            [entry.gene, entry.uniprotId, ...(entry.subcellularLocations || [])]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter entries (gene, UniProt, location…)"
+          getKey={(entry, i) => `${entry.gene}-${entry.uniprotId || i}`}
+          renderItem={(entry) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <span className="text-xs font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-2 py-0.5 rounded shrink-0">
                   {entry.gene}
@@ -45,8 +72,8 @@ export const ProteinAtlasPanel = memo(function ProteinAtlasPanel({ entries, pane
                 View in Protein Atlas →
               </a>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

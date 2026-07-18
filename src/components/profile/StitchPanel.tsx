@@ -1,21 +1,52 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ChemicalProteinInteraction } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 export const StitchPanel = memo(function StitchPanel({ interactions, panelId, lastFetched }: { interactions: ChemicalProteinInteraction[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = interactions.length === 0
+  const list = Array.isArray(interactions) ? interactions : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<ChemicalProteinInteraction>((i) => i.combinedScore || 0, {
+        high: 'Highest score',
+        low: 'Lowest score',
+      }),
+      ...alphaSortOptions<ChemicalProteinInteraction>((i) => i.proteinName || ''),
+      ...alphaSortOptions<ChemicalProteinInteraction>((i) => i.chemicalName || '').map((o) => ({
+        ...o,
+        id: `chem-${o.id}`,
+        label: o.id.includes('asc') ? 'Chemical A–Z' : 'Chemical Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Chemical-Protein Interactions (STITCH)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No chemical-protein interactions found for this molecule." : undefined}
+      empty={isEmpty ? 'No chemical-protein interactions found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {interactions.map((interaction, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(interaction) =>
+            [interaction.chemicalName, interaction.proteinName]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter interactions (chemical, protein…)"
+          getKey={(interaction, i) => `${interaction.chemicalName}-${interaction.proteinName}-${i}`}
+          renderItem={(interaction) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">
                   {interaction.chemicalName} → {interaction.proteinName}
@@ -51,8 +82,8 @@ export const StitchPanel = memo(function StitchPanel({ interactions, panelId, la
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

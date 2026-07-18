@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { KEGGPathway, KEGGCompound, KEGGDrug } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function PathwayItem({ pathway }: { pathway: KEGGPathway }) {
   return (
@@ -130,16 +133,39 @@ type KEGGData = {
   drugs: KEGGDrug[]
 }
 
-export const KEGGPanel = memo(function KEGGPanel({ data, panelId, lastFetched }: { data: KEGGData, panelId?: string, lastFetched?: Date }) {
-  const { pathways, compounds, drugs } = data
+export const KEGGPanel = memo(function KEGGPanel({
+  data,
+  panelId,
+  lastFetched,
+}: {
+  data: KEGGData
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const pathways = Array.isArray(data?.pathways) ? data.pathways : []
+  const compounds = Array.isArray(data?.compounds) ? data.compounds : []
+  const drugs = Array.isArray(data?.drugs) ? data.drugs : []
   const isEmpty = pathways.length === 0 && compounds.length === 0 && drugs.length === 0
+
+  const pathwaySort = useMemo(
+    () => alphaSortOptions<KEGGPathway>((p) => p.name || ''),
+    [],
+  )
+  const compoundSort = useMemo(
+    () => alphaSortOptions<KEGGCompound>((c) => c.name || ''),
+    [],
+  )
+  const drugSort = useMemo(
+    () => alphaSortOptions<KEGGDrug>((d) => d.name || ''),
+    [],
+  )
 
   return (
     <Panel
       title="KEGG"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No KEGG pathway, compound, or drug data found for this molecule." : undefined}
+      empty={isEmpty ? 'No KEGG pathway, compound, or drug data found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
@@ -153,11 +179,17 @@ export const KEGGPanel = memo(function KEGGPanel({ data, panelId, lastFetched }:
                 <span className="text-purple-400">Pathways</span>
                 <span className="text-xs text-slate-500">({pathways.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {pathways.map((pathway, i) => (
-                  <PathwayItem key={`${pathway.id}-${i}`} pathway={pathway} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={pathways}
+                getSearchText={(p) =>
+                  [p.name, p.id, p.class, p.description].filter(Boolean).join(' ')
+                }
+                sortOptions={pathwaySort}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter pathways…"
+                getKey={(pathway, i) => `${pathway.id}-${i}`}
+                renderItem={(pathway) => <PathwayItem pathway={pathway} />}
+              />
             </div>
           )}
 
@@ -167,11 +199,17 @@ export const KEGGPanel = memo(function KEGGPanel({ data, panelId, lastFetched }:
                 <span className="text-cyan-400">Compounds</span>
                 <span className="text-xs text-slate-500">({compounds.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {compounds.map((compound, i) => (
-                  <CompoundItem key={`${compound.id}-${i}`} compound={compound} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={compounds}
+                getSearchText={(c) =>
+                  [c.name, c.id, c.formula].filter(Boolean).join(' ')
+                }
+                sortOptions={compoundSort}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter compounds…"
+                getKey={(compound, i) => `${compound.id}-${i}`}
+                renderItem={(compound) => <CompoundItem compound={compound} />}
+              />
             </div>
           )}
 
@@ -181,11 +219,17 @@ export const KEGGPanel = memo(function KEGGPanel({ data, panelId, lastFetched }:
                 <span className="text-green-400">Drugs</span>
                 <span className="text-xs text-slate-500">({drugs.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {drugs.map((drug, i) => (
-                  <DrugItem key={`${drug.id}-${i}`} drug={drug} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={drugs}
+                getSearchText={(d) =>
+                  [d.name, d.id, d.formula, d.ATC].filter(Boolean).join(' ')
+                }
+                sortOptions={drugSort}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter drugs…"
+                getKey={(drug, i) => `${drug.id}-${i}`}
+                renderItem={(drug) => <DrugItem drug={drug} />}
+              />
             </div>
           )}
         </>

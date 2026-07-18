@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GoAnnotation } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function aspectColor(aspect: string): string {
   if (aspect === 'molecular_function') return 'bg-blue-900/40 text-blue-300 border-blue-700/30'
@@ -11,18 +14,47 @@ function aspectColor(aspect: string): string {
 }
 
 export const QuickGoPanel = memo(function QuickGoPanel({ annotations, panelId, lastFetched }: { annotations: GoAnnotation[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = annotations.length === 0
+  const list = Array.isArray(annotations) ? annotations : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<GoAnnotation>((a) => a.goName || ''),
+      ...alphaSortOptions<GoAnnotation>((a) => a.goAspect || '').map((o) => ({
+        ...o,
+        id: `aspect-${o.id}`,
+        label: o.id.includes('asc') ? 'Aspect A–Z' : 'Aspect Z–A',
+      })),
+      ...alphaSortOptions<GoAnnotation>((a) => a.goId || '').map((o) => ({
+        ...o,
+        id: `goid-${o.id}`,
+        label: o.id.includes('asc') ? 'GO ID A–Z' : 'GO ID Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Gene Ontology (QuickGO)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No Gene Ontology annotations found for this molecule." : undefined}
+      empty={isEmpty ? 'No Gene Ontology annotations found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {annotations.map((ann, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(ann) =>
+            [ann.goName, ann.goId, ann.goAspect, ann.qualifier, ann.evidence]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter annotations (name, GO ID, aspect…)"
+          getKey={(ann, i) => `${ann.goId}-${i}`}
+          renderItem={(ann) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${aspectColor(ann.goAspect)}`}>
                   {ann.goAspect}
@@ -47,8 +79,8 @@ export const QuickGoPanel = memo(function QuickGoPanel({ annotations, panelId, l
                 </a>
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

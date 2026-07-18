@@ -1,10 +1,13 @@
 /** NHGRI AnVIL datasets. */
 
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import type { AnvilDataset } from '@/lib/types'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface NhgriAnvilPanelProps {
   data: AnvilDataset[]
@@ -33,6 +36,23 @@ export const NhgriAnvilPanel = memo(function NhgriAnvilPanel({
   const list = Array.isArray(data) ? data : []
   const isEmpty = !isLoading && list.length === 0
 
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<AnvilDataset>((d) => d.name || ''),
+      ...numberSortOptions<AnvilDataset>((d) => d.participantCount ?? 0, {
+        high: 'Most participants',
+        low: 'Fewest participants',
+        idPrefix: 'participants',
+      }),
+      ...numberSortOptions<AnvilDataset>((d) => d.sampleCount ?? 0, {
+        high: 'Most samples',
+        low: 'Fewest samples',
+        idPrefix: 'samples',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'NHGRI AnVIL Datasets' : `NHGRI AnVIL Datasets (${list.length})`}
@@ -47,12 +67,28 @@ export const NhgriAnvilPanel = memo(function NhgriAnvilPanel({
       }
     >
       {!isEmpty && !isLoading && (
-        <PaginatedList className="space-y-1">
-          {list.map((d, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(d) =>
+            [
+              d.name,
+              d.datasetId,
+              d.studyName,
+              d.description,
+              ...(d.dataTypes || []),
+              ...(d.consentGroups || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter datasets (name, study, type…)"
+          getKey={(d, i) => `${d.datasetId}-${i}`}
+          renderItem={(d) => {
             const href = datasetUrl(d)
             return (
               <DataPoint
-                key={`${d.datasetId}-${i}`}
                 sourceKey="nhgri-anvil"
                 label={d.name}
                 recordUrl={href}
@@ -118,8 +154,8 @@ export const NhgriAnvilPanel = memo(function NhgriAnvilPanel({
                 </div>
               </DataPoint>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

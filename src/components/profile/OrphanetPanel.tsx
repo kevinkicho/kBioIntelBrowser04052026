@@ -1,8 +1,11 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OrphanetDisease } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 interface OrphanetPanelProps {
   diseases?: OrphanetDisease[]
@@ -11,20 +14,55 @@ interface OrphanetPanelProps {
 }
 
 export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, lastFetched }: OrphanetPanelProps) {
-  const isEmpty = !diseases || diseases.length === 0
-  const title = isEmpty ? "Orphanet" : "Orphanet Rare Diseases"
+  const list = Array.isArray(diseases) ? diseases : []
+  const isEmpty = list.length === 0
+  const title = isEmpty ? 'Orphanet' : 'Orphanet Rare Diseases'
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<OrphanetDisease>((d) => d.diseaseName || ''),
+      ...alphaSortOptions<OrphanetDisease>((d) => d.orphaCode || '').map((o) => ({
+        ...o,
+        id: `orpha-${o.id}`,
+        label: o.id.includes('asc') ? 'ORPHA code A–Z' : 'ORPHA code Z–A',
+      })),
+      ...alphaSortOptions<OrphanetDisease>((d) => d.diseaseType || '').map((o) => ({
+        ...o,
+        id: `type-${o.id}`,
+        label: o.id.includes('asc') ? 'Type A–Z' : 'Type Z–A',
+      })),
+    ],
+    [],
+  )
 
   return (
     <Panel
       title={title}
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No rare disease data found for this molecule." : undefined}
+      empty={isEmpty ? 'No rare disease data found for this molecule.' : undefined}
     >
-      {!isEmpty && diseases && (
-        <PaginatedList className="space-y-2">
-          {diseases.map((disease, idx) => (
-            <div key={idx} className="py-2 border-b border-slate-700/50 last:border-0">
+      {!isEmpty && (
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(disease) =>
+            [
+              disease.diseaseName,
+              disease.orphaCode,
+              disease.diseaseType,
+              disease.prevalence,
+              disease.definition,
+              ...(disease.genes || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter diseases (name, ORPHA, gene…)"
+          getKey={(disease, idx) => `${disease.orphaCode || idx}`}
+          renderItem={(disease) => (
+            <div className="py-2 border-b border-slate-700/50 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <div className="flex items-center gap-1.5">
@@ -62,8 +100,8 @@ export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, la
                 </p>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

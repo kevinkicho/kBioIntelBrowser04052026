@@ -1,21 +1,59 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PdbeLigand } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 export const PdbeLigandsPanel = memo(function PdbeLigandsPanel({ ligands, panelId, lastFetched }: { ligands: PdbeLigand[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = ligands.length === 0
+  const list = Array.isArray(ligands) ? ligands : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<PdbeLigand>((l) => l.name || l.compId || ''),
+      ...numberSortOptions<PdbeLigand>((l) => l.molecularWeight || 0, {
+        high: 'Highest MW',
+        low: 'Lowest MW',
+        idPrefix: 'mw',
+      }),
+      ...alphaSortOptions<PdbeLigand>((l) => l.compId || '').map((o) => ({
+        ...o,
+        id: `comp-${o.id}`,
+        label: o.id.includes('asc') ? 'Comp ID A–Z' : 'Comp ID Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="PDBe Ligands"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No PDBe ligand data found for this molecule." : undefined}
+      empty={isEmpty ? 'No PDBe ligand data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {ligands.map((ligand, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(ligand) =>
+            [
+              ligand.compId,
+              ligand.name,
+              ligand.formula,
+              ligand.inchiKey,
+              ligand.drugbankId,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter ligands (name, ID, formula…)"
+          getKey={(ligand, i) => `${ligand.compId || i}`}
+          renderItem={(ligand) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-center gap-2">
                 <span className="text-xs bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-2 py-0.5 rounded">
                   {ligand.compId}
@@ -43,8 +81,8 @@ export const PdbeLigandsPanel = memo(function PdbeLigandsPanel({ ligands, panelI
                 View on PDBe →
               </a>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

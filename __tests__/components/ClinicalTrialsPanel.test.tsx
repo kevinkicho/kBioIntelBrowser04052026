@@ -28,8 +28,14 @@ describe('ClinicalTrialsPanel', () => {
   })
 
   test('renders sponsor name', () => {
+    const { container } = render(<ClinicalTrialsPanel trials={mockTrials} />)
+    expect(container.textContent).toMatch(/Novo Nordisk/)
+  })
+
+  test('shows filter and sort controls', () => {
     render(<ClinicalTrialsPanel trials={mockTrials} />)
-    expect(screen.getByText(/Novo Nordisk/)).toBeInTheDocument()
+    expect(screen.getByTestId('list-filter-input')).toBeInTheDocument()
+    expect(screen.getByTestId('list-sort-select')).toBeInTheDocument()
   })
 
   test('renders empty state when no trials', () => {

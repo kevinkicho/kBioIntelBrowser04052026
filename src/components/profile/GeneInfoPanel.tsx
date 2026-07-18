@@ -1,8 +1,14 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GeneInfo } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 export const GeneInfoPanel = memo(function GeneInfoPanel({
   genes,
@@ -15,6 +21,23 @@ export const GeneInfoPanel = memo(function GeneInfoPanel({
 }) {
   const list = Array.isArray(genes) ? genes : []
   const isEmpty = list.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<GeneInfo>((g) => g.symbol || ''),
+      ...alphaSortOptions<GeneInfo>((g) => g.name || '').map((o) => ({
+        ...o,
+        id: `fullname-${o.id}`,
+        label: o.id === 'name-asc' ? 'Full name A–Z' : 'Full name Z–A',
+      })),
+      ...numberSortOptions<GeneInfo>((g) => Number(g.geneId) || 0, {
+        high: 'Entrez ID high',
+        low: 'Entrez ID low',
+        idPrefix: 'entrez',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'NCBI Gene' : `NCBI Gene (${list.length})`}
@@ -23,12 +46,29 @@ export const GeneInfoPanel = memo(function GeneInfoPanel({
       empty={isEmpty ? 'No gene information found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((gene, i) => (
-            <div
-              key={`${gene.geneId || gene.symbol}-${i}`}
-              className="py-2 border-b border-slate-700/60 last:border-0"
-            >
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(gene) =>
+            [
+              gene.symbol,
+              gene.name,
+              gene.geneId,
+              gene.chromosome,
+              gene.mapLocation,
+              gene.organism,
+              gene.summary,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter genes…"
+          getKey={(gene, i) => `${gene.geneId || gene.symbol}-${i}`}
+          pageSize={5}
+          className="space-y-1"
+          renderItem={(gene) => (
+            <div className="py-2 border-b border-slate-700/60 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -76,8 +116,8 @@ export const GeneInfoPanel = memo(function GeneInfoPanel({
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

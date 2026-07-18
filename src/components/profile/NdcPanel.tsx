@@ -1,21 +1,62 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { NdcProduct } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const NdcPanel = memo(function NdcPanel({ products, panelId, lastFetched }: { products: NdcProduct[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = products.length === 0
+  const list = Array.isArray(products) ? products : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<NdcProduct>((p) => p.brandName || p.genericName || ''),
+      ...alphaSortOptions<NdcProduct>((p) => p.genericName || '').map((o) => ({
+        ...o,
+        id: `generic-${o.id}`,
+        label: o.id.includes('asc') ? 'Generic A–Z' : 'Generic Z–A',
+      })),
+      ...alphaSortOptions<NdcProduct>((p) => p.labelerName || '').map((o) => ({
+        ...o,
+        id: `labeler-${o.id}`,
+        label: o.id.includes('asc') ? 'Labeler A–Z' : 'Labeler Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="FDA NDC Directory"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No FDA NDC data found for this molecule." : undefined}
+      empty={isEmpty ? 'No FDA NDC data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {products.map((product, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(product) =>
+            [
+              product.brandName,
+              product.genericName,
+              product.productNdc,
+              product.dosageForm,
+              product.route,
+              product.marketingCategory,
+              product.labelerName,
+              ...(product.pharmClass || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter products (brand, generic, NDC, labeler…)"
+          getKey={(product, i) => `${product.productNdc || i}`}
+          renderItem={(product) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <a
@@ -59,8 +100,8 @@ export const NdcPanel = memo(function NdcPanel({ products, panelId, lastFetched 
                 </div>
               )}
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

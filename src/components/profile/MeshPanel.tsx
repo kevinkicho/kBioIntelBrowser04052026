@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MeshTerm } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const MeshPanel = memo(function MeshPanel({
   terms,
@@ -14,6 +17,12 @@ export const MeshPanel = memo(function MeshPanel({
 }) {
   const list = Array.isArray(terms) ? terms : []
   const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => alphaSortOptions<MeshTerm>((t) => t.name || t.termName || ''),
+    [],
+  )
+
   return (
     <Panel
       title={isEmpty ? 'MeSH Terms (NLM)' : `MeSH Terms (NLM) (${list.length})`}
@@ -22,12 +31,26 @@ export const MeshPanel = memo(function MeshPanel({
       empty={isEmpty ? 'No MeSH term data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((term, i) => (
-            <div
-              key={`${term.meshId || term.name}-${i}`}
-              className="py-2 border-b border-slate-700/60 last:border-0"
-            >
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(t) =>
+            [
+              t.name,
+              t.termName,
+              t.meshId,
+              t.scopeNote,
+              t.definition,
+              ...(t.treeNumbers || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter MeSH terms…"
+          getKey={(term, i) => `${term.meshId || term.name}-${i}`}
+          renderItem={(term) => (
+            <div className="py-2 border-b border-slate-700/60 last:border-0">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -80,8 +103,8 @@ export const MeshPanel = memo(function MeshPanel({
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

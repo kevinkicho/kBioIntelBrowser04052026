@@ -1,21 +1,64 @@
-import { memo } from 'react'
-import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import type { MolecularInteraction } from '@/lib/types'
+'use client'
 
-export const IntActPanel = memo(function IntActPanel({ interactions, panelId, lastFetched }: { interactions: MolecularInteraction[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = interactions.length === 0
+import { memo, useMemo } from 'react'
+import { Panel } from '@/components/ui/Panel'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import type { MolecularInteraction } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
+
+export const IntActPanel = memo(function IntActPanel({
+  interactions,
+  panelId,
+  lastFetched,
+}: {
+  interactions: MolecularInteraction[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(interactions) ? interactions : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<MolecularInteraction>((i) => i.confidenceScore ?? 0, {
+        high: 'Highest score',
+        low: 'Lowest score',
+      }),
+      ...alphaSortOptions<MolecularInteraction>(
+        (i) => `${i.interactorA || ''} ${i.interactorB || ''}`,
+      ),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Molecular Interactions (IntAct)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No molecular interaction data found for this molecule." : undefined}
+      empty={isEmpty ? 'No molecular interaction data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {interactions.map((interaction, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(i) =>
+            [
+              i.interactorA,
+              i.interactorB,
+              i.interactionType,
+              i.detectionMethod,
+              i.pubmedId,
+              i.interactionId,
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter interactions…"
+          getKey={(interaction, i) => `${interaction.interactionId || i}-${i}`}
+          renderItem={(interaction) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">
                   {interaction.interactorA} ↔ {interaction.interactorB}
@@ -63,8 +106,8 @@ export const IntActPanel = memo(function IntActPanel({ interactions, panelId, la
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

@@ -1,7 +1,13 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { FoodBCompound } from '@/lib/types'
+import {
+  alphaSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 interface FooDBPanelProps {
   compounds?: FoodBCompound[]
@@ -10,7 +16,24 @@ interface FooDBPanelProps {
 }
 
 export const FooDBPanel = memo(function FooDBPanel({ compounds, panelId, lastFetched }: FooDBPanelProps) {
-  const isEmpty = !compounds || compounds.length === 0
+  const list = compounds ?? []
+  const isEmpty = list.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<FoodBCompound>((c) => c.name || ''),
+      ...numberSortOptions<FoodBCompound>((c) => c.mass ?? 0, {
+        high: 'Highest mass',
+        low: 'Lowest mass',
+      }),
+      ...numberSortOptions<FoodBCompound>((c) => c.foodSources?.length ?? 0, {
+        high: 'Most food sources',
+        low: 'Fewest food sources',
+        idPrefix: 'sources',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="FooDB - Food Compounds"
@@ -19,7 +42,7 @@ export const FooDBPanel = memo(function FooDBPanel({ compounds, panelId, lastFet
       className="space-y-4"
       empty={isEmpty ? "No food compound data found in FooDB." : undefined}
     >
-      {!isEmpty && compounds && (
+      {!isEmpty && (
         <>
           <p className="text-sm text-slate-400">
             Compounds found in food from FooDB, the comprehensive database of food constituents and metabolites.
@@ -27,14 +50,28 @@ export const FooDBPanel = memo(function FooDBPanel({ compounds, panelId, lastFet
 
           <div className="space-y-2">
             <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-              Food Compounds ({compounds.length})
+              Food Compounds ({list.length})
             </h3>
-            <PaginatedList pageSize={5}>
-              {compounds.map((compound) => (
-                <div
-                  key={compound.id}
-                  className="p-4 rounded-lg bg-slate-800/30 border border-slate-700"
-                >
+            <FilterablePaginatedList
+              items={list}
+              getSearchText={(compound) =>
+                [
+                  compound.name,
+                  compound.id,
+                  compound.formula,
+                  ...(compound.foodSources ?? []),
+                  ...(compound.synonyms ?? []),
+                ]
+                  .filter(Boolean)
+                  .join(' ')
+              }
+              sortOptions={sortOptions}
+              defaultSortId="name-asc"
+              filterPlaceholder="Filter compounds…"
+              getKey={(compound) => compound.id}
+              pageSize={5}
+              renderItem={(compound) => (
+                <div className="p-4 rounded-lg bg-slate-800/30 border border-slate-700">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <div className="flex-1">
                       <h4 className="font-semibold text-slate-100">{compound.name}</h4>
@@ -90,8 +127,8 @@ export const FooDBPanel = memo(function FooDBPanel({ compounds, panelId, lastFet
                     </div>
                   )}
                 </div>
-              ))}
-            </PaginatedList>
+              )}
+            />
           </div>
         </>
       )}

@@ -2,12 +2,14 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import { PaginatedVirtualizedList } from '@/components/ui/VirtualizedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { isMatch } from '@/hooks/useDiseaseContext'
 import type { ClinicalTrial } from '@/lib/types'
-
-const VIRTUALIZATION_THRESHOLD = 20
+import {
+  alphaSortOptions,
+  dateSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 const STATUS_COLORS: Record<string, string> = {
   COMPLETED: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30',
@@ -20,52 +22,144 @@ function statusClass(status: string): string {
   return STATUS_COLORS[status] ?? 'bg-slate-700 text-slate-300 border-slate-600'
 }
 
-function ClinicalTrialItem({ trial, diseaseMatch }: { trial: ClinicalTrial; diseaseMatch: boolean }) {
+function ClinicalTrialItem({
+  trial,
+  diseaseMatch,
+}: {
+  trial: ClinicalTrial
+  diseaseMatch: boolean
+}) {
+  const ctGov = trial.nctId
+    ? `https://clinicaltrials.gov/study/${encodeURIComponent(trial.nctId)}`
+    : undefined
   return (
-    <div className={`py-3 border-b border-slate-700 last:border-0 ${diseaseMatch ? 'bg-amber-950/20 -mx-4 px-4 rounded-md' : ''}`}>
+    <div
+      className={`py-2 border-b border-slate-700/60 last:border-0 ${
+        diseaseMatch ? 'bg-amber-950/20 -mx-2 px-2 rounded-md' : ''
+      }`}
+    >
       <div className="flex items-start justify-between gap-2">
-        <p className="font-semibold text-slate-100 text-sm">{trial.title}</p>
-        <div className="flex items-center gap-1.5 shrink-0">
+        <div className="min-w-0">
+          {ctGov ? (
+            <a
+              href={ctGov}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-semibold text-slate-100 text-sm hover:text-indigo-300"
+            >
+              {trial.title}
+            </a>
+          ) : (
+            <p className="font-semibold text-slate-100 text-sm">{trial.title}</p>
+          )}
+          <p className="text-[11px] text-slate-500 mt-0.5">
+            {[trial.nctId, trial.sponsor].filter(Boolean).join(' · ')}
+          </p>
+          <div className="flex gap-1.5 mt-1 flex-wrap">
+            {trial.phase && trial.phase !== 'N/A' && (
+              <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
+                {trial.phase}
+              </span>
+            )}
+            {trial.conditions?.slice(0, 3).map((c, j) => (
+              <span
+                key={j}
+                className={`text-[10px] px-1.5 py-0.5 rounded ${
+                  diseaseMatch
+                    ? 'bg-amber-700/30 text-amber-200'
+                    : 'bg-slate-700/50 text-slate-400'
+                }`}
+              >
+                {c}
+              </span>
+            ))}
+          </div>
+          <p className="text-[10px] text-slate-600 mt-0.5">
+            {[
+              trial.startDate && `Start ${trial.startDate}`,
+              trial.completionDate && `End ${trial.completionDate}`,
+              trial.enrollment != null && `n=${trial.enrollment}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+        </div>
+        <div className="flex flex-col items-end gap-1 shrink-0">
           {diseaseMatch && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-700/40 whitespace-nowrap">
+            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-700/40">
               Match
             </span>
           )}
-          <span className={`text-xs border px-2 py-0.5 rounded ${statusClass(trial.status)}`}>
+          <span className={`text-[10px] border px-1.5 py-0.5 rounded ${statusClass(trial.status)}`}>
             {trial.status}
           </span>
+          {ctGov && (
+            <a
+              href={ctGov}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-indigo-400 hover:text-indigo-300"
+            >
+              CT.gov ↗
+            </a>
+          )}
         </div>
       </div>
-      <p className="text-xs text-slate-400 mt-1">{trial.nctId} · {trial.sponsor}</p>
-      <div className="flex gap-2 mt-1 flex-wrap">
-        {trial.phase !== 'N/A' && (
-          <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded">{trial.phase}</span>
-        )}
-        {trial.conditions.slice(0, 2).map((c, j) => (
-          <span key={j} className={`text-xs px-2 py-0.5 rounded ${diseaseMatch ? 'bg-amber-700/30 text-amber-200' : 'bg-slate-700/50 text-slate-400'}`}>{c}</span>
-        ))}
-      </div>
-      {trial.startDate && (
-        <p className="text-xs text-slate-500 mt-1">Started: {trial.startDate}</p>
-      )}
     </div>
   )
 }
 
-export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({ trials, panelId, lastFetched, diseaseName }: { trials: ClinicalTrial[], panelId?: string, lastFetched?: Date, diseaseName?: string }) {
-  const sortedTrials = useMemo(() => {
-    if (!diseaseName) return trials
-    const scored = trials.map(trial => {
-      const conditionText = [trial.title, ...trial.conditions].join(' ')
-      const matched = isMatch(conditionText, diseaseName)
-      return { trial, matched }
-    })
-    const matching = scored.filter(s => s.matched).map(s => s.trial)
-    const nonMatching = scored.filter(s => !s.matched).map(s => s.trial)
-    return [...matching, ...nonMatching]
-  }, [trials, diseaseName])
+export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
+  trials,
+  panelId,
+  lastFetched,
+  diseaseName,
+}: {
+  trials: ClinicalTrial[]
+  panelId?: string
+  lastFetched?: Date
+  diseaseName?: string
+}) {
+  const list = Array.isArray(trials) ? trials : []
 
-  if (trials.length === 0) {
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<ClinicalTrial>(
+        (t) => t.startDate || t.completionDate,
+        { newest: 'Newest start', oldest: 'Oldest start' },
+      ),
+      ...dateSortOptions<ClinicalTrial>((t) => t.completionDate, {
+        newest: 'Newest completion',
+        oldest: 'Oldest completion',
+      }).map((o) => ({ ...o, id: `end-${o.id}` })),
+      ...alphaSortOptions<ClinicalTrial>((t) => t.title || t.nctId),
+      ...numberSortOptions<ClinicalTrial>((t) => t.enrollment ?? 0, {
+        high: 'Largest enrollment',
+        low: 'Smallest enrollment',
+      }),
+      {
+        id: 'status',
+        label: 'Status A–Z',
+        compare: (a: ClinicalTrial, b: ClinicalTrial) =>
+          (a.status || '').localeCompare(b.status || ''),
+      },
+    ],
+    [],
+  )
+
+  const matchCount = diseaseName
+    ? list.filter((t) => isMatch([t.title, ...(t.conditions || [])].join(' '), diseaseName))
+        .length
+    : 0
+
+  const titleSuffix =
+    diseaseName && matchCount > 0 ? (
+      <span className="text-xs font-normal text-amber-300 ml-2">
+        {matchCount} relevant to {diseaseName}
+      </span>
+    ) : null
+
+  if (list.length === 0) {
     return (
       <Panel title="Clinical Trials" panelId={panelId} lastFetched={lastFetched}>
         <p className="text-slate-500 text-sm">No clinical trials found for this molecule.</p>
@@ -73,42 +167,41 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({ trials, p
     )
   }
 
-  const matchCount = diseaseName ? sortedTrials.filter(t => {
-    const conditionText = [t.title, ...t.conditions].join(' ')
-    return isMatch(conditionText, diseaseName)
-  }).length : 0
-
-  const titleSuffix = diseaseName && matchCount > 0
-    ? <span className="text-xs font-normal text-amber-300 ml-2">{matchCount} relevant to {diseaseName}</span>
-    : null
-
-  if (trials.length > VIRTUALIZATION_THRESHOLD) {
-    return (
-      <Panel title="Clinical Trials" panelId={panelId} lastFetched={lastFetched} titleExtra={titleSuffix}>
-        <PaginatedVirtualizedList
-          items={sortedTrials}
-          renderItem={(trial, i) => {
-            const conditionText = [trial.title, ...trial.conditions].join(' ')
-            const diseaseMatch = diseaseName ? isMatch(conditionText, diseaseName) : false
-            return <ClinicalTrialItem key={`${trial.nctId}-${i}`} trial={trial} diseaseMatch={diseaseMatch} />
-          }}
-          initialCount={10}
-          estimateSize={100}
-          emptyMessage="No clinical trials found for this molecule."
-        />
-      </Panel>
-    )
-  }
-
   return (
-    <Panel title="Clinical Trials" panelId={panelId} lastFetched={lastFetched} titleExtra={titleSuffix}>
-      <PaginatedList className="space-y-3">
-        {sortedTrials.map((trial, i) => {
-          const conditionText = [trial.title, ...trial.conditions].join(' ')
+    <Panel
+      title={`Clinical Trials (${list.length})`}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      titleExtra={titleSuffix}
+    >
+      <FilterablePaginatedList
+        items={list}
+        getSearchText={(t) =>
+          [
+            t.title,
+            t.nctId,
+            t.status,
+            t.phase,
+            t.sponsor,
+            ...(t.conditions || []),
+            ...(t.interventions || []),
+            t.startDate,
+            t.completionDate,
+          ]
+            .filter(Boolean)
+            .join(' ')
+        }
+        sortOptions={sortOptions}
+        defaultSortId="date-desc"
+        filterPlaceholder="Filter trials (title, NCT, status, condition…)"
+        getKey={(t, i) => `${t.nctId}-${i}`}
+        pageSize={5}
+        renderItem={(trial) => {
+          const conditionText = [trial.title, ...(trial.conditions || [])].join(' ')
           const diseaseMatch = diseaseName ? isMatch(conditionText, diseaseName) : false
-          return <ClinicalTrialItem key={`${trial.nctId}-${i}`} trial={trial} diseaseMatch={diseaseMatch} />
-        })}
-      </PaginatedList>
+          return <ClinicalTrialItem trial={trial} diseaseMatch={diseaseMatch} />
+        }}
+      />
     </Panel>
   )
 })

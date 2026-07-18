@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CATHDomain, Gene3DEntry } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function DomainItem({ domain }: { domain: CATHDomain }) {
   return (
@@ -128,6 +131,30 @@ export const CATHPanel = memo(function CATHPanel({ data, panelId, lastFetched }:
   const { domains, gene3dEntries } = data
   const isEmpty = domains.length === 0 && gene3dEntries.length === 0
 
+  const domainSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<CATHDomain>((d) => d.domainId || d.protein || ''),
+      ...numberSortOptions<CATHDomain>((d) => d.length ?? 0, {
+        high: 'Longest first',
+        low: 'Shortest first',
+        idPrefix: 'len',
+      }),
+    ],
+    [],
+  )
+
+  const geneSortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<Gene3DEntry>((e) => e.geneSymbol || e.geneId),
+      ...numberSortOptions<Gene3DEntry>((e) => e.domains?.length ?? 0, {
+        high: 'Most domains',
+        low: 'Fewest domains',
+        idPrefix: 'domains',
+      }),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="CATH/Gene3D"
@@ -147,11 +174,20 @@ export const CATHPanel = memo(function CATHPanel({ data, panelId, lastFetched }:
                 <span className="text-purple-400">Domains</span>
                 <span className="text-xs text-slate-500">({domains.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {domains.map((domain, i) => (
-                  <DomainItem key={`${domain.domainId}-${i}`} domain={domain} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={domains}
+                getSearchText={(d) =>
+                  [d.domainId, d.protein, d.fold, d.superfamily, d.functionalFamily, d.organism, d.pdbId, d.superfamilyId]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={domainSortOptions}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter domains…"
+                getKey={(d, i) => `${d.domainId}-${i}`}
+                className="space-y-2"
+                renderItem={(domain) => <DomainItem domain={domain} />}
+              />
             </div>
           )}
 
@@ -161,11 +197,20 @@ export const CATHPanel = memo(function CATHPanel({ data, panelId, lastFetched }:
                 <span className="text-green-400">Gene3D Entries</span>
                 <span className="text-xs text-slate-500">({gene3dEntries.length})</span>
               </h4>
-              <PaginatedList className="space-y-2">
-                {gene3dEntries.map((entry, i) => (
-                  <GeneItem key={`${entry.geneId}-${i}`} entry={entry} />
-                ))}
-              </PaginatedList>
+              <FilterablePaginatedList
+                items={gene3dEntries}
+                getSearchText={(e) =>
+                  [e.geneSymbol, e.geneId, e.proteinName, e.organism, e.domainArchitecture]
+                    .filter(Boolean)
+                    .join(' ')
+                }
+                sortOptions={geneSortOptions}
+                defaultSortId="name-asc"
+                filterPlaceholder="Filter genes…"
+                getKey={(e, i) => `${e.geneId}-${i}`}
+                className="space-y-2"
+                renderItem={(entry) => <GeneItem entry={entry} />}
+              />
             </div>
           )}
         </>

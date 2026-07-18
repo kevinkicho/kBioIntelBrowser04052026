@@ -1,40 +1,40 @@
-import { memo } from 'react'
-import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
-import { PaginatedVirtualizedList } from '@/components/ui/VirtualizedList'
-import type { LiteratureResult } from '@/lib/types'
+'use client'
 
-const VIRTUALIZATION_THRESHOLD = 20
+import { memo, useMemo } from 'react'
+import { Panel } from '@/components/ui/Panel'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import type { LiteratureResult } from '@/lib/types'
+import {
+  alphaSortOptions,
+  dateSortOptions,
+  numberSortOptions,
+} from '@/lib/listControls'
 
 function LiteratureItem({ paper }: { paper: LiteratureResult }) {
   return (
-    <div className="py-3 border-b border-slate-700 last:border-0">
+    <div className="py-2 border-b border-slate-700/60 last:border-0">
       <p className="font-semibold text-slate-100 text-sm leading-snug">{paper.title}</p>
       {paper.authors && (
-        <p className="text-xs text-slate-400 mt-1 truncate">{paper.authors}</p>
+        <p className="text-[11px] text-slate-400 mt-0.5 truncate">{paper.authors}</p>
       )}
-      <div className="flex items-center gap-3 mt-1">
-        {paper.journal && (
-          <span className="text-xs text-slate-500">{paper.journal}</span>
-        )}
-        {paper.year > 0 && (
-          <span className="text-xs text-slate-500">{paper.year}</span>
-        )}
+      <div className="flex items-center gap-2 mt-0.5 flex-wrap text-[11px] text-slate-500">
+        {paper.journal && <span>{paper.journal}</span>}
+        {paper.year > 0 && <span className="font-mono">{paper.year}</span>}
         {paper.citedByCount !== undefined && paper.citedByCount > 0 && (
-          <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/30 px-2 py-0.5 rounded">
+          <span className="text-[10px] bg-blue-900/40 text-blue-300 border border-blue-700/30 px-1.5 py-0.5 rounded">
             {paper.citedByCount} cited
           </span>
         )}
       </div>
-      <div className="flex items-center gap-3 mt-1">
+      <div className="flex items-center gap-2 mt-1 flex-wrap text-[10px]">
         {paper.doi && (
           <a
             href={`https://doi.org/${paper.doi}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-blue-400 hover:text-blue-300"
+            className="text-blue-400 hover:text-blue-300"
           >
-            DOI:{paper.doi}
+            DOI ↗
           </a>
         )}
         {paper.pmid && (
@@ -42,9 +42,9 @@ function LiteratureItem({ paper }: { paper: LiteratureResult }) {
             href={`https://pubmed.ncbi.nlm.nih.gov/${paper.pmid}/`}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-xs text-emerald-400 hover:text-emerald-300"
+            className="text-emerald-400 hover:text-emerald-300"
           >
-            PubMed:{paper.pmid}
+            PubMed ↗
           </a>
         )}
       </div>
@@ -52,37 +52,62 @@ function LiteratureItem({ paper }: { paper: LiteratureResult }) {
   )
 }
 
-export const LiteraturePanel = memo(function LiteraturePanel({ results, panelId, lastFetched }: { results: LiteratureResult[], panelId?: string, lastFetched?: Date }) {
-  if (results.length === 0) {
+export const LiteraturePanel = memo(function LiteraturePanel({
+  results,
+  panelId,
+  lastFetched,
+}: {
+  results: LiteratureResult[]
+  panelId?: string
+  lastFetched?: Date
+}) {
+  const list = Array.isArray(results) ? results : []
+  const sortOptions = useMemo(
+    () => [
+      ...dateSortOptions<LiteratureResult>((p) => p.year, {
+        newest: 'Newest year',
+        oldest: 'Oldest year',
+      }),
+      ...numberSortOptions<LiteratureResult>((p) => p.citedByCount ?? 0, {
+        high: 'Most cited',
+        low: 'Least cited',
+      }),
+      ...alphaSortOptions<LiteratureResult>((p) => p.title || ''),
+    ],
+    [],
+  )
+
+  if (list.length === 0) {
     return (
-      <Panel title="Scientific Literature (Europe PMC)" panelId={panelId} lastFetched={lastFetched}>
+      <Panel
+        title="Scientific Literature (Europe PMC)"
+        panelId={panelId}
+        lastFetched={lastFetched}
+      >
         <p className="text-slate-500 text-sm">No publications found for this molecule.</p>
       </Panel>
     )
   }
 
-  // Use virtualization for large datasets
-  if (results.length > VIRTUALIZATION_THRESHOLD) {
-    return (
-      <Panel title="Scientific Literature (Europe PMC)" panelId={panelId} lastFetched={lastFetched}>
-        <PaginatedVirtualizedList
-          items={results}
-          renderItem={(paper, i) => <LiteratureItem key={`${paper.doi || paper.title}-${i}`} paper={paper} />}
-          initialCount={10}
-          estimateSize={120}
-          emptyMessage="No publications found for this molecule."
-        />
-      </Panel>
-    )
-  }
-
   return (
-    <Panel title="Scientific Literature (Europe PMC)" panelId={panelId} lastFetched={lastFetched}>
-      <PaginatedList className="space-y-3">
-        {results.map((paper, i) => (
-          <LiteratureItem key={`${paper.doi || paper.title}-${i}`} paper={paper} />
-        ))}
-      </PaginatedList>
+    <Panel
+      title={`Scientific Literature (Europe PMC) (${list.length})`}
+      panelId={panelId}
+      lastFetched={lastFetched}
+    >
+      <FilterablePaginatedList
+        items={list}
+        getSearchText={(p) =>
+          [p.title, p.authors, p.journal, p.doi, p.pmid, String(p.year || '')]
+            .filter(Boolean)
+            .join(' ')
+        }
+        sortOptions={sortOptions}
+        defaultSortId="date-desc"
+        filterPlaceholder="Filter papers (title, author, journal, DOI…)"
+        getKey={(p, i) => `${p.doi || p.pmid || p.title}-${i}`}
+        renderItem={(paper) => <LiteratureItem paper={paper} />}
+      />
     </Panel>
   )
 })

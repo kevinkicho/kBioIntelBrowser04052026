@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SAbDabEntry } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function EntryItem({ entry }: { entry: SAbDabEntry }) {
   const typeColors: Record<string, string> = {
@@ -112,46 +115,78 @@ function EntryItem({ entry }: { entry: SAbDabEntry }) {
 }
 
 export const SAbDabPanel = memo(function SAbDabPanel({ entries, panelId, lastFetched }: { entries: SAbDabEntry[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = entries.length === 0
+  const list = Array.isArray(entries) ? entries : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<SAbDabEntry>((e) => e.antigen || e.pdbId || ''),
+      ...numberSortOptions<SAbDabEntry>((e) => e.resolution || 0, {
+        high: 'Highest resolution value',
+        low: 'Best resolution (lowest Å)',
+        idPrefix: 'res',
+      }),
+      ...alphaSortOptions<SAbDabEntry>((e) => e.antibodyType || '').map((o) => ({
+        ...o,
+        id: `type-${o.id}`,
+        label: o.id.includes('asc') ? 'Type A–Z' : 'Type Z–A',
+      })),
+    ],
+    [],
+  )
+
+  const typeCounts = list.reduce((acc, e) => {
+    acc[e.antibodyType] = (acc[e.antibodyType] || 0) + 1
+    return acc
+  }, {} as Record<string, number>)
+
+  const withAffinity = list.filter((e) => e.affinity !== null).length
 
   return (
     <Panel
       title="SAbDab"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No antibody structure data found for this molecule." : undefined}
+      empty={isEmpty ? 'No antibody structure data found for this molecule.' : undefined}
     >
-      {!isEmpty && (() => {
-        const typeCounts = entries.reduce((acc, e) => {
-          acc[e.antibodyType] = (acc[e.antibodyType] || 0) + 1
-          return acc
-        }, {} as Record<string, number>)
+      {!isEmpty && (
+        <>
+          <p className="text-xs text-slate-400 mb-3">
+            Structural Antibody Database — {list.length} structure{list.length !== 1 ? 's' : ''}
+            {withAffinity > 0 && <span className="text-cyan-400 ml-2">{withAffinity} with affinity data</span>}
+          </p>
 
-        const withAffinity = entries.filter(e => e.affinity !== null).length
+          <div className="flex flex-wrap gap-1.5 mb-3">
+            {Object.entries(typeCounts).map(([type, count]) => (
+              <span key={type} className="text-xs bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
+                {type}: {count}
+              </span>
+            ))}
+          </div>
 
-        return (
-          <>
-            <p className="text-xs text-slate-400 mb-3">
-              Structural Antibody Database — {entries.length} structure{entries.length !== 1 ? 's' : ''}
-              {withAffinity > 0 && <span className="text-cyan-400 ml-2">{withAffinity} with affinity data</span>}
-            </p>
-
-            <div className="flex flex-wrap gap-1.5 mb-3">
-              {Object.entries(typeCounts).map(([type, count]) => (
-                <span key={type} className="text-xs bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
-                  {type}: {count}
-                </span>
-              ))}
-            </div>
-
-            <PaginatedList className="space-y-2">
-              {entries.map((entry, i) => (
-                <EntryItem key={`${entry.pdbId}-${i}`} entry={entry} />
-              ))}
-            </PaginatedList>
-          </>
-        )
-      })()}
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(entry) =>
+              [
+                entry.pdbId,
+                entry.antibodyType,
+                entry.antigen,
+                entry.antigenType,
+                entry.heavyChain,
+                entry.lightChain,
+                ...(entry.species || []),
+              ]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter antibodies (PDB, antigen, type…)"
+            getKey={(entry, i) => `${entry.pdbId}-${i}`}
+            renderItem={(entry) => <EntryItem entry={entry} />}
+          />
+        </>
+      )}
     </Panel>
   )
 })

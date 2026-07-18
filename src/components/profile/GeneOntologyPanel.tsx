@@ -1,7 +1,10 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GoAnnotation } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 function goAspectBadge(aspect: string): string {
   const normalizedAspect = aspect?.toLowerCase() || ''
@@ -41,6 +44,22 @@ export const GeneOntologyPanel = memo(function GeneOntologyPanel({
 }) {
   const list = Array.isArray(terms) ? terms : []
   const isEmpty = list.length === 0
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<GoAnnotation>((t) => t.goName || ''),
+      ...alphaSortOptions<GoAnnotation>((t) => t.goId || '').map((o) => ({
+        ...o,
+        id: `goid-${o.id}`,
+        label: o.id === 'name-asc' ? 'GO ID A–Z' : 'GO ID Z–A',
+      })),
+      ...alphaSortOptions<GoAnnotation>((t) => t.goAspect || '').map((o) => ({
+        ...o,
+        id: `aspect-${o.id}`,
+        label: o.id === 'name-asc' ? 'Aspect A–Z' : 'Aspect Z–A',
+      })),
+    ],
+    [],
+  )
 
   return (
     <Panel
@@ -50,14 +69,23 @@ export const GeneOntologyPanel = memo(function GeneOntologyPanel({
       empty={isEmpty ? 'No Gene Ontology terms found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-1">
-          {list.map((term, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(term) =>
+            [term.goName, term.goId, term.goAspect, term.qualifier, term.evidence]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter GO terms…"
+          getKey={(term, i) => `${term.goId || i}-${i}`}
+          pageSize={5}
+          className="space-y-1"
+          renderItem={(term) => {
             const href = term.url || `https://amigo.geneontology.org/amigo/term/${term.goId}`
             return (
-              <div
-                key={`${term.goId || i}-${i}`}
-                className="py-2 border-b border-slate-700/60 last:border-0"
-              >
+              <div className="py-2 border-b border-slate-700/60 last:border-0">
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
@@ -106,8 +134,8 @@ export const GeneOntologyPanel = memo(function GeneOntologyPanel({
                 </div>
               </div>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

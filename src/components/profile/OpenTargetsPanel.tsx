@@ -1,9 +1,12 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { DiseaseAssociation } from '@/lib/types'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 function diseaseHref(disease: DiseaseAssociation): string {
   if (disease.diseaseId) {
@@ -23,6 +26,23 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
 }) {
   const list = Array.isArray(diseases) ? diseases : []
   const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<DiseaseAssociation>((d) => d.score ?? 0, {
+        high: 'Highest score',
+        low: 'Lowest score',
+      }),
+      ...numberSortOptions<DiseaseAssociation>((d) => d.evidenceCount || 0, {
+        high: 'Most evidence',
+        low: 'Least evidence',
+        idPrefix: 'evidence',
+      }),
+      ...alphaSortOptions<DiseaseAssociation>((d) => d.diseaseName || ''),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Disease Associations (Open Targets)"
@@ -31,8 +51,23 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
       empty={isEmpty ? 'No disease associations found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-2">
-          {list.map((disease, i) => {
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(disease) =>
+            [
+              disease.diseaseName,
+              disease.diseaseId,
+              disease.description,
+              ...(disease.therapeuticAreas || []),
+            ]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter diseases (name, ID, area…)"
+          getKey={(disease, i) => `${disease.diseaseId || disease.diseaseName}-${i}`}
+          renderItem={(disease) => {
             const otUrl = diseaseHref(disease)
             const localDisease = `/disease?q=${encodeURIComponent(disease.diseaseName)}`
             const discoverHref = `/discover?q=${encodeURIComponent(disease.diseaseName)}${
@@ -40,7 +75,6 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
             }`
             return (
               <DataPoint
-                key={`${disease.diseaseId || disease.diseaseName}-${i}`}
                 sourceKey="opentargets"
                 label={disease.diseaseName}
                 recordUrl={otUrl}
@@ -114,8 +148,8 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
                 </div>
               </DataPoint>
             )
-          })}
-        </PaginatedList>
+          }}
+        />
       )}
     </Panel>
   )

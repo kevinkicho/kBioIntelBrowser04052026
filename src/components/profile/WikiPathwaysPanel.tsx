@@ -1,22 +1,52 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import Image from 'next/image'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { WikiPathway } from '@/lib/types'
+import { alphaSortOptions } from '@/lib/listControls'
 
 export const WikiPathwaysPanel = memo(function WikiPathwaysPanel({ pathways, panelId, lastFetched }: { pathways: WikiPathway[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = pathways.length === 0
+  const list = Array.isArray(pathways) ? pathways : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...alphaSortOptions<WikiPathway>((p) => p.name || ''),
+      ...alphaSortOptions<WikiPathway>((p) => p.id || '').map((o) => ({
+        ...o,
+        id: `id-${o.id}`,
+        label: o.id.includes('asc') ? 'ID A–Z' : 'ID Z–A',
+      })),
+      ...alphaSortOptions<WikiPathway>((p) => p.species || '').map((o) => ({
+        ...o,
+        id: `species-${o.id}`,
+        label: o.id.includes('asc') ? 'Species A–Z' : 'Species Z–A',
+      })),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="WikiPathways"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No WikiPathways data found for this molecule." : undefined}
+      empty={isEmpty ? 'No WikiPathways data found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {pathways.map((pathway, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(pathway) =>
+            [pathway.id, pathway.name, pathway.species].filter(Boolean).join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="name-asc"
+          filterPlaceholder="Filter pathways (name, ID, species…)"
+          getKey={(pathway, i) => `${pathway.id || i}`}
+          renderItem={(pathway) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-2 py-0.5 rounded font-mono">
@@ -55,8 +85,8 @@ export const WikiPathwaysPanel = memo(function WikiPathwaysPanel({ pathways, pan
                 </div>
               </details>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )

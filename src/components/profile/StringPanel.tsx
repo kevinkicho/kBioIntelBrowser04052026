@@ -1,21 +1,47 @@
-import { memo } from 'react'
+'use client'
+
+import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
-import { PaginatedList } from '@/components/ui/PaginatedList'
+import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { StringInteraction } from '@/lib/types'
+import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 export const StringPanel = memo(function StringPanel({ interactions, panelId, lastFetched }: { interactions: StringInteraction[], panelId?: string, lastFetched?: Date }) {
-  const isEmpty = interactions.length === 0
+  const list = Array.isArray(interactions) ? interactions : []
+  const isEmpty = list.length === 0
+
+  const sortOptions = useMemo(
+    () => [
+      ...numberSortOptions<StringInteraction>((i) => i.score || 0, {
+        high: 'Highest score',
+        low: 'Lowest score',
+      }),
+      ...alphaSortOptions<StringInteraction>((i) => `${i.proteinA} ${i.proteinB}`),
+    ],
+    [],
+  )
+
   return (
     <Panel
       title="Protein Interactions (STRING)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No protein interactions found for this molecule." : undefined}
+      empty={isEmpty ? 'No protein interactions found for this molecule.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {interactions.map((interaction, i) => (
-            <div key={i} className="py-3 border-b border-slate-700 last:border-0">
+        <FilterablePaginatedList
+          items={list}
+          getSearchText={(interaction) =>
+            [interaction.proteinA, interaction.proteinB]
+              .filter(Boolean)
+              .join(' ')
+          }
+          sortOptions={sortOptions}
+          defaultSortId="num-desc"
+          filterPlaceholder="Filter interactions (protein…)"
+          getKey={(interaction, i) => `${interaction.proteinA}-${interaction.proteinB}-${i}`}
+          renderItem={(interaction) => (
+            <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-center justify-between gap-2">
                 <p className="font-semibold text-slate-100 text-sm">
                   {interaction.proteinA} ↔ {interaction.proteinB}
@@ -61,8 +87,8 @@ export const StringPanel = memo(function StringPanel({ interactions, panelId, la
                 )}
               </div>
             </div>
-          ))}
-        </PaginatedList>
+          )}
+        />
       )}
     </Panel>
   )
