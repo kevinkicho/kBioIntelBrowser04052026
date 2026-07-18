@@ -279,8 +279,10 @@ export async function getUniChemMappings(inchiKey: string): Promise<UniChemMappi
 export async function getUniChemCrossRefs(
   fromSource: string,
   fromId: string,
-  _toSource?: string,
+  /** Reserved for future to-source filtering (API currently returns all sources). */
+  toSource?: string,
 ): Promise<UniChemMapping[]> {
+  void toSource
   try {
     const sourceNum = resolveSourceNumber(fromSource)
     if (sourceNum == null) return []

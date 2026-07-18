@@ -88,10 +88,9 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
   }, [indications])
 
   const moleculeCardHref =
+    chemblCompoundIndicationsUrl(moleculeChemblId) ||
     chemblCompoundIndicationsSectionUrl(moleculeChemblId) ||
     chemblCompoundUrl(moleculeChemblId)
-  const moleculeIndicationsHref =
-    chemblCompoundIndicationsUrl(moleculeChemblId) || moleculeCardHref
 
   const titleExtra = (
     <span className="inline-flex flex-wrap items-center gap-2">
