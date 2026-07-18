@@ -4,7 +4,11 @@ import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { AtcClassification } from '@/lib/types'
-import { atcDeepLink, atcLevelLabel, isWhoAtcCode } from '@/lib/api/atc'
+import {
+  atcDeepLink,
+  atcLevelLabel,
+  dedupeAtcClassifications,
+} from '@/lib/api/atc'
 import { alphaSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
@@ -24,12 +28,12 @@ export const AtcPanel = memo(function AtcPanel({
   panelId?: string
   lastFetched?: Date
 }) {
-  // Prefer WHO ATC codes only (API may still surface non-ATC in cached payloads)
-  const items = useMemo(() => {
-    const list = Array.isArray(classifications) ? classifications : []
-    const filtered = list.filter((c) => isWhoAtcCode(c.code))
-    return filtered.length > 0 ? filtered : list
-  }, [classifications])
+  // Always dedupe by WHO ATC code — RxClass + stale caches can repeat the same
+  // classId 5× (same code, name, level, and deep link).
+  const items = useMemo(
+    () => dedupeAtcClassifications(classifications),
+    [classifications],
+  )
 
   const isEmpty = items.length === 0
 
@@ -75,7 +79,7 @@ export const AtcPanel = memo(function AtcPanel({
             sortOptions={sortOptions}
             defaultSortId="code-asc"
             filterPlaceholder="Filter by code, name, or level…"
-            getKey={(c, i) => `${c.code}-${i}`}
+            getKey={(c) => c.code}
             pageSize={10}
             className="space-y-0"
             renderItem={(cls, index) => {

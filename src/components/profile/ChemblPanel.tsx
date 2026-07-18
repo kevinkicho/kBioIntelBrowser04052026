@@ -129,7 +129,7 @@ export const ChemblPanel = memo(function ChemblPanel({
                 >
                   <span>Target</span>
                   <span>Type</span>
-                  <span>Potency</span>
+                  <span className="text-right">Potency</span>
                   <span>Assay</span>
                   <span className="text-right">Open</span>
                 </div>
@@ -155,7 +155,7 @@ export const ChemblPanel = memo(function ChemblPanel({
                   {activity.activityType || activity.standardType || '—'}
                 </span>
                 <span
-                  className={`text-xs font-mono text-emerald-400/95 tabular-nums truncate ${emptyDataClass(emptyPotency)}`}
+                  className={`text-xs font-mono text-emerald-400/95 tabular-nums text-right truncate ${emptyDataClass(emptyPotency)}`}
                 >
                   {potency}
                 </span>

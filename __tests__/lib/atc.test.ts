@@ -1,6 +1,7 @@
 import {
   atcDeepLink,
   atcLevelLabel,
+  dedupeAtcClassifications,
   getAtcClassificationsByName,
   isWhoAtcCode,
 } from '@/lib/api/atc'
@@ -91,5 +92,64 @@ describe('getAtcClassificationsByName', () => {
   test('returns empty when RxCUI missing', async () => {
     ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue(null)
     expect(await getAtcClassificationsByName('zzz')).toEqual([])
+  })
+
+  test('collapses repeated classId rows from multi-relation RxClass payloads', async () => {
+    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('1242999')
+    const dup = {
+      rxclassMinConceptItem: {
+        classId: 'L01EK',
+        className: 'Vascular endothelial growth factor receptor (VEGFR) tyrosine kinase inhibitors',
+        classType: 'ATC1-4',
+      },
+    }
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        rxclassDrugInfoList: {
+          // Real-world shape: same ATC classId once per relation type
+          rxclassDrugInfo: [dup, dup, dup, dup, dup],
+        },
+      }),
+    })
+    const results = await getAtcClassificationsByName('axitinib')
+    expect(results).toHaveLength(1)
+    expect(results[0].code).toBe('L01EK')
+    expect(results[0].url).toContain('code=L01EK')
+  })
+})
+
+describe('dedupeAtcClassifications', () => {
+  test('drops non-WHO and collapses same code', () => {
+    const out = dedupeAtcClassifications([
+      {
+        code: 'L01EK',
+        name: 'Short',
+        classType: 'ATC1-4',
+        url: 'https://atcddd.fhi.no/atc_ddd_index/?code=L01EK&showdescription=yes',
+      },
+      {
+        code: 'L01EK',
+        name: 'Vascular endothelial growth factor receptor (VEGFR) tyrosine kinase inhibitors',
+        classType: 'ATC1-4',
+        url: 'https://atcddd.fhi.no/atc_ddd_index/?code=L01EK&showdescription=yes',
+      },
+      {
+        code: 'CN103',
+        name: 'VA junk',
+        classType: 'VA',
+        url: '',
+      },
+      {
+        code: 'l01ek',
+        name: 'lowercase dup',
+        classType: 'ATC1-4',
+        url: '',
+      },
+    ])
+    expect(out).toHaveLength(1)
+    expect(out[0].code).toBe('L01EK')
+    // Prefer the longer informative name
+    expect(out[0].name).toContain('VEGFR')
   })
 })

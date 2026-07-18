@@ -48,12 +48,80 @@ export function atcDeepLink(code: string | null | undefined): string {
   return ATC_INDEX_BASE
 }
 
+/**
+ * Collapse RxClass multi-relation rows (same ATC classId can appear 5+ times)
+ * and drop non-WHO VA/SNOMED noise. Safe to call on cached payloads.
+ */
+export function dedupeAtcClassifications(
+  rows: readonly AtcClassification[] | null | undefined,
+): AtcClassification[] {
+  if (!Array.isArray(rows) || rows.length === 0) return []
+
+  const byCode = new Map<string, AtcClassification>()
+
+  for (const row of rows) {
+    if (!row || typeof row !== 'object') continue
+    const code = String(row.code ?? '').trim().toUpperCase()
+    if (!isWhoAtcCode(code)) continue
+
+    const name = String(row.name ?? '').trim()
+    const classType = String(row.classType ?? '').trim()
+    const url =
+      row.url && (row.url.includes('atcddd.fhi.no') || row.url.includes('whocc.no'))
+        ? row.url
+        : atcDeepLink(code)
+
+    const next: AtcClassification = {
+      code,
+      name,
+      classType: classType || atcLevelLabel(code),
+      url,
+    }
+
+    const prev = byCode.get(code)
+    if (!prev) {
+      byCode.set(code, next)
+      continue
+    }
+    // Keep the longer / more informative class name when duplicates collide
+    if ((next.name?.length ?? 0) > (prev.name?.length ?? 0)) {
+      byCode.set(code, { ...prev, name: next.name, classType: next.classType || prev.classType })
+    }
+  }
+
+  const out = Array.from(byCode.values())
+  // Prefer longer (more specific) codes first, then alpha
+  out.sort((a, b) => {
+    if (b.code.length !== a.code.length) return b.code.length - a.code.length
+    return a.code.localeCompare(b.code)
+  })
+  return out
+}
+
+function mapRxClassItems(drugInfoList: unknown[]): AtcClassification[] {
+  const raw: AtcClassification[] = []
+  for (const item of drugInfoList) {
+    const rec = item as Record<string, unknown>
+    const concept = (rec.rxclassMinConceptItem ?? rec) as Record<string, unknown>
+    const code = String(concept.classId ?? concept.class_id ?? '').trim().toUpperCase()
+    if (!code) continue
+    raw.push({
+      code,
+      name: String(concept.className ?? concept.class_name ?? '').trim(),
+      classType: String(concept.classType ?? concept.class_type ?? '').trim(),
+      url: atcDeepLink(code),
+    })
+  }
+  return dedupeAtcClassifications(raw)
+}
+
 export async function getAtcClassificationsByName(name: string): Promise<AtcClassification[]> {
   try {
     const rxcui = await getRxcuiByName(name)
     if (!rxcui) return []
 
-    // relaSource=ATC keeps WHO ATC; classType alone still mixes VA classes
+    // relaSource=ATC keeps WHO ATC; without it RxClass repeats the same classId
+    // once per relation type (often 5× identical L01EK-style rows).
     const url = `${BASE_URL}?rxcui=${encodeURIComponent(rxcui)}&relaSource=ATC`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
@@ -64,34 +132,8 @@ export async function getAtcClassificationsByName(name: string): Promise<AtcClas
       data.rxclassMinConceptList?.rxclassMinConcept ??
       []
 
-    const seen = new Set<string>()
-    const out: AtcClassification[] = []
-
-    for (const item of drugInfoList) {
-      const rec = item as Record<string, unknown>
-      const concept = (rec.rxclassMinConceptItem ?? rec) as Record<string, unknown>
-      const code = String(concept.classId ?? '').trim().toUpperCase()
-      if (!isWhoAtcCode(code)) continue
-      if (seen.has(code)) continue
-      seen.add(code)
-
-      const className = String(concept.className ?? '').trim()
-      const classType = String(concept.classType ?? '').trim()
-      out.push({
-        code,
-        name: className,
-        classType: classType || atcLevelLabel(code),
-        url: atcDeepLink(code),
-      })
-    }
-
-    // Prefer longer (more specific) codes first, then alpha
-    out.sort((a, b) => {
-      if (b.code.length !== a.code.length) return b.code.length - a.code.length
-      return a.code.localeCompare(b.code)
-    })
-
-    return out
+    const list = Array.isArray(drugInfoList) ? drugInfoList : [drugInfoList]
+    return mapRxClassItems(list)
   } catch {
     return []
   }

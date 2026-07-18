@@ -9,6 +9,11 @@ const NAV = [
   { href: '/', label: 'Home', match: (p: string) => p === '/' },
   { href: '/discover', label: 'Discover', match: (p: string) => p.startsWith('/discover') },
   { href: '/projects', label: 'Projects', match: (p: string) => p.startsWith('/projects') },
+  {
+    href: '/how-it-works',
+    label: 'How it works',
+    match: (p: string) => p.startsWith('/how-it-works'),
+  },
 ] as const
 
 /**

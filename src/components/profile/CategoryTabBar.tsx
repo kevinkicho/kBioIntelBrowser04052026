@@ -13,16 +13,10 @@ interface CategoryTabBarProps {
 }
 
 /**
- * Health dot: green only when loaded *with* data.
- * Empty loaded categories stay without a green “success” signal (user request).
+ * Status indicator for loading/error only.
+ * Green “ok” dots removed — empty vs filled is conveyed by opacity + counts.
  */
-function HealthDot({
-  health,
-  hasData,
-}: {
-  health: string
-  hasData: boolean
-}) {
+function StatusDot({ health }: { health: string }) {
   if (health === 'loading') {
     return (
       <span
@@ -41,16 +35,6 @@ function HealthDot({
       />
     )
   }
-  if (health === 'ok' && hasData) {
-    return (
-      <span
-        className="w-1 h-1 rounded-full bg-emerald-400 shrink-0"
-        title="Loaded with data"
-        data-testid="tab-health-ok"
-      />
-    )
-  }
-  // idle, or loaded with 0 panels — no green deception
   return null
 }
 
@@ -100,12 +84,13 @@ export function CategoryTabBar({ active, counts, onChange, freshness, disabled }
                 : hasData
                   ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
                   : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/30'
-            } ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+            } ${!hasData ? 'opacity-30' : ''} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
             onClick={() => onChange(cat.id)}
             disabled={disabled}
             title={title}
             data-testid={`category-tab-${cat.id}`}
             data-has-data={hasData ? 'true' : 'false'}
+            data-empty={!hasData ? 'true' : 'false'}
           >
             <span>{cat.label}</span>
             <span
@@ -113,7 +98,7 @@ export function CategoryTabBar({ active, counts, onChange, freshness, disabled }
             >
               {count.withData}/{count.total}
             </span>
-            {f && <HealthDot health={f.health} hasData={hasData} />}
+            {f && <StatusDot health={f.health} />}
           </button>
         )
       })}

@@ -13,24 +13,17 @@ interface CategorySidebarProps {
   disabled?: boolean
 }
 
-function HealthIndicator({
+/** Loading / error only — no green ok dots (empty vs filled via opacity + counts). */
+function StatusIndicator({
   health,
-  hasData,
   tooltip,
 }: {
   health: string
-  hasData: boolean
   tooltip: string
 }) {
-  // No green dot when category loaded empty (0/N)
-  if (health === 'ok' && !hasData) return null
-  if (health !== 'ok' && health !== 'loading' && health !== 'error') return null
+  if (health !== 'loading' && health !== 'error') return null
   const color =
-    health === 'ok'
-      ? 'bg-emerald-400'
-      : health === 'loading'
-        ? 'bg-amber-400 animate-pulse'
-        : 'bg-red-400'
+    health === 'loading' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'
 
   return (
     <span className="relative group">
@@ -119,12 +112,16 @@ export function CategorySidebar({ active, counts, onChange, freshness, disabled 
               <a
                 key={cat.id}
                 href={`#${cat.id}`}
-                className={`${baseItemClasses} ${isActive ? activeClasses : inactiveClasses} ${disabled ? 'pointer-events-none opacity-50' : ''}`}
+                className={`${baseItemClasses} ${isActive ? activeClasses : inactiveClasses} ${
+                  !hasData ? 'opacity-30' : ''
+                } ${disabled ? 'pointer-events-none opacity-50' : ''}`}
                 onClick={(e) => {
                   e.preventDefault()
                   if (!disabled) onChange(cat.id)
                 }}
                title={collapsed ? `${cat.icon} ${cat.label} (${count.withData}/${count.total})` : undefined}
+               data-has-data={hasData ? 'true' : 'false'}
+               data-empty={!hasData ? 'true' : 'false'}
              >
                <span className="text-base">{cat.icon}</span>
                {!collapsed && (
@@ -134,7 +131,7 @@ export function CategorySidebar({ active, counts, onChange, freshness, disabled 
                      {count.withData}/{count.total}
                    </span>
                    {f && (
-                     <HealthIndicator health={f.health} hasData={hasData} tooltip={tooltip} />
+                     <StatusIndicator health={f.health} tooltip={tooltip} />
                    )}
                  </>
                )}

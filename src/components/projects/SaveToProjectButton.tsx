@@ -27,6 +27,9 @@ export interface SaveProjectContext {
   rubric?: ScoreRubric
   preferencesSnapshot?: ProjectPreferencesSnapshot
   defaultProjectName?: string
+  /** Frozen ScoreVector at Discover board-add time (reproducibility) */
+  scoreSnapshot?: import('@/lib/domain/score').ScoreVector | null
+  rankedAt?: string | null
 }
 
 interface Props {
@@ -112,13 +115,33 @@ export function SaveToProjectButton({
     }
   }, [projectContext])
 
+  const candidateWithSnapshot = useCallback(() => {
+    const snap = projectContext?.scoreSnapshot
+    if (!snap) {
+      return { ...candidate, boardStatus: candidate.boardStatus ?? 'untriaged' as const }
+    }
+    return {
+      ...candidate,
+      boardStatus: candidate.boardStatus ?? ('untriaged' as const),
+      scores: {
+        ...snap,
+        // Preserve freeze metadata for later reweight honesty
+        rubricId: snap.rubricId ?? projectContext?.rubric?.preset,
+        weights: snap.weights ?? projectContext?.rubric?.weights,
+      },
+    }
+  }, [candidate, projectContext])
+
   const saveTo = useCallback(
     (projectId: string) => {
-      const result = addCandidateAndSave(projectId, candidate)
+      const toSave = candidateWithSnapshot()
+      const result = addCandidateAndSave(projectId, toSave)
       if (result.ok) {
         emitProductEvent('board_candidate_added', {
           projectId,
           candidateId: candidate.candidateId,
+          hasScoreSnapshot: Boolean(projectContext?.scoreSnapshot),
+          rankedAt: projectContext?.rankedAt ?? null,
         })
         // Stamp empty disease/targets/rubric only (do not overwrite different disease)
         const stamp = stampContext()
@@ -154,7 +177,7 @@ export function SaveToProjectButton({
       }
       handleResult(result, 'Saved to project board')
     },
-    [candidate, handleResult, stampContext],
+    [candidate, candidateWithSnapshot, handleResult, projectContext, stampContext],
   )
 
   const createAndSave = useCallback(() => {
@@ -166,7 +189,7 @@ export function SaveToProjectButton({
       `Board · ${candidate.identity.name}`.slice(0, 80)
     const created = createAndSaveProject({
       name: name.slice(0, 200),
-      candidates: [{ ...candidate, boardStatus: candidate.boardStatus ?? 'untriaged' }],
+      candidates: [candidateWithSnapshot()],
       disease: stamp.disease ?? null,
       targetIds: stamp.targetIds ?? [],
       rubric: stamp.rubric,
@@ -177,10 +200,12 @@ export function SaveToProjectButton({
       emitProductEvent('board_candidate_added', {
         projectId: created.value.id,
         candidateId: candidate.candidateId,
+        hasScoreSnapshot: Boolean(projectContext?.scoreSnapshot),
+        rankedAt: projectContext?.rankedAt ?? null,
       })
     }
     handleResult(created, 'Created project and saved candidate')
-  }, [candidate, defaultProjectName, handleResult, projectContext, stampContext])
+  }, [candidate, candidateWithSnapshot, defaultProjectName, handleResult, projectContext, stampContext])
 
   const baseBtn = compact
     ? 'text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/20 text-emerald-300 hover:bg-emerald-900/40 transition-colors'

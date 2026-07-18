@@ -12,26 +12,19 @@ interface CategoryTabsProps {
   freshness?: FreshnessMap
 }
 
-function HealthDot({
+/** Loading / error only — no green ok dots (empty vs filled via opacity + counts). */
+function StatusDot({
   health,
-  hasData,
   tooltip,
 }: {
   health: string
-  hasData: boolean
   tooltip: string
 }) {
   const [show, setShow] = useState(false)
-  // Green only when loaded *with* data — empty 0/N tabs must not look “healthy”
-  if (health === 'ok' && !hasData) return null
-  if (health !== 'ok' && health !== 'loading' && health !== 'error') return null
+  if (health !== 'loading' && health !== 'error') return null
 
   const color =
-    health === 'ok'
-      ? 'bg-emerald-400'
-      : health === 'loading'
-        ? 'bg-amber-400 animate-pulse'
-        : 'bg-red-400'
+    health === 'loading' ? 'bg-amber-400 animate-pulse' : 'bg-red-400'
 
   return (
     <span
@@ -89,15 +82,18 @@ export function CategoryTabs({ active, counts, onChange, freshness }: CategoryTa
             key={cat.id}
             role="tab"
             aria-selected={isActive}
-            className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses} flex items-center gap-1.5`}
+            className={`${baseClasses} ${isActive ? activeClasses : inactiveClasses} flex items-center gap-1.5 ${
+              !hasData ? 'opacity-30' : ''
+            }`}
             onClick={() => onChange(cat.id)}
+            data-has-data={hasData ? 'true' : 'false'}
+            data-empty={!hasData ? 'true' : 'false'}
           >
             {cat.icon} {cat.label} ({count.withData}/{count.total})
-            {f && <HealthDot health={f.health} hasData={hasData} tooltip={tooltip} />}
+            {f && <StatusDot health={f.health} tooltip={tooltip} />}
           </button>
         )
       })}
     </div>
   )
 }
-

@@ -66,4 +66,20 @@ describe('AtcPanel', () => {
     render(<AtcPanel classifications={[]} />)
     expect(screen.getByText(/no atc classification found/i)).toBeInTheDocument()
   })
+
+  test('collapses duplicate list rows with the same ATC code (RxClass multi-relation cache)', () => {
+    const dups: AtcClassification[] = Array.from({ length: 5 }, () => ({
+      code: 'L01EK',
+      name: 'Vascular endothelial growth factor receptor (VEGFR) tyrosine kinase inhibitors',
+      classType: 'ATC1-4',
+      url: 'https://atcddd.fhi.no/atc_ddd_index/?code=L01EK&showdescription=yes',
+    }))
+    render(<AtcPanel classifications={dups} />)
+    expect(screen.getAllByText('L01EK')).toHaveLength(1)
+    expect(
+      screen.getAllByRole('link', {
+        name: /L01EK.*VEGFR/i,
+      }),
+    ).toHaveLength(1)
+  })
 })

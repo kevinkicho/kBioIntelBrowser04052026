@@ -164,6 +164,7 @@ function AICopilotInner({ categoryData, categoryStatus, fetchedAt, identity, dis
                 ai={ai}
                 connecting={connecting}
                 onConnect={handleConnect}
+                lastPrompt={copilot.lastPrompt}
               />
             )}
           </div>
@@ -775,10 +776,18 @@ function SettingsTab({
   ai,
   connecting,
   onConnect,
+  lastPrompt,
 }: {
   ai: ReturnType<typeof useAI>
   connecting: boolean
   onConnect: () => void
+  lastPrompt?: {
+    mode: string
+    system: string
+    user: string
+    at: number
+    version: string
+  } | null
 }) {
   return (
     <div className="space-y-4">
@@ -888,8 +897,50 @@ function SettingsTab({
           BioIntel Copilot uses <span className="text-cyan-400">Ollama Cloud</span> with your API key.
           Configure the key via the header <strong className="text-slate-400">AI</strong> button, then connect.
           Traffic goes browser → this app’s server → ollama.com (not local port 11434).
+          Insights must cite loaded panels; sparse data triggers a refuse-and-gap response.
         </p>
+        <Link
+          href="/how-it-works"
+          className="mt-2 inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
+        >
+          View prompts & algorithms →
+        </Link>
       </div>
+
+      {lastPrompt && (
+        <div
+          className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30"
+          data-testid="copilot-last-prompt"
+        >
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
+            Last prompt
+            <span className="ml-2 font-mono font-normal text-slate-600">
+              {lastPrompt.version} · {lastPrompt.mode}
+            </span>
+          </p>
+          <p className="text-[9px] text-slate-600 mb-2">
+            What was sent to the model (truncated). Does not affect Discover ranks.
+          </p>
+          <details className="text-[10px] text-slate-500">
+            <summary className="cursor-pointer text-indigo-400/90 hover:text-indigo-300">
+              System ({lastPrompt.system.length} chars)
+            </summary>
+            <pre className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-2 text-[9px] text-slate-500">
+              {lastPrompt.system.slice(0, 4000)}
+              {lastPrompt.system.length > 4000 ? '\n…' : ''}
+            </pre>
+          </details>
+          <details className="mt-1.5 text-[10px] text-slate-500">
+            <summary className="cursor-pointer text-indigo-400/90 hover:text-indigo-300">
+              User ({lastPrompt.user.length} chars)
+            </summary>
+            <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-2 text-[9px] text-slate-500">
+              {lastPrompt.user.slice(0, 6000)}
+              {lastPrompt.user.length > 6000 ? '\n…' : ''}
+            </pre>
+          </details>
+        </div>
+      )}
     </div>
   )
 }

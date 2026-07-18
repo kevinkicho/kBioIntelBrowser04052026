@@ -148,6 +148,14 @@ export function useAICopilot(
     return msg
   }, [])
 
+  const [lastPrompt, setLastPrompt] = useState<{
+    mode: string
+    system: string
+    user: string
+    at: number
+    version: string
+  } | null>(null)
+
   const generateInsight = useCallback(async (mode: PromptMode, opts: GenerateInsightOptions = {}) => {
     if (!aiAvailable) {
       const recent = messagesRef.current.slice(-3)
@@ -314,6 +322,14 @@ export function useAICopilot(
       }
     }
 
+    setLastPrompt({
+      mode,
+      system: prompts.system,
+      user: prompts.user + (diseasePromptSuffix || ''),
+      at: Date.now(),
+      version: 'promptCatalog@v1',
+    })
+
     addMessage('system', `Generating ${mode.replace('_', ' ')}...`, mode)
     const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
     setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode, timestamp: Date.now() }])
@@ -449,12 +465,26 @@ export function useAICopilot(
     if (isDiseaseContext && diseaseCtx) {
       const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
       const { system, user } = buildDiseaseQAPrompt(diseaseBlock, question)
+      setLastPrompt({
+        mode: 'free_qa',
+        system,
+        user,
+        at: Date.now(),
+        version: 'promptCatalog@v1',
+      })
       chatMessages = [
         { role: 'system', content: system },
         { role: 'user', content: user },
       ]
     } else if (isGeneContext && geneCtx) {
       const { system, user } = buildGeneQAPrompt(geneCtx, question)
+      setLastPrompt({
+        mode: 'free_qa',
+        system,
+        user,
+        at: Date.now(),
+        version: 'promptCatalog@v1',
+      })
       chatMessages = [
         { role: 'system', content: system },
         { role: 'user', content: user },
@@ -471,8 +501,24 @@ export function useAICopilot(
         const lastUserIdx = chatMessages.length - 1
         chatMessages[lastUserIdx] = { ...chatMessages[lastUserIdx], content: chatMessages[lastUserIdx].content + diseasePromptSuffix }
       }
+      const sys = chatMessages.find((m) => m.role === 'system')?.content ?? ''
+      const usr = chatMessages.filter((m) => m.role === 'user').map((m) => m.content).join('\n---\n')
+      setLastPrompt({
+        mode: 'followup',
+        system: sys,
+        user: usr,
+        at: Date.now(),
+        version: 'promptCatalog@v1',
+      })
     } else {
       const { system, user } = buildFreeQAPrompt(context, question)
+      setLastPrompt({
+        mode: 'free_qa',
+        system,
+        user: user + diseasePromptSuffix,
+        at: Date.now(),
+        version: 'promptCatalog@v1',
+      })
       chatMessages = [
         { role: 'system', content: system },
         { role: 'user', content: user + diseasePromptSuffix },
@@ -594,5 +640,7 @@ export function useAICopilot(
     stopStreaming,
     clearChat,
     formatRetrievalSummary: () => formatRetrievalSummary(snapshot),
+    /** Last system+user prompt sent to the model (transparency) */
+    lastPrompt,
   }
 }

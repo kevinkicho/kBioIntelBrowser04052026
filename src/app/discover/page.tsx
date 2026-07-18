@@ -12,6 +12,10 @@ import { ExportResults } from './components/ExportResults'
 import { GeneTable } from './components/GeneTable'
 import { SourceStatusStrip } from './components/SourceStatusStrip'
 import { TargetPinPanel } from '@/components/discover/TargetPinPanel'
+import { DiscoverRunTelemetry } from '@/components/discover/DiscoverRunTelemetry'
+import { SourceHonestyHeatmap } from '@/components/discover/SourceHonestyHeatmap'
+import { RubricWhatIfPanel } from '@/components/discover/RubricWhatIfPanel'
+import { DiscoverJourneys } from '@/components/discover/DiscoverJourneys'
 import { DiscoverySettingsDrawer } from '@/components/discovery/DiscoverySettingsDrawer'
 import { OrphanetPinProvenanceStrip } from '@/components/discovery/OrphanetPinProvenanceStrip'
 import { RUBRIC_PRESET_LABELS } from '@/lib/discovery/preferences'
@@ -266,6 +270,13 @@ export default function DiscoverPage() {
           initialQuery={initialQuery}
         />
 
+        {state.status === 'idle' && (
+          <DiscoverJourneys
+            disabled={false}
+            onRun={(disease) => handleSearch(disease)}
+          />
+        )}
+
         <TargetPinPanel
           targets={state.targets}
           waitingForDisease={state.status === 'idle' && !state.query}
@@ -387,13 +398,33 @@ export default function DiscoverPage() {
                       </div>
                     )}
                     {state.result.v2?.scorePhase && (
-                      <p className="mt-1 text-[10px] text-slate-600">
-                        Score phase: {state.result.v2.scorePhase}
-                        {state.prefs.harvestTiming === 'board-promote' &&
-                          state.result.v2.scorePhase === 'cheap' &&
-                          ' · safety deferred until promote/harvest'}
+                      <p className="mt-1 text-[10px] text-slate-600 flex flex-wrap items-center gap-1">
+                        <span>
+                          Score phase: {state.result.v2.scorePhase}
+                          {state.prefs.harvestTiming === 'board-promote' &&
+                            state.result.v2.scorePhase === 'cheap' &&
+                            ' · safety deferred until promote/harvest'}
+                        </span>
+                        <span
+                          className="inline-flex cursor-help rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-500"
+                          title={
+                            state.result.v2.scorePhase === 'full'
+                              ? 'Full phase: cheap multi-axis score plus safety/novelty harvest for top candidates.'
+                              : 'Cheap phase: multi-axis shortlist without rank-time AE harvest. Load safety scores or promote to board to fill safety/novelty.'
+                          }
+                        >
+                          ?
+                        </span>
                       </p>
                     )}
+                    <p className="mt-1 text-[10px] text-slate-600">
+                      Rubric:{' '}
+                      <span className="text-slate-400">
+                        {RUBRIC_PRESET_LABELS[state.prefs.rubricPreset]}
+                      </span>
+                      {' · '}
+                      Ranked with free public APIs (deterministic — not generative AI)
+                    </p>
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
                     {showLoadSafety && (
@@ -419,9 +450,19 @@ export default function DiscoverPage() {
                   </div>
                 </div>
 
+                <DiscoverRunTelemetry
+                  result={state.result}
+                  harvestStatus={state.harvestStatus}
+                />
+
                 {(state.result.sourceStatuses?.length ?? 0) > 0 && (
                   <SourceStatusStrip sourceStatuses={state.result.sourceStatuses ?? []} />
                 )}
+
+                <SourceHonestyHeatmap
+                  candidates={state.result.candidates}
+                  sourceStatuses={state.result.sourceStatuses ?? []}
+                />
 
                 <OrphanetPinProvenanceStrip
                   provenance={state.orphanetProvenance}
@@ -432,6 +473,12 @@ export default function DiscoverPage() {
                   Scores are multi-axis investigation priority (not clinical predictions). Missing
                   axes are never invented — expand a card for weight breakdown.
                 </p>
+
+                <RubricWhatIfPanel
+                  candidates={state.result.candidates}
+                  domainCandidates={state.result.v2?.candidates}
+                  baseRubric={state.result.v2?.rubric}
+                />
 
                 <GeneTable
                   genes={state.result.genes}
@@ -455,20 +502,26 @@ export default function DiscoverPage() {
                     let projectContext
                     try {
                       const prefs = loadDiscoveryPreferences()
+                      const rubric =
+                        state.result?.v2?.rubric ?? scoreRubricFromPreferences(prefs)
                       projectContext = {
                         disease: state.result?.v2?.disease ?? null,
                         targetIds: state.targets,
-                        rubric:
-                          state.result?.v2?.rubric ?? scoreRubricFromPreferences(prefs),
+                        rubric,
                         preferencesSnapshot: snapshotDiscoveryPreferences(prefs),
                         defaultProjectName: state.result?.diseaseName
                           ? `${state.result.diseaseName} board`
                           : undefined,
+                        /** Freeze score vector at board-add time for reproducibility */
+                        scoreSnapshot: domainCandidate?.scores ?? null,
+                        rankedAt: state.result?.generatedAt ?? null,
                       }
                     } catch {
                       projectContext = {
                         disease: state.result?.v2?.disease ?? null,
                         targetIds: state.targets,
+                        scoreSnapshot: domainCandidate?.scores ?? null,
+                        rankedAt: state.result?.generatedAt ?? null,
                       }
                     }
                     return (

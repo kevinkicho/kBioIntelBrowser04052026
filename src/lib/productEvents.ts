@@ -235,6 +235,14 @@ export function emitProductEvent(
   props?: ProductEvent['props'],
 ): void {
   postOnce(name, props)
+  // Solo funnel (localStorage) — never blocks UX
+  try {
+    void import('@/lib/analytics/localFunnel').then(({ recordLocalFunnelEvent }) => {
+      recordLocalFunnelEvent(name)
+    })
+  } catch {
+    /* ignore */
+  }
 }
 
 /** @deprecated Prefer emitProductEvent — same behavior after clean-cut. */

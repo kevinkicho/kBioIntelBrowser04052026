@@ -59,6 +59,13 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   const [customQuestion, setCustomQuestion] = useState('')
 
   const claimCount = pack?.claims?.length ?? 0
+  const citableCount = useMemo(() => {
+    if (!pack?.claims) return 0
+    return pack.claims.filter((c) => {
+      const any = c as { citable?: boolean; hasCitation?: boolean; provenance?: { url?: string } }
+      return any.citable === true || any.hasCitation === true || Boolean(any.provenance?.url)
+    }).length
+  }, [pack?.claims])
   const minClaims = minClaimsForPackMode(mode)
   const gated = claimCount < minClaims
   const isCustom = mode === 'pack_custom_prompt'
@@ -166,6 +173,44 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         <span className="text-[10px] text-slate-600">
           grounded in pack evidence · Ollama Cloud
         </span>
+      </div>
+
+      {/* Claim coverage — honesty before AI */}
+      <div
+        className="mb-3 rounded-lg border border-slate-800 bg-slate-900/50 px-2.5 py-2"
+        data-testid="pack-claim-coverage"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 text-[10px]">
+          <span className="text-slate-400">
+            Claims{' '}
+            <span className="font-mono tabular-nums text-slate-200">{claimCount}</span>
+            <span className="text-slate-600"> · citable </span>
+            <span className="font-mono tabular-nums text-slate-200">{citableCount}</span>
+            <span className="text-slate-600"> · mode needs ≥{minClaims}</span>
+          </span>
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold ${
+              gated
+                ? 'border-amber-800/50 text-amber-300'
+                : 'border-emerald-800/50 text-emerald-300'
+            }`}
+          >
+            {gated ? 'thin evidence' : 'ready'}
+          </span>
+        </div>
+        <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+          <div
+            className={`h-full rounded-full transition-all ${
+              gated ? 'bg-amber-600/70' : 'bg-emerald-600/80'
+            }`}
+            style={{
+              width: `${Math.min(100, minClaims > 0 ? (claimCount / Math.max(minClaims, 1)) * 100 : 0)}%`,
+            }}
+          />
+        </div>
+        <p className="mt-1 text-[9px] text-slate-600">
+          AI answers only from allowlisted claim ids — empty Core panels mean thinner packs.
+        </p>
       </div>
 
       <div className="mb-2 flex flex-wrap gap-1">

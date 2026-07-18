@@ -1,22 +1,26 @@
 import React from 'react'
 import { render, screen, fireEvent } from '@testing-library/react'
 import { CategoryTabs } from '@/components/profile/CategoryTabs'
-import { CATEGORIES, getCategoryDataCounts, CategoryId, CategoryDataCount } from '@/lib/categoryConfig'
+import {
+  MOLECULE_CATEGORIES,
+  type CategoryId,
+  type CategoryDataCount,
+} from '@/lib/categoryConfig'
 
 function makeCounts(overrides: Partial<Record<CategoryId, CategoryDataCount>> = {}): Record<CategoryId, CategoryDataCount> {
   const base: Record<string, CategoryDataCount> = {}
-  for (const cat of CATEGORIES) {
+  for (const cat of MOLECULE_CATEGORIES) {
     base[cat.id] = { withData: 2, total: cat.panels.length }
   }
   return { ...base, ...overrides } as Record<CategoryId, CategoryDataCount>
 }
 
 describe('CategoryTabs', () => {
-  it('renders All tab plus all 10 category tabs', () => {
+  it('renders All tab plus all molecule category tabs', () => {
     const counts = makeCounts()
     render(<CategoryTabs active="all" counts={counts} onChange={() => {}} />)
     const tabs = screen.getAllByRole('tab')
-    expect(tabs).toHaveLength(11) // All + 10 categories
+    expect(tabs).toHaveLength(MOLECULE_CATEGORIES.length + 1) // All + molecule categories
   })
 
   it('shows correct total in All tab', () => {
@@ -72,6 +76,42 @@ describe('CategoryTabs', () => {
     const tabs = screen.getAllByRole('tab')
     fireEvent.click(tabs[0])
     expect(onChange).toHaveBeenCalledWith('all')
+  })
+
+  it('dims empty 0/N category tabs with opacity-30 and no green ok dots', () => {
+    const counts = makeCounts({
+      'protein-structure': { withData: 0, total: 16 },
+      pharmaceutical: { withData: 5, total: 11 },
+    })
+    render(
+      <CategoryTabs
+        active="all"
+        counts={counts}
+        onChange={() => {}}
+        freshness={{
+          'protein-structure': {
+            status: 'loaded',
+            fetchedAt: new Date(),
+            health: 'ok',
+          },
+          pharmaceutical: {
+            status: 'loaded',
+            fetchedAt: new Date(),
+            health: 'ok',
+          },
+        } as never}
+      />,
+    )
+    const tabs = screen.getAllByRole('tab')
+    // pharmaceutical is index 1 (after All)
+    const pharma = tabs[1]
+    const protein = tabs.find((t) => t.textContent?.includes('Protein'))
+    expect(protein).toBeTruthy()
+    expect(protein!.className).toContain('opacity-30')
+    expect(protein!.getAttribute('data-empty')).toBe('true')
+    expect(pharma.className).not.toContain('opacity-30')
+    // No green health dots in the tree
+    expect(document.querySelector('.bg-emerald-400')).toBeNull()
   })
 })
 
