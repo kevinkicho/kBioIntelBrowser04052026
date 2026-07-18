@@ -241,6 +241,17 @@ export function SearchBar({
           return
         }
 
+        // Pathway / ontology ID mistaken for a molecule (e.g. WP1220)
+        if (data.unsupportedId) {
+          setIsNavigating(false)
+          setIsOpen(false)
+          window.alert(
+            data.message ||
+              `"${name}" is a pathway/ontology id, not a molecule or gene. Try a chemical name, CID, or gene symbol.`,
+          )
+          return
+        }
+
         if (data.needsDisambiguation && Array.isArray(data.candidates) && data.candidates.length > 1) {
           setCandidates(data.candidates)
           setIsNavigating(false)

@@ -6,20 +6,12 @@ import {
   type MoleculeCandidate,
 } from '@/lib/api/pubchem'
 import type { SearchType } from '@/lib/apiIdentifiers'
+import { isDatabaseIdNoise, looksLikeGeneSymbol } from '@/lib/search/entityHints'
 
 const VALID_SEARCH_TYPES = new Set(['name', 'cid', 'cas', 'smiles', 'inchikey', 'inchi', 'formula', 'disease'])
 
-const GENE_SYMBOL_PATTERN = /^[A-Z][A-Z0-9-]{1,14}$/
 const PUBCHEM_PUG = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug'
 const PC_FETCH_OPTS: RequestInit = { next: { revalidate: 86400 } }
-
-/**
- * Gene queries should NOT resolve to a random small-molecule CID.
- * Redirect the client to the gene explorer instead.
- */
-function looksLikeGeneSymbol(name: string): boolean {
-  return GENE_SYMBOL_PATTERN.test(name) && name.length >= 2 && name.length <= 15
-}
 
 async function getExtendedIdentifiers(cid: number) {
   try {
@@ -81,6 +73,18 @@ export async function GET(request: NextRequest) {
 
   if (typeParam === 'disease') {
     return NextResponse.json({ disease: true, name })
+  }
+
+  // WikiPathways / ontology IDs are not molecules or genes
+  if (typeParam === 'name' && isDatabaseIdNoise(name)) {
+    return NextResponse.json({
+      cid: null,
+      gene: false,
+      unsupportedId: true,
+      id: name.trim(),
+      message:
+        'This looks like a pathway or ontology identifier (e.g. WikiPathways WP…), not a molecule or gene symbol.',
+    })
   }
 
   // Gene symbols: do not invent a molecule CID — send to gene path

@@ -5,6 +5,10 @@ import { searchOrphanetDiseases } from '@/lib/api/orphanet'
 import { getGenesByDisease } from '@/lib/api/disgenet'
 import { searchGenes } from '@/lib/api/mygene'
 import type { SearchType } from '@/lib/apiIdentifiers'
+import {
+  filterMoleculeSuggestionLabels,
+  isDatabaseIdNoise,
+} from '@/lib/search/entityHints'
 
 const VALID_SEARCH_TYPES = new Set<string>([
   'all',
@@ -94,18 +98,26 @@ async function searchMoleculesList(query: string, typeParam: SearchType): Promis
     }
   }
 
-  return suggestions
+  return filterMoleculeSuggestionLabels(suggestions)
 }
 
 async function searchGenesList(
   query: string,
   limit = 5,
 ): Promise<Array<{ label: string; geneKey: string }>> {
+  // Pathway IDs are not genes — do not fan out mygene for WP1220 etc.
+  if (isDatabaseIdNoise(query)) return []
   const genes = await searchGenes(query)
-  return genes.slice(0, limit).map((g) => ({
-    label: g.symbol || String(g.geneId),
-    geneKey: `${g.geneId}-${g.symbol}`,
-  }))
+  return genes
+    .slice(0, limit)
+    .filter((g) => {
+      const sym = g.symbol || String(g.geneId)
+      return !isDatabaseIdNoise(sym)
+    })
+    .map((g) => ({
+      label: g.symbol || String(g.geneId),
+      geneKey: `${g.geneId}-${g.symbol}`,
+    }))
 }
 
 /** Unified fan-out: disease + molecule + gene in parallel. */

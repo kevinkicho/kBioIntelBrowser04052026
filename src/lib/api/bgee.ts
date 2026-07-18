@@ -37,74 +37,136 @@ function lit(binding: Record<string, unknown> | undefined, key: string): string 
   return v?.value?.trim() ?? ''
 }
 
+function num(binding: Record<string, unknown> | undefined, key: string): number {
+  const raw = lit(binding, key)
+  if (!raw) return 0
+  const n = Number(raw)
+  return Number.isFinite(n) ? n : 0
+}
+
+function shortId(uri: string): string {
+  if (!uri) return ''
+  const last = uri.split('/').pop() ?? uri
+  return last.replace(/^GENE_/, '').replace(/^UBERON_/, 'UBERON:').replace(/^CL_/, 'CL:')
+}
+
+function mapBinding(
+  binding: Record<string, unknown>,
+  fallbackSymbol: string,
+): BgeeExpression {
+  const geneUri = lit(binding, 'gene')
+  const anatUri = lit(binding, 'anatEntity')
+  const stageUri = lit(binding, 'stage')
+  const level = lit(binding, 'level') || lit(binding, 'exprLevel') || 'present'
+  const score = num(binding, 'score') || num(binding, 'exprScore')
+  const conf = num(binding, 'confidence') || num(binding, 'quality')
+  return {
+    geneId: shortId(geneUri),
+    geneSymbol: lit(binding, 'geneName') || fallbackSymbol,
+    species: lit(binding, 'species') || 'Homo sapiens',
+    anatomicalEntityId: shortId(anatUri),
+    anatomicalEntityName: lit(binding, 'anatName'),
+    developmentalStageId: shortId(stageUri),
+    developmentalStageName: lit(binding, 'stageName'),
+    expressionLevel: level,
+    expressionScore: score,
+    confidenceScore: conf,
+  }
+}
+
+function pushUnique(
+  out: BgeeExpression[],
+  seen: Set<string>,
+  row: BgeeExpression,
+  max = 40,
+): void {
+  const name = row.anatomicalEntityName.trim()
+  if (!name) return
+  const key = `${name.toLowerCase()}|${row.developmentalStageName.toLowerCase()}`
+  if (GENERIC_ANAT.has(name.toLowerCase())) return
+  if (seen.has(key)) return
+  seen.add(key)
+  out.push(row)
+}
+
 /**
  * Get gene expression across human tissues (UBERON anatomy preferred).
- * Avoids generic CL "cell" root labels that dominated the prior query.
+ * Tries expression-call query first (level / score when available), then isExpressedIn.
  */
 export async function getGeneExpression(geneSymbol: string): Promise<BgeeExpression[]> {
   const safe = geneSymbol.replace(/["\\\n\r]/g, '').trim()
   if (safe.length < 1) return []
 
-  // Prefer UBERON tissues/organs — isExpressedIn alone returns many CL_* "cell" roots.
-  const query = `
+  const seen = new Set<string>()
+  const out: BgeeExpression[] = []
+
+  // Richer call-based query (Bgee genex Expression calls)
+  const callQuery = `
     PREFIX orth: <http://purl.org/net/orth#>
     PREFIX genex: <http://purl.org/genex#>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
     PREFIX obo: <http://purl.obolibrary.org/obo/>
-    SELECT DISTINCT ?gene ?geneName ?anatEntity ?anatName ?stage ?stageName
+    SELECT DISTINCT ?gene ?geneName ?anatEntity ?anatName ?stage ?stageName ?level ?score ?confidence
     WHERE {
       ?gene a orth:Gene ;
             orth:organism ?organism ;
             rdfs:label ?geneName .
       ?organism obo:RO_0002162 <http://purl.uniprot.org/taxonomy/9606> .
-      ?gene genex:isExpressedIn ?anatEntity .
-      ?anatEntity rdfs:label ?anatName .
       FILTER(LCASE(STR(?geneName)) = LCASE("${safe}"))
-      FILTER(CONTAINS(STR(?anatEntity), "UBERON"))
+      ?call a genex:Expression ;
+            genex:hasGene ?gene ;
+            genex:hasAnatomicalEntity ?anatEntity .
+      ?anatEntity rdfs:label ?anatName .
+      FILTER(CONTAINS(STR(?anatEntity), "UBERON") || CONTAINS(STR(?anatEntity), "CL_"))
       OPTIONAL {
-        ?gene genex:hasDevelopmentalStage ?stage .
+        ?call genex:hasDevelopmentalStage ?stage .
         ?stage rdfs:label ?stageName .
       }
+      OPTIONAL { ?call genex:hasExpressionLevel ?level . }
+      OPTIONAL { ?call genex:hasExpressionScore ?score . }
+      OPTIONAL { ?call genex:hasConfidenceLevel ?confidence . }
     }
-    LIMIT 80
+    LIMIT 100
   `
 
-  const results = await querySparql(query)
-
-  const mapped = results.map((binding: Record<string, unknown>) => {
-    const geneUri = lit(binding, 'gene')
-    const anatUri = lit(binding, 'anatEntity')
-    const anatName = lit(binding, 'anatName')
-    const stageName = lit(binding, 'stageName')
-    return {
-      geneId: geneUri.split('/').pop()?.replace(/^GENE_/, '') ?? '',
-      geneSymbol: lit(binding, 'geneName') || safe,
-      species: 'Homo sapiens',
-      anatomicalEntityId: anatUri.split('/').pop() ?? '',
-      anatomicalEntityName: anatName,
-      developmentalStageId: lit(binding, 'stage').split('/').pop() ?? '',
-      developmentalStageName: stageName,
-      expressionLevel: 'present' as const,
-      expressionScore: 0,
-      confidenceScore: 0,
-    }
-  })
-
-  // Deduplicate by anatomy label; drop generic terms
-  const seen = new Set<string>()
-  const out: BgeeExpression[] = []
-  for (const row of mapped) {
-    const name = row.anatomicalEntityName.trim()
-    if (!name) continue
-    const key = name.toLowerCase()
-    if (GENERIC_ANAT.has(key)) continue
-    if (seen.has(key)) continue
-    seen.add(key)
-    out.push(row)
-    if (out.length >= 30) break
+  const callResults = await querySparql(callQuery)
+  for (const binding of callResults) {
+    pushUnique(out, seen, mapBinding(binding, safe))
+    if (out.length >= 40) break
   }
 
-  // Fallback: if UBERON filter empty, use CL terms but still drop "cell"
+  // Presence query (isExpressedIn) if calls empty or thin
+  if (out.length < 8) {
+    const presenceQuery = `
+      PREFIX orth: <http://purl.org/net/orth#>
+      PREFIX genex: <http://purl.org/genex#>
+      PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+      PREFIX obo: <http://purl.obolibrary.org/obo/>
+      SELECT DISTINCT ?gene ?geneName ?anatEntity ?anatName ?stage ?stageName
+      WHERE {
+        ?gene a orth:Gene ;
+              orth:organism ?organism ;
+              rdfs:label ?geneName .
+        ?organism obo:RO_0002162 <http://purl.uniprot.org/taxonomy/9606> .
+        ?gene genex:isExpressedIn ?anatEntity .
+        ?anatEntity rdfs:label ?anatName .
+        FILTER(LCASE(STR(?geneName)) = LCASE("${safe}"))
+        FILTER(CONTAINS(STR(?anatEntity), "UBERON"))
+        OPTIONAL {
+          ?gene genex:hasDevelopmentalStage ?stage .
+          ?stage rdfs:label ?stageName .
+        }
+      }
+      LIMIT 80
+    `
+    const results = await querySparql(presenceQuery)
+    for (const binding of results) {
+      pushUnique(out, seen, mapBinding(binding, safe))
+      if (out.length >= 40) break
+    }
+  }
+
+  // Fallback: CL terms if still empty
   if (out.length === 0) {
     const fallbackQ = `
       PREFIX orth: <http://purl.org/net/orth#>
@@ -126,29 +188,14 @@ export async function getGeneExpression(geneSymbol: string): Promise<BgeeExpress
     `
     const fb = await querySparql(fallbackQ)
     for (const binding of fb) {
-      const anatName = lit(binding, 'anatName')
-      const key = anatName.toLowerCase()
-      if (!anatName || GENERIC_ANAT.has(key) || seen.has(key)) continue
-      seen.add(key)
-      const geneUri = lit(binding, 'gene')
-      const anatUri = lit(binding, 'anatEntity')
-      out.push({
-        geneId: geneUri.split('/').pop()?.replace(/^GENE_/, '') ?? '',
-        geneSymbol: lit(binding, 'geneName') || safe,
-        species: 'Homo sapiens',
-        anatomicalEntityId: anatUri.split('/').pop() ?? '',
-        anatomicalEntityName: anatName,
-        developmentalStageId: '',
-        developmentalStageName: '',
-        expressionLevel: 'present',
-        expressionScore: 0,
-        confidenceScore: 0,
-      })
+      pushUnique(out, seen, mapBinding(binding, safe))
       if (out.length >= 30) break
     }
   }
 
-  return out
+  // Prefer higher score first when available
+  out.sort((a, b) => (b.expressionScore || 0) - (a.expressionScore || 0))
+  return out.slice(0, 40)
 }
 
 /**
@@ -160,6 +207,22 @@ export async function getBgeeData(geneSymbol: string): Promise<{
   const expressions = await getGeneExpression(geneSymbol)
 
   return {
-    expressions: expressions.slice(0, 30),
+    expressions: expressions.slice(0, 40),
   }
+}
+
+/** Deep link to Bgee gene page or anatomical entity. */
+export function bgeeRecordUrl(expr: Pick<BgeeExpression, 'geneId' | 'geneSymbol' | 'anatomicalEntityId'>): string {
+  if (expr.geneId && !expr.geneId.startsWith('http')) {
+    // Prefer ensembl-style or symbol on Bgee gene page
+    return `https://www.bgee.org/gene/${encodeURIComponent(expr.geneId)}`
+  }
+  if (expr.geneSymbol) {
+    return `https://www.bgee.org/?page=gene&gene_id=${encodeURIComponent(expr.geneSymbol)}`
+  }
+  if (expr.anatomicalEntityId) {
+    const id = expr.anatomicalEntityId.replace(':', '_')
+    return `https://www.ebi.ac.uk/ols4/ontologies/uberon/terms?iri=http%3A%2F%2Fpurl.obolibrary.org%2Fobo%2F${encodeURIComponent(id)}`
+  }
+  return 'https://www.bgee.org/'
 }

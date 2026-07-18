@@ -316,31 +316,58 @@ function GeneExpressionPanel({
       )}
       {bgeeExps && bgeeExps.length > 0 && (
         <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Bgee Expression ({bgeeExps.length})</h3>
-          <div className="space-y-1.5 max-h-64 overflow-y-auto">
-            {bgeeExps.slice(0, 30).map((e, i) => (
-              <DataPoint
-                key={i}
-                sourceKey="bgee"
-                fetchedAt={fetchedAt}
-                label={e.anatomicalEntityName || 'Bgee'}
-                recordUrl={
-                  e.geneSymbol
-                    ? `https://www.bgee.org/?page=gene&gene_id=${encodeURIComponent(e.geneId || e.geneSymbol)}`
-                    : 'https://www.bgee.org/'
-                }
-              >
-                <div className="flex items-center justify-between py-1 px-2 rounded text-sm gap-2">
-                  <span className="text-slate-300 truncate">{e.anatomicalEntityName || '—'}</span>
-                  <span className="text-[10px] text-slate-500 shrink-0">
-                    {e.expressionLevel}
-                    {typeof e.expressionScore === 'number' && e.expressionScore > 0
-                      ? ` · ${e.expressionScore.toFixed(2)}`
-                      : ''}
-                  </span>
-                </div>
-              </DataPoint>
-            ))}
+          <h3 className="text-sm font-semibold text-slate-200 mb-3">
+            Bgee Expression ({bgeeExps.length})
+          </h3>
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {bgeeExps.slice(0, 40).map((e, i) => {
+              const anatId = e.anatomicalEntityId?.replace(/^UBERON_/, 'UBERON:') || ''
+              const recordUrl = e.geneId
+                ? `https://www.bgee.org/gene/${encodeURIComponent(e.geneId)}`
+                : e.geneSymbol
+                  ? `https://www.bgee.org/?page=gene&gene_id=${encodeURIComponent(e.geneSymbol)}`
+                  : 'https://www.bgee.org/'
+              return (
+                <DataPoint
+                  key={`${e.anatomicalEntityId}-${e.developmentalStageId}-${i}`}
+                  sourceKey="bgee"
+                  fetchedAt={fetchedAt}
+                  label={e.anatomicalEntityName || 'Bgee'}
+                  recordUrl={recordUrl}
+                >
+                  <div className="py-1.5 px-2 rounded text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <span className="text-slate-200 font-medium block truncate">
+                          {e.anatomicalEntityName || '—'}
+                        </span>
+                        {e.developmentalStageName && (
+                          <span className="block text-[10px] text-slate-400 mt-0.5">
+                            Stage: {e.developmentalStageName}
+                          </span>
+                        )}
+                        <span className="block text-[9px] font-mono text-slate-600 mt-0.5 truncate">
+                          {[e.species, anatId, e.geneSymbol].filter(Boolean).join(' · ')}
+                        </span>
+                      </div>
+                      <div className="shrink-0 text-right text-[10px] text-slate-400 space-y-0.5">
+                        {e.expressionLevel && (
+                          <span className="block text-emerald-300/90">{e.expressionLevel}</span>
+                        )}
+                        {typeof e.expressionScore === 'number' && e.expressionScore > 0 && (
+                          <span className="block tabular-nums">score {e.expressionScore.toFixed(2)}</span>
+                        )}
+                        {typeof e.confidenceScore === 'number' && e.confidenceScore > 0 && (
+                          <span className="block tabular-nums text-slate-500">
+                            conf {e.confidenceScore.toFixed(2)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </DataPoint>
+              )
+            })}
           </div>
         </div>
       )}
