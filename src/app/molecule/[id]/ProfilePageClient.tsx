@@ -531,11 +531,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
   }, [categoryStatus, isEmbed])
 
-  // Auto-load the active category when it changes
+  // Auto-load the active category when it changes (incl. decision-mode deep links
+  // like ?tab=interactions-pathways — outside Core six first-paint set)
   useEffect(() => {
     if (!cacheReady || activeCategory === 'all') return
     if (categoryStatusRef.current[activeCategory] === 'idle') {
-      loadCategory(activeCategory)
+      void loadCategory(activeCategory)
     }
   }, [activeCategory, loadCategory, cacheReady])
 
@@ -992,11 +993,27 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
   // filteredCategories is used for display filtering
 
+  /**
+   * In decision mode the default “All” view is Core six only.
+   * When the user opens a specific category tab (or deep-link ?tab=interactions-pathways),
+   * show that category’s full panels so counts match visible content.
+   */
+  function showFullPanelsForCategory(catId: CategoryId): boolean {
+    if (!isDecisionMode) return true
+    if (activeCategory === catId) return true
+    return false
+  }
+
   function renderCategoryContent(catId: CategoryId, panels: typeof CATEGORIES[0]['panels']) {
     const status = categoryStatus[catId]
+    const fullForCat = showFullPanelsForCategory(catId)
 
-    if (hideEmpty && status === 'idle') return null
-    if (hideEmpty && status === 'loading') return null
+    // Never hide a category the user explicitly selected via tab / URL
+    const suppressEmpty =
+      hideEmpty && activeCategory !== catId && activeCategory !== 'all'
+
+    if (suppressEmpty && status === 'idle') return null
+    if (suppressEmpty && status === 'loading') return null
 
     if (status === 'idle') {
       return (
@@ -1005,6 +1022,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             onClick={() => loadCategory(catId)}
             disabled={isBusy}
             className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 py-2 rounded-lg text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            data-testid={`load-category-${catId}`}
           >
             Load data
           </button>
@@ -1057,10 +1075,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       | undefined
     const fromCache = Boolean(catPayload?._fromClientCache)
 
-    // Decision mode: only the Core six decision panels (design §4.3)
-    const modePanels = isDecisionMode
-      ? panels.filter(p => DECISION_PANEL_ID_SET.has(p.id))
-      : panels
+    // Decision “All”: Core six only. Focused category tab: full panel set for that category.
+    const modePanels = fullForCat
+      ? panels
+      : isDecisionMode
+        ? panels.filter((p) => DECISION_PANEL_ID_SET.has(p.id))
+        : panels
 
     const visiblePanels = hideEmpty
       ? modePanels.filter(p => {
@@ -1303,41 +1323,67 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             <div className="space-y-6">
               {(isDecisionMode
                 ? [
-                    // Decision categories first, then any remaining that still host a decision panel
-                    ...MOLECULE_CATEGORIES.filter(c => DECISION_CATEGORY_IDS.includes(c.id)),
-                    ...MOLECULE_CATEGORIES.filter(c => !DECISION_CATEGORY_IDS.includes(c.id)),
+                    // Decision categories first, then remaining (available when user picks that tab)
+                    ...MOLECULE_CATEGORIES.filter((c) => DECISION_CATEGORY_IDS.includes(c.id)),
+                    ...MOLECULE_CATEGORIES.filter((c) => !DECISION_CATEGORY_IDS.includes(c.id)),
                   ]
                 : MOLECULE_CATEGORIES
-              ).map(cat => {
-                const matchingPanels = cat.panels.filter(p =>
-                  (!searchQuery || p.title.toLowerCase().includes(searchLower)) &&
-                  isPanelAllowed(p.id) &&
-                  (!isDecisionMode || DECISION_PANEL_ID_SET.has(p.id))
-                )
-                if (matchingPanels.length === 0) return null
-                const count = dataCounts[cat.id]
-                const decisionWithData = isDecisionMode
-                  ? matchingPanels.filter(p => {
-                      const value = mergedData[p.propKey]
-                      if (value == null) return false
-                      if (Array.isArray(value)) return value.length > 0
-                      return true
-                    }).length
-                  : count.withData
-                const decisionTotal = isDecisionMode ? matchingPanels.length : count.total
+              ).map((cat) => {
+                // Decision “All”: only Core six panels. Focused tab: full category panels.
+                const focused = activeCategory === cat.id
+                const matchingPanels = cat.panels.filter((p) => {
+                  if (searchQuery && !p.title.toLowerCase().includes(searchLower)) return false
+                  if (!isPanelAllowed(p.id)) return false
+                  if (!isDecisionMode) return true
+                  if (focused) return true
+                  return DECISION_PANEL_ID_SET.has(p.id)
+                })
+                if (matchingPanels.length === 0) {
+                  // Still mount focused empty categories so Load / empty state can show
+                  if (!focused) return null
+                }
+                const count = dataCounts[cat.id] ?? {
+                  withData: 0,
+                  total: cat.panels.length,
+                }
+                const shownWithData = matchingPanels.filter((p) => {
+                  const value = mergedData[p.propKey]
+                  if (value == null) return false
+                  if (Array.isArray(value)) return value.length > 0
+                  if (typeof value === 'object') {
+                    return Object.values(value as Record<string, unknown>).some((v) =>
+                      Array.isArray(v) ? v.length > 0 : v != null && v !== '',
+                    )
+                  }
+                  return true
+                }).length
+                const withData = focused ? count.withData : isDecisionMode ? shownWithData : count.withData
+                const total = focused || !isDecisionMode ? count.total : matchingPanels.length
 
-                if (hideEmpty && decisionWithData === 0 && categoryStatus[cat.id] === 'loaded') return null
+                // Hide empty non-focused categories; always keep the active tab’s section
+                if (
+                  hideEmpty &&
+                  !focused &&
+                  withData === 0 &&
+                  categoryStatus[cat.id] === 'loaded'
+                ) {
+                  return null
+                }
 
-                 return (<div key={cat.id} id={cat.id}>
-                  <CategorySection
-                    icon={cat.icon}
-                    label={cat.label}
-                    withData={decisionWithData}
-                    total={decisionTotal}
-                  >
-                    {renderCategoryContent(cat.id, matchingPanels)}
-                  </CategorySection>
-                </div>
+                return (
+                  <div key={cat.id} id={cat.id} data-testid={`category-section-${cat.id}`}>
+                    <CategorySection
+                      icon={cat.icon}
+                      label={cat.label}
+                      withData={withData}
+                      total={total}
+                    >
+                      {renderCategoryContent(
+                        cat.id,
+                        matchingPanels.length > 0 ? matchingPanels : cat.panels,
+                      )}
+                    </CategorySection>
+                  </div>
                 )
               })}
             </div>

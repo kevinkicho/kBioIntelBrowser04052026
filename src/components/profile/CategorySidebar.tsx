@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CATEGORIES, CategoryId, CategoryDataCount } from '@/lib/categoryConfig'
+import { MOLECULE_CATEGORIES, type CategoryId, type CategoryDataCount } from '@/lib/categoryConfig'
 import type { FreshnessMap } from '@/lib/dataFreshness'
 import { formatTimeSince } from '@/lib/dataFreshness'
 
@@ -13,12 +13,24 @@ interface CategorySidebarProps {
   disabled?: boolean
 }
 
-function HealthIndicator({ health, tooltip }: { health: string; tooltip: string }) {
+function HealthIndicator({
+  health,
+  hasData,
+  tooltip,
+}: {
+  health: string
+  hasData: boolean
+  tooltip: string
+}) {
+  // No green dot when category loaded empty (0/N)
+  if (health === 'ok' && !hasData) return null
+  if (health !== 'ok' && health !== 'loading' && health !== 'error') return null
   const color =
-    health === 'ok' ? 'bg-emerald-400' :
-    health === 'loading' ? 'bg-amber-400 animate-pulse' :
-    health === 'error' ? 'bg-red-400' :
-    'bg-slate-600'
+    health === 'ok'
+      ? 'bg-emerald-400'
+      : health === 'loading'
+        ? 'bg-amber-400 animate-pulse'
+        : 'bg-red-400'
 
   return (
     <span className="relative group">
@@ -86,17 +98,22 @@ export function CategorySidebar({ active, counts, onChange, freshness, disabled 
         </button>
 
         {/* Category items */}
-         {CATEGORIES.map((cat) => {
-           const count = counts[cat.id]
+         {MOLECULE_CATEGORIES.map((cat) => {
+           const count = counts[cat.id] ?? { withData: 0, total: cat.panels.length }
            const isActive = active === cat.id
            const f = freshness?.[cat.id]
+           const hasData = (count.withData ?? 0) > 0
            const tooltip = f
-             ? f.health === 'ok' ? `Loaded ${formatTimeSince(f.fetchedAt)}`
-             : f.health === 'loading' ? 'Loading...'
-             : f.health === 'error' ? 'Failed — click to retry'
+             ? f.health === 'ok'
+               ? hasData
+                 ? `Loaded ${formatTimeSince(f.fetchedAt)}`
+                 : `Loaded · no panel data`
+               : f.health === 'loading'
+                 ? 'Loading...'
+                 : f.health === 'error'
+                   ? 'Failed — click to retry'
+                   : 'Not loaded yet'
              : 'Not loaded yet'
-             : 'Not loaded yet'
-           const hasData = count.withData > 0
 
            return (
               <a
@@ -116,7 +133,9 @@ export function CategorySidebar({ active, counts, onChange, freshness, disabled 
                    <span className={`text-[10px] px-1.5 py-0.5 rounded ${hasData ? 'bg-indigo-900/30 text-indigo-300' : 'bg-slate-800/50 text-slate-500'}`}>
                      {count.withData}/{count.total}
                    </span>
-                   {f && <HealthIndicator health={f.health} tooltip={tooltip} />}
+                   {f && (
+                     <HealthIndicator health={f.health} hasData={hasData} tooltip={tooltip} />
+                   )}
                  </>
                )}
              </a>

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { CATEGORIES, CategoryId, CategoryDataCount } from '@/lib/categoryConfig'
+import { MOLECULE_CATEGORIES, type CategoryId, type CategoryDataCount } from '@/lib/categoryConfig'
 import type { FreshnessMap } from '@/lib/dataFreshness'
 import { formatTimeSince } from '@/lib/dataFreshness'
 
@@ -12,13 +12,26 @@ interface CategoryTabsProps {
   freshness?: FreshnessMap
 }
 
-function HealthDot({ health, tooltip }: { health: string; tooltip: string }) {
+function HealthDot({
+  health,
+  hasData,
+  tooltip,
+}: {
+  health: string
+  hasData: boolean
+  tooltip: string
+}) {
   const [show, setShow] = useState(false)
+  // Green only when loaded *with* data — empty 0/N tabs must not look “healthy”
+  if (health === 'ok' && !hasData) return null
+  if (health !== 'ok' && health !== 'loading' && health !== 'error') return null
+
   const color =
-    health === 'ok' ? 'bg-emerald-400' :
-    health === 'loading' ? 'bg-amber-400 animate-pulse' :
-    health === 'error' ? 'bg-red-400' :
-    'bg-slate-600'
+    health === 'ok'
+      ? 'bg-emerald-400'
+      : health === 'loading'
+        ? 'bg-amber-400 animate-pulse'
+        : 'bg-red-400'
 
   return (
     <span
@@ -54,15 +67,21 @@ export function CategoryTabs({ active, counts, onChange, freshness }: CategoryTa
       >
         All ({totalWithData}/{totalAll})
       </button>
-      {CATEGORIES.map((cat) => {
-        const count = counts[cat.id]
+      {MOLECULE_CATEGORIES.map((cat) => {
+        const count = counts[cat.id] ?? { withData: 0, total: cat.panels.length }
         const isActive = active === cat.id
         const f = freshness?.[cat.id]
+        const hasData = (count.withData ?? 0) > 0
         const tooltip = f
-          ? f.health === 'ok' ? `Loaded ${formatTimeSince(f.fetchedAt)}`
-          : f.health === 'loading' ? 'Loading...'
-          : f.health === 'error' ? 'Failed — click to retry'
-          : 'Not loaded yet'
+          ? f.health === 'ok'
+            ? hasData
+              ? `Loaded ${formatTimeSince(f.fetchedAt)}`
+              : `Loaded · no panel data (${count.withData}/${count.total})`
+            : f.health === 'loading'
+              ? 'Loading...'
+              : f.health === 'error'
+                ? 'Failed — click to retry'
+                : 'Not loaded yet'
           : 'Not loaded yet'
 
         return (
@@ -74,7 +93,7 @@ export function CategoryTabs({ active, counts, onChange, freshness }: CategoryTa
             onClick={() => onChange(cat.id)}
           >
             {cat.icon} {cat.label} ({count.withData}/{count.total})
-            {f && <HealthDot health={f.health} tooltip={tooltip} />}
+            {f && <HealthDot health={f.health} hasData={hasData} tooltip={tooltip} />}
           </button>
         )
       })}
