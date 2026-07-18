@@ -4,6 +4,7 @@ import { generateChat } from '@/lib/ai/ollama'
 import { parseRequestOllamaApiKey } from '@/lib/ai/cloudConfig'
 import {
   buildPackAiContext,
+  isStructuredPackMode,
   packModeSystemPrompt,
   packModeUserPrompt,
   type PackAiMode,
@@ -16,11 +17,12 @@ const MODES = new Set<PackAiMode>([
   'pack_gap_analysis',
   'pack_next_experiment',
   'pack_red_team',
+  'pack_custom_prompt',
 ])
 
 /**
- * POST structured pack AI analysis. Validates claimIds against pack allowlist.
- * Body: { mode, pack: { title, claims, candidates?, disease? }, model, ollamaUrl }
+ * POST pack AI analysis (structured modes) or free-form claim-bound chat.
+ * Body: { mode, pack, model, ollamaUrl, customQuestion? }
  */
 export async function POST(request: NextRequest) {
   const body = (await request.json().catch(() => ({}))) as Partial<PackAiRequest> & {
@@ -28,6 +30,7 @@ export async function POST(request: NextRequest) {
     ollamaUrl?: string
     ollamaApiKey?: string
     apiKey?: string
+    customQuestion?: string
   }
   const apiKey = parseRequestOllamaApiKey(body)
 
@@ -41,6 +44,9 @@ export async function POST(request: NextRequest) {
   if (!body.ollamaUrl || !body.model) {
     return NextResponse.json({ error: 'model and ollamaUrl required' }, { status: 400 })
   }
+  if (mode === 'pack_custom_prompt' && !(body.customQuestion || '').trim()) {
+    return NextResponse.json({ error: 'customQuestion required for pack_custom_prompt' }, { status: 400 })
+  }
 
   const validation = validateOllamaUrl(body.ollamaUrl, { forServer: true })
   if (!validation.valid) {
@@ -50,7 +56,10 @@ export async function POST(request: NextRequest) {
   const ctx = buildPackAiContext(body.pack as PackAiRequest['pack'])
   const messages = [
     { role: 'system' as const, content: packModeSystemPrompt(mode) },
-    { role: 'user' as const, content: packModeUserPrompt(ctx, mode) },
+    {
+      role: 'user' as const,
+      content: packModeUserPrompt(ctx, mode, body.customQuestion),
+    },
   ]
 
   let raw = ''
@@ -71,6 +80,32 @@ export async function POST(request: NextRequest) {
       mode,
       refused: true,
       refuseReason: result.error ?? 'Chat failed',
+    })
+  }
+
+  // Free-form chat: return prose as insight.summary (no JSON validation)
+  if (!isStructuredPackMode(mode)) {
+    const text = raw.trim()
+    if (!text) {
+      return NextResponse.json({
+        ok: false,
+        mode,
+        refused: true,
+        refuseReason: 'Empty model response',
+      })
+    }
+    // Best-effort: collect allowlisted ids mentioned in the answer
+    const claimIds = ctx.claimIdAllowlist.filter((id) => text.includes(id))
+    return NextResponse.json({
+      ok: true,
+      mode,
+      insight: {
+        summary: text,
+        claimIds,
+        nextSteps: undefined,
+        risks: undefined,
+      },
+      refused: false,
     })
   }
 

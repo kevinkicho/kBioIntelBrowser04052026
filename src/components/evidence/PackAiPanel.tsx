@@ -3,7 +3,12 @@
 import { useMemo, useState } from 'react'
 import type { EvidencePack } from '@/lib/evidence/pack'
 import type { PackAiMode, StructuredInsight } from '@/lib/ai/contracts'
-import { minClaimsForPackMode } from '@/lib/ai/contracts'
+import {
+  isStructuredPackMode,
+  minClaimsForPackMode,
+  packModePromptPreview,
+  packModeTaskLabel,
+} from '@/lib/ai/contracts'
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
 import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
@@ -13,6 +18,7 @@ const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_gap_analysis', label: 'Gap analysis' },
   { id: 'pack_next_experiment', label: 'Next experiments' },
   { id: 'pack_red_team', label: 'Red team' },
+  { id: 'pack_custom_prompt', label: 'Prompt' },
 ]
 
 export interface PackAiPanelProps {
@@ -49,18 +55,30 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   const [busy, setBusy] = useState(false)
   const [insight, setInsight] = useState<StructuredInsight | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [showPrompt, setShowPrompt] = useState(false)
+  const [customQuestion, setCustomQuestion] = useState('')
 
   const claimCount = pack?.claims?.length ?? 0
   const minClaims = minClaimsForPackMode(mode)
   const gated = claimCount < minClaims
+  const isCustom = mode === 'pack_custom_prompt'
 
   const evidenceLines = useMemo(
     () => resolveEvidenceLines(pack, insight?.claimIds ?? []),
     [pack, insight?.claimIds],
   )
 
+  const promptPreview = useMemo(() => {
+    if (!pack) return null
+    return packModePromptPreview(mode, pack, customQuestion)
+  }, [pack, mode, customQuestion])
+
   const run = async () => {
     if (!pack || gated) return
+    if (isCustom && !customQuestion.trim()) {
+      setError('Enter a question or prompt first.')
+      return
+    }
     if (!ai.enabled || !ai.model) {
       setError('Connect Ollama Cloud (AI button) with your API key to run pack analysis.')
       return
@@ -83,6 +101,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           },
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
+          ...(isCustom ? { customQuestion: customQuestion.trim() } : {}),
           ...(ai.ollamaApiKey ? { ollamaApiKey: ai.ollamaApiKey } : {}),
         }),
       })
@@ -145,22 +164,85 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           grounded in pack evidence · Ollama Cloud
         </span>
       </div>
+
       <div className="mb-2 flex flex-wrap gap-1">
         {MODES.map((m) => (
           <button
             key={m.id}
             type="button"
-            onClick={() => setMode(m.id)}
+            onClick={() => {
+              setMode(m.id)
+              setInsight(null)
+              setError(null)
+              if (m.id === 'pack_custom_prompt') setShowPrompt(true)
+            }}
+            title={packModeTaskLabel(m.id)}
             className={`rounded border px-2 py-1 text-[10px] ${
               mode === m.id
-                ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
+                ? m.id === 'pack_custom_prompt'
+                  ? 'border-cyan-600 bg-cyan-900/40 text-cyan-200'
+                  : 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
                 : 'border-slate-700 text-slate-500 hover:border-slate-600'
             }`}
+            data-testid={`pack-ai-mode-${m.id}`}
           >
             {m.label}
           </button>
         ))}
       </div>
+
+      <p className="mb-2 text-[11px] text-slate-500 leading-relaxed">{packModeTaskLabel(mode)}</p>
+
+      {isCustom && (
+        <div className="mb-2 space-y-1.5" data-testid="pack-ai-custom-prompt">
+          <label className="block text-[10px] font-medium text-slate-400">Your prompt</label>
+          <textarea
+            value={customQuestion}
+            onChange={(e) => setCustomQuestion(e.target.value)}
+            rows={3}
+            placeholder="Ask anything about this pack’s evidence (e.g. compare safety signals, list trial gaps…)"
+            className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-2.5 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:border-cyan-600 focus:outline-none resize-y min-h-[4rem]"
+            data-testid="pack-ai-custom-input"
+          />
+        </div>
+      )}
+
+      <div className="mb-2">
+        <button
+          type="button"
+          onClick={() => setShowPrompt((v) => !v)}
+          className="text-[10px] text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
+          data-testid="pack-ai-toggle-prompt"
+        >
+          {showPrompt ? 'Hide prompt' : 'View prompt sent to the model'}
+        </button>
+        {showPrompt && promptPreview && (
+          <div
+            className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/60 p-2 max-h-56 overflow-y-auto"
+            data-testid="pack-ai-prompt-preview"
+          >
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                System
+              </p>
+              <pre className="whitespace-pre-wrap break-words font-sans text-[10px] text-slate-400 leading-relaxed">
+                {promptPreview.system}
+              </pre>
+            </div>
+            <div>
+              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
+                User message
+              </p>
+              <pre className="whitespace-pre-wrap break-words font-sans text-[10px] text-slate-400 leading-relaxed">
+                {promptPreview.user.length > 4000
+                  ? `${promptPreview.user.slice(0, 4000)}\n… (truncated for display)`
+                  : promptPreview.user}
+              </pre>
+            </div>
+          </div>
+        )}
+      </div>
+
       {gated ? (
         <p className="text-[11px] text-amber-400/90">
           Need ≥{minClaims} claims in pack for {mode.replace(/_/g, ' ')} (have {claimCount}).
@@ -170,19 +252,32 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         <button
           type="button"
           onClick={() => void run()}
-          disabled={busy || !pack}
+          disabled={busy || !pack || (isCustom && !customQuestion.trim())}
           className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
+          data-testid="pack-ai-run"
         >
-          {busy ? 'Running…' : 'Run analysis'}
+          {busy
+            ? isCustom
+              ? 'Thinking…'
+              : 'Running…'
+            : isCustom
+              ? 'Send prompt'
+              : 'Run analysis'}
         </button>
       )}
+
       {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
+
       {insight && (
         <div
           className="mt-3 space-y-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300"
           data-testid="pack-ai-insight"
         >
-          <p className="leading-relaxed">{insight.summary}</p>
+          {!isStructuredPackMode(mode) ? (
+            <div className="leading-relaxed whitespace-pre-wrap">{insight.summary}</div>
+          ) : (
+            <p className="leading-relaxed">{insight.summary}</p>
+          )}
           {insight.nextSteps && insight.nextSteps.length > 0 && (
             <div>
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
@@ -234,7 +329,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               )}
             </div>
           )}
-          {insight.claimIds.length > 0 && evidenceLines.length === 0 && (
+          {insight.claimIds.length > 0 && evidenceLines.length === 0 && isStructuredPackMode(mode) && (
             <p className="text-[10px] text-slate-600">
               Model cited {insight.claimIds.length} claim id(s), but they could not be matched to
               pack statements (stale pack or invalid ids).
