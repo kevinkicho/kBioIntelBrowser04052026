@@ -5,6 +5,14 @@ import {
   isOllamaCloudUrl,
   ollamaRequestHeaders,
 } from './cloudConfig'
+import {
+  getCachedOllamaHealth,
+  healthCacheKey,
+  logOllamaCheckOnce,
+  logOllamaUnavailableOnce,
+  resolvePrimaryOllamaUrlForServer,
+  setCachedOllamaHealth,
+} from './ollamaRuntime'
 
 export interface OllamaModel {
   name: string
@@ -81,7 +89,7 @@ async function checkOllamaHealthOnce(
   }
   const url = normalizeOllamaUrl(ollamaUrl)
   const cloud = isOllamaCloudUrl(url)
-  console.log('[ai] Checking Ollama health at', url, cloud ? '(cloud)' : '(local)')
+  logOllamaCheckOnce(url, cloud)
   try {
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), OLLAMA_TIMEOUT)
@@ -95,7 +103,6 @@ async function checkOllamaHealthOnce(
 
     if (!res.ok) {
       const body = await res.text().catch(() => '')
-      console.warn('[ai] Ollama responded with status', res.status, body.slice(0, 200))
       return {
         available: false,
         models: [],
@@ -105,9 +112,7 @@ async function checkOllamaHealthOnce(
     }
 
     const data: OllamaTagsResponse = await res.json()
-    console.log('[ai] Ollama /api/tags raw response keys:', Object.keys(data))
     const models = extractModelNames(data)
-    console.log('[ai] Ollama is available. Models:', models.length > 0 ? models.join(', ') : `(none — raw: ${JSON.stringify(data).slice(0, 300)})`)
 
     return {
       available: true,
@@ -118,10 +123,8 @@ async function checkOllamaHealthOnce(
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err)
     if (message.includes('abort') || message.includes('AbortError') || message.includes('timeout')) {
-      console.warn('[ai] Ollama health check timed out for', url)
       return { available: false, models: [], error: `Connection timed out (${url})`, effectiveUrl: url }
     }
-    console.warn('[ai] Ollama not available at', url, ':', message)
     return {
       available: false,
       models: [],
@@ -134,14 +137,42 @@ async function checkOllamaHealthOnce(
 /**
  * Health check with optional Ollama Cloud fallback when local/LAN is down
  * and a cloud API key is available (user key or server env).
+ *
+ * On Cloud Run / production: skips localhost probes (no daemon) and prefers
+ * Ollama Cloud when a key is configured. Results are cached ~90s.
  */
 export async function checkOllamaHealth(
   ollamaUrl: string,
   opts?: OllamaAuthOpts,
 ): Promise<OllamaHealthResponse> {
-  const primaryUrl = normalizeOllamaUrl(ollamaUrl)
+  const resolved = resolvePrimaryOllamaUrlForServer(ollamaUrl, opts)
+  const cacheKey = healthCacheKey(
+    resolved.url || ollamaUrl || 'none',
+    Boolean(opts?.apiKey),
+  )
+  const cached = getCachedOllamaHealth(cacheKey)
+  if (cached) return cached
+
+  // Cloud Run with loopback request and no cloud key — do not dial localhost.
+  if (resolved.skippedLocal && !resolved.url) {
+    const result: OllamaHealthResponse = {
+      available: false,
+      models: [],
+      error:
+        'Local Ollama is not available on App Hosting. Configure OLLAMA_API_KEY (Ollama Cloud) or pass a user API key.',
+      effectiveUrl: undefined,
+    }
+    setCachedOllamaHealth(cacheKey, result)
+    logOllamaUnavailableOnce({ error: result.error })
+    return result
+  }
+
+  const primaryUrl = resolved.url || normalizeOllamaUrl(ollamaUrl)
   const primary = await checkOllamaHealthOnce(primaryUrl, opts)
-  if (primary.available) return primary
+  if (primary.available) {
+    setCachedOllamaHealth(cacheKey, primary)
+    return primary
+  }
 
   // Already targeting cloud, explicit local-only, or no API key configured
   if (
@@ -149,22 +180,29 @@ export async function checkOllamaHealth(
     isOllamaCloudUrl(primaryUrl) ||
     !hasOllamaCloudFallback(opts?.apiKey)
   ) {
+    setCachedOllamaHealth(cacheKey, primary)
+    logOllamaUnavailableOnce({
+      url: primaryUrl,
+      error: primary.error,
+      viaCloud: isOllamaCloudUrl(primaryUrl),
+    })
     return primary
   }
 
   const cloudBase = normalizeOllamaUrl(getOllamaCloudBase())
-  console.log('[ai] Local Ollama unavailable; falling back to Ollama Cloud at', cloudBase)
   const cloud = await checkOllamaHealthOnce(cloudBase, opts)
   if (cloud.available) {
-    return {
+    const ok: OllamaHealthResponse = {
       ...cloud,
       viaCloud: true,
       effectiveUrl: cloudBase,
       error: undefined,
     }
+    setCachedOllamaHealth(cacheKey, ok)
+    return ok
   }
 
-  return {
+  const failed: OllamaHealthResponse = {
     available: false,
     models: [],
     error: primary.error
@@ -172,6 +210,13 @@ export async function checkOllamaHealth(
       : cloud.error,
     effectiveUrl: cloudBase,
   }
+  setCachedOllamaHealth(cacheKey, failed)
+  logOllamaUnavailableOnce({
+    url: cloudBase,
+    error: failed.error,
+    viaCloud: true,
+  })
+  return failed
 }
 
 export async function pullModel(

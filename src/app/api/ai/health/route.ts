@@ -2,22 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 import { checkOllamaHealth } from '@/lib/ai/ollama'
 import { validateOllamaUrl } from '@/lib/ai/config'
 import {
+  getOllamaCloudBase,
   hasOllamaCloudFallback,
   parseRequestOllamaApiKey,
 } from '@/lib/ai/cloudConfig'
+import { resolvePrimaryOllamaUrlForServer } from '@/lib/ai/ollamaRuntime'
+import { shouldSkipLocalOllama } from '@/lib/runtimeEnv'
+import { logServerEvent } from '@/lib/serverLog'
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}))
-  const ollamaUrl = body.ollamaUrl
+  const ollamaUrl = typeof body.ollamaUrl === 'string' ? body.ollamaUrl : ''
   const apiKey = parseRequestOllamaApiKey(body)
   const noCloudFallback = Boolean(body.noCloudFallback)
   const auth = { apiKey, noCloudFallback }
+  const cloudConfigured = hasOllamaCloudFallback(apiKey)
 
-  // Allow empty URL when cloud fallback is configured — check cloud directly.
+  // Empty URL → cloud-only when configured
   if (!ollamaUrl) {
-    if (hasOllamaCloudFallback(apiKey)) {
-      console.log('[ai/health] No local URL; checking Ollama Cloud fallback')
-      const health = await checkOllamaHealth('https://ollama.com', auth)
+    if (cloudConfigured && !noCloudFallback) {
+      const health = await checkOllamaHealth(getOllamaCloudBase(), auth)
       return NextResponse.json({
         available: health.available,
         models: health.models,
@@ -37,12 +41,36 @@ export async function POST(request: NextRequest) {
     })
   }
 
+  // App Hosting / production: never dial localhost — rewrite to cloud when possible
+  const resolved = resolvePrimaryOllamaUrlForServer(ollamaUrl, auth)
+  if (resolved.skippedLocal) {
+    if (!resolved.url) {
+      return NextResponse.json({
+        available: false,
+        models: [],
+        cloudFallbackConfigured: cloudConfigured,
+        skippedLocal: true,
+        error:
+          'Local Ollama is not available on App Hosting. Set OLLAMA_API_KEY secret or enter an Ollama Cloud API key.',
+      })
+    }
+    const health = await checkOllamaHealth(resolved.url, auth)
+    return NextResponse.json({
+      available: health.available,
+      models: health.models,
+      ollamaUrl: health.effectiveUrl ?? resolved.url,
+      viaCloud: true,
+      cloudFallbackConfigured: cloudConfigured,
+      usingUserKey: Boolean(apiKey),
+      skippedLocal: true,
+      error: health.error,
+    })
+  }
+
   const validation = validateOllamaUrl(ollamaUrl, { forServer: true })
   if (!validation.valid) {
-    // Still try cloud if local URL is invalid but cloud is configured
-    if (hasOllamaCloudFallback(apiKey)) {
-      console.log('[ai/health] Invalid local URL; trying Ollama Cloud fallback')
-      const health = await checkOllamaHealth('https://ollama.com', auth)
+    if (cloudConfigured && !noCloudFallback) {
+      const health = await checkOllamaHealth(getOllamaCloudBase(), auth)
       if (health.available) {
         return NextResponse.json({
           available: true,
@@ -58,40 +86,56 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       available: false,
       models: [],
-      cloudFallbackConfigured: hasOllamaCloudFallback(apiKey),
+      cloudFallbackConfigured: cloudConfigured,
       error: validation.error,
     })
   }
-  const validatedUrl = validation.normalized!
 
-  console.log(`[ai/health] Checking ${validatedUrl}/api/tags`)
+  const validatedUrl = validation.normalized!
+  // On managed hosts, still prefer cloud when client sent loopback (defense in depth)
+  if (shouldSkipLocalOllama() && /localhost|127\.0\.0\.1/i.test(validatedUrl)) {
+    if (cloudConfigured && !noCloudFallback) {
+      const health = await checkOllamaHealth(getOllamaCloudBase(), auth)
+      return NextResponse.json({
+        available: health.available,
+        models: health.models,
+        ollamaUrl: health.effectiveUrl,
+        viaCloud: true,
+        cloudFallbackConfigured: true,
+        usingUserKey: Boolean(apiKey),
+        skippedLocal: true,
+        error: health.error,
+      })
+    }
+  }
+
   const health = await checkOllamaHealth(validatedUrl, auth)
 
   if (!health.available) {
-    console.warn(`[ai/health] Ollama at ${validatedUrl} unavailable — ${health.error}`)
     return NextResponse.json({
       available: false,
       models: [],
       ollamaUrl: health.effectiveUrl ?? validatedUrl,
       viaCloud: Boolean(health.viaCloud),
-      cloudFallbackConfigured: hasOllamaCloudFallback(apiKey),
+      cloudFallbackConfigured: cloudConfigured,
       usingUserKey: Boolean(apiKey),
       error: health.error,
     })
   }
 
   const viaCloud = Boolean(health.viaCloud)
-  console.log(
-    `[ai/health] Ollama ${viaCloud ? 'Cloud' : 'local'} available | models: [${health.models.join(', ')}] | userKey: ${Boolean(apiKey)}`,
-  )
+  logServerEvent('INFO', 'ollama_available', {
+    viaCloud,
+    modelCount: health.models.length,
+    usingUserKey: Boolean(apiKey),
+  })
 
   return NextResponse.json({
     available: true,
     models: health.models,
-    // Prefer cloud base when fallback succeeded so later chat/show hit cloud, not dead localhost
     ollamaUrl: health.effectiveUrl ?? validatedUrl,
     viaCloud,
-    cloudFallbackConfigured: hasOllamaCloudFallback(apiKey),
+    cloudFallbackConfigured: cloudConfigured,
     usingUserKey: Boolean(apiKey),
     error: undefined,
   })
@@ -102,6 +146,7 @@ export async function GET() {
     available: false,
     models: [],
     cloudFallbackConfigured: hasOllamaCloudFallback(),
+    skipLocalOllama: shouldSkipLocalOllama(),
     error: 'Use POST with { ollamaUrl, ollamaApiKey? } to check Ollama health',
   })
 }

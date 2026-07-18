@@ -5,6 +5,7 @@ import { getCategoryTimeout, withTimeout } from '@/lib/utils'
 import { flushApiMetrics, metricsToSourceStatus } from '@/lib/api-tracker'
 import { recordMetric } from '@/lib/analytics/db'
 import { buildCategoryApiTrace } from '@/lib/panelApiTrace'
+import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
 
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import { getMoleculeIdentifiers, resolveApiQuery } from '@/lib/resolveApiQuery'
@@ -33,6 +34,7 @@ export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; categoryId: string } }
 ) {
+  const timer = startApiTimer()
   const cid = parseInt(params.id, 10)
   if (isNaN(cid) || cid < 1) {
     return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
@@ -47,8 +49,18 @@ export async function GET(
   try {
     molecule = await getMoleculeById(cid)
   } catch (error) {
-    console.error(`[api/category] Error fetching molecule ${cid}:`, error)
     if (error instanceof PubChemUpstreamError) {
+      logApiOutcome({
+        route: '/api/molecule/[id]/category/[categoryId]',
+        method: 'GET',
+        status: 502,
+        ms: timer.ms(),
+        cid,
+        source: 'pubchem',
+        categoryId,
+        retryable: true,
+        error: error.message.slice(0, 200),
+      })
       return NextResponse.json(
         {
           error: 'Upstream molecule lookup unavailable',
@@ -58,6 +70,15 @@ export async function GET(
         { status: 502 },
       )
     }
+    logApiOutcome({
+      route: '/api/molecule/[id]/category/[categoryId]',
+      method: 'GET',
+      status: 500,
+      ms: timer.ms(),
+      cid,
+      categoryId,
+      error: error instanceof Error ? error.message.slice(0, 200) : 'unknown',
+    })
     return NextResponse.json({ error: 'Failed to fetch molecule data' }, { status: 500 })
   }
   if (!molecule) {
@@ -130,6 +151,15 @@ export async function GET(
             dataKeys: Object.keys(cached),
           }),
     }
+    logApiOutcome({
+      route: '/api/molecule/[id]/category/[categoryId]',
+      method: 'GET',
+      status: 200,
+      ms: timer.ms(),
+      cid,
+      categoryId,
+      fromCache: true,
+    })
     return NextResponse.json(payload)
   }
 
@@ -190,7 +220,15 @@ export async function GET(
         has_data: m.has_data,
       })
     }
-    console.error(`[api/category] Error fetching ${categoryId} for molecule ${cid}:`, err)
+    logApiOutcome({
+      route: '/api/molecule/[id]/category/[categoryId]',
+      method: 'GET',
+      status: 500,
+      ms: timer.ms(),
+      cid,
+      categoryId,
+      error: err instanceof Error ? err.message.slice(0, 200) : 'unknown',
+    })
     return NextResponse.json({
       error: 'Failed to fetch category data',
       category: categoryId,
@@ -238,5 +276,14 @@ export async function GET(
   }
 
   setCache(cacheKey, payload)
+  logApiOutcome({
+    route: '/api/molecule/[id]/category/[categoryId]',
+    method: 'GET',
+    status: 200,
+    ms: timer.ms(),
+    cid,
+    categoryId,
+    fromCache: false,
+  })
   return NextResponse.json(payload)
 }

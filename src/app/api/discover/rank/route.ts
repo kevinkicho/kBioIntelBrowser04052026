@@ -12,6 +12,7 @@ import {
   type AeAggressiveness,
 } from '@/lib/domain/score'
 import type { DiscoveryPreferencesSnapshot } from '@/lib/discovery/preferences'
+import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
 
 const MAX_LIMIT = 25
 const MIN_QUERY_LENGTH = 2
@@ -241,17 +242,41 @@ export async function POST(request: NextRequest) {
       .slice(0, 10)
   }
 
+  const timer = startApiTimer()
   try {
     const result = await rankCandidatesForDisease(query, options)
+    logApiOutcome({
+      route: '/api/discover/rank',
+      method: 'POST',
+      status: 200,
+      ms: timer.ms(),
+      diseaseId: options.diseaseId ?? null,
+      count: Array.isArray(result?.candidates) ? result.candidates.length : undefined,
+    })
     return NextResponse.json(result)
   } catch (error) {
     if (error instanceof UnknownDiseaseIdError) {
+      logApiOutcome({
+        route: '/api/discover/rank',
+        method: 'POST',
+        status: 404,
+        ms: timer.ms(),
+        diseaseId: error.diseaseId,
+        error: error.message.slice(0, 200),
+      })
       return NextResponse.json(
         { error: 'Unknown diseaseId', message: error.message, diseaseId: error.diseaseId },
         { status: 404 },
       )
     }
-    console.error('[api/discover/rank] POST Error:', error)
+    logApiOutcome({
+      route: '/api/discover/rank',
+      method: 'POST',
+      status: 500,
+      ms: timer.ms(),
+      diseaseId: options.diseaseId ?? null,
+      error: error instanceof Error ? error.message.slice(0, 200) : 'unknown',
+    })
     return NextResponse.json(
       {
         error: 'Candidate ranking failed',
