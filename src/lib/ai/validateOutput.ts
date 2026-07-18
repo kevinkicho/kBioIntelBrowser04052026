@@ -68,8 +68,13 @@ export function validatePackAiOutput(
   }
   if (orphans.length) errors.push(`orphan_claim_ids:${orphans.slice(0, 5).join(',')}`)
 
-  const confidence = isConfidence(o.confidence) ? o.confidence : 'low'
-  if (!isConfidence(o.confidence)) errors.push('invalid_confidence')
+  // Ignore model self-confidence (high/medium/low) — not product truth.
+  // Only honor explicit "insufficient" if the model still emits it.
+  const confidence =
+    o.confidence === 'insufficient' ? ('insufficient' as const) : undefined
+  if (o.confidence != null && !isConfidence(o.confidence)) {
+    errors.push('ignored_invalid_confidence')
+  }
 
   const nextSteps = Array.isArray(o.nextSteps)
     ? o.nextSteps.filter((x): x is string => typeof x === 'string').slice(0, 8)
@@ -79,22 +84,38 @@ export function validatePackAiOutput(
     : undefined
 
   const minClaims = minClaimsForPackMode(mode)
-  if (allowlist.length < minClaims || confidence === 'insufficient' || claimIds.length === 0 && minClaims > 0) {
-    if (allowlist.length < minClaims) {
-      return {
-        ok: true,
-        refused: true,
-        refuseReason: `Insufficient evidence in pack (${allowlist.length} claims; need ≥${minClaims} for ${mode})`,
-        errors,
-        insight: {
-          summary: summary || 'Insufficient evidence for deep synthesis.',
-          claimIds,
-          confidence: 'insufficient',
-          nextSteps: ['Load more Core panels', 'Re-export pack after data arrives'],
-          risks,
-        },
-      }
+  if (allowlist.length < minClaims) {
+    return {
+      ok: true,
+      refused: true,
+      refuseReason: `Insufficient evidence in pack (${allowlist.length} claims; need ≥${minClaims} for ${mode})`,
+      errors,
+      insight: {
+        summary: summary || 'Insufficient evidence for deep synthesis.',
+        claimIds,
+        confidence: 'insufficient',
+        nextSteps: ['Load more Core panels', 'Re-export pack after data arrives'],
+        risks,
+      },
     }
+  }
+  if (confidence === 'insufficient' && minClaims > 0) {
+    return {
+      ok: true,
+      refused: true,
+      refuseReason: 'Model reported insufficient evidence for deep synthesis',
+      errors,
+      insight: {
+        summary: summary || 'Insufficient evidence for deep synthesis.',
+        claimIds,
+        confidence: 'insufficient',
+        nextSteps: nextSteps ?? ['Load more Core panels', 'Re-export pack after data arrives'],
+        risks,
+      },
+    }
+  }
+  if (claimIds.length === 0 && minClaims > 0) {
+    // Allow brief without citations only for gap analysis; other modes need at least one real claim id
   }
 
   if (orphans.length && claimIds.length === 0 && minClaims > 0) {
@@ -117,7 +138,7 @@ export function validatePackAiOutput(
     insight: {
       summary,
       claimIds,
-      confidence,
+      // Do not persist LLM self-scores (high/medium/low)
       nextSteps,
       risks,
     },

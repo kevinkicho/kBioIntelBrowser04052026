@@ -16,7 +16,12 @@ export interface StructuredInsight {
   summary: string
   /** Must reference EvidenceClaim.id values from the pack */
   claimIds: string[]
-  confidence: 'high' | 'medium' | 'low' | 'insufficient'
+  /**
+   * Only meaningful value is `insufficient` (refuse path).
+   * high/medium/low were LLM self-ratings and are not shown in the UI.
+   * @deprecated Do not display high|medium|low as product confidence.
+   */
+  confidence?: 'high' | 'medium' | 'low' | 'insufficient'
   nextSteps?: string[]
   risks?: string[]
 }
@@ -68,20 +73,22 @@ export function buildPackAiContext(
 export function packModeSystemPrompt(mode: PackAiMode): string {
   const base = `You are BioIntel Copilot operating on an evidence pack.
 RULES:
-1. Every factual claim MUST cite one or more claimIds from the allowlist using the form [claimId].
-2. Do NOT invent claimIds. If evidence is insufficient, set confidence to "insufficient" and refuse deep synthesis.
-3. Respond with JSON only matching:
-{"summary":"string","claimIds":["ec:..."],"confidence":"high|medium|low|insufficient","nextSteps":["..."],"risks":["..."]}`
+1. Base the summary only on the claim statements provided. Cite claimIds you used in claimIds[].
+2. Do NOT invent claimIds. Use only ids from the allowlist. If evidence is thin, write a cautious summary and list gaps in nextSteps/risks — do not invent clinical conclusions.
+3. Do NOT invent a confidence rating (no high/medium/low). Evidence quality is the pack's claim set, not your self-score.
+4. Respond with JSON only matching:
+{"summary":"string","claimIds":["ec:..."],"nextSteps":["..."],"risks":["..."]}
+claimIds must be the evidence claim ids you relied on (from the allowlist).`
 
   switch (mode) {
     case 'pack_executive_brief':
-      return `${base}\nTask: Write a short executive brief for decision-makers.`
+      return `${base}\nTask: Write a short executive brief for decision-makers, grounded in the listed claims.`
     case 'pack_gap_analysis':
-      return `${base}\nTask: List the most important evidence gaps and what panels would close them.`
+      return `${base}\nTask: List the most important evidence gaps and what public data would close them.`
     case 'pack_next_experiment':
       return `${base}\nTask: Propose 1-3 concrete next experiments with rationale tied to claimIds.`
     case 'pack_red_team':
-      return `${base}\nTask: Argue why the leading candidates may fail; cite safety/trial claims.`
+      return `${base}\nTask: Argue why leading candidates may fail; cite safety/trial claims only.`
     default:
       return base
   }

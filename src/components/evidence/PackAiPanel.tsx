@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import type { EvidencePack } from '@/lib/evidence/pack'
 import type { PackAiMode, StructuredInsight } from '@/lib/ai/contracts'
 import { minClaimsForPackMode } from '@/lib/ai/contracts'
@@ -21,6 +21,28 @@ export interface PackAiPanelProps {
   onInsight?: (mode: PackAiMode, insight: StructuredInsight) => void
 }
 
+/** Resolve opaque claim ids (ec:…) to human-readable evidence lines from the pack. */
+function resolveEvidenceLines(
+  pack: EvidencePack | null,
+  claimIds: string[],
+): Array<{ id: string; statement: string; source?: string; type?: string }> {
+  if (!pack?.claims?.length || !claimIds.length) return []
+  const byId = new Map(pack.claims.map((c) => [c.id, c]))
+  const out: Array<{ id: string; statement: string; source?: string; type?: string }> = []
+  for (const id of claimIds) {
+    const c = byId.get(id)
+    if (c?.statement) {
+      out.push({
+        id,
+        statement: c.statement,
+        source: c.provenance?.source,
+        type: c.claimType,
+      })
+    }
+  }
+  return out
+}
+
 export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProps) {
   const ai = useAI()
   const [mode, setMode] = useState<PackAiMode>('pack_executive_brief')
@@ -31,6 +53,11 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   const claimCount = pack?.claims?.length ?? 0
   const minClaims = minClaimsForPackMode(mode)
   const gated = claimCount < minClaims
+
+  const evidenceLines = useMemo(
+    () => resolveEvidenceLines(pack, insight?.claimIds ?? []),
+    [pack, insight?.claimIds],
+  )
 
   const run = async () => {
     if (!pack || gated) return
@@ -114,7 +141,9 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
     >
       <div className="mb-2 flex flex-wrap items-center gap-2">
         <span className="text-xs font-semibold text-slate-300">Pack AI</span>
-        <span className="text-[10px] text-slate-600">claim-id validated · Ollama Cloud</span>
+        <span className="text-[10px] text-slate-600">
+          grounded in pack evidence · Ollama Cloud
+        </span>
       </div>
       <div className="mb-2 flex flex-wrap gap-1">
         {MODES.map((m) => (
@@ -149,29 +178,66 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       )}
       {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
       {insight && (
-        <div className="mt-3 space-y-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300">
-          <p className="text-[10px] uppercase text-slate-500">
-            confidence: {insight.confidence}
-          </p>
+        <div
+          className="mt-3 space-y-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300"
+          data-testid="pack-ai-insight"
+        >
           <p className="leading-relaxed">{insight.summary}</p>
           {insight.nextSteps && insight.nextSteps.length > 0 && (
-            <ul className="list-inside list-disc text-[11px] text-emerald-300/90">
-              {insight.nextSteps.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
+                Next steps
+              </p>
+              <ul className="list-inside list-disc text-[11px] text-emerald-300/90">
+                {insight.nextSteps.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            </div>
           )}
           {insight.risks && insight.risks.length > 0 && (
-            <ul className="list-inside list-disc text-[11px] text-amber-300/90">
-              {insight.risks.map((s) => (
-                <li key={s}>{s}</li>
-              ))}
-            </ul>
+            <div>
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
+                Risks / caveats
+              </p>
+              <ul className="list-inside list-disc text-[11px] text-amber-300/90">
+                {insight.risks.map((s) => (
+                  <li key={s}>{s}</li>
+                ))}
+              </ul>
+            </div>
           )}
-          {insight.claimIds.length > 0 && (
-            <p className="font-mono text-[9px] text-slate-600">
-              claims: {insight.claimIds.slice(0, 8).join(', ')}
-              {insight.claimIds.length > 8 ? '…' : ''}
+          {evidenceLines.length > 0 && (
+            <div data-testid="pack-ai-evidence-used">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
+                Evidence used ({evidenceLines.length})
+              </p>
+              <ul className="space-y-1.5 max-h-40 overflow-y-auto">
+                {evidenceLines.slice(0, 12).map((e) => (
+                  <li
+                    key={e.id}
+                    className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 text-[11px] text-slate-300 leading-snug"
+                  >
+                    <span className="text-slate-200">{e.statement}</span>
+                    {(e.source || e.type) && (
+                      <span className="mt-0.5 block text-[9px] text-slate-600">
+                        {[e.type, e.source].filter(Boolean).join(' · ')}
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {evidenceLines.length > 12 && (
+                <p className="mt-1 text-[9px] text-slate-600">
+                  +{evidenceLines.length - 12} more claims cited
+                </p>
+              )}
+            </div>
+          )}
+          {insight.claimIds.length > 0 && evidenceLines.length === 0 && (
+            <p className="text-[10px] text-slate-600">
+              Model cited {insight.claimIds.length} claim id(s), but they could not be matched to
+              pack statements (stale pack or invalid ids).
             </p>
           )}
         </div>
