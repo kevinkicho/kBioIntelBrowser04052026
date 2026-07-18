@@ -1,5 +1,6 @@
 'use client'
 
+import { Suspense } from 'react'
 import { usePathname } from 'next/navigation'
 import { AppHeader } from './AppHeader'
 import { SearchHistorySidebar } from './SearchHistorySidebar'
@@ -25,7 +26,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   return (
     <>
       <AppHeader />
-      {!isEmbed && <SearchHistorySidebar />}
+      {/* useSearchParams inside sidebar requires Suspense for static prerender */}
+      {!isEmbed && (
+        <Suspense fallback={null}>
+          <SearchHistorySidebar />
+        </Suspense>
+      )}
       <div
         className={`min-h-[calc(100vh-var(--app-header-height))] transition-[padding] duration-200 ${padClass}`}
         data-testid="app-shell-main"
