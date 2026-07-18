@@ -1,4 +1,10 @@
 import type { ChemblIndication } from '../types'
+import {
+  chemblCompoundIndicationsUrl,
+  chemblCompoundUrl,
+  chemblIndicationDeepLink,
+  normalizeChemblId,
+} from '../chemblLinks'
 
 const SEARCH_URL = 'https://www.ebi.ac.uk/chembl/api/data/molecule/search.json'
 const INDICATION_URL = 'https://www.ebi.ac.uk/chembl/api/data/drug_indication.json'
@@ -14,7 +20,11 @@ export async function getChemblIndicationsByName(name: string): Promise<ChemblIn
     const searchData = await searchRes.json()
     const molecules = searchData.molecules ?? []
     if (molecules.length === 0) return []
-    const chemblId = molecules[0].molecule_chembl_id
+    const chemblId = normalizeChemblId(molecules[0].molecule_chembl_id) || molecules[0].molecule_chembl_id
+    const moleculeName = molecules[0].pref_name || name
+    // Prefer compound report card DrugIndications (stable) over SPA hash browse URLs
+    const moleculeIndUrl =
+      chemblCompoundIndicationsUrl(chemblId) || chemblCompoundUrl(chemblId) || ''
 
     const indRes = await fetch(
       `${INDICATION_URL}?molecule_chembl_id=${chemblId}&limit=10`,
@@ -24,19 +34,38 @@ export async function getChemblIndicationsByName(name: string): Promise<ChemblIn
     const indData = await indRes.json()
 
     return (indData.drug_indications ?? []).map((d: {
+      drugind_id?: number | string
       mesh_heading?: string
       mesh_id?: string
       efo_term?: string
       efo_id?: string
       max_phase_for_ind?: number
-    }) => ({
-      meshHeading: d.mesh_heading ?? '',
-      meshId: d.mesh_id ?? '',
-      efoTerm: d.efo_term ?? '',
-      efoId: d.efo_id ?? '',
-      maxPhaseForIndication: Number(d.max_phase_for_ind) || 0,
-      url: `https://www.ebi.ac.uk/chembl/g/#browse/drug_indications/filter/molecule_chembl_id:${chemblId}`,
-    }))
+    }) => {
+      const meshId = d.mesh_id ?? ''
+      const efoId = d.efo_id ?? ''
+      const meshHeading = d.mesh_heading ?? ''
+      const efoTerm = d.efo_term ?? ''
+      return {
+        indicationId: d.drugind_id != null ? String(d.drugind_id) : `${chemblId}-${meshId || efoId}`,
+        moleculeName,
+        condition: meshHeading || efoTerm || '',
+        maxPhase: Number(d.max_phase_for_ind) || 0,
+        maxPhaseForIndication: Number(d.max_phase_for_ind) || 0,
+        meshId,
+        meshHeading,
+        efoId,
+        efoTerm,
+        // Direct: compound indications section (primary) — not broken SPA filter hashes
+        url:
+          moleculeIndUrl ||
+          chemblIndicationDeepLink({
+            moleculeChemblId: chemblId,
+            meshId,
+            efoId,
+            condition: meshHeading || efoTerm,
+          }),
+      } satisfies ChemblIndication
+    })
   } catch {
     return []
   }

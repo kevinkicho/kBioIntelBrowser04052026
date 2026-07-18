@@ -39,13 +39,26 @@ function enc(s: string): string {
 }
 
 function chemblSearch(ctx: OriginLinkContext): string | null {
-  if (ctx.chemblId?.trim()) {
-    const id = ctx.chemblId.trim().toUpperCase().startsWith('CHEMBL')
-      ? ctx.chemblId.trim().toUpperCase()
-      : `CHEMBL${ctx.chemblId.trim()}`
-    return `https://www.ebi.ac.uk/chembl/compound_report_card/${id}/`
+  // Prefer compound report card (stable deep link) over SPA hash search
+  try {
+    // Lazy require-style import avoided; inline normalize
+    const raw = ctx.chemblId?.trim()
+    if (raw) {
+      const upper = raw.toUpperCase()
+      const id = upper.startsWith('CHEMBL')
+        ? `CHEMBL${upper.slice(6).replace(/\D/g, '')}`
+        : /^\d+$/.test(raw)
+          ? `CHEMBL${raw}`
+          : null
+      if (id && id.length > 6) {
+        return `https://www.ebi.ac.uk/chembl/compound_report_card/${id}/`
+      }
+    }
+  } catch {
+    /* fall through */
   }
   if (ctx.cid != null && ctx.cid > 0) {
+    // PubChem CID search on ChEMBL (still a working entry when no CHEMBL id)
     return `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${enc(String(ctx.cid))}`
   }
   if (ctx.name?.trim()) {

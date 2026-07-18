@@ -1,5 +1,11 @@
 import type { ChemblActivity, RelatedCompound } from '../types'
 import { LIMITS } from '../api-limits'
+import {
+  chemblActivityDeepLink,
+  chemblCompoundUrl,
+  chemblTargetUrl,
+  normalizeChemblId,
+} from '../chemblLinks'
 
 const SEARCH_URL = 'https://www.ebi.ac.uk/chembl/api/data/molecule/search.json'
 const ACTIVITY_URL = 'https://www.ebi.ac.uk/chembl/api/data/activity.json'
@@ -82,26 +88,58 @@ export async function getChemblActivitiesByName(name: string, limit: number = LI
     if (!res.ok) return []
     const data = await res.json()
 
-    return (data.activities ?? []).map((a: {
-      target_pref_name?: string
-      target_chembl_id: string
-      standard_type?: string
-      standard_value?: number | string
-      standard_units?: string
-      assay_type?: string
-    }) => ({
-      targetName: a.target_pref_name ?? 'Unknown target',
-      targetChemblId: a.target_chembl_id,
-      activityType: a.standard_type ?? '',
-      activityValue: Number(a.standard_value) || 0,
-      activityUnits: a.standard_units ?? '',
-      assayType: a.assay_type ?? '',
-      chemblId,
-    }))
+    const molId = normalizeChemblId(chemblId) || chemblId
+    return (data.activities ?? []).map(
+      (a: {
+        activity_id?: number | string
+        target_pref_name?: string
+        target_chembl_id?: string
+        assay_chembl_id?: string
+        molecule_chembl_id?: string
+        standard_type?: string
+        standard_value?: number | string
+        standard_units?: string
+        assay_type?: string
+        pchembl_value?: number | string
+        target_organism?: string
+      }) => {
+        const targetChemblId = normalizeChemblId(a.target_chembl_id) || a.target_chembl_id || ''
+        const assayChemblId = normalizeChemblId(a.assay_chembl_id) || ''
+        const moleculeChemblId =
+          normalizeChemblId(a.molecule_chembl_id) || molId
+        const activityId = a.activity_id != null ? String(a.activity_id) : ''
+        return {
+          activityId,
+          targetName: a.target_pref_name ?? 'Unknown target',
+          targetOrganism: a.target_organism ?? '',
+          targetChemblId,
+          chemblId: moleculeChemblId,
+          assayType: a.assay_type ?? '',
+          standardType: a.standard_type ?? '',
+          standardValue: Number(a.standard_value) || 0,
+          standardUnits: a.standard_units ?? '',
+          pchemblValue: Number(a.pchembl_value) || 0,
+          activityType: a.standard_type ?? '',
+          activityValue: Number(a.standard_value) || 0,
+          activityUnits: a.standard_units ?? '',
+          // Prefer target report card (direct); assay / molecule as fallbacks
+          url: chemblActivityDeepLink({
+            targetChemblId,
+            assayChemblId,
+            moleculeChemblId,
+            chemblId: moleculeChemblId,
+            activityId,
+          }),
+        } satisfies ChemblActivity
+      },
+    )
   } catch {
     return []
   }
 }
+
+/** Public helpers re-export for panels that only have an id. */
+export { chemblCompoundUrl, chemblTargetUrl, normalizeChemblId }
 
 /**
  * Get target details by ChEMBL target ID
