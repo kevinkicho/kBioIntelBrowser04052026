@@ -29,6 +29,28 @@ import {
   type DiscoverSessionSnapshot,
 } from '@/lib/discovery/discoverSessions'
 
+/** Stable key for discover URL params — used to re-run rank when history changes q/diseaseId/targets. */
+function discoverUrlKey(
+  q: string,
+  diseaseId: string | undefined,
+  targets: string[],
+  forceRefresh: boolean,
+  refreshToken: string | null,
+): string {
+  const t = [...targets]
+    .map((s) => s.trim().toUpperCase())
+    .filter(Boolean)
+    .sort()
+    .join(',')
+  return [
+    q.trim().toLowerCase(),
+    (diseaseId ?? '').trim(),
+    t,
+    forceRefresh ? '1' : '0',
+    refreshToken ?? '',
+  ].join('|')
+}
+
 export default function DiscoverPage() {
   const searchParams = useSearchParams()
   const router = useRouter()
@@ -46,7 +68,8 @@ export default function DiscoverPage() {
     setTargets,
     rerankWithCurrentPins,
   } = useDiscovery()
-  const bootstrapped = useRef(false)
+  /** Last URL key we already applied a rank for (history / deep-link / same-page nav). */
+  const appliedUrlKey = useRef<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sessions, setSessions] = useState<DiscoverSessionSnapshot[]>([])
 
@@ -56,13 +79,23 @@ export default function DiscoverPage() {
 
   const forceRefresh =
     searchParams.get('refresh') === '1' || searchParams.get('refresh') === 'true'
+  const refreshToken = searchParams.get('_t')
 
-  // Deep link: /discover?q=&diseaseId=&targets= — diseaseId skips picker; targets pin genes
-  // refresh=1 from history sidebar forces engine re-query (skips client rank cache)
+  // Deep link + search-history reopen: any change to q / diseaseId / targets must re-rank.
+  // Previously a bootstrapped ref only ran once, so history clicks only updated the URL field.
   useEffect(() => {
-    if (bootstrapped.current && !forceRefresh) return
     if (!initialQuery && !initialDiseaseId && initialTargets.length === 0) return
-    bootstrapped.current = true
+
+    const key = discoverUrlKey(
+      initialQuery,
+      initialDiseaseId,
+      initialTargets,
+      forceRefresh,
+      refreshToken,
+    )
+    if (appliedUrlKey.current === key) return
+    appliedUrlKey.current = key
+
     void search(initialQuery || initialDiseaseId || '', {
       diseaseId: initialDiseaseId,
       targets: initialTargets,
@@ -76,7 +109,16 @@ export default function DiscoverPage() {
         router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
       }
     })
-  }, [initialQuery, initialDiseaseId, initialTargets, search, forceRefresh, router, searchParams])
+  }, [
+    initialQuery,
+    initialDiseaseId,
+    initialTargets,
+    search,
+    forceRefresh,
+    refreshToken,
+    router,
+    searchParams,
+  ])
 
   const scorePhase = state.result?.v2?.scorePhase ?? 'cheap'
   const showLoadSafety =
@@ -96,13 +138,16 @@ export default function DiscoverPage() {
   }
 
   function handleSearch(query: string, opts?: { diseaseId?: string }) {
+    const targets = state.targets
     const params = new URLSearchParams()
     params.set('q', query)
     if (opts?.diseaseId) params.set('diseaseId', opts.diseaseId)
-    if (state.targets.length > 0) params.set('targets', state.targets.join(','))
+    if (targets.length > 0) params.set('targets', targets.join(','))
+    // Mark key applied so the URL effect does not double-fetch
+    appliedUrlKey.current = discoverUrlKey(query, opts?.diseaseId, targets, false, null)
     router.replace(`/discover?${params.toString()}`, { scroll: false })
     void search(query, {
-      targets: state.targets,
+      targets,
       diseaseId: opts?.diseaseId,
     })
   }
@@ -112,11 +157,19 @@ export default function DiscoverPage() {
     if (state.query) params.set('q', state.query)
     params.set('diseaseId', diseaseId)
     if (state.targets.length > 0) params.set('targets', state.targets.join(','))
+    appliedUrlKey.current = discoverUrlKey(
+      state.query,
+      diseaseId,
+      state.targets,
+      false,
+      null,
+    )
     router.replace(`/discover?${params.toString()}`, { scroll: false })
     void confirmDisease(diseaseId)
   }
 
   function handleCancelConfirm() {
+    appliedUrlKey.current = discoverUrlKey('', undefined, [], false, null)
     router.replace('/discover', { scroll: false })
     reset()
   }
@@ -136,6 +189,13 @@ export default function DiscoverPage() {
     const next = state.targets.filter((t) => t.trim().toUpperCase() !== key)
     const capped = applyTargets(next)
     if (state.query || state.diseaseId) {
+      appliedUrlKey.current = discoverUrlKey(
+        state.query,
+        state.diseaseId ?? undefined,
+        capped,
+        false,
+        null,
+      )
       void search(state.query || state.diseaseId || '', {
         diseaseId: state.diseaseId ?? undefined,
         targets: capped,
@@ -146,6 +206,13 @@ export default function DiscoverPage() {
   function handleClearTargets() {
     applyTargets([])
     if (state.query || state.diseaseId) {
+      appliedUrlKey.current = discoverUrlKey(
+        state.query,
+        state.diseaseId ?? undefined,
+        [],
+        false,
+        null,
+      )
       void search(state.query || state.diseaseId || '', {
         diseaseId: state.diseaseId ?? undefined,
         targets: [],
@@ -237,15 +304,17 @@ export default function DiscoverPage() {
               <button
                 type="button"
                 className="hover:text-indigo-300"
-                title="Restore URL fields only (does not auto-rank)"
+                title="Restore this session (re-ranks from URL / cache)"
                 onClick={() => {
                   const params = new URLSearchParams()
                   if (s.q) params.set('q', s.q)
                   if (s.diseaseId) params.set('diseaseId', s.diseaseId)
                   if (s.targets.length) params.set('targets', s.targets.join(','))
                   const qs = params.toString()
-                  router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
+                  // Clear applied key so the URL effect always re-ranks this session
+                  appliedUrlKey.current = null
                   setTargets(s.targets)
+                  router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
                 }}
               >
                 {s.label.slice(0, 28)}

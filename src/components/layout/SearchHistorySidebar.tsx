@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
+import { useRouter, usePathname, useSearchParams } from 'next/navigation'
 import { useSearchHistory } from '@/hooks/useSearchHistory'
 import {
   type SearchHistoryEntry,
@@ -58,10 +58,33 @@ function kindIcon(kind: SearchHistoryEntry['kind']): string {
   }
 }
 
-function isActiveHref(pathname: string, href: string): boolean {
+/**
+ * Highlight the history row that matches the current page + query string
+ * (not just pathname — all Discover sessions share /discover).
+ */
+function isActiveHref(pathname: string, search: string, href: string): boolean {
   try {
     const u = new URL(href, 'http://local.invalid')
-    return pathname === u.pathname || pathname.startsWith(u.pathname + '/')
+    if (pathname !== u.pathname && !pathname.startsWith(u.pathname + '/')) return false
+    // Path-only kinds (e.g. /gene/123): pathname match is enough when href has no search
+    if (!u.search || u.search === '?') {
+      return !search || search === '?'
+    }
+    const current = new URLSearchParams(search.startsWith('?') ? search.slice(1) : search)
+    const target = u.searchParams
+    // Compare meaningful discover / search params (ignore refresh bust)
+    const keys = new Set([
+      ...Array.from(current.keys()),
+      ...Array.from(target.keys()),
+    ])
+    keys.delete('refresh')
+    keys.delete('_t')
+    for (const k of Array.from(keys)) {
+      const a = (current.get(k) ?? '').trim()
+      const b = (target.get(k) ?? '').trim()
+      if (a.toLowerCase() !== b.toLowerCase()) return false
+    }
+    return true
   } catch {
     return pathname === href.split('?')[0]
   }
@@ -73,6 +96,8 @@ function isActiveHref(pathname: string, href: string): boolean {
 export function SearchHistorySidebar() {
   const router = useRouter()
   const pathname = usePathname() ?? ''
+  const searchParams = useSearchParams()
+  const search = searchParams?.toString() ? `?${searchParams.toString()}` : ''
   const [cacheClearing, setCacheClearing] = useState(false)
   const {
     hydrated,
@@ -228,7 +253,7 @@ export function SearchHistorySidebar() {
         ) : (
           <ul className="space-y-1" data-testid="search-history-list">
             {visible.map((entry) => {
-              const active = isActiveHref(pathname, entry.href)
+              const active = isActiveHref(pathname, search, entry.href)
               return (
                 <li
                   key={entry.id}
