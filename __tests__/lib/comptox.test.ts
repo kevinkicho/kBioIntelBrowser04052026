@@ -7,7 +7,7 @@ beforeEach(() => jest.resetAllMocks())
 describe('getCompToxByName', () => {
   test('returns parsed CompTox data on success', async () => {
     ;(fetch as jest.Mock)
-      // 1) CompTox search
+      // 1) CompTox equal search
       .mockResolvedValueOnce(
         mockJsonResponse([
           {
@@ -55,8 +55,9 @@ describe('getCompToxByName', () => {
     expect(result!.casNumber).toBe('50-78-2')
     expect(result!.molecularFormula).toBe('C9H8O4')
     expect(result!.molecularWeight).toBeCloseTo(180.16, 2)
-    expect(result!.structureUrl).toContain('DTXSID7020182')
+    expect(result!.structureUrl).toContain('pubchem')
     expect(result!.url).toBe('https://comptox.epa.gov/dashboard/chemical/details/DTXSID7020182')
+    expect(result!.toxcastAvailable).toBe(false)
   })
 
   test('falls back to first result when no name/Approved-Name match', async () => {
@@ -81,12 +82,16 @@ describe('getCompToxByName', () => {
     expect(result!.dtxsid).toBe('DTXSID7020182')
     expect(result!.toxcastActive).toBe(0)
     expect(result!.toxcastTotal).toBe(0)
+    expect(result!.toxcastAvailable).toBe(false)
   })
 
   test('returns null when search returns empty array', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse([]))
+    // equal empty → start-with empty
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(mockJsonResponse([]))
+      .mockResolvedValueOnce(mockJsonResponse([]))
     expect(await getCompToxByName('unknownxyz')).toBeNull()
-    expect(fetch).toHaveBeenCalledTimes(1)
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
   test('returns null when search returns non-ok', async () => {

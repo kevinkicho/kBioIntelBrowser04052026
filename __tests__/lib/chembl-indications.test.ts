@@ -34,7 +34,10 @@ describe('getChemblIndicationsByName', () => {
     expect(results[0].efoTerm).toBe('pain')
     expect(results[0].efoId).toBe('EFO_0003843')
     expect(results[0].maxPhaseForIndication).toBe(4)
+    expect(results[0].moleculeChemblId).toBe('CHEMBL25')
     expect(results[0].url).toContain('CHEMBL25')
+    expect(results[0].url).toContain('drug_indications')
+    expect(results[0].url).not.toContain('/g/#')
   })
 
   test('returns empty array when molecule search returns no results', async () => {

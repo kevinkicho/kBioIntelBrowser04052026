@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useRef, Suspense, type ReactNode } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { GeneOverview as GeneOverviewType } from '@/lib/categoryFetchers/gene'
@@ -12,6 +12,8 @@ import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { DataPoint } from '@/components/ui/DataPoint'
 import type { BgeeExpression, GeneExpression, dbSNPVariant } from '@/lib/types'
 import { BgeeExpressionRow } from '@/components/expression/BgeeExpressionRow'
+import { ElapsedTimer } from '@/components/ui/ElapsedTimer'
+import { clientFetch } from '@/lib/clientFetch'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -159,47 +161,181 @@ function GeneDiseasesPanel({
   geneSymbol?: string
   fetchedAt?: Date | null
 }) {
-  const diseases = (data?.geneDiseases as Record<string, unknown>)?.disgenetAssociations as Array<{ diseaseName: string; score: number; diseaseId: string; source: string; geneSymbol?: string }> | undefined
-  if (status?.status === 'error') return <ErrorSection label="disease associations" error={status.error} />
-  if (!diseases || diseases.length === 0) return <EmptySection label="disease associations" hint="DisGeNET may not have associations for this gene" />
+  const geneDiseases = data?.geneDiseases as Record<string, unknown> | undefined
+  const diseases = geneDiseases?.disgenetAssociations as
+    | Array<{ diseaseName: string; score: number; diseaseId: string; source: string; geneSymbol?: string }>
+    | undefined
+  const gwas = geneDiseases?.gwasAssociations as
+    | Array<{
+        trait?: string
+        diseaseTrait?: string
+        pValue?: string | number
+        pubmedId?: string
+        url?: string
+      }>
+    | undefined
+  const clingen = geneDiseases?.clingenGeneDiseases as
+    | Array<{ diseaseName?: string; name?: string; score?: number; url?: string; mondoId?: string }>
+    | undefined
+
+  if (status?.status === 'error') {
+    return <ErrorSection label="disease associations" error={status.error} />
+  }
+
+  const hasDisgenet = Boolean(diseases && diseases.length > 0)
+  const hasGwas = Boolean(gwas && gwas.length > 0)
+  const hasClingen = Boolean(clingen && clingen.length > 0)
+
+  if (!hasDisgenet && !hasGwas && !hasClingen) {
+    return (
+      <EmptySection
+        label="disease associations"
+        hint="DisGeNET / GWAS / ClinGen may not have associations for this gene"
+      />
+    )
+  }
+
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <h3 className="text-sm font-semibold text-slate-200 mb-3">Associated Diseases ({diseases.length})</h3>
-      <p className="text-[10px] text-slate-600 mb-2">Use the <span className="font-semibold text-slate-400">API</span> button on a row for source, timestamp, and endpoint.</p>
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {diseases.slice(0, 30).map((d, i) => {
-          const discoverHref = buildDiscoverHref({
-            q: d.diseaseName,
-            targets: geneSymbol ? [geneSymbol] : undefined,
-          })
-          const recordUrl = d.diseaseId
-            ? `https://www.disgenet.org/browser/0/1/0/${encodeURIComponent(d.diseaseId)}/`
-            : undefined
-          return (
-            <DataPoint
-              key={`${d.diseaseId}-${i}`}
-              sourceKey="disgenet"
-              fetchedAt={fetchedAt}
-              label={d.diseaseName}
-              recordUrl={recordUrl}
-            >
-              <div className="flex items-center justify-between gap-2 py-1.5 px-2 rounded text-sm">
-                <Link href={`/disease?q=${encodeURIComponent(d.diseaseName)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2 min-w-0">{d.diseaseName}</Link>
-                <div className="flex items-center gap-2 shrink-0">
-                  <Link
-                    href={discoverHref}
-                    className="text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/30 text-emerald-300 hover:border-emerald-500 hover:text-emerald-200 transition-colors"
-                    title={`Rank candidates for ${d.diseaseName}${geneSymbol ? ` with target ${geneSymbol}` : ''}`}
-                  >
-                    Discover
-                  </Link>
-                  <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">{d.score.toFixed(2)}</span>
-                </div>
-              </div>
-            </DataPoint>
-          )
-        })}
-      </div>
+    <div className="space-y-3" data-testid="gene-diseases-cards">
+      <p className="text-[10px] text-slate-600 px-0.5">
+        Disease sources are shown as separate cards (DisGeNET, GWAS Catalog, ClinGen). Use the API
+        button on a row for source, timestamp, and endpoint.
+      </p>
+
+      {hasDisgenet && diseases && (
+        <ExpressionSourceCard
+          title={`DisGeNET Associations (${diseases.length})`}
+          subtitle="Gene–disease associations with scores."
+          testId="gene-disgenet-diseases"
+        >
+          <div className="space-y-2 max-h-96 overflow-y-auto">
+            {diseases.slice(0, 30).map((d, i) => {
+              const discoverHref = buildDiscoverHref({
+                q: d.diseaseName,
+                targets: geneSymbol ? [geneSymbol] : undefined,
+              })
+              const recordUrl = d.diseaseId
+                ? `https://www.disgenet.org/browser/0/1/0/${encodeURIComponent(d.diseaseId)}/`
+                : undefined
+              return (
+                <DataPoint
+                  key={`${d.diseaseId}-${i}`}
+                  sourceKey="disgenet"
+                  fetchedAt={fetchedAt}
+                  label={d.diseaseName}
+                  recordUrl={recordUrl}
+                >
+                  <div className="flex items-center justify-between gap-2 py-1.5 px-2 rounded text-sm">
+                    <Link
+                      href={`/disease?q=${encodeURIComponent(d.diseaseName)}`}
+                      className="text-indigo-300 hover:text-indigo-200 hover:underline truncate mr-2 min-w-0"
+                    >
+                      {d.diseaseName}
+                    </Link>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <Link
+                        href={discoverHref}
+                        className="text-[10px] px-2 py-0.5 rounded border border-emerald-800/50 bg-emerald-900/30 text-emerald-300 hover:border-emerald-500 hover:text-emerald-200 transition-colors"
+                        title={`Rank candidates for ${d.diseaseName}${geneSymbol ? ` with target ${geneSymbol}` : ''}`}
+                      >
+                        Discover
+                      </Link>
+                      <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300">
+                        {d.score.toFixed(2)}
+                      </span>
+                    </div>
+                  </div>
+                </DataPoint>
+              )
+            })}
+          </div>
+        </ExpressionSourceCard>
+      )}
+
+      {hasGwas && gwas && (
+        <ExpressionSourceCard
+          title={`GWAS Catalog (${gwas.length})`}
+          subtitle="Genome-wide association study traits."
+          testId="gene-gwas-diseases"
+        >
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {gwas.slice(0, 20).map((g, i) => {
+              const trait = g.trait || g.diseaseTrait || 'GWAS trait'
+              const href =
+                g.url ||
+                (g.pubmedId
+                  ? `https://pubmed.ncbi.nlm.nih.gov/${g.pubmedId}/`
+                  : 'https://www.ebi.ac.uk/gwas/')
+              return (
+                <DataPoint
+                  key={i}
+                  sourceKey="gwas-catalog"
+                  fetchedAt={fetchedAt}
+                  label={trait}
+                  recordUrl={href}
+                >
+                  <div className="py-1 px-2 text-sm">
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:underline"
+                    >
+                      {trait}
+                    </a>
+                    {g.pValue != null && (
+                      <span className="ml-2 text-[11px] text-slate-500 font-mono">
+                        p={String(g.pValue)}
+                      </span>
+                    )}
+                  </div>
+                </DataPoint>
+              )
+            })}
+          </div>
+        </ExpressionSourceCard>
+      )}
+
+      {hasClingen && clingen && (
+        <ExpressionSourceCard
+          title={`ClinGen Gene–Disease (${clingen.length})`}
+          subtitle="ClinGen curated gene–disease validity."
+          testId="gene-clingen-diseases"
+        >
+          <div className="space-y-1.5 max-h-64 overflow-y-auto">
+            {clingen.slice(0, 20).map((c, i) => {
+              const name = c.diseaseName || c.name || 'ClinGen disease'
+              const href =
+                c.url ||
+                (c.mondoId
+                  ? `https://monarchinitiative.org/disease/${encodeURIComponent(c.mondoId)}`
+                  : undefined)
+              return (
+                <DataPoint
+                  key={i}
+                  sourceKey="clingen"
+                  fetchedAt={fetchedAt}
+                  label={name}
+                  recordUrl={href}
+                >
+                  <div className="py-1 px-2 text-sm text-slate-300">
+                    {href ? (
+                      <a href={href} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">
+                        {name}
+                      </a>
+                    ) : (
+                      name
+                    )}
+                    {c.score != null && (
+                      <span className="ml-2 text-[11px] text-slate-500">{c.score}</span>
+                    )}
+                  </div>
+                </DataPoint>
+              )
+            })}
+          </div>
+        </ExpressionSourceCard>
+      )}
     </div>
   )
 }
@@ -211,15 +347,59 @@ function GeneVariantsPanel({
   data: Record<string, unknown> | null
   fetchedAt?: Date | null
 }) {
-  const clinvarVariants = (data?.geneVariants as Record<string, unknown>)?.clinvarVariants as Array<{ title?: string; clinicalSignificance: string; geneSymbol: string; conditionName?: string; url?: string }> | undefined
-  const dbsnpVariants = (data?.geneVariants as Record<string, unknown>)?.dbsnpVariants as dbSNPVariant[] | undefined
+  const geneVariants = data?.geneVariants as Record<string, unknown> | undefined
+  const clinvarVariants = geneVariants?.clinvarVariants as
+    | Array<{
+        title?: string
+        clinicalSignificance: string
+        geneSymbol: string
+        conditionName?: string
+        url?: string
+      }>
+    | undefined
+  const dbsnpVariants = geneVariants?.dbsnpVariants as dbSNPVariant[] | undefined
+  const clingenDosage = geneVariants?.clingenDosage as
+    | {
+        geneSymbol?: string
+        haploinsufficiency?: string
+        triplosensitivity?: string
+        url?: string
+      }
+    | null
+    | undefined
+
+  const hasClinvar = Boolean(clinvarVariants && clinvarVariants.length > 0)
+  const hasDbsnp = Boolean(dbsnpVariants && dbsnpVariants.length > 0)
+  const hasClingen =
+    Boolean(clingenDosage) &&
+    Boolean(
+      clingenDosage?.haploinsufficiency ||
+        clingenDosage?.triplosensitivity ||
+        clingenDosage?.url ||
+        clingenDosage?.geneSymbol,
+    )
+
+  if (!hasClinvar && !hasDbsnp && !hasClingen) {
+    return (
+      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+        <div className="text-slate-500 text-sm py-2">No variant data found.</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <p className="text-[10px] text-slate-600 mb-2">Use the <span className="font-semibold text-slate-400">API</span> button for source, timestamp, and endpoint.</p>
-      {clinvarVariants && clinvarVariants.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">ClinVar Variants ({clinvarVariants.length})</h3>
+    <div className="space-y-3" data-testid="gene-variants-cards">
+      <p className="text-[10px] text-slate-600 px-0.5">
+        Variant sources are shown as separate cards (ClinVar, dbSNP, ClinGen dosage). Use the API
+        button on a row for source, timestamp, and endpoint.
+      </p>
+
+      {hasClinvar && clinvarVariants && (
+        <ExpressionSourceCard
+          title={`ClinVar Variants (${clinvarVariants.length})`}
+          subtitle="Clinical significance and conditions from ClinVar."
+          testId="gene-clinvar-variants"
+        >
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {clinvarVariants.slice(0, 20).map((v, i) => (
               <DataPoint
@@ -230,19 +410,39 @@ function GeneVariantsPanel({
                 recordUrl={v.url}
               >
                 <div className="py-1.5 px-2 rounded text-sm">
-                  <span className="text-slate-300">{v.geneSymbol}</span>
+                  {v.url ? (
+                    <a
+                      href={v.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-400 hover:underline"
+                    >
+                      {v.geneSymbol || v.title || 'Variant'}
+                    </a>
+                  ) : (
+                    <span className="text-slate-300">{v.geneSymbol}</span>
+                  )}
                   <span className="mx-2 text-slate-600">|</span>
                   <span className="text-slate-400">{v.clinicalSignificance}</span>
-                  {v.conditionName && <><span className="mx-2 text-slate-600">|</span><span className="text-slate-400">{v.conditionName}</span></>}
+                  {v.conditionName && (
+                    <>
+                      <span className="mx-2 text-slate-600">|</span>
+                      <span className="text-slate-400">{v.conditionName}</span>
+                    </>
+                  )}
                 </div>
               </DataPoint>
             ))}
           </div>
-        </div>
+        </ExpressionSourceCard>
       )}
-      {dbsnpVariants && dbsnpVariants.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">dbSNP Variants ({dbsnpVariants.length})</h3>
+
+      {hasDbsnp && dbsnpVariants && (
+        <ExpressionSourceCard
+          title={`dbSNP Variants (${dbsnpVariants.length})`}
+          subtitle="Reference SNPs and genomic positions."
+          testId="gene-dbsnp-variants"
+        >
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {dbsnpVariants.slice(0, 20).map((v, i) => {
               const rs = v.rsId || v.refSNPId
@@ -250,9 +450,21 @@ function GeneVariantsPanel({
                 ? `https://www.ncbi.nlm.nih.gov/snp/${String(rs).replace(/^rs/i, 'rs')}`
                 : undefined
               return (
-                <DataPoint key={i} sourceKey="dbsnp" fetchedAt={fetchedAt} label={rs || 'dbSNP'} recordUrl={url}>
+                <DataPoint
+                  key={i}
+                  sourceKey="dbsnp"
+                  fetchedAt={fetchedAt}
+                  label={rs || 'dbSNP'}
+                  recordUrl={url}
+                >
                   <div className="py-1 px-2 rounded text-sm text-slate-300 font-mono">
-                    {rs || '—'}
+                    {url ? (
+                      <a href={url} target="_blank" rel="noopener noreferrer" className="text-indigo-400 hover:underline">
+                        {rs || '—'}
+                      </a>
+                    ) : (
+                      rs || '—'
+                    )}
                     {v.chromosome ? (
                       <span className="ml-2 text-slate-500">
                         chr{v.chromosome}:{v.position}
@@ -263,11 +475,79 @@ function GeneVariantsPanel({
               )
             })}
           </div>
-        </div>
+        </ExpressionSourceCard>
       )}
-      {(!clinvarVariants || clinvarVariants.length === 0) && (!dbsnpVariants || dbsnpVariants.length === 0) && (
-        <div className="text-slate-500 text-sm py-4">No variant data found.</div>
+
+      {hasClingen && clingenDosage && (
+        <ExpressionSourceCard
+          title="ClinGen Dosage Sensitivity"
+          subtitle="Haploinsufficiency / triplosensitivity scores from ClinGen."
+          testId="gene-clingen-dosage"
+        >
+          <DataPoint
+            sourceKey="clingen"
+            fetchedAt={fetchedAt}
+            label={clingenDosage.geneSymbol || 'ClinGen dosage'}
+            recordUrl={clingenDosage.url}
+          >
+            <div className="space-y-1.5 py-1 px-2 text-sm">
+              {clingenDosage.geneSymbol && (
+                <p className="text-slate-200 font-medium">{clingenDosage.geneSymbol}</p>
+              )}
+              <div className="flex flex-wrap gap-3 text-xs text-slate-400">
+                {clingenDosage.haploinsufficiency && (
+                  <span>
+                    Haploinsufficiency:{' '}
+                    <span className="text-slate-200">{clingenDosage.haploinsufficiency}</span>
+                  </span>
+                )}
+                {clingenDosage.triplosensitivity && (
+                  <span>
+                    Triplosensitivity:{' '}
+                    <span className="text-slate-200">{clingenDosage.triplosensitivity}</span>
+                  </span>
+                )}
+              </div>
+              {clingenDosage.url && (
+                <a
+                  href={clingenDosage.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-block text-[11px] text-indigo-400 hover:underline"
+                >
+                  Open ClinGen ↗
+                </a>
+              )}
+            </div>
+          </DataPoint>
+        </ExpressionSourceCard>
       )}
+    </div>
+  )
+}
+
+/** Shared shell for each expression source so they render as separate main cards. */
+function ExpressionSourceCard({
+  title,
+  subtitle,
+  testId,
+  children,
+  empty,
+}: {
+  title: string
+  subtitle?: string
+  testId?: string
+  children: ReactNode
+  empty?: boolean
+}) {
+  return (
+    <div
+      data-testid={testId}
+      className={`bg-slate-800/50 border border-slate-700 rounded-xl p-5 ${empty ? 'opacity-20' : ''}`}
+    >
+      <h3 className="text-sm font-semibold text-slate-100 mb-0.5">{title}</h3>
+      {subtitle && <p className="text-[10px] text-slate-600 mb-3 leading-relaxed">{subtitle}</p>}
+      {children}
     </div>
   )
 }
@@ -279,19 +559,42 @@ function GeneExpressionPanel({
   data: Record<string, unknown> | null
   fetchedAt?: Date | null
 }) {
-  const gtexExps = (data?.geneExpressionData as Record<string, unknown>)?.gtexExpressions as Array<{ tissueName?: string; tpm?: number; geneSymbol?: string }> | undefined
-  const bgeeExps = (data?.geneExpressionData as Record<string, unknown>)?.bgeeExpressions as BgeeExpression[] | undefined
-  const atlasData = (data?.geneExpressionData as Record<string, unknown>)?.expressionAtlasData as GeneExpression[] | undefined
+  const gtexExps = (data?.geneExpressionData as Record<string, unknown>)?.gtexExpressions as
+    | Array<{ tissueName?: string; tpm?: number; geneSymbol?: string }>
+    | undefined
+  const bgeeExps = (data?.geneExpressionData as Record<string, unknown>)?.bgeeExpressions as
+    | BgeeExpression[]
+    | undefined
+  const atlasData = (data?.geneExpressionData as Record<string, unknown>)?.expressionAtlasData as
+    | GeneExpression[]
+    | undefined
+
+  const hasGtex = Boolean(gtexExps && gtexExps.length > 0)
+  const hasBgee = Boolean(bgeeExps && bgeeExps.length > 0)
+  const hasAtlas = Boolean(atlasData && atlasData.length > 0)
+
+  if (!hasGtex && !hasBgee && !hasAtlas) {
+    return (
+      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+        <div className="text-slate-500 text-sm py-2">No expression data found.</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <p className="text-[10px] text-slate-600 mb-3">
-        Counts sum GTEx + Bgee + Expression Atlas. Use the API button on a row for source, fetch time, endpoint, and URL.
+    <div className="space-y-3" data-testid="gene-expression-cards">
+      <p className="text-[10px] text-slate-600 px-0.5">
+        Expression sources are shown as separate cards (GTEx, Bgee, Expression Atlas). Use the API
+        button on a row for source, fetch time, endpoint, and URL.
       </p>
-      {gtexExps && gtexExps.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">GTEx Top Tissues ({gtexExps.length})</h3>
-          <div className="space-y-1.5">
+
+      {hasGtex && gtexExps && (
+        <ExpressionSourceCard
+          title={`GTEx Top Tissues (${gtexExps.length})`}
+          subtitle="Tissue-level TPM from GTEx Portal."
+          testId="gene-gtex-expression"
+        >
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
             {gtexExps.slice(0, 15).map((e, i) => (
               <DataPoint
                 key={i}
@@ -313,16 +616,15 @@ function GeneExpressionPanel({
               </DataPoint>
             ))}
           </div>
-        </div>
+        </ExpressionSourceCard>
       )}
-      {bgeeExps && bgeeExps.length > 0 && (
-        <div className="mb-4" data-testid="gene-bgee-expression">
-          <h3 className="text-sm font-semibold text-slate-200 mb-1">
-            Bgee Expression ({bgeeExps.length})
-          </h3>
-          <p className="text-[10px] text-slate-600 mb-2">
-            Anatomy · ontology id · stage · presence/score · links (not tissue name alone).
-          </p>
+
+      {hasBgee && bgeeExps && (
+        <ExpressionSourceCard
+          title={`Bgee Expression (${bgeeExps.length})`}
+          subtitle="Anatomy · ontology id · stage · presence/score · links (not tissue name alone)."
+          testId="gene-bgee-expression"
+        >
           <div className="space-y-0 max-h-80 overflow-y-auto rounded-lg border border-slate-700/50 divide-y divide-slate-800/80">
             {bgeeExps.slice(0, 40).map((e, i) => (
               <BgeeExpressionRow
@@ -333,16 +635,15 @@ function GeneExpressionPanel({
               />
             ))}
           </div>
-        </div>
+        </ExpressionSourceCard>
       )}
-      {atlasData && atlasData.length > 0 && (
-        <div data-testid="gene-expression-atlas">
-          <h3 className="text-sm font-semibold text-slate-200 mb-1">
-            Expression Atlas ({atlasData.length})
-          </h3>
-          <p className="text-[10px] text-slate-600 mb-2">
-            Experiment · type · tissue/condition · level when available.
-          </p>
+
+      {hasAtlas && atlasData && (
+        <ExpressionSourceCard
+          title={`Expression Atlas (${atlasData.length})`}
+          subtitle="Experiment · type · tissue/condition · level when available."
+          testId="gene-expression-atlas"
+        >
           <div className="space-y-1.5 max-h-72 overflow-y-auto">
             {atlasData.slice(0, 30).map((e, i) => (
               <DataPoint
@@ -386,10 +687,7 @@ function GeneExpressionPanel({
               </DataPoint>
             ))}
           </div>
-        </div>
-      )}
-      {(!gtexExps || gtexExps.length === 0) && (!bgeeExps || bgeeExps.length === 0) && (!atlasData || atlasData.length === 0) && (
-        <div className="text-slate-500 text-sm py-4">No expression data found.</div>
+        </ExpressionSourceCard>
       )}
     </div>
   )
@@ -402,58 +700,95 @@ function TargetedDrugsPanel({
   data: Record<string, unknown> | null
   fetchedAt?: Date | null
 }) {
-  const drugs = (data?.geneDrugs as Array<{ drugName?: string; interactionType?: string; sources?: string[]; score?: number }>) ?? []
+  const drugs =
+    (data?.geneDrugs as Array<{
+      drugName?: string
+      interactionType?: string
+      sources?: string[]
+      score?: number
+    }>) ?? []
 
-  if (drugs.length === 0) return <div className="text-slate-500 text-sm py-4">No targeted drug data found.</div>
+  if (drugs.length === 0) {
+    return (
+      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+        <div className="text-slate-500 text-sm py-2">No targeted drug data found.</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <h3 className="text-sm font-semibold text-slate-200 mb-1">Drugs targeting this gene ({drugs.length})</h3>
-      <p className="text-[10px] text-slate-600 mb-3">Use the <span className="font-semibold text-slate-400">API</span> button for source, timestamp, and endpoint.</p>
-      <div className="space-y-2 max-h-96 overflow-y-auto">
-        {drugs.map((d, i) => (
-          <DataPoint
-            key={`${d.drugName}-${i}`}
-            sourceKey="dgidb"
-            fetchedAt={fetchedAt}
-            label={d.drugName || 'DGIdb interaction'}
-            recordUrl={
-              d.drugName
-                ? `https://www.dgidb.org/results?searchType=drug&searchTerms=${encodeURIComponent(String(d.drugName))}`
-                : 'https://www.dgidb.org/'
-            }
-          >
-            <div className="flex items-center justify-between py-1.5 px-2 rounded text-sm">
-              <div className="flex items-center gap-2 min-w-0">
-                {d.drugName && /^\d+$/.test(String(d.drugName)) === false && (
-                  <Link
-                    href={`/molecule/name/${encodeURIComponent(String(d.drugName))}`}
-                    className="text-indigo-400 hover:underline truncate"
-                  >
-                    {d.drugName}
-                  </Link>
-                )}
-                {d.drugName && /^\d+$/.test(String(d.drugName)) && (
-                  <Link
-                    href={`/molecule/${String(d.drugName)}`}
-                    className="text-indigo-400 hover:underline truncate font-mono"
-                  >
-                    CID {d.drugName}
-                  </Link>
-                )}
-                {!d.drugName && <span className="text-slate-500">Unknown</span>}
+    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5" data-testid="gene-targeted-drugs">
+      <h3 className="text-sm font-semibold text-slate-100 mb-0.5">
+        Drugs targeting this gene ({drugs.length})
+      </h3>
+      <p className="text-[10px] text-slate-600 mb-3">
+        DGIdb interactions. Use the API button for source, timestamp, and endpoint. Open ↗ goes to
+        DGIdb drug search.
+      </p>
+      <div
+        className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,1fr)_3rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+        role="row"
+      >
+        <span>Drug</span>
+        <span>Type</span>
+        <span>Sources</span>
+        <span className="text-right">Score</span>
+        <span className="text-right">Open</span>
+      </div>
+      <div className="max-h-96 overflow-y-auto">
+        {drugs.map((d, i) => {
+          const name = d.drugName ? String(d.drugName) : ''
+          const dgidbUrl = name
+            ? `https://www.dgidb.org/results?searchType=drug&searchTerms=${encodeURIComponent(name)}`
+            : 'https://www.dgidb.org/results'
+          const isCid = name && /^\d+$/.test(name)
+          const localHref = name
+            ? isCid
+              ? `/molecule/${name}`
+              : `/molecule/name/${encodeURIComponent(name)}`
+            : null
+          return (
+            <DataPoint
+              key={`${d.drugName}-${i}`}
+              sourceKey="dgidb"
+              fetchedAt={fetchedAt}
+              label={d.drugName || 'DGIdb interaction'}
+              recordUrl={dgidbUrl}
+            >
+              <div className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,1fr)_3rem_2.5rem] gap-x-2 items-center px-2 py-1.5 border-b border-slate-800/80 text-sm">
+                <div className="min-w-0 truncate">
+                  {localHref ? (
+                    <Link href={localHref} className="text-indigo-400 hover:underline truncate">
+                      {isCid ? `CID ${name}` : name}
+                    </Link>
+                  ) : (
+                    <span className="text-slate-500">Unknown</span>
+                  )}
+                </div>
+                <span className="text-xs text-violet-300/90 truncate">
+                  {d.interactionType || '—'}
+                </span>
+                <span className="text-[11px] text-slate-500 truncate">
+                  {Array.isArray(d.sources) && d.sources.length > 0
+                    ? d.sources.slice(0, 2).join(', ')
+                    : '—'}
+                </span>
+                <span className="text-[11px] text-slate-500 text-right tabular-nums">
+                  {typeof d.score === 'number' && d.score > 0 ? d.score.toFixed(1) : '—'}
+                </span>
+                <a
+                  href={dgidbUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-xs text-blue-400 hover:text-blue-300 text-right"
+                  title="View in DGIdb"
+                >
+                  ↗
+                </a>
               </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {d.interactionType && (
-                  <span className="text-[10px] px-2 py-0.5 rounded bg-violet-900/40 text-violet-300 border border-violet-800/50">{d.interactionType}</span>
-                )}
-                {Array.isArray(d.sources) && d.sources.length > 0 && (
-                  <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-400">{d.sources.slice(0, 2).join(', ')}</span>
-                )}
-              </div>
-            </div>
-          </DataPoint>
-        ))}
+            </DataPoint>
+          )
+        })}
       </div>
     </div>
   )
@@ -466,69 +801,120 @@ function GenePathwaysPanel({
   data: Record<string, unknown> | null
   fetchedAt?: Date | null
 }) {
-  const reactome = (data?.genePathways as Record<string, unknown>)?.reactomePathways as Array<{ name?: string; stId?: string; url?: string }> | undefined
-  const wikipathways = (data?.genePathways as Record<string, unknown>)?.wikiPathways as Array<{ name?: string; id?: string; url?: string }> | undefined
-  const goTerms = (data?.genePathways as Record<string, unknown>)?.goTerms as Array<{ id?: string; name?: string; url?: string } | string> | undefined
+  const reactome = (data?.genePathways as Record<string, unknown>)?.reactomePathways as
+    | Array<{ name?: string; stId?: string; url?: string }>
+    | undefined
+  const wikipathways = (data?.genePathways as Record<string, unknown>)?.wikiPathways as
+    | Array<{ name?: string; id?: string; url?: string }>
+    | undefined
+  const goTerms = (data?.genePathways as Record<string, unknown>)?.goTerms as
+    | Array<{ id?: string; name?: string; url?: string } | string>
+    | undefined
+
+  const hasReactome = Boolean(reactome && reactome.length > 0)
+  const hasWiki = Boolean(wikipathways && wikipathways.length > 0)
+  const hasGo = Boolean(goTerms && goTerms.length > 0)
+
+  if (!hasReactome && !hasWiki && !hasGo) {
+    return (
+      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
+        <div className="text-slate-500 text-sm py-2">No pathway data found.</div>
+      </div>
+    )
+  }
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-      <p className="text-[10px] text-slate-600 mb-3">Use the <span className="font-semibold text-slate-400">API</span> button for source, timestamp, and endpoint.</p>
-      {reactome && reactome.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Reactome Pathways ({reactome.length})</h3>
-          <div className="space-y-1.5">
-            {reactome.slice(0, 15).map((p, i) => (
-              <DataPoint
-                key={p.stId || i}
-                sourceKey="reactome"
-                fetchedAt={fetchedAt}
-                label={p.name || p.stId || 'Reactome'}
-                recordUrl={p.url || (p.stId ? `https://reactome.org/content/detail/${p.stId}` : undefined)}
-              >
-                <div className="py-1 px-2 rounded text-sm text-slate-300">
-                  {p.url ? (
-                    <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-400">
-                      {p.name}
-                    </a>
-                  ) : (
-                    p.name
-                  )}
-                </div>
-              </DataPoint>
-            ))}
+    <div className="space-y-3" data-testid="gene-pathways-cards">
+      <p className="text-[10px] text-slate-600 px-0.5">
+        Pathway sources are shown as separate cards (Reactome, WikiPathways, Gene Ontology). Use the
+        API button on a row for source, timestamp, and endpoint.
+      </p>
+
+      {hasReactome && reactome && (
+        <ExpressionSourceCard
+          title={`Reactome Pathways (${reactome.length})`}
+          subtitle="Curated pathway reactions from Reactome."
+          testId="gene-reactome-pathways"
+        >
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {reactome.slice(0, 15).map((p, i) => {
+              const href =
+                p.url || (p.stId ? `https://reactome.org/content/detail/${p.stId}` : undefined)
+              return (
+                <DataPoint
+                  key={p.stId || i}
+                  sourceKey="reactome"
+                  fetchedAt={fetchedAt}
+                  label={p.name || p.stId || 'Reactome'}
+                  recordUrl={href}
+                >
+                  <div className="py-1 px-2 rounded text-sm text-slate-300">
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-400"
+                      >
+                        {p.name || p.stId}
+                      </a>
+                    ) : (
+                      p.name || p.stId
+                    )}
+                  </div>
+                </DataPoint>
+              )
+            })}
           </div>
-        </div>
+        </ExpressionSourceCard>
       )}
-      {wikipathways && wikipathways.length > 0 && (
-        <div className="mb-4">
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">WikiPathways ({wikipathways.length})</h3>
-          <div className="space-y-1.5">
-            {wikipathways.slice(0, 15).map((p, i) => (
-              <DataPoint
-                key={p.id || i}
-                sourceKey="wikipathways"
-                fetchedAt={fetchedAt}
-                label={p.name || p.id || 'WikiPathways'}
-                recordUrl={p.url || (p.id ? `https://www.wikipathways.org/pathways/${p.id}` : undefined)}
-              >
-                <div className="py-1 px-2 rounded text-sm text-slate-300">
-                  {p.url ? (
-                    <a href={p.url} target="_blank" rel="noopener noreferrer" className="hover:underline text-indigo-400">
-                      {p.name}
-                    </a>
-                  ) : (
-                    p.name
-                  )}
-                </div>
-              </DataPoint>
-            ))}
+
+      {hasWiki && wikipathways && (
+        <ExpressionSourceCard
+          title={`WikiPathways (${wikipathways.length})`}
+          subtitle="Community-curated biological pathways."
+          testId="gene-wikipathways"
+        >
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
+            {wikipathways.slice(0, 15).map((p, i) => {
+              const href =
+                p.url || (p.id ? `https://www.wikipathways.org/pathways/${p.id}` : undefined)
+              return (
+                <DataPoint
+                  key={p.id || i}
+                  sourceKey="wikipathways"
+                  fetchedAt={fetchedAt}
+                  label={p.name || p.id || 'WikiPathways'}
+                  recordUrl={href}
+                >
+                  <div className="py-1 px-2 rounded text-sm text-slate-300">
+                    {href ? (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-400"
+                      >
+                        {p.name || p.id}
+                      </a>
+                    ) : (
+                      p.name || p.id
+                    )}
+                  </div>
+                </DataPoint>
+              )
+            })}
           </div>
-        </div>
+        </ExpressionSourceCard>
       )}
-      {goTerms && goTerms.length > 0 && (
-        <div>
-          <h3 className="text-sm font-semibold text-slate-200 mb-3">Gene Ontology Terms ({goTerms.length})</h3>
-          <div className="space-y-1.5 max-h-48 overflow-y-auto">
+
+      {hasGo && goTerms && (
+        <ExpressionSourceCard
+          title={`Gene Ontology Terms (${goTerms.length})`}
+          subtitle="Functional annotations via GO / QuickGO."
+          testId="gene-go-pathways"
+        >
+          <div className="space-y-1.5 max-h-72 overflow-y-auto">
             {goTerms.slice(0, 20).map((t, i) => {
               const term = typeof t === 'string' ? { name: t } : t
               const id = term.id
@@ -544,17 +930,27 @@ function GenePathwaysPanel({
                   recordUrl={url}
                 >
                   <div className="py-1 px-2 rounded text-sm text-slate-300">
-                    {id && <span className="font-mono text-[10px] text-slate-500 mr-2">{id}</span>}
-                    {term.name || '—'}
+                    {id && (
+                      <span className="font-mono text-[10px] text-slate-500 mr-2">{id}</span>
+                    )}
+                    {url ? (
+                      <a
+                        href={url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:underline text-indigo-400"
+                      >
+                        {term.name || '—'}
+                      </a>
+                    ) : (
+                      term.name || '—'
+                    )}
                   </div>
                 </DataPoint>
               )
             })}
           </div>
-        </div>
-      )}
-      {(!reactome || reactome.length === 0) && (!wikipathways || wikipathways.length === 0) && (!goTerms || goTerms.length === 0) && (
-        <div className="text-slate-500 text-sm py-4">No pathway data found.</div>
+        </ExpressionSourceCard>
       )}
     </div>
   )
@@ -572,7 +968,8 @@ const GENE_PANELS = [
 export function GeneDetailPageClient(props: GeneDetailPageClientProps) {
   return (
     <Suspense fallback={<div className="animate-pulse h-96 bg-slate-800/50 rounded-xl" />}>
-      <GeneDetailPageClientInner {...props} />
+      {/* Remount on gene change so loaded/loading gates do not skip the new entity. */}
+      <GeneDetailPageClientInner key={`${props.geneId}-${props.symbol}`} {...props} />
     </Suspense>
   )
 }
@@ -596,36 +993,84 @@ function GeneDetailPageClientInner({
   const [error, setError] = useState<string | null>(null)
   const [loaded, setLoaded] = useState(false)
   const [fetchedAt, setFetchedAt] = useState<Date | null>(null)
+  const loadGenRef = useRef(0)
+  const abortRef = useRef<AbortController | null>(null)
+  const loadingRef = useRef(false)
 
   const categoryDataMap: Partial<Record<CategoryId, Record<string, unknown>>> = loaded ? { gene: categoryData } : {}
-  const categoryStatusMap = buildFullStatus('gene', loaded ? 'loaded' : loading ? 'loading' : 'error')
+  const categoryStatusMap = buildFullStatus(
+    'gene',
+    loaded ? 'loaded' : loading ? 'loading' : error ? 'error' : 'idle',
+  )
   const fetchedAtMap: Partial<Record<CategoryId, Date>> = fetchedAt ? { gene: fetchedAt } : {}
 
   const geneIdParam = `${geneId}-${symbol}`
 
-  const loadGeneCategory = useCallback(async () => {
-    if (loading || loaded) return
+  /**
+   * Load gene multi-source category. Soft-refresh (`force`) keeps existing panels mounted.
+   */
+  const loadGeneCategory = useCallback(async (opts?: { force?: boolean }) => {
+    const force = Boolean(opts?.force)
+    if (loadingRef.current && !force) return
+    if (loaded && !force) return
+
+    try {
+      abortRef.current?.abort()
+    } catch {
+      /* ignore */
+    }
+    const ac = new AbortController()
+    abortRef.current = ac
+    const gen = ++loadGenRef.current
+
+    loadingRef.current = true
     setLoading(true)
     setError(null)
     try {
-      const res = await fetch(`/api/gene/${geneIdParam}/category/gene`)
+      const url = force
+        ? `/api/gene/${geneIdParam}/category/gene?refresh=1&_t=${Date.now()}`
+        : `/api/gene/${geneIdParam}/category/gene`
+      const res = await clientFetch(url, { signal: ac.signal }, { retries: 1, retryDelayMs: 400 })
       if (!res.ok) {
         throw new Error(`Failed to load gene data: ${res.status}`)
       }
       const data = await res.json()
+      if (loadGenRef.current !== gen) return
       setCategoryData(data)
       setFetchedAt(new Date())
       setLoaded(true)
     } catch (err) {
+      if (loadGenRef.current !== gen) return
+      if (
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && err.name === 'AbortError')
+      ) {
+        return
+      }
       setError(err instanceof Error ? err.message : 'Failed to load gene data')
+      // Soft-refresh failure: keep previous data
+      if (!loaded) setLoaded(false)
     } finally {
-      setLoading(false)
+      if (loadGenRef.current === gen) {
+        loadingRef.current = false
+        setLoading(false)
+        if (abortRef.current === ac) abortRef.current = null
+      }
     }
-  }, [geneIdParam, loading, loaded])
+  }, [geneIdParam, loaded])
 
   useEffect(() => {
-    loadGeneCategory()
-  }, [loadGeneCategory])
+    void loadGeneCategory()
+    return () => {
+      try {
+        abortRef.current?.abort()
+      } catch {
+        /* ignore */
+      }
+    }
+    // Initial load only; force refresh is user-driven
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [geneIdParam])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -758,6 +1203,16 @@ function GeneDetailPageClientInner({
               >
                 Discover with target →
               </Link>
+              <button
+                type="button"
+                onClick={() => void loadGeneCategory({ force: true })}
+                disabled={loading}
+                className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-200 transition-colors disabled:opacity-50"
+                data-testid="gene-soft-refresh"
+                title="Re-query gene sources without leaving this page"
+              >
+                {loading && loaded ? 'Refreshing…' : 'Refresh data'}
+              </button>
               <a
                 href={displayUrl}
                 target="_blank"
@@ -768,6 +1223,15 @@ function GeneDetailPageClientInner({
               </a>
             </div>
           </div>
+
+          {loading && (
+            <div className="mb-3 rounded-xl border border-indigo-800/40 bg-slate-900/70 px-4 py-3">
+              <p className="text-xs text-slate-300 mb-1">
+                {loaded ? 'Refreshing gene evidence from free public APIs…' : 'Loading gene evidence from free public APIs…'}
+              </p>
+              <ElapsedTimer active={loading} showHint testId="gene-elapsed" />
+            </div>
+          )}
 
           <div className="flex flex-wrap gap-1.5 mt-2">
             {displayType && (
@@ -880,7 +1344,13 @@ function GeneDetailPageClientInner({
         {error && (
           <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-red-300 mb-4">
             <p>{error}</p>
-            <button onClick={loadGeneCategory} className="mt-2 text-xs underline text-red-200 hover:text-white">Retry</button>
+            <button
+              type="button"
+              onClick={() => void loadGeneCategory({ force: true })}
+              className="mt-2 text-xs underline text-red-200 hover:text-white"
+            >
+              Retry
+            </button>
           </div>
         )}
 

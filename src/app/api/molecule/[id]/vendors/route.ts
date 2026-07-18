@@ -39,7 +39,7 @@ const DATABASE_TEMPLATES: { pattern: RegExp; name: string; urlTemplate: string }
   { pattern: /PDB|RCSB/i, name: 'RCSB PDB', urlTemplate: 'https://www.rcsb.org/search?request=%7B%22query%22%3A%7B%22type%22%3A%22terminal%22%2C%22service%22%3A%22full_text%22%2C%22parameters%22%3A%7B%22value%22%3A%22{name}%22%7D%7D%2C%22return_type%22%3A%22entry%22%7D' },
   { pattern: /KEGG/i, name: 'KEGG', urlTemplate: 'https://www.genome.jp/dbget-bin/www_bfind_sub?mode=bfind&max_hit=1000&dbkey=kegg&keywords={name}' },
   { pattern: /DrugBank/i, name: 'DrugBank', urlTemplate: 'https://go.drugbank.com/unearth/q?utf8=%E2%9C%93&searcher=drugs&query={name}' },
-  { pattern: /ChEMBL/i, name: 'ChEMBL', urlTemplate: 'https://www.ebi.ac.uk/chembl/g/#search_results/all/query={name}' },
+  { pattern: /ChEMBL/i, name: 'ChEMBL', urlTemplate: 'https://www.ebi.ac.uk/chembl/explore/compounds/QUERYSTRING:{name}' },
   { pattern: /Wikipedia/i, name: 'Wikipedia', urlTemplate: 'https://en.wikipedia.org/w/index.php?search={name}' },
   { pattern: /ChemIDplus/i, name: 'ChemIDplus', urlTemplate: 'https://pubchem.ncbi.nlm.nih.gov/compound/{cid}' },
   { pattern: /NCI\/CADD|NCI Open/i, name: 'NCI CADD', urlTemplate: 'https://cactus.nci.nih.gov/chemical/structure/{name}/file?format=sdf' },

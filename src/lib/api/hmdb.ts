@@ -85,14 +85,49 @@ export async function getMetaboliteById(hmdbId: string): Promise<HMDBMetabolite 
 }
 
 /**
- * Main export: Get HMDB data for a metabolite name
+ * Main export: Get HMDB data for a metabolite name or HMDB id.
+ * Identity-first: if query looks like HMDB######, fetch XML detail first.
  */
-export async function getHMDBData(name: string): Promise<{
+export async function getHMDBData(
+  name: string,
+  opts?: { inchiKey?: string | null },
+): Promise<{
   metabolites: HMDBMetabolite[]
 }> {
-  const metabolites = await searchMetabolites(name)
+  const q = (name || '').trim()
+  if (!q && !opts?.inchiKey) return { metabolites: [] }
+
+  // 1) Direct HMDB accession
+  const idMatch = q.match(/^(?:HMDB)?0*(\d{1,7})$/i) || q.match(/^(HMDB\d+)$/i)
+  if (idMatch) {
+    const raw = idMatch[1]
+    const hmdbId = raw.toUpperCase().startsWith('HMDB')
+      ? raw.toUpperCase()
+      : `HMDB${raw.padStart(7, '0')}`
+    const byId = await getMetaboliteById(hmdbId)
+    if (byId) return { metabolites: [byId] }
+  }
+
+  // 2) Name / free-text unearth search
+  let metabolites = q ? await searchMetabolites(q) : []
+
+  // 3) Prefer exact name match first in results
+  if (metabolites.length > 1 && q) {
+    const ql = q.toLowerCase()
+    metabolites = [
+      ...metabolites.filter((m) => m.name?.toLowerCase() === ql),
+      ...metabolites.filter((m) => m.name?.toLowerCase() !== ql),
+    ]
+  }
+
+  // 4) Optional InChIKey filter when provided
+  if (opts?.inchiKey?.trim() && metabolites.length > 0) {
+    const key = opts.inchiKey.trim().toUpperCase()
+    const keyed = metabolites.filter((m) => (m.inchiKey || '').toUpperCase() === key)
+    if (keyed.length > 0) metabolites = keyed
+  }
 
   return {
-    metabolites: metabolites.slice(0, 10)
+    metabolites: metabolites.slice(0, 10),
   }
 }

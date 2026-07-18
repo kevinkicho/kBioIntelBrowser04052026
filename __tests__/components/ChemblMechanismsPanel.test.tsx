@@ -28,14 +28,16 @@ describe('ChemblMechanismsPanel', () => {
     expect(screen.getByText('INHIBITOR')).toBeInTheDocument()
   })
 
-  test('renders max phase', () => {
+  test('renders max phase in table', () => {
     render(<ChemblMechanismsPanel mechanisms={mockMechanisms} />)
-    expect(screen.getByText(/Max Phase: 4/)).toBeInTheDocument()
+    expect(screen.getByText('4')).toBeInTheDocument()
+    expect(screen.getByText('Phase')).toBeInTheDocument()
   })
 
-  test('renders direct interaction flag', () => {
+  test('row deep-links to ChEMBL', () => {
     render(<ChemblMechanismsPanel mechanisms={mockMechanisms} />)
-    expect(screen.getByText('Direct interaction')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /Cyclooxygenase inhibitor/i })
+    expect(link.getAttribute('href')).toMatch(/chembl/)
   })
 
   test('renders empty state when no mechanisms', () => {

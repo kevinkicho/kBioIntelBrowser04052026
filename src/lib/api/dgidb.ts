@@ -1,7 +1,44 @@
 import type { DrugGeneInteraction } from '../types'
 
 const GRAPHQL_URL = 'https://dgidb.org/api/graphql'
+const DGIDB_WEB = 'https://www.dgidb.org'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
+
+/**
+ * DGIdb v5 React SPA gene pages are keyed by conceptId (e.g. hgnc:5743),
+ * not gene symbols. `/genes/PTGS2` 404s client-side.
+ */
+export function dgidbGeneDeepLink(
+  conceptId: string | null | undefined,
+  geneName: string,
+): string {
+  const id = (conceptId || '').trim()
+  // Allow typical normalizer IDs: hgnc:3827, ncbigene:5743, iuphar.ligand:6239
+  if (id && /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(id)) {
+    return `${DGIDB_WEB}/genes/${id}`
+  }
+  const term = geneName.trim()
+  if (term) {
+    return `${DGIDB_WEB}/results?searchType=gene&searchTerms=${encodeURIComponent(term)}`
+  }
+  return `${DGIDB_WEB}/results`
+}
+
+/** Drug record or interaction-results search on DGIdb v5. */
+export function dgidbDrugDeepLink(
+  conceptId: string | null | undefined,
+  drugName: string,
+): string {
+  const id = (conceptId || '').trim()
+  if (id && /^[a-zA-Z0-9][a-zA-Z0-9._:-]*$/.test(id)) {
+    return `${DGIDB_WEB}/drugs/${id}`
+  }
+  const term = drugName.trim()
+  if (term) {
+    return `${DGIDB_WEB}/results?searchType=drug&searchTerms=${encodeURIComponent(term)}`
+  }
+  return `${DGIDB_WEB}/results`
+}
 
 export interface TargetRelatedMolecule {
   name: string
@@ -110,6 +147,7 @@ export async function getDrugGeneInteractionsByName(name: string): Promise<DrugG
       for (const interaction of node.interactions) {
         const geneName = interaction.gene?.name || ''
         if (!geneName) continue
+        const geneConceptId = interaction.gene?.conceptId as string | undefined
         allInteractions.push({
           drugName: name,
           geneSymbol: geneName,
@@ -118,7 +156,7 @@ export async function getDrugGeneInteractionsByName(name: string): Promise<DrugG
           evidence: (interaction.sources || []).map((s: { sourceDbName: string }) => s.sourceDbName).filter(Boolean).join(', '),
           source: (interaction.sources || []).map((s: { sourceDbName: string }) => s.sourceDbName).filter(Boolean).join(', '),
           score: 0,
-          url: `https://dgidb.org/genes/${encodeURIComponent(geneName)}`,
+          url: dgidbGeneDeepLink(geneConceptId, geneName),
         })
       }
     }

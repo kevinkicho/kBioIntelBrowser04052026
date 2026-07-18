@@ -193,7 +193,12 @@ export async function GET(
       }
     })()
 
-    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000)
+    // AbortController linked so slow upstream work can stop when wall-clock expires
+    const ac = new AbortController()
+    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000, {
+      abortController: ac,
+      signal: request.signal,
+    })
 
     const metrics = flushApiMetrics()
     sourceStatus = metricsToSourceStatus(metrics)

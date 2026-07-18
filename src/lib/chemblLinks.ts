@@ -1,6 +1,8 @@
 /**
- * Stable ChEMBL UI deep links (report cards — not SPA hash routes that fail to open).
- * Prefer compound / target / assay report cards over /g/#search or bare chembl homepage.
+ * Stable ChEMBL UI deep links.
+ *
+ * ChEMBL v33+ UI uses `/explore/{entity}/{id}` (legacy `*_report_card` redirects).
+ * Avoid `/g/#…` SPA hashes and bare `chembl/` homepage — those dump users on the main page.
  */
 
 const CHEMBL_WEB = 'https://www.ebi.ac.uk/chembl'
@@ -23,38 +25,78 @@ export function normalizeChemblId(raw: string | null | undefined): string | null
   return null
 }
 
-export function chemblCompoundUrl(chemblId: string | null | undefined): string | null {
-  const id = normalizeChemblId(chemblId)
-  return id ? `${CHEMBL_WEB}/compound_report_card/${id}/` : null
+/** Extract first CHEMBL id from a free-form string/URL. */
+export function extractChemblId(raw: string | null | undefined): string | null {
+  if (!raw) return null
+  const m = String(raw).match(/CHEMBL\s*(\d+)/i)
+  return m ? `CHEMBL${m[1]}` : null
 }
 
-/** Compound card + Drug Indications section anchor when supported by ChEMBL UI. */
+/**
+ * True only for stable entity deep links (not homepage, not /g/# SPA shells).
+ */
+export function isStableChemblDeepLink(url: string | null | undefined): boolean {
+  if (!url?.trim()) return false
+  const u = url.trim()
+  if (!/ebi\.ac\.uk\/chembl/i.test(u) && !/chembl/i.test(u)) return false
+  if (/\/g\/#/i.test(u)) return false
+  // Bare homepage e.g. https://www.ebi.ac.uk/chembl/ or /chembl
+  const pathOnly = u.replace(/[?#].*$/, '').replace(/\/+$/, '')
+  if (/\/chembl$/i.test(pathOnly)) return false
+  return (
+    /\/explore\/(compound|target|assay|document|drug_indications|drug_mechanisms)\//i.test(u) ||
+    /\/(compound|target|assay|document)_report_card\//i.test(u) ||
+    /\/embed\/report_cards\//i.test(u)
+  )
+}
+
+export function chemblCompoundUrl(chemblId: string | null | undefined): string | null {
+  const id = normalizeChemblId(chemblId)
+  // Modern explore UI (no extra redirect hop from legacy report_card paths)
+  return id ? `${CHEMBL_WEB}/explore/compound/${id}` : null
+}
+
+/**
+ * Compound page focused on Drug Indications.
+ * Uses the dedicated embed section (full indications table) when possible.
+ */
 export function chemblCompoundIndicationsUrl(chemblId: string | null | undefined): string | null {
+  const id = normalizeChemblId(chemblId)
+  if (!id) return null
+  // Embed section = indications table only; compound#DrugIndications also works on explore UI
+  return `${CHEMBL_WEB}/embed/report_cards/compound/sections/drug_indications/${id}`
+}
+
+/** Compound explore page + DrugIndications hash (full report card context). */
+export function chemblCompoundIndicationsSectionUrl(
+  chemblId: string | null | undefined,
+): string | null {
   const base = chemblCompoundUrl(chemblId)
   return base ? `${base}#DrugIndications` : null
 }
 
 export function chemblTargetUrl(targetChemblId: string | null | undefined): string | null {
   const id = normalizeChemblId(targetChemblId)
-  return id ? `${CHEMBL_WEB}/target_report_card/${id}/` : null
+  return id ? `${CHEMBL_WEB}/explore/target/${id}` : null
 }
 
 export function chemblAssayUrl(assayChemblId: string | null | undefined): string | null {
   const id = normalizeChemblId(assayChemblId)
-  return id ? `${CHEMBL_WEB}/assay_report_card/${id}/` : null
+  return id ? `${CHEMBL_WEB}/explore/assay/${id}` : null
 }
 
 export function chemblDocumentUrl(documentChemblId: string | null | undefined): string | null {
   const id = normalizeChemblId(documentChemblId)
-  return id ? `${CHEMBL_WEB}/document_report_card/${id}/` : null
+  return id ? `${CHEMBL_WEB}/explore/document/${id}` : null
 }
 
-/** Free-text / CID search when no structured ChEMBL id is available. */
+/** Free-text search when no structured ChEMBL id is available. */
 export function chemblSearchUrl(query: string | number | null | undefined): string | null {
   if (query == null) return null
   const q = String(query).trim()
   if (!q) return null
-  return `${CHEMBL_WEB}/g/#search_results/all/query=${encodeURIComponent(q)}`
+  // Explore compounds browser with query (more reliable than /g/#search shells)
+  return `${CHEMBL_WEB}/explore/compounds/QUERYSTRING:${encodeURIComponent(q)}`
 }
 
 /**
@@ -72,7 +114,7 @@ export function chemblActivityDeepLink(input: {
     chemblAssayUrl(input.assayChemblId) ||
     chemblCompoundUrl(input.moleculeChemblId || input.chemblId) ||
     chemblSearchUrl(input.activityId || input.chemblId || 'chembl') ||
-    `${CHEMBL_WEB}/`
+    `${CHEMBL_WEB}/explore/compounds/`
   )
 }
 
@@ -86,12 +128,13 @@ export function chemblMechanismDeepLink(input: {
   return (
     chemblTargetUrl(input.targetChemblId) ||
     chemblCompoundUrl(input.moleculeChemblId) ||
-    `${CHEMBL_WEB}/`
+    `${CHEMBL_WEB}/explore/compounds/`
   )
 }
 
 /**
- * Indication row: molecule DrugIndications section, else MeSH/EFO external, else search.
+ * Indication list-item: ChEMBL drug-indications table for the molecule,
+ * else disease ontology (MeSH/EFO), else explore search — never bare homepage.
  */
 export function chemblIndicationDeepLink(input: {
   moleculeChemblId?: string | null
@@ -99,11 +142,12 @@ export function chemblIndicationDeepLink(input: {
   efoId?: string | null
   condition?: string | null
 }): string {
-  const compoundInd = chemblCompoundIndicationsUrl(input.moleculeChemblId)
+  const compoundInd =
+    chemblCompoundIndicationsUrl(input.moleculeChemblId) ||
+    chemblCompoundIndicationsSectionUrl(input.moleculeChemblId)
   if (compoundInd) return compoundInd
   const mesh = input.meshId?.trim()
   if (mesh) {
-    // MeSH browser (direct record when D#####)
     const meshClean = mesh.replace(/^MESH:/i, '')
     return `https://meshb.nlm.nih.gov/record/ui?ui=${encodeURIComponent(meshClean)}`
   }
@@ -114,5 +158,7 @@ export function chemblIndicationDeepLink(input: {
       : `http://www.ebi.ac.uk/efo/${efo.replace(':', '_')}`
     return `https://www.ebi.ac.uk/ols4/ontologies/efo/terms?iri=${encodeURIComponent(efoIri)}`
   }
-  return chemblSearchUrl(input.condition) || `${CHEMBL_WEB}/`
+  return (
+    chemblSearchUrl(input.condition) || `${CHEMBL_WEB}/explore/drug_indications/`
+  )
 }

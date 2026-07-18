@@ -168,4 +168,54 @@ describe('MoleculeSummary', () => {
     const zeros = screen.getAllByText('0')
     expect(zeros.length).toBeGreaterThanOrEqual(2) // primary + secondary
   })
+
+  it('dims cards with no data (opacity-20) vs cards with data', () => {
+    const mixed: MoleculeSummaryData = {
+      cards: [
+        {
+          id: 'approval',
+          title: 'Approval & Products',
+          icon: '✅',
+          accentColor: 'border-t-emerald-500',
+          categoryId: 'pharmaceutical',
+          primaryLabel: 'Approved Products',
+          primaryValue: 0,
+          secondaryMetrics: [
+            { label: 'NDC Codes', value: 0 },
+            { label: 'Orange Book', value: 0 },
+          ],
+        },
+        {
+          id: 'research',
+          title: 'Research Activity',
+          icon: '📊',
+          accentColor: 'border-t-amber-500',
+          categoryId: 'research-literature',
+          primaryLabel: 'Publications',
+          primaryValue: 10,
+          secondaryMetrics: [
+            { label: 'NIH Grants', value: 0 },
+            { label: 'Total Citations', value: 134 },
+          ],
+        },
+      ],
+    }
+    render(<MoleculeSummary data={mixed} onCategoryClick={mockOnCategoryClick} />)
+
+    const emptyCard = screen.getByTestId('summary-card-approval')
+    const fullCard = screen.getByTestId('summary-card-research')
+    expect(emptyCard).toHaveAttribute('data-empty', 'true')
+    expect(emptyCard.className).toMatch(/opacity-20/)
+    expect(fullCard).toHaveAttribute('data-empty', 'false')
+    expect(fullCard.className).not.toMatch(/opacity-20/)
+
+    // Within a card that has data, zero secondary metrics are dimmed
+    const zeroGrant = screen.getByTestId('summary-metric-research-NIH Grants')
+    const cites = screen.getByTestId('summary-metric-research-Total Citations')
+    expect(zeroGrant).toHaveAttribute('data-empty', 'true')
+    expect(zeroGrant.className).toMatch(/opacity-20/)
+    expect(cites).toHaveAttribute('data-empty', 'false')
+    expect(cites.className).not.toMatch(/opacity-20/)
+  })
 })
+

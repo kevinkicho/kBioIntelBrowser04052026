@@ -5,8 +5,25 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ChemicalProteinInteraction } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
+import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
-export const StitchPanel = memo(function StitchPanel({ interactions, panelId, lastFetched }: { interactions: ChemicalProteinInteraction[], panelId?: string, lastFetched?: Date }) {
+function stitchHref(interaction: ChemicalProteinInteraction): string {
+  const fallback = interaction.chemicalName
+    ? `http://stitch.embl.de/cgi/network.pl?search_terms=${encodeURIComponent(interaction.chemicalName)}`
+    : 'http://stitch.embl.de/'
+  return preferStableDeepLink(interaction.url, fallback)
+}
+
+export const StitchPanel = memo(function StitchPanel({
+  interactions,
+  panelId,
+  lastFetched,
+}: {
+  interactions: ChemicalProteinInteraction[]
+  panelId?: string
+  lastFetched?: Date
+}) {
   const list = Array.isArray(interactions) ? interactions : []
   const isEmpty = list.length === 0
 
@@ -31,58 +48,67 @@ export const StitchPanel = memo(function StitchPanel({ interactions, panelId, la
       title="Chemical-Protein Interactions (STITCH)"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? 'No chemical-protein interactions found for this molecule.' : undefined}
+      empty={
+        isEmpty ? 'No chemical-protein interactions found for this molecule.' : undefined
+      }
     >
       {!isEmpty && (
         <FilterablePaginatedList
           items={list}
           getSearchText={(interaction) =>
-            [interaction.chemicalName, interaction.proteinName]
-              .filter(Boolean)
-              .join(' ')
+            [interaction.chemicalName, interaction.proteinName].filter(Boolean).join(' ')
           }
           sortOptions={sortOptions}
           defaultSortId="num-desc"
           filterPlaceholder="Filter interactions (chemical, protein…)"
-          getKey={(interaction, i) => `${interaction.chemicalName}-${interaction.proteinName}-${i}`}
-          renderItem={(interaction) => (
-            <div className="py-3 border-b border-slate-700 last:border-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold text-slate-100 text-sm">
-                  {interaction.chemicalName} → {interaction.proteinName}
-                </p>
-                <a href={interaction.url} target="_blank" rel="noopener noreferrer" className="text-xs text-cyan-400 hover:text-cyan-300 underline shrink-0">
-                  STITCH →
+          getKey={(interaction, i) =>
+            `${interaction.chemicalName}-${interaction.proteinName}-${i}`
+          }
+          pageSize={8}
+          className="space-y-0"
+          renderItem={(interaction, index) => {
+            const href = stitchHref(interaction)
+            return (
+              <div>
+                {index === 0 && (
+                  <div
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    role="row"
+                  >
+                    <span>Chemical</span>
+                    <span>Protein</span>
+                    <span className="text-right">Score</span>
+                    <span className="text-right">Open</span>
+                  </div>
+                )}
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    onDeepLinkClick('stitch', href, {
+                      panelId: 'stitch',
+                      label: interaction.proteinName,
+                    })
+                  }
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                >
+                  <span className="text-sm text-slate-100 truncate group-hover:text-orange-200">
+                    {interaction.chemicalName || '—'}
+                  </span>
+                  <span className="text-sm text-slate-100 truncate group-hover:text-orange-200">
+                    {interaction.proteinName || '—'}
+                  </span>
+                  <span className="text-xs font-mono tabular-nums text-right text-slate-300">
+                    {(interaction.combinedScore ?? 0).toFixed(3)}
+                  </span>
+                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
+                    ↗
+                  </span>
                 </a>
               </div>
-              <div className="mt-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-400">Combined score</span>
-                  <span className="text-xs font-mono text-slate-200">{interaction.combinedScore.toFixed(3)}</span>
-                </div>
-                <div className="w-full bg-slate-700 rounded-full h-1.5">
-                  <div className="bg-orange-500 h-1.5 rounded-full" style={{ width: `${(interaction.combinedScore * 100).toFixed(1)}%` }} />
-                </div>
-              </div>
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {interaction.experimentalScore > 0 && (
-                  <span className="text-xs bg-teal-900/40 text-teal-300 border border-teal-700/30 px-2 py-0.5 rounded">
-                    exp {interaction.experimentalScore.toFixed(3)}
-                  </span>
-                )}
-                {interaction.databaseScore > 0 && (
-                  <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/30 px-2 py-0.5 rounded">
-                    db {interaction.databaseScore.toFixed(3)}
-                  </span>
-                )}
-                {interaction.textminingScore > 0 && (
-                  <span className="text-xs bg-slate-700/60 text-slate-300 border border-slate-600/30 px-2 py-0.5 rounded">
-                    text {interaction.textminingScore.toFixed(3)}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
+            )
+          }}
         />
       )}
     </Panel>

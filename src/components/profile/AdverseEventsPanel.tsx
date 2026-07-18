@@ -9,38 +9,13 @@ import {
   dateSortOptions,
   numberSortOptions,
 } from '@/lib/listControls'
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
-function AdverseEventItem({ event, maxCount }: { event: AdverseEvent; maxCount: number }) {
-  return (
-    <div className="py-2 border-b border-slate-700/50 last:border-0">
-      <div className="flex items-center justify-between mb-1 gap-2">
-        <span className="text-sm text-slate-200 capitalize">{event.reactionName || event.reaction}</span>
-        <div className="flex items-center gap-2 shrink-0">
-          {event.serious > 0 && (
-            <span className="text-[10px] bg-red-900/40 text-red-300 border border-red-700/30 px-1.5 py-0.5 rounded">
-              {event.serious} serious
-            </span>
-          )}
-          <span className="text-xs text-slate-400 tabular-nums font-mono">
-            {event.count.toLocaleString()}
-          </span>
-        </div>
-      </div>
-      <div className="w-full bg-slate-700/50 rounded-full h-1.5">
-        <div
-          className="bg-rose-500/60 h-1.5 rounded-full"
-          style={{ width: `${Math.round((event.count / maxCount) * 100)}%` }}
-        />
-      </div>
-      {(event.reportDate || event.outcome) && (
-        <p className="text-[10px] text-slate-600 mt-0.5">
-          {[event.reportDate && `Reported ${event.reportDate}`, event.outcome]
-            .filter(Boolean)
-            .join(' · ')}
-        </p>
-      )}
-    </div>
-  )
+function faersHref(event: AdverseEvent): string {
+  const term = event.reactionName || event.reaction || event.drugName || ''
+  if (!term) return 'https://open.fda.gov/apis/drug/event/'
+  return `https://open.fda.gov/apis/drug/event/?search=patient.reaction.reactionmeddrapt:"${encodeURIComponent(term)}"`
 }
 
 export const AdverseEventsPanel = memo(function AdverseEventsPanel({
@@ -75,18 +50,17 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
 
   if (list.length === 0) {
     return (
-      <Panel title="Adverse Events" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No adverse events found for this molecule.</p>
-      </Panel>
+      <Panel
+        title="Adverse Events"
+        panelId={panelId}
+        lastFetched={lastFetched}
+        empty="No adverse events found for this molecule."
+      />
     )
   }
 
   return (
-    <Panel
-      title={`Adverse Events (${list.length})`}
-      panelId={panelId}
-      lastFetched={lastFetched}
-    >
+    <Panel title={`Adverse Events (${list.length})`} panelId={panelId} lastFetched={lastFetched}>
       <FilterablePaginatedList
         items={list}
         getSearchText={(e) =>
@@ -98,7 +72,68 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
         defaultSortId="num-desc"
         filterPlaceholder="Filter reactions…"
         getKey={(e, i) => `${e.reactionName}-${i}`}
-        renderItem={(event) => <AdverseEventItem event={event} maxCount={maxCount} />}
+        pageSize={8}
+        className="space-y-0"
+        renderItem={(event, index) => {
+          const name = event.reactionName || event.reaction || '—'
+          const href = faersHref(event)
+          const pct = Math.round((event.count / maxCount) * 100)
+          const seriousEmpty = isEmptyMetric(event.serious)
+          return (
+            <div>
+              {index === 0 && (
+                <div
+                  className="grid grid-cols-[minmax(0,1.3fr)_4rem_4rem_minmax(4rem,0.8fr)_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                  role="row"
+                >
+                  <span>Reaction</span>
+                  <span className="text-right">Count</span>
+                  <span className="text-right">Serious</span>
+                  <span>Share</span>
+                  <span className="text-right">Open</span>
+                </div>
+              )}
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Explore openFDA drug event API"
+                onClick={() =>
+                  onDeepLinkClick('faers', href, { panelId: 'adverse-events', label: name })
+                }
+                className="grid grid-cols-[minmax(0,1.3fr)_4rem_4rem_minmax(4rem,0.8fr)_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+              >
+                <span className="text-sm text-slate-100 capitalize truncate group-hover:text-rose-200">
+                  {name}
+                </span>
+                <span className="text-xs font-mono tabular-nums text-slate-300 text-right">
+                  {event.count.toLocaleString()}
+                </span>
+                <span
+                  className={`text-xs tabular-nums text-right ${
+                    seriousEmpty ? emptyDataClass(true) : 'text-red-300'
+                  }`}
+                >
+                  {seriousEmpty ? '—' : event.serious}
+                </span>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <div className="flex-1 bg-slate-700/50 rounded-full h-1.5 min-w-[2rem]">
+                    <div
+                      className="bg-rose-500/60 h-1.5 rounded-full"
+                      style={{ width: `${pct}%` }}
+                    />
+                  </div>
+                  <span className="text-[10px] text-slate-600 tabular-nums w-7 text-right">
+                    {pct}%
+                  </span>
+                </div>
+                <span className="text-xs text-indigo-400 group-hover:text-indigo-300 text-right">
+                  ↗
+                </span>
+              </a>
+            </div>
+          )
+        }}
       />
     </Panel>
   )

@@ -7,9 +7,13 @@ import { isMatch } from '@/hooks/useDiseaseContext'
 import type { ChemblIndication } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import {
+  chemblCompoundIndicationsSectionUrl,
   chemblCompoundIndicationsUrl,
   chemblCompoundUrl,
   chemblIndicationDeepLink,
+  extractChemblId,
+  isStableChemblDeepLink,
+  normalizeChemblId,
 } from '@/lib/chemblLinks'
 
 const phaseColors: Record<number, { bg: string; label: string }> = {
@@ -70,17 +74,24 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
         }).length
       : 0
 
-  // Infer molecule ChEMBL id from first indication URL if encoded
-  const compoundFromUrl = useMemo(() => {
+  // Prefer explicit moleculeChemblId, else recover from stored URL (legacy rows)
+  const moleculeChemblId = useMemo(() => {
     for (const ind of indications) {
-      const m = ind.url?.match(/CHEMBL\d+/i)
-      if (m) return m[0].toUpperCase()
+      const fromField = normalizeChemblId(ind.moleculeChemblId)
+      if (fromField) return fromField
+    }
+    for (const ind of indications) {
+      const fromUrl = extractChemblId(ind.url)
+      if (fromUrl) return fromUrl
     }
     return null
   }, [indications])
 
   const moleculeCardHref =
-    chemblCompoundIndicationsUrl(compoundFromUrl) || chemblCompoundUrl(compoundFromUrl)
+    chemblCompoundIndicationsSectionUrl(moleculeChemblId) ||
+    chemblCompoundUrl(moleculeChemblId)
+  const moleculeIndicationsHref =
+    chemblCompoundIndicationsUrl(moleculeChemblId) || moleculeCardHref
 
   const titleExtra = (
     <span className="inline-flex flex-wrap items-center gap-2">
@@ -122,95 +133,64 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
           defaultSortId="phase-desc"
           filterPlaceholder="Filter indications…"
           getKey={(ind, i) => `${ind.indicationId || ind.meshId || ind.efoId}-${i}`}
-          className="space-y-3"
-          renderItem={(ind) => {
+          pageSize={8}
+          className="space-y-0"
+          renderItem={(ind, index) => {
             const phase = phaseColors[ind.maxPhaseForIndication] ?? phaseColors[1]
             const displayName = ind.meshHeading || ind.efoTerm || 'Unknown indication'
             const displayId = ind.meshId || ind.efoId || ''
             const text = [ind.meshHeading, ind.efoTerm, ind.condition].join(' ')
             const diseaseMatch = diseaseName ? isMatch(text, diseaseName) : false
-            const href =
-              ind.url && ind.url.includes('chembl') && !ind.url.includes('/g/#browse')
-                ? ind.url
-                : chemblIndicationDeepLink({
-                    moleculeChemblId: compoundFromUrl,
-                    meshId: ind.meshId,
-                    efoId: ind.efoId,
-                    condition: displayName,
-                  })
-            const meshHref = ind.meshId
-              ? `https://meshb.nlm.nih.gov/record/ui?ui=${encodeURIComponent(ind.meshId.replace(/^MESH:/i, ''))}`
-              : null
-            const efoHref = ind.efoId
-              ? `https://www.ebi.ac.uk/ols4/ontologies/efo/terms?iri=${encodeURIComponent(
-                  ind.efoId.includes('http')
-                    ? ind.efoId
-                    : `http://www.ebi.ac.uk/efo/${ind.efoId.replace(':', '_')}`,
-                )}`
-              : null
+            const rowMolId =
+              normalizeChemblId(ind.moleculeChemblId) ||
+              extractChemblId(ind.url) ||
+              moleculeChemblId
+            const href = isStableChemblDeepLink(ind.url)
+              ? ind.url
+              : chemblIndicationDeepLink({
+                  moleculeChemblId: rowMolId,
+                  meshId: ind.meshId,
+                  efoId: ind.efoId,
+                  condition: displayName,
+                })
             return (
-              <div
-                className={`py-3 border-b border-slate-700 last:border-0 ${diseaseMatch ? 'bg-amber-950/20 -mx-4 px-4 rounded-md' : ''}`}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-slate-100 text-sm hover:text-cyan-400 transition-colors"
-                    title="Open in ChEMBL / ontology"
+              <div>
+                {index === 0 && (
+                  <div
+                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    role="row"
                   >
-                    {displayName}
-                    <span className="ml-1 text-[10px] text-cyan-500/80" aria-hidden>
-                      ↗
-                    </span>
-                  </a>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    {diseaseMatch && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-700/40">
-                        Match
-                      </span>
-                    )}
-                    <span className={`text-xs border px-2 py-0.5 rounded ${phase.bg}`}>
-                      {phase.label}
-                    </span>
+                    <span>Indication</span>
+                    <span>ID</span>
+                    <span className="text-right">Phase</span>
+                    <span className="text-right">Open</span>
                   </div>
-                </div>
-                {displayId && (
-                  <p className="text-xs text-slate-500 mt-1 font-mono">{displayId}</p>
                 )}
-                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
-                  {meshHref && (
-                    <a
-                      href={meshHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-400/90 hover:underline"
-                    >
-                      MeSH ↗
-                    </a>
-                  )}
-                  {efoHref && (
-                    <a
-                      href={efoHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-indigo-400/90 hover:underline"
-                    >
-                      EFO ↗
-                    </a>
-                  )}
-                  {moleculeCardHref && (
-                    <a
-                      href={moleculeCardHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-emerald-400/90 hover:underline"
-                    >
-                      ChEMBL molecule ↗
-                    </a>
-                  )}
-                </div>
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open drug indications in ChEMBL"
+                  className={`grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group ${
+                    diseaseMatch ? 'bg-amber-950/20' : ''
+                  }`}
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
+                      {displayName}
+                      {diseaseMatch && (
+                        <span className="ml-1.5 text-[10px] text-amber-300 font-normal">Match</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className="text-[11px] font-mono text-slate-500 truncate" title={displayId}>
+                    {displayId || '—'}
+                  </span>
+                  <span className={`text-[11px] text-right border px-1.5 py-0.5 rounded justify-self-end ${phase.bg}`}>
+                    {phase.label.replace('Phase ', 'P')}
+                  </span>
+                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
+                </a>
               </div>
             )
           }}

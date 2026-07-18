@@ -8,6 +8,7 @@ import {
   type CategoryDef,
 } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
+import { ElapsedTimer } from '@/components/ui/ElapsedTimer'
 
 interface LoadingOverlayProps {
   categoryStatus: Record<CategoryId, CategoryLoadState>
@@ -47,6 +48,7 @@ export function LoadingOverlay({
   const allDone =
     totalAll > 0 &&
     categories.every((c) => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error')
+  const anyLoading = categories.some((c) => categoryStatus[c.id] === 'loading')
 
   useEffect(() => {
     if (allDone && visible && !fading) {
@@ -65,7 +67,7 @@ export function LoadingOverlay({
       data-testid="loading-overlay"
     >
       <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-        <div className="text-center mb-4">
+        <div className="text-center mb-3">
           <div className="text-lg font-semibold text-slate-100">
             {allDone ? 'All Data Loaded' : 'Fetching Data...'}
           </div>
@@ -74,9 +76,19 @@ export function LoadingOverlay({
           </div>
         </div>
 
-        <div className="w-full bg-slate-800 rounded-full h-2 mb-5">
+        {/* Live elapsed clock so long free-API waits feel intentional, not stuck */}
+        <ElapsedTimer
+          active={!allDone && (anyLoading || totalLoaded < totalAll)}
+          showHint
+          className="mb-4"
+          testId="loading-overlay-elapsed"
+        />
+
+        <div className="w-full bg-slate-800 rounded-full h-2 mb-5 overflow-hidden">
           <div
-            className={`h-2 rounded-full transition-all duration-500 ${allDone ? 'bg-emerald-500' : 'bg-indigo-500'}`}
+            className={`h-2 rounded-full transition-all duration-500 ${
+              allDone ? 'bg-emerald-500' : 'bg-indigo-500'
+            } ${!allDone ? 'animate-pulse' : ''}`}
             style={{ width: `${totalAll ? (totalLoaded / totalAll) * 100 : 0}%` }}
           />
         </div>
@@ -120,7 +132,7 @@ export function LoadingOverlay({
         </div>
         <p className="mt-3 text-[10px] text-slate-600 text-center leading-relaxed">
           Molecule profile categories only. Gene explorer data loads on gene pages (search a gene
-          symbol), not here.
+          symbol), not here. Free public APIs — times vary by source.
         </p>
       </div>
     </div>

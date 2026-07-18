@@ -8,16 +8,17 @@ import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import {
   chemblMechanismDeepLink,
   chemblTargetUrl,
+  isStableChemblDeepLink,
   normalizeChemblId,
 } from '@/lib/chemblLinks'
+import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 
 const actionTypeColors: Record<string, string> = {
-  INHIBITOR: 'bg-red-900/40 text-red-300 border-red-700/30',
-  AGONIST: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30',
-  ANTAGONIST: 'bg-amber-900/40 text-amber-300 border-amber-700/30',
+  INHIBITOR: 'text-red-300',
+  AGONIST: 'text-emerald-300',
+  ANTAGONIST: 'text-amber-300',
 }
-
-const defaultColors = 'bg-slate-700/40 text-slate-300 border-slate-600/30'
 
 export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({
   mechanisms,
@@ -66,65 +67,64 @@ export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({
           defaultSortId="phase-desc"
           filterPlaceholder="Filter mechanisms…"
           getKey={(m, i) => `${m.mechanismId || m.mechanismOfAction}-${i}`}
-          className="space-y-3"
-          renderItem={(mech) => {
-            const colors = actionTypeColors[mech.actionType?.toUpperCase()] ?? defaultColors
+          pageSize={8}
+          className="space-y-0"
+          renderItem={(mech, index) => {
             const targetId = normalizeChemblId(mech.targetChemblId)
-            const href =
-              mech.url && !mech.url.endsWith('//') && mech.url.includes('chembl')
-                ? mech.url
-                : chemblMechanismDeepLink({
-                    targetChemblId: mech.targetChemblId,
-                    moleculeChemblId: undefined,
-                  })
+            const href = preferStableDeepLink(
+              isStableChemblDeepLink(mech.url) ? mech.url : null,
+              chemblMechanismDeepLink({
+                targetChemblId: mech.targetChemblId,
+                moleculeChemblId: undefined,
+              }),
+            )
             const targetHref = chemblTargetUrl(mech.targetChemblId)
+            const phaseEmpty = isEmptyMetric(mech.maxPhase)
+            const typeColor =
+              actionTypeColors[mech.actionType?.toUpperCase() || ''] || 'text-slate-300'
             return (
-              <div className="py-3 border-b border-slate-700 last:border-0">
-                <div className="flex items-start justify-between gap-2">
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-semibold text-slate-100 text-sm hover:text-cyan-400 transition-colors"
-                    title="Open in ChEMBL"
+              <div>
+                {index === 0 && (
+                  <div
+                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_5rem_3.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    role="row"
                   >
-                    {mech.mechanismOfAction || 'Mechanism'}
-                    <span className="ml-1 text-[10px] text-cyan-500/80" aria-hidden>
-                      ↗
-                    </span>
-                  </a>
-                  {mech.actionType && (
-                    <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${colors}`}>
-                      {mech.actionType}
-                    </span>
-                  )}
-                </div>
-                {mech.targetName && (
-                  <p className="text-xs text-slate-400 mt-1">Target: {mech.targetName}</p>
+                    <span>Mechanism</span>
+                    <span>Target</span>
+                    <span>Action</span>
+                    <span className="text-right">Phase</span>
+                    <span className="text-right">Open</span>
+                  </div>
                 )}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                  {mech.maxPhase > 0 && (
-                    <span className="text-xs text-slate-400">Max Phase: {mech.maxPhase}</span>
-                  )}
-                  <span className="text-xs text-slate-500">
-                    {mech.directInteraction ? 'Direct interaction' : 'Indirect interaction'}
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open in ChEMBL"
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_5rem_3.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                >
+                  <span className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
+                    {mech.mechanismOfAction || 'Mechanism'}
                   </span>
-                </div>
-                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
-                  {targetId && targetHref && (
-                    <a
-                      href={targetHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-indigo-400/90 hover:text-indigo-300 hover:underline"
-                    >
-                      Target {targetId} ↗
-                    </a>
-                  )}
-                  {mech.moleculeName && (
-                    <span className="text-slate-600">{mech.moleculeName}</span>
-                  )}
-                </div>
+                  <span className="text-xs text-slate-400 truncate" title={mech.targetName}>
+                    {targetId && targetHref ? (
+                      <span className="font-mono text-indigo-400/90">{targetId}</span>
+                    ) : (
+                      mech.targetName || '—'
+                    )}
+                  </span>
+                  <span className={`text-xs truncate ${typeColor}`}>
+                    {mech.actionType || '—'}
+                  </span>
+                  <span
+                    className={`text-xs text-right tabular-nums text-slate-400 ${emptyDataClass(phaseEmpty)}`}
+                  >
+                    {phaseEmpty ? '—' : mech.maxPhase}
+                  </span>
+                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
+                    ↗
+                  </span>
+                </a>
               </div>
             )
           }}

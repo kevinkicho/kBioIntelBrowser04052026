@@ -34,7 +34,10 @@ export async function GET(
   const { geneId, symbol } = parsed
 
   const cacheKey = `gene-category:${geneId}:${symbol}:${categoryId}`
-  const cached = getCached<Record<string, unknown>>(cacheKey)
+  const forceRefresh =
+    request.nextUrl.searchParams.get('refresh') === '1' ||
+    request.nextUrl.searchParams.get('refresh') === 'true'
+  const cached = forceRefresh ? undefined : getCached<Record<string, unknown>>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
   }
@@ -47,7 +50,11 @@ export async function GET(
       return await fetchGene(geneId, symbol)
     })()
 
-    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000)
+    const ac = new AbortController()
+    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000, {
+      abortController: ac,
+      signal: request.signal,
+    })
 
     for (const m of flushApiMetrics()) {
       recordMetric({

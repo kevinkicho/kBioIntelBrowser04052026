@@ -70,7 +70,7 @@ export function identityIdChips(keys?: IdentityKeys): IdentityIdChip[] {
       kind: 'inchikey',
       label: `InChIKey ${inchiKey.slice(0, 14)}…`,
       title: inchiKey,
-      href: `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${encodeURIComponent(inchiKey)}`,
+      href: `https://pubchem.ncbi.nlm.nih.gov/#query=${encodeURIComponent(inchiKey)}`,
     })
   }
   const cid = normalizeCid(keys.cid ?? null)
@@ -88,7 +88,7 @@ export function identityIdChips(keys?: IdentityKeys): IdentityIdChip[] {
       kind: 'chembl',
       label: chemblId,
       title: chemblId,
-      href: `https://www.ebi.ac.uk/chembl/compound_report_card/${chemblId}/`,
+      href: `https://www.ebi.ac.uk/chembl/explore/compound/${chemblId}`,
     })
   }
   if (keys.chebiId?.trim()) {

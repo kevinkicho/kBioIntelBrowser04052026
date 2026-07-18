@@ -20,11 +20,15 @@ export async function getChemblIndicationsByName(name: string): Promise<ChemblIn
     const searchData = await searchRes.json()
     const molecules = searchData.molecules ?? []
     if (molecules.length === 0) return []
-    const chemblId = normalizeChemblId(molecules[0].molecule_chembl_id) || molecules[0].molecule_chembl_id
+    const chemblId =
+      normalizeChemblId(molecules[0].molecule_chembl_id) ||
+      String(molecules[0].molecule_chembl_id || '')
     const moleculeName = molecules[0].pref_name || name
-    // Prefer compound report card DrugIndications (stable) over SPA hash browse URLs
+    // Embed indications table for this molecule (stable explore-era URL)
     const moleculeIndUrl =
-      chemblCompoundIndicationsUrl(chemblId) || chemblCompoundUrl(chemblId) || ''
+      chemblCompoundIndicationsUrl(chemblId) ||
+      chemblCompoundUrl(chemblId) ||
+      ''
 
     const indRes = await fetch(
       `${INDICATION_URL}?molecule_chembl_id=${chemblId}&limit=10`,
@@ -48,6 +52,7 @@ export async function getChemblIndicationsByName(name: string): Promise<ChemblIn
       return {
         indicationId: d.drugind_id != null ? String(d.drugind_id) : `${chemblId}-${meshId || efoId}`,
         moleculeName,
+        moleculeChemblId: chemblId || undefined,
         condition: meshHeading || efoTerm || '',
         maxPhase: Number(d.max_phase_for_ind) || 0,
         maxPhaseForIndication: Number(d.max_phase_for_ind) || 0,
@@ -55,7 +60,6 @@ export async function getChemblIndicationsByName(name: string): Promise<ChemblIn
         meshHeading,
         efoId,
         efoTerm,
-        // Direct: compound indications section (primary) — not broken SPA filter hashes
         url:
           moleculeIndUrl ||
           chemblIndicationDeepLink({

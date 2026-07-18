@@ -154,7 +154,7 @@ Local main is **ahead of origin** (filter/sort + trail hardening). Production Ap
 | P0 | Verify App Hosting secrets: `OLLAMA_API_KEY` grant + effective runtime | Verify on deploy |
 | P1 | Skip localhost Ollama on Cloud Run; cache health; reduce log spam | **Shipped** (`ollamaRuntime.ts`, `ollama.ts`, `/api/ai/health`) |
 | P2 | Structured API outcome logs (5xx / slow / retryable) | **Shipped** (`serverLog.ts` + molecule / category / rank routes) |
-| P3 | Deploy current main to App Hosting | On push/rollout |
+| P3 | Deploy current main to App Hosting | **Rollout created** (commit `4106cec`, branch main) |
 | — | “Eliminate all 502s” by lying about PubChem | **Do not** |
 
 ### As-built knobs

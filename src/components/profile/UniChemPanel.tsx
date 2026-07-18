@@ -4,6 +4,8 @@ import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { UniChemMapping } from '@/lib/types'
+import { unichemMappingDeepLink } from '@/lib/api/unichem'
+import { isBrokenSourceShellUrl, preferStableDeepLink } from '@/lib/deepLinkPolicy'
 import { alphaSortOptions } from '@/lib/listControls'
 
 interface UniChemPanelProps {
@@ -12,7 +14,23 @@ interface UniChemPanelProps {
   lastFetched?: Date
 }
 
-export const UniChemPanel = memo(function UniChemPanel({ mappings, panelId, lastFetched }: UniChemPanelProps) {
+function mappingHref(mapping: UniChemMapping): string {
+  const fallback = unichemMappingDeepLink(
+    mapping.sourceName,
+    mapping.externalId,
+    mapping.sourceId,
+  )
+  return preferStableDeepLink(
+    isBrokenSourceShellUrl(mapping.url) ? null : mapping.url,
+    fallback,
+  )
+}
+
+export const UniChemPanel = memo(function UniChemPanel({
+  mappings,
+  panelId,
+  lastFetched,
+}: UniChemPanelProps) {
   const list = Array.isArray(mappings) ? mappings : []
   const isEmpty = list.length === 0
 
@@ -33,53 +51,65 @@ export const UniChemPanel = memo(function UniChemPanel({ mappings, panelId, last
       title="UniChem Cross-References"
       panelId={panelId}
       lastFetched={lastFetched}
-      className="space-y-4"
-      empty={isEmpty ? 'No cross-reference data found. UniChem provides mappings between chemical databases.' : undefined}
+      empty={
+        isEmpty
+          ? 'No cross-reference data found. UniChem provides mappings between chemical databases.'
+          : undefined
+      }
     >
       {!isEmpty && (
         <>
-          <p className="text-sm text-slate-400">
-            Cross-references from EMBL-EBI UniChem, mapping this compound across multiple chemical databases.
+          <p className="text-xs text-slate-400 mb-2">
+            Each row opens the matching record in the source database (not the UniChem homepage).
           </p>
-
-          <div className="space-y-2">
-            <h3 className="text-sm font-semibold uppercase tracking-wider text-slate-400">
-              Database Mappings ({list.length})
-            </h3>
-            <FilterablePaginatedList
-              items={list}
-              getSearchText={(mapping) =>
-                [mapping.sourceName, mapping.externalId, mapping.sourceId]
-                  .filter(Boolean)
-                  .join(' ')
-              }
-              sortOptions={sortOptions}
-              defaultSortId="name-asc"
-              filterPlaceholder="Filter mappings (source, ID…)"
-              getKey={(mapping, idx) => `${mapping.sourceId}-${mapping.externalId}-${idx}`}
-              pageSize={10}
-              renderItem={(mapping) => (
-                <div className="p-3 rounded-lg bg-slate-800/30 border border-slate-700">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium text-slate-100 text-sm">{mapping.sourceName}</p>
-                      <p className="text-xs text-slate-400 truncate">ID: {mapping.externalId}</p>
+          <FilterablePaginatedList
+            items={list}
+            getSearchText={(mapping) =>
+              [mapping.sourceName, mapping.externalId, mapping.sourceId]
+                .filter(Boolean)
+                .join(' ')
+            }
+            sortOptions={sortOptions}
+            defaultSortId="name-asc"
+            filterPlaceholder="Filter mappings (source, ID…)"
+            getKey={(mapping, idx) => `${mapping.sourceId}-${mapping.externalId}-${idx}`}
+            pageSize={10}
+            className="space-y-0"
+            renderItem={(mapping, index) => {
+              const href = mappingHref(mapping)
+              return (
+                <div>
+                  {index === 0 && (
+                    <div
+                      className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_3rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                      role="row"
+                    >
+                      <span>Source</span>
+                      <span>External ID</span>
+                      <span className="text-right">Open</span>
                     </div>
-                    {mapping.url && (
-                      <a
-                        href={mapping.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs text-blue-400 hover:text-blue-300 whitespace-nowrap"
-                      >
-                        View →
-                      </a>
-                    )}
-                  </div>
+                  )}
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open ${mapping.sourceName} record ${mapping.externalId}`}
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)_3rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                  >
+                    <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                      {mapping.sourceName || mapping.sourceId || '—'}
+                    </span>
+                    <span className="text-xs font-mono text-slate-400 truncate">
+                      {mapping.externalId || '—'}
+                    </span>
+                    <span className="text-xs text-blue-400 group-hover:text-blue-300 text-right">
+                      ↗
+                    </span>
+                  </a>
                 </div>
-              )}
-            />
-          </div>
+              )
+            }}
+          />
         </>
       )}
     </Panel>

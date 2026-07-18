@@ -9,8 +9,11 @@ import {
   chemblActivityDeepLink,
   chemblCompoundUrl,
   chemblTargetUrl,
+  isStableChemblDeepLink,
   normalizeChemblId,
 } from '@/lib/chemblLinks'
+import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 
 const ASSAY_TYPE_LABELS: Record<string, string> = {
   B: 'Binding',
@@ -20,78 +23,14 @@ const ASSAY_TYPE_LABELS: Record<string, string> = {
   P: 'Physicochemical',
 }
 
-function ChemblActivityItem({ activity }: { activity: ChemblActivity }) {
-  const targetId = normalizeChemblId(activity.targetChemblId)
-  const molId = normalizeChemblId(activity.chemblId)
-  const targetHref =
-    chemblTargetUrl(activity.targetChemblId) ||
-    chemblActivityDeepLink({
-      targetChemblId: activity.targetChemblId,
-      moleculeChemblId: activity.chemblId,
-      chemblId: activity.chemblId,
-    })
-  const molHref = chemblCompoundUrl(activity.chemblId)
-  const rowHref =
-    activity.url?.includes('chembl') && !activity.url.endsWith('//')
-      ? activity.url
-      : targetHref
-
-  return (
-    <div className="py-3 border-b border-slate-700 last:border-0">
-      <div className="flex items-start justify-between gap-2">
-        <a
-          href={rowHref}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-semibold text-slate-100 text-sm hover:text-cyan-400 transition-colors"
-          title="Open in ChEMBL"
-        >
-          {activity.targetName || 'Unknown target'}
-          <span className="ml-1 text-[10px] text-cyan-500/80" aria-hidden>
-            ↗
-          </span>
-        </a>
-        <span className="text-xs bg-teal-900/40 text-teal-300 border border-teal-700/30 px-2 py-0.5 rounded shrink-0">
-          {activity.activityType || activity.standardType}
-        </span>
-      </div>
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-        <span className="text-sm text-slate-300">
-          {activity.activityValue} {activity.activityUnits}
-        </span>
-        <span className="text-xs text-slate-500">
-          {ASSAY_TYPE_LABELS[activity.assayType] ?? activity.assayType}
-        </span>
-        {typeof activity.pchemblValue === 'number' && activity.pchemblValue > 0 && (
-          <span className="text-xs text-slate-500 tabular-nums">
-            pChEMBL {activity.pchemblValue.toFixed(1)}
-          </span>
-        )}
-      </div>
-      <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[10px]">
-        {targetId && (
-          <a
-            href={chemblTargetUrl(targetId) || rowHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-indigo-400/90 hover:text-indigo-300 hover:underline"
-          >
-            Target {targetId} ↗
-          </a>
-        )}
-        {molId && molHref && (
-          <a
-            href={molHref}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono text-emerald-400/90 hover:text-emerald-300 hover:underline"
-          >
-            Molecule {molId} ↗
-          </a>
-        )}
-      </div>
-    </div>
-  )
+function formatActivityValue(a: ChemblActivity): string {
+  if (typeof a.pchemblValue === 'number' && a.pchemblValue > 0) {
+    return `pChEMBL ${a.pchemblValue.toFixed(1)}`
+  }
+  if (typeof a.activityValue === 'number' && Number.isFinite(a.activityValue) && a.activityValue !== 0) {
+    return `${a.activityValue} ${a.activityUnits || a.standardUnits || ''}`.trim()
+  }
+  return '—'
 }
 
 export const ChemblPanel = memo(function ChemblPanel({
@@ -108,7 +47,7 @@ export const ChemblPanel = memo(function ChemblPanel({
   const compoundHref = chemblCompoundUrl(molId)
   const sortOptions = useMemo(
     () => [
-      ...numberSortOptions<ChemblActivity>((a) => a.activityValue ?? a.pchemblValue ?? 0, {
+      ...numberSortOptions<ChemblActivity>((a) => a.pchemblValue ?? a.activityValue ?? 0, {
         high: 'Highest activity',
         low: 'Lowest activity',
         idPrefix: 'activity',
@@ -120,9 +59,12 @@ export const ChemblPanel = memo(function ChemblPanel({
 
   if (list.length === 0) {
     return (
-      <Panel title="Bioactivity (ChEMBL)" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No bioactivity data found for this molecule.</p>
-      </Panel>
+      <Panel
+        title="Bioactivity (ChEMBL)"
+        panelId={panelId}
+        lastFetched={lastFetched}
+        empty="No bioactivity data found for this molecule."
+      />
     )
   }
 
@@ -163,8 +105,70 @@ export const ChemblPanel = memo(function ChemblPanel({
         defaultSortId="activity-desc"
         filterPlaceholder="Filter activities (target, type…)"
         getKey={(a, i) => `${a.targetChemblId || a.targetName}-${a.activityType}-${i}`}
-        className="space-y-3"
-        renderItem={(activity) => <ChemblActivityItem activity={activity} />}
+        pageSize={8}
+        className="space-y-0"
+        renderItem={(activity, index) => {
+          const targetId = normalizeChemblId(activity.targetChemblId)
+          const targetHref = chemblTargetUrl(activity.targetChemblId)
+          const rowHref = preferStableDeepLink(
+            isStableChemblDeepLink(activity.url) ? activity.url : null,
+            chemblActivityDeepLink({
+              targetChemblId: activity.targetChemblId,
+              moleculeChemblId: activity.chemblId,
+              chemblId: activity.chemblId,
+            }),
+          )
+          const potency = formatActivityValue(activity)
+          const emptyPotency = potency === '—'
+          return (
+            <div>
+              {index === 0 && (
+                <div
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(4rem,0.7fr)_minmax(5rem,0.9fr)_4rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                  role="row"
+                >
+                  <span>Target</span>
+                  <span>Type</span>
+                  <span>Potency</span>
+                  <span>Assay</span>
+                  <span className="text-right">Open</span>
+                </div>
+              )}
+              <a
+                href={rowHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                title={`Open ${activity.targetName || 'activity'} in ChEMBL`}
+                className="grid grid-cols-[minmax(0,1.4fr)_minmax(4rem,0.7fr)_minmax(5rem,0.9fr)_4rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+              >
+                <div className="min-w-0">
+                  <div className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
+                    {activity.targetName || 'Unknown target'}
+                  </div>
+                  {targetId && (
+                    <div className="text-[10px] font-mono text-slate-600 truncate">
+                      {targetHref ? targetId : targetId}
+                    </div>
+                  )}
+                </div>
+                <span className="text-xs text-teal-300/90 truncate">
+                  {activity.activityType || activity.standardType || '—'}
+                </span>
+                <span
+                  className={`text-xs font-mono text-emerald-400/95 tabular-nums truncate ${emptyDataClass(emptyPotency)}`}
+                >
+                  {potency}
+                </span>
+                <span
+                  className={`text-[10px] text-slate-500 truncate ${emptyDataClass(isEmptyMetric(activity.assayType))}`}
+                >
+                  {ASSAY_TYPE_LABELS[activity.assayType] ?? activity.assayType ?? '—'}
+                </span>
+                <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
+              </a>
+            </div>
+          )
+        }}
       />
     </Panel>
   )

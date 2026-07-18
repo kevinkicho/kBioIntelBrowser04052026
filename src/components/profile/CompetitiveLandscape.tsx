@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
+import { chemblCompoundUrl, chemblTargetUrl, normalizeChemblId } from '@/lib/chemblLinks'
 import type { ChemblActivity, RelatedCompound } from '@/lib/types'
 
 interface Props {
@@ -9,13 +10,57 @@ interface Props {
   currentChemblId: string
 }
 
+function phaseLabel(phase: number | null | undefined): string {
+  if (phase == null || !Number.isFinite(phase) || phase <= 0) return '—'
+  if (phase >= 4) return 'Approved'
+  return `Ph ${Math.floor(phase)}`
+}
+
+function formatActivity(comp: RelatedCompound): string {
+  if (typeof comp.pchemblValue === 'number' && comp.pchemblValue > 0) {
+    return `pChEMBL ${comp.pchemblValue.toFixed(1)}`
+  }
+  if (typeof comp.activityValue === 'number' && comp.activityValue > 0) {
+    const units = (comp.activityUnits || 'nM').trim()
+    const v = comp.activityValue
+    if (v >= 1000 && units.toLowerCase() === 'nm') {
+      return `${(v / 1000).toFixed(2)} µM`
+    }
+    if (v < 0.01 || v >= 10000) return `${v.toExponential(2)} ${units}`
+    return `${Number.isInteger(v) ? v : v.toFixed(v < 10 ? 2 : 1)} ${units}`
+  }
+  return '—'
+}
+
+function displayName(comp: RelatedCompound): string {
+  const n = (comp.name || comp.compoundName || '').trim()
+  if (n && n !== comp.chemblId) return n
+  return comp.chemblId || 'Unknown'
+}
+
 export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
   const [targetMolecules, setTargetMolecules] = useState<Record<string, RelatedCompound[]>>({})
   const [loading, setLoading] = useState(true)
 
-  // Extract unique targets with significant activity
-  const topTargets = Array.from(new Set(activities.map(a => a.targetChemblId)))
-    .slice(0, 3) // Limit to top 3 targets for density
+  const currentId = normalizeChemblId(currentChemblId) || currentChemblId
+
+  // Prefer targets that appear most often / with measured IC50-like rows
+  const topTargets = useMemo(() => {
+    const counts = new Map<string, { count: number; name: string }>()
+    for (const a of activities) {
+      const id = normalizeChemblId(a.targetChemblId) || a.targetChemblId
+      if (!id) continue
+      const prev = counts.get(id)
+      counts.set(id, {
+        count: (prev?.count ?? 0) + 1,
+        name: a.targetName || prev?.name || id,
+      })
+    }
+    return Array.from(counts.entries())
+      .sort((a, b) => b[1].count - a[1].count)
+      .slice(0, 3)
+      .map(([id, meta]) => ({ id, name: meta.name }))
+  }, [activities])
 
   useEffect(() => {
     if (topTargets.length === 0) {
@@ -23,83 +68,165 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
       return
     }
 
-    async function fetchCompettivity() {
+    let cancelled = false
+
+    async function fetchCompetitivity() {
       const results: Record<string, RelatedCompound[]> = {}
-      for (const targetId of topTargets) {
-        try {
-          const res = await clientFetch(`/api/competitive/${targetId}`)
-          if (res.ok) {
-            const data = await res.json()
-            // Filter out the current molecule and limit to top 5 competitors
-            results[targetId] = data
-              .filter((c: RelatedCompound) => c.chemblId !== currentChemblId)
-              .slice(0, 5)
+      await Promise.all(
+        topTargets.map(async ({ id }) => {
+          try {
+            const res = await clientFetch(`/api/competitive/${encodeURIComponent(id)}`)
+            if (!res.ok) return
+            const data = (await res.json()) as RelatedCompound[]
+            if (!Array.isArray(data)) return
+            results[id] = data
+              .filter((c) => {
+                const cid = normalizeChemblId(c.chemblId) || c.chemblId
+                return cid && cid !== currentId
+              })
+              .slice(0, 8)
+          } catch (e) {
+            console.error('Failed to fetch competitive data for', id, e)
           }
-        } catch (e) {
-          console.error('Failed to fetch competitive data for', targetId, e)
-        }
+        }),
+      )
+      if (!cancelled) {
+        setTargetMolecules(results)
+        setLoading(false)
       }
-      setTargetMolecules(results)
-      setLoading(false)
     }
 
-    fetchCompettivity()
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activities, currentChemblId])
+    setLoading(true)
+    fetchCompetitivity()
+    return () => {
+      cancelled = true
+    }
+  }, [topTargets, currentId])
 
   if (loading) {
     return (
       <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 animate-pulse h-64">
-        <div className="h-4 w-32 bg-slate-700 mb-4 rounded" />
-        <div className="space-y-3">
-          {[1,2,3,4].map(i => <div key={i} className="h-8 bg-slate-700/50 rounded" />)}
+        <div className="h-4 w-40 bg-slate-700 mb-4 rounded" />
+        <div className="space-y-2">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className="h-7 bg-slate-700/50 rounded" />
+          ))}
         </div>
       </div>
     )
   }
 
-  if (Object.keys(targetMolecules).length === 0) return null
+  const sections = topTargets
+    .map((t) => ({
+      ...t,
+      competitors: targetMolecules[t.id] ?? [],
+    }))
+    .filter((s) => s.competitors.length > 0)
+
+  if (sections.length === 0) return null
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 overflow-hidden">
-      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-4 flex items-center gap-2">
-        <span>🏟️ Competitive Landscape</span>
-        <span className="text-[10px] lowercase font-normal text-slate-500">(based on shared targets)</span>
+    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 sm:p-5 overflow-hidden">
+      <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-1 flex items-center gap-2">
+        <span>Competitive Landscape</span>
       </h3>
+      <p className="text-[11px] text-slate-500 mb-3">
+        Other molecules with measured IC50 on shared ChEMBL targets (most potent / later phase first).
+      </p>
 
-      <div className="space-y-6">
-        {topTargets.map(targetId => {
-          const competitors = targetMolecules[targetId]
-          const targetName = activities.find(a => a.targetChemblId === targetId)?.targetName || targetId
-          if (!competitors || competitors.length === 0) return null
-
+      <div className="space-y-5">
+        {sections.map(({ id, name, competitors }) => {
+          const targetHref = chemblTargetUrl(id)
           return (
-            <div key={targetId}>
-              <div className="text-[11px] font-medium text-indigo-400 mb-2 truncate" title={targetName}>
-                Target: {targetName}
+            <div key={id}>
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <div className="min-w-0">
+                  {targetHref ? (
+                    <a
+                      href={targetHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 truncate block"
+                      title={name}
+                    >
+                      Target: {name}
+                      <span className="ml-1 text-[9px] text-indigo-500/80">↗</span>
+                    </a>
+                  ) : (
+                    <div className="text-[11px] font-medium text-indigo-400 truncate" title={name}>
+                      Target: {name}
+                    </div>
+                  )}
+                  <div className="text-[10px] font-mono text-slate-600">{id}</div>
+                </div>
+                <span className="text-[10px] text-slate-600 shrink-0">
+                  {competitors.length} competitor{competitors.length !== 1 ? 's' : ''}
+                </span>
               </div>
-              <div className="grid grid-cols-1 gap-1.5">
-                {competitors.map((comp, idx) => (
-                  <div 
-                    key={`${targetId}-${comp.chemblId}-${idx}`}
-                    className="flex items-center justify-between p-2 rounded bg-slate-900/40 border border-slate-800 hover:border-slate-700 transition-colors group"
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-xs font-medium text-slate-200 truncate group-hover:text-indigo-300">
-                        {comp.name}
-                      </span>
-                      <span className="text-[10px] text-slate-500">Phase {comp.maxPhase}</span>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <div className="text-xs font-mono text-emerald-400">
-                        {typeof comp.activityValue === 'number' && comp.activityValue > 0 
-                          ? `${comp.activityValue.toFixed(1)}nM` 
-                          : 'Active'}
+
+              {/* Aligned listview columns */}
+              <div
+                className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem_2.5rem] gap-x-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                role="row"
+              >
+                <span>Compound</span>
+                <span>Phase</span>
+                <span>Potency</span>
+                <span>Type</span>
+                <span className="text-right">Open</span>
+              </div>
+
+              <div className="divide-y divide-slate-800/80">
+                {competitors.map((comp, idx) => {
+                  const href =
+                    comp.url ||
+                    chemblCompoundUrl(comp.chemblId) ||
+                    `https://www.ebi.ac.uk/chembl/explore/compound/${comp.chemblId}`
+                  const label = displayName(comp)
+                  const potency = formatActivity(comp)
+                  const phase = phaseLabel(comp.maxPhase)
+                  return (
+                    <a
+                      key={`${id}-${comp.chemblId}-${idx}`}
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      title={`Open ${label} in ChEMBL`}
+                      className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem_2.5rem] gap-x-2 items-center px-2 py-1.5 hover:bg-slate-900/50 transition-colors group"
+                    >
+                      <div className="min-w-0">
+                        <div className="text-xs font-medium text-slate-100 group-hover:text-indigo-300 truncate">
+                          {label}
+                        </div>
+                        {label !== comp.chemblId && (
+                          <div className="text-[10px] font-mono text-slate-600 truncate">
+                            {comp.chemblId}
+                          </div>
+                        )}
                       </div>
-                      <div className="text-[9px] text-slate-600 uppercase">{comp.activityType}</div>
-                    </div>
-                  </div>
-                ))}
+                      <span
+                        className={`text-[11px] tabular-nums ${
+                          comp.maxPhase >= 4
+                            ? 'text-emerald-400'
+                            : comp.maxPhase >= 2
+                              ? 'text-amber-300/90'
+                              : 'text-slate-500'
+                        }`}
+                      >
+                        {phase}
+                      </span>
+                      <span className="text-xs font-mono text-emerald-400/95 tabular-nums truncate">
+                        {potency}
+                      </span>
+                      <span className="text-[10px] text-slate-500 uppercase truncate">
+                        {comp.activityType || 'IC50'}
+                      </span>
+                      <span className="text-[11px] text-cyan-400 group-hover:text-cyan-300 text-right">
+                        ↗
+                      </span>
+                    </a>
+                  )
+                })}
               </div>
             </div>
           )

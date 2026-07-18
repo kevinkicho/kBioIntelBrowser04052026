@@ -39,7 +39,7 @@ export const FIXTURE_CHEMBL_ACTIVITIES: ChemblActivity[] = [
     activityType: 'IC50',
     activityValue: 0.04,
     activityUnits: 'uM',
-    url: 'https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25/',
+    url: 'https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL25',
   },
   {
     activityId: 'ACT_002',
@@ -55,7 +55,7 @@ export const FIXTURE_CHEMBL_ACTIVITIES: ChemblActivity[] = [
     activityType: 'IC50',
     activityValue: 5.2,
     activityUnits: 'uM',
-    url: 'https://www.ebi.ac.uk/chembl/compound_report_card/CHEMBL25/',
+    url: 'https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL25',
   },
 ]
 

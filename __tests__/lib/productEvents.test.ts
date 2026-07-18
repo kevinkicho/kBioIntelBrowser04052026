@@ -47,6 +47,13 @@ describe('productEvents clean-cut (canonical only)', () => {
     expect(PRODUCT_EVENT_METRIC.preference_tooltip_opened).toBe('M9')
   })
 
+  test('source_deep_link_opened is first-class (M6)', () => {
+    emitProductEvent('source_deep_link_opened', { source: 'chembl', panelId: 'chembl' })
+    expect(readQueuedProductEvents().map((e) => e.name)).toContain('source_deep_link_opened')
+    expect(PRODUCT_EVENT_METRIC.source_deep_link_opened).toBe('M6')
+    expect(PRODUCT_EVENT_LABELS.source_deep_link_opened).toMatch(/deep link/i)
+  })
+
   test('labels cover all event names', () => {
     expect(productEventLabel('pack_exported')).toBe('Pack exported')
     expect(productEventLabel('unknown_event')).toMatch(/unknown/)

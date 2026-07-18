@@ -18,7 +18,7 @@ import { searchChemSpider } from '@/lib/api/chemspider'
 import { searchMetaboLights } from '@/lib/api/metabolights'
 import { searchGNPSLibrary, searchGNPSNetworks } from '@/lib/api/gnps'
 import { searchLipidMaps } from '@/lib/api/lipidmaps'
-import { getAllCompoundIds } from '@/lib/api/unichem'
+import { getAllCompoundIds, unichemMappingDeepLink } from '@/lib/api/unichem'
 import { searchFooDB } from '@/lib/api/foodb'
 
 async function fetchSynthesisRoutes(moleculeName: string): Promise<SynthesisRoute[]> {
@@ -54,16 +54,34 @@ export async function fetchMolecularChemical(name: string, cid: number, molecula
     trackedSafe('comptox', getCompToxByName(queryFor('comptox')), null),
     trackedSafe('synthesis-routes', fetchSynthesisRoutes(name), []),
     trackedSafe('metabolomics', getMetabolomicsData(name, molecularWeight), { metabolites: [], studies: [] }),
-    trackedSafe('mychem', getMyChemData(queryFor('mychem')), { chemicals: [] }),
+    // Prefer /chem/{cid} annotation then fielded name search (avoids NDC-only "Unknown compound" hits)
+    trackedSafe('mychem', getMyChemData(queryFor('mychem'), { cid }), { chemicals: [] }),
     trackedSafe('hmdb', getHMDBData(queryFor('hmdb')), { metabolites: [] }),
     trackedSafe('massbank', searchMassBank(queryFor('massbank')), [], API_SOURCE_TIMEOUTS['massbank']),
     trackedSafe('chemspider', searchChemSpider(queryFor('chemspider')), []),
     trackedSafe('metabolights', searchMetaboLights(name), []),
     trackedSafe('gnps-library', Promise.all([searchGNPSLibrary(name), searchGNPSNetworks(name)]).then(([spectra, clusters]) => ({ spectra, clusters })), { spectra: [], clusters: [] }),
     trackedSafe('lipidmaps', searchLipidMaps(queryFor('lipidmaps')), { lipids: [], total: 0 }),
-    trackedSafe('unichem', getAllCompoundIds('pubchem', String(cid)), { inchiKey: null, mappings: {} }),
+    trackedSafe('unichem', getAllCompoundIds('pubchem', String(cid)), {
+      inchiKey: null,
+      mappings: {},
+      mappingList: [],
+    }),
     trackedSafe('foodb', searchFooDB(name), []),
   ])
+
+  // Prefer API-built mappingList (with real DB deep links). Fall back to map entries
+  // rebuilt through unichemMappingDeepLink — never UniChem SPA hash URLs.
+  const unichemMappings =
+    Array.isArray(unichemResult.mappingList) && unichemResult.mappingList.length > 0
+      ? unichemResult.mappingList
+      : Object.entries(unichemResult.mappings || {}).map(([source, id]) => ({
+          sourceId: source.toLowerCase(),
+          sourceName: source,
+          externalId: String(id),
+          url: unichemMappingDeepLink(source, String(id)),
+        }))
+
   return {
     computedProperties,
     ghsHazards,
@@ -78,12 +96,7 @@ export async function fetchMolecularChemical(name: string, cid: number, molecula
     metabolightsData: { studies: metabolightsData, metabolites: [] },
     gnpsData,
     lipidMapsLipids: lipidMapsResult.lipids,
-    unichemMappings: Object.entries(unichemResult.mappings).map(([source, id]) => ({
-      sourceId: source.toLowerCase(),
-      sourceName: source,
-      externalId: id,
-      url: `https://www.ebi.ac.uk/unichem/#/search/${source.toLowerCase()}/${encodeURIComponent(id)}`,
-    })),
+    unichemMappings,
     foodbCompounds,
   }
 }

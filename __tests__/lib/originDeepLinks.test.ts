@@ -13,10 +13,18 @@ describe('originSourceDeepLink', () => {
     expect(r.href).toBe('https://pubchem.ncbi.nlm.nih.gov/compound/2244')
   })
 
-  test('DGIdb uses molecule name in search', () => {
+  test('DGIdb uses drug results search for molecule name', () => {
     const r = originSourceDeepLink('dgidb', ctx)
-    expect(r.href).toContain('dgidb.org')
-    expect(r.href).toContain(encodeURIComponent('Aspirin'))
+    expect(r.href).toBe(
+      'https://www.dgidb.org/results?searchType=drug&searchTerms=Aspirin',
+    )
+  })
+
+  test('DGIdb prefers gene results when geneSymbol is set', () => {
+    const r = originSourceDeepLink('dgidb', { ...ctx, geneSymbol: 'PTGS2' })
+    expect(r.href).toBe(
+      'https://www.dgidb.org/results?searchType=gene&searchTerms=PTGS2',
+    )
   })
 
   test('ClinicalTrials includes name and disease', () => {
@@ -25,10 +33,10 @@ describe('originSourceDeepLink', () => {
     expect(r.href).toContain('Aspirin')
   })
 
-  test('ChEMBL prefers compound report card', () => {
+  test('ChEMBL prefers explore compound page', () => {
     const r = originSourceDeepLink('chembl-indication', ctx)
     expect(r.href).toContain('CHEMBL25')
-    expect(r.href).toContain('compound_report_card')
+    expect(r.href).toContain('explore/compound')
   })
 
   test('manual has no external link', () => {
@@ -42,9 +50,10 @@ describe('originSourceDeepLink', () => {
     expect(r.href).toContain('Aspirin')
   })
 
-  test('ChEMBL Mechanisms → compound report card', () => {
+  test('ChEMBL Mechanisms → explore compound page', () => {
     const r = originSourceDeepLink('ChEMBL Mechanisms', ctx)
     expect(r.href).toContain('CHEMBL25')
+    expect(r.href).toContain('explore/compound')
   })
 })
 

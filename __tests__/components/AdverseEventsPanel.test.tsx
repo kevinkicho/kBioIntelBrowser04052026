@@ -36,9 +36,10 @@ describe('AdverseEventsPanel', () => {
     expect(screen.getByText(/1,?523/)).toBeInTheDocument()
   })
 
-  test('renders serious count', () => {
+  test('renders serious count in table', () => {
     render(<AdverseEventsPanel adverseEvents={mockEvents} />)
-    expect(screen.getByText(/45 serious/)).toBeInTheDocument()
+    expect(screen.getByText('45')).toBeInTheDocument()
+    expect(screen.getByText('Serious')).toBeInTheDocument()
   })
 
   test('renders empty state when no events', () => {

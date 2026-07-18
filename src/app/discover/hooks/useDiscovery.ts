@@ -352,6 +352,8 @@ export function useDiscovery() {
           throw new Error(data.error ?? data.message ?? `Request failed (${res.status})`)
         }
         const data: RankResult = await res.json()
+        // Superseded by a newer search (or unmount abort) — do not clobber UI/cache
+        if (controller.signal.aborted || abortRef.current !== controller) return
         try {
           setCachedDiscoverRank(cacheKey, data)
         } catch {
@@ -366,6 +368,7 @@ export function useDiscovery() {
             multiHit: true,
             count: candidates.length,
           })
+          if (controller.signal.aborted || abortRef.current !== controller) return
           setState((prev) => ({
             ...prev,
             status: 'confirm_disease',
@@ -451,6 +454,8 @@ export function useDiscovery() {
           }
         }
 
+        if (controller.signal.aborted || abortRef.current !== controller) return
+
         const finalDiseaseId = data.diseaseId ?? diseaseId ?? null
         const href = buildDiscoverHistoryHref(
           data.diseaseName || effectiveQuery,
@@ -501,6 +506,8 @@ export function useDiscovery() {
           )
           return
         }
+        // Non-abort error after a newer search started — do not clobber
+        if (abortRef.current !== controller) return
 
         setState((prev) => ({
           ...prev,

@@ -76,13 +76,82 @@ const API_TIMEOUTS: Record<string, number> = {
   'gene': 12000,
 }
 
-export function withTimeout<T>(promise: Promise<T>, ms?: number): Promise<T> {
+export interface WithTimeoutOptions {
+  /** Reject immediately / on abort when this signal fires. */
+  signal?: AbortSignal
+  /**
+   * When timeout fires, abort this controller so linked `fetch(..., { signal })`
+   * work stops (best-effort; underlying clients must pass the signal).
+   */
+  abortController?: AbortController
+}
+
+/**
+ * Race a promise against a wall-clock timeout.
+ * Optional AbortSignal cancels the wait; optional abortController is aborted on timeout.
+ */
+export function withTimeout<T>(
+  promise: Promise<T>,
+  ms?: number,
+  options?: WithTimeoutOptions,
+): Promise<T> {
   const timeout = ms ?? DEFAULT_API_TIMEOUT
+  const signal = options?.signal
+  const abortController = options?.abortController
+
+  if (signal?.aborted) {
+    return Promise.reject(
+      signal.reason instanceof Error
+        ? signal.reason
+        : new DOMException('Aborted', 'AbortError'),
+    )
+  }
+
   return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(`API call timed out after ${timeout}ms`)), timeout)
+    let settled = false
+    const timer = setTimeout(() => {
+      if (settled) return
+      settled = true
+      cleanup()
+      try {
+        abortController?.abort()
+      } catch {
+        /* ignore */
+      }
+      reject(new Error(`API call timed out after ${timeout}ms`))
+    }, timeout)
+
+    const onAbort = () => {
+      if (settled) return
+      settled = true
+      cleanup()
+      reject(
+        signal?.reason instanceof Error
+          ? signal.reason
+          : new DOMException('Aborted', 'AbortError'),
+      )
+    }
+
+    function cleanup() {
+      clearTimeout(timer)
+      if (signal) signal.removeEventListener('abort', onAbort)
+    }
+
+    if (signal) signal.addEventListener('abort', onAbort, { once: true })
+
     promise.then(
-      (val) => { clearTimeout(timer); resolve(val) },
-      (err) => { clearTimeout(timer); reject(err) },
+      (val) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        resolve(val)
+      },
+      (err) => {
+        if (settled) return
+        settled = true
+        cleanup()
+        reject(err)
+      },
     )
   })
 }

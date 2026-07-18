@@ -32,10 +32,15 @@ describe('ChemblPanel', () => {
     expect(screen.getByText('IC50')).toBeInTheDocument()
   })
 
-  test('renders activity value with units', () => {
+  test('prefers pChEMBL in potency column when present', () => {
     render(<ChemblPanel activities={mockActivities} />)
-    expect(screen.getByText(/0\.04/)).toBeInTheDocument()
-    expect(screen.getByText(/uM/)).toBeInTheDocument()
+    expect(screen.getByText(/pChEMBL 7\.4/)).toBeInTheDocument()
+  })
+
+  test('table headers present', () => {
+    render(<ChemblPanel activities={mockActivities} />)
+    expect(screen.getByText('Target')).toBeInTheDocument()
+    expect(screen.getByText('Potency')).toBeInTheDocument()
   })
 
   test('renders empty state when no activities', () => {

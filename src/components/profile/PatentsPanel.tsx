@@ -5,62 +5,8 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { Patent } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
-
-function PatentItem({ patent }: { patent: Patent }) {
-  const href = patent.patentNumber
-    ? `https://patents.google.com/patent/${encodeURIComponent(patent.patentNumber)}`
-    : undefined
-  return (
-    <div className="py-2 border-b border-slate-700/60 last:border-0">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          {href ? (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-slate-100 text-sm hover:text-cyan-300"
-            >
-              {patent.title}
-            </a>
-          ) : (
-            <p className="font-semibold text-slate-100 text-sm">{patent.title}</p>
-          )}
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            {[patent.assignee, patent.status].filter(Boolean).join(' · ')}
-          </p>
-          <p className="text-[10px] text-slate-600 mt-0.5">
-            {[
-              patent.filingDate && `Filed ${patent.filingDate}`,
-              patent.publicationDate && `Pub ${patent.publicationDate}`,
-              patent.expirationDate && `Exp ${patent.expirationDate}`,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-          {patent.abstract && (
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2">{patent.abstract}</p>
-          )}
-        </div>
-        <div className="shrink-0 flex flex-col items-end gap-1">
-          <span className="text-[10px] font-mono bg-cyan-900/40 text-cyan-300 border border-cyan-700/30 px-1.5 py-0.5 rounded">
-            {patent.patentNumber}
-          </span>
-          {href && (
-            <a
-              href={href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-cyan-400 hover:text-cyan-300"
-            >
-              Patent ↗
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  )
-}
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 export const PatentsPanel = memo(function PatentsPanel({
   patents,
@@ -90,30 +36,91 @@ export const PatentsPanel = memo(function PatentsPanel({
 
   if (list.length === 0) {
     return (
-      <Panel title="USPTO Patents" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No patents found for this molecule.</p>
-      </Panel>
+      <Panel
+        title="USPTO Patents"
+        panelId={panelId}
+        lastFetched={lastFetched}
+        empty="No patents found for this molecule."
+      />
     )
   }
 
   return (
-    <Panel
-      title={`USPTO Patents (${list.length})`}
-      panelId={panelId}
-      lastFetched={lastFetched}
-    >
+    <Panel title={`USPTO Patents (${list.length})`} panelId={panelId} lastFetched={lastFetched}>
       <FilterablePaginatedList
         items={list}
         getSearchText={(p) =>
-          [p.title, p.patentNumber, p.assignee, p.status, p.abstract, p.filingDate]
-            .filter(Boolean)
-            .join(' ')
+          [p.title, p.patentNumber, p.assignee, p.status, p.abstract].filter(Boolean).join(' ')
         }
         sortOptions={sortOptions}
         defaultSortId="date-desc"
-        filterPlaceholder="Filter patents (title, number, assignee…)"
+        filterPlaceholder="Filter patents…"
         getKey={(p, i) => `${p.patentNumber}-${i}`}
-        renderItem={(patent) => <PatentItem patent={patent} />}
+        pageSize={8}
+        className="space-y-0"
+        renderItem={(patent, index) => {
+          const href = patent.patentNumber
+            ? `https://patents.google.com/patent/${encodeURIComponent(patent.patentNumber)}`
+            : null
+          const date = patent.filingDate || patent.publicationDate || ''
+          const row = (
+            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_minmax(0,0.9fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group">
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
+                  {patent.title || '—'}
+                </div>
+                {patent.abstract && (
+                  <div className="text-[10px] text-slate-600 line-clamp-1">{patent.abstract}</div>
+                )}
+              </div>
+              <span className="text-[10px] font-mono text-cyan-300/90 truncate">
+                {patent.patentNumber || '—'}
+              </span>
+              <span className="text-[11px] text-slate-500 truncate" title={patent.assignee}>
+                {patent.assignee || '—'}
+              </span>
+              <span
+                className={`text-[11px] text-slate-500 tabular-nums truncate ${emptyDataClass(isEmptyMetric(date))}`}
+              >
+                {date || '—'}
+              </span>
+              <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
+            </div>
+          )
+          return (
+            <div>
+              {index === 0 && (
+                <div
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_minmax(0,0.9fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                  role="row"
+                >
+                  <span>Title</span>
+                  <span>Number</span>
+                  <span>Assignee</span>
+                  <span>Date</span>
+                  <span className="text-right">Open</span>
+                </div>
+              )}
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    onDeepLinkClick('patents', href, {
+                      panelId: 'patents',
+                      label: patent.patentNumber,
+                    })
+                  }
+                >
+                  {row}
+                </a>
+              ) : (
+                row
+              )}
+            </div>
+          )
+        }}
       />
     </Panel>
   )

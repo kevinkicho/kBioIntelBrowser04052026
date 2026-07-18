@@ -44,6 +44,8 @@ import { panelIdFromHash } from '@/lib/signals'
 import { emitProductEvent } from '@/lib/productEvents'
 import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
+import { useElapsedMs } from '@/components/ui/ElapsedTimer'
+import { formatElapsed } from '@/lib/elapsedTime'
 import { AICopilot } from '@/components/ai/AICopilot'
 import { NextStepsPanel, DiscoverBreadcrumb } from '@/components/profile/NextStepsPanel'
 import { PipelinePanel } from '@/components/profile/PipelinePanel'
@@ -115,6 +117,7 @@ function AutoLoadIndicator({ categoryStatus }: { categoryStatus: CategoriesStatu
   const [visible, setVisible] = useState(true)
   const priorityLoaded = DISCOVER_PRIORITY_CATEGORIES.every(id => categoryStatus[id] === 'loaded')
   const anyLoading = DISCOVER_PRIORITY_CATEGORIES.some(id => categoryStatus[id] === 'loading')
+  const elapsed = useElapsedMs(anyLoading)
 
   useEffect(() => {
     if (priorityLoaded) {
@@ -128,9 +131,12 @@ function AutoLoadIndicator({ categoryStatus }: { categoryStatus: CategoriesStatu
   return (
     <div className={`text-[10px] text-indigo-400/70 transition-opacity duration-500 ${visible ? 'opacity-100' : 'opacity-0'}`}>
       {anyLoading ? (
-        <span className="flex items-center gap-1">
+        <span className="flex items-center gap-1.5 flex-wrap">
           <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
-          Auto-loading key data from discovery...
+          Auto-loading key data from discovery…
+          <span className="font-mono tabular-nums text-indigo-300/90" data-testid="autoload-elapsed">
+            {formatElapsed(elapsed)}
+          </span>
         </span>
       ) : priorityLoaded ? (
         <span className="flex items-center gap-1">
@@ -151,7 +157,9 @@ function initStatus(): CategoriesStatus {
 export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
   return (
     <Suspense fallback={<div className="animate-pulse h-96 bg-slate-800/50 rounded-xl" />}>
+      {/* key=cid remounts client state on SPA molecule→molecule nav (avoids stale panels / skipped loads). */}
       <ProfilePageClientInner
+        key={cid}
         cid={cid}
         moleculeName={moleculeName}
         molecularWeight={molecularWeight}
@@ -184,6 +192,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   const projectParam = searchParams.get('project')
   const rankParam = parseInt(searchParams.get('rank') ?? '0', 10) || 0
   const pendingRef = useRef<Set<CategoryId>>(new Set())
+  /** Monotonic per-category load token — drop stale responses when force/soft-refresh races. */
+  const loadGenRef = useRef<Partial<Record<CategoryId, number>>>({})
+  /** Per-category AbortController — cancel in-flight on force refresh or unmount. */
+  const abortByCatRef = useRef<Partial<Record<CategoryId, AbortController>>>({})
   /** In-place re-fetch: keep panels mounted (no skeleton) so scroll position stays put. */
   const softRefreshingRef = useRef<Set<CategoryId>>(new Set())
   const [softRefreshTick, setSoftRefreshTick] = useState(0)
@@ -382,6 +394,18 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       }
     }
 
+    // Cancel any in-flight request for this category (force / soft-refresh / remount race)
+    try {
+      abortByCatRef.current[catId]?.abort()
+    } catch {
+      /* ignore */
+    }
+    const ac = new AbortController()
+    abortByCatRef.current[catId] = ac
+
+    // Bump generation so an older in-flight force/soft-refresh cannot overwrite a newer one.
+    const gen = (loadGenRef.current[catId] ?? 0) + 1
+    loadGenRef.current[catId] = gen
     pendingRef.current.add(catId)
     const scrollY =
       typeof window !== 'undefined' && softRefresh ? window.scrollY : null
@@ -394,7 +418,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     try {
       const data = await fetchCategoryData(cid, catId, apiOverrides, apiParams, {
         refresh: doRefresh,
+        signal: ac.signal,
       })
+      if (loadGenRef.current[catId] !== gen) return
       setCategoryData(prev => ({ ...prev, [catId]: data }))
       setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
       setCategoryErrors(prev => {
@@ -408,6 +434,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         setCategoryTraces((prev) => ({ ...prev, [catId]: trace }))
       }
     } catch (err) {
+      if (loadGenRef.current[catId] !== gen) return
+      // Aborted by a newer load — silent
+      if (
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && err.name === 'AbortError')
+      ) {
+        return
+      }
       const msg = err instanceof Error ? err.message : 'Failed to load category'
       // Soft refresh failure: keep previous data mounted; only surface error if we had no data
       if (!softRefresh) {
@@ -417,19 +451,39 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
         setCategoryErrors(prev => ({ ...prev, [catId]: msg }))
       }
     } finally {
-      pendingRef.current.delete(catId)
-      if (softRefresh) {
-        softRefreshingRef.current.delete(catId)
-        setSoftRefreshTick((n) => n + 1)
-        if (scrollY != null && typeof window !== 'undefined') {
-          // Restore exact viewport after any layout from data swap
-          requestAnimationFrame(() => {
-            window.scrollTo({ top: scrollY, left: 0, behavior: 'instant' as ScrollBehavior })
-          })
+      // Only the latest generation clears pending / soft-refresh UI
+      if (loadGenRef.current[catId] === gen) {
+        pendingRef.current.delete(catId)
+        if (abortByCatRef.current[catId] === ac) {
+          delete abortByCatRef.current[catId]
+        }
+        if (softRefresh) {
+          softRefreshingRef.current.delete(catId)
+          setSoftRefreshTick((n) => n + 1)
+          if (scrollY != null && typeof window !== 'undefined') {
+            // Restore exact viewport after any layout from data swap
+            requestAnimationFrame(() => {
+              window.scrollTo({ top: scrollY, left: 0, behavior: 'instant' as ScrollBehavior })
+            })
+          }
         }
       }
     }
   }, [cid, apiOverrides, apiParams, forceRefresh])
+
+  // Abort all in-flight category fetches on unmount (SPA leave / key remount)
+  useEffect(() => {
+    return () => {
+      for (const id of Object.keys(abortByCatRef.current) as CategoryId[]) {
+        try {
+          abortByCatRef.current[id]?.abort()
+        } catch {
+          /* ignore */
+        }
+      }
+      abortByCatRef.current = {}
+    }
+  }, [])
 
   // Phase B: hydrate IDB → L1 *before* tiered loads (perf + durability).
   useEffect(() => {
@@ -519,16 +573,22 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   useEffect(() => {
     if (activeCategory === 'all' || isEmbed) return
     let attempts = 0
+    let cancelled = false
+    let timer: number | undefined
     const tryScroll = () => {
+      if (cancelled) return
       const el = document.getElementById(activeCategory)
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' })
         return
       }
-      if (attempts++ < 30) window.setTimeout(tryScroll, 50)
+      if (attempts++ < 30) timer = window.setTimeout(tryScroll, 50)
     }
-    const t = window.setTimeout(tryScroll, 30)
-    return () => window.clearTimeout(t)
+    timer = window.setTimeout(tryScroll, 30)
+    return () => {
+      cancelled = true
+      if (timer != null) window.clearTimeout(timer)
+    }
   }, [activeCategory, isEmbed])
 
   /** Scroll to a panel anchor (hash deep-link from board signal badges). */
@@ -673,13 +733,19 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       ...TIER1.filter(id => !DECISION_CATEGORY_IDS.includes(id)),
     ]
     let i = 0
+    let cancelled = false
+    let timer: number | undefined
     const tick = () => {
-      if (i >= priorityCategories.length) return
+      if (cancelled || i >= priorityCategories.length) return
       void loadCategory(priorityCategories[i]!)
       i += 1
-      if (i < priorityCategories.length) window.setTimeout(tick, 80)
+      if (i < priorityCategories.length) timer = window.setTimeout(tick, 80)
     }
     tick()
+    return () => {
+      cancelled = true
+      if (timer != null) window.clearTimeout(timer)
+    }
   }, [fromDiscover, loadCategory, cacheReady]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // When hideEmpty is toggled on, load remaining idle categories so we can evaluate them

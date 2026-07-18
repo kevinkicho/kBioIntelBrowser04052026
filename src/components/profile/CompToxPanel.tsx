@@ -1,8 +1,18 @@
+'use client'
+
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import type { CompToxData } from '@/lib/types'
 
-export const CompToxPanel = memo(function CompToxPanel({ data, panelId, lastFetched }: { data: CompToxData | null, panelId?: string, lastFetched?: Date }) {
+export const CompToxPanel = memo(function CompToxPanel({
+  data,
+  panelId,
+  lastFetched,
+}: {
+  data: CompToxData | null
+  panelId?: string
+  lastFetched?: Date
+}) {
   const isEmpty = !data
 
   return (
@@ -10,42 +20,116 @@ export const CompToxPanel = memo(function CompToxPanel({ data, panelId, lastFetc
       title="EPA CompTox Dashboard"
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No CompTox data available for this molecule." : undefined}
+      empty={isEmpty ? 'No CompTox data available for this molecule.' : undefined}
     >
       {!isEmpty && data && (() => {
-        const pct = data.toxcastTotal > 0 ? (data.toxcastActive / data.toxcastTotal) * 100 : 0
+        const cas = data.casNumber || data.casrn
+        const hasToxcastCounts =
+          data.toxcastAvailable === true ||
+          (data.toxcastAvailable !== false && data.toxcastTotal > 0)
+        const pct =
+          hasToxcastCounts && data.toxcastTotal > 0
+            ? (data.toxcastActive / data.toxcastTotal) * 100
+            : 0
+        const synonyms = (data.synonyms || []).filter(Boolean).slice(0, 8)
+
         return (
           <div className="space-y-4">
-            {data.casNumber && (
+            <div>
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                Chemical
+              </span>
+              <p className="text-sm text-slate-100 font-medium mt-0.5">
+                {data.chemicalName || 'Unknown'}
+              </p>
+              {data.dtxsid && (
+                <p className="text-xs font-mono text-slate-400 mt-0.5">{data.dtxsid}</p>
+              )}
+            </div>
+
+            {cas && (
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">CAS Number</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  CAS Number
+                </span>
                 <div className="mt-1">
                   <span className="text-xs bg-amber-900/40 text-amber-300 border border-amber-700/30 px-2 py-0.5 rounded font-mono">
-                    {data.casNumber}
+                    {cas}
                   </span>
                 </div>
               </div>
             )}
 
-            <div>
-              <div className="flex items-center justify-between mb-1">
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">ToxCast Activity</span>
-                <span className="text-sm text-slate-200 font-mono">
-                  {data.toxcastActive} / {data.toxcastTotal}
+            {(data.molecularFormula || data.molecularWeight > 0) && (
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                {data.molecularFormula && (
+                  <div>
+                    <span className="text-slate-500 uppercase tracking-wider text-[10px]">
+                      Formula
+                    </span>
+                    <p className="text-slate-200 font-mono mt-0.5">{data.molecularFormula}</p>
+                  </div>
+                )}
+                {data.molecularWeight > 0 && (
+                  <div>
+                    <span className="text-slate-500 uppercase tracking-wider text-[10px]">
+                      Mol. weight
+                    </span>
+                    <p className="text-slate-200 font-mono mt-0.5">
+                      {data.molecularWeight.toFixed(2)}
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {synonyms.length > 0 && (
+              <div>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Synonyms
                 </span>
+                <p className="text-xs text-slate-400 mt-1 line-clamp-3">
+                  {synonyms.join(' · ')}
+                </p>
               </div>
-              <div className="w-full bg-slate-700 rounded-full h-2">
-                <div
-                  className="bg-orange-500 h-2 rounded-full transition-all"
-                  style={{ width: `${pct.toFixed(1)}%` }}
-                />
+            )}
+
+            {hasToxcastCounts ? (
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    ToxCast Activity
+                  </span>
+                  <span className="text-sm text-slate-200 font-mono">
+                    {data.toxcastActive} / {data.toxcastTotal}
+                  </span>
+                </div>
+                <div className="w-full bg-slate-700 rounded-full h-2">
+                  <div
+                    className="bg-orange-500 h-2 rounded-full transition-all"
+                    style={{ width: `${Math.min(100, Math.max(0, pct)).toFixed(1)}%` }}
+                  />
+                </div>
+                <p className="text-xs text-slate-500 mt-1">
+                  {pct.toFixed(1)}% active assays
+                </p>
               </div>
-              <p className="text-xs text-slate-500 mt-1">{pct.toFixed(1)}% active assays</p>
-            </div>
+            ) : (
+              <div className="rounded-md border border-slate-700/80 bg-slate-800/40 px-3 py-2">
+                <p className="text-xs font-medium text-slate-300">ToxCast assay counts</p>
+                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                  Not available from the free CompTox search API (detail/ToxCast endpoints no
+                  longer return public counts). Open the CompTox Dashboard for bioactivity and
+                  ToxCast tables, or check the separate ToxCast panel when assay rows load.
+                </p>
+              </div>
+            )}
 
             {data.exposurePrediction && (
               <div>
-                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Exposure Prediction</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                  Exposure Prediction
+                </span>
                 <p className="text-sm text-slate-300 mt-1">{data.exposurePrediction}</p>
               </div>
             )}

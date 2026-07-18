@@ -5,8 +5,26 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { StringInteraction } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
+import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
-export const StringPanel = memo(function StringPanel({ interactions, panelId, lastFetched }: { interactions: StringInteraction[], panelId?: string, lastFetched?: Date }) {
+function stringHref(interaction: StringInteraction): string {
+  const fallback =
+    interaction.proteinA && interaction.proteinB
+      ? `https://string-db.org/network/${encodeURIComponent(interaction.proteinA)}`
+      : 'https://string-db.org/'
+  return preferStableDeepLink(interaction.url, fallback)
+}
+
+export const StringPanel = memo(function StringPanel({
+  interactions,
+  panelId,
+  lastFetched,
+}: {
+  interactions: StringInteraction[]
+  panelId?: string
+  lastFetched?: Date
+}) {
   const list = Array.isArray(interactions) ? interactions : []
   const isEmpty = list.length === 0
 
@@ -32,62 +50,57 @@ export const StringPanel = memo(function StringPanel({ interactions, panelId, la
         <FilterablePaginatedList
           items={list}
           getSearchText={(interaction) =>
-            [interaction.proteinA, interaction.proteinB]
-              .filter(Boolean)
-              .join(' ')
+            [interaction.proteinA, interaction.proteinB].filter(Boolean).join(' ')
           }
           sortOptions={sortOptions}
           defaultSortId="num-desc"
           filterPlaceholder="Filter interactions (protein…)"
           getKey={(interaction, i) => `${interaction.proteinA}-${interaction.proteinB}-${i}`}
-          renderItem={(interaction) => (
-            <div className="py-3 border-b border-slate-700 last:border-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold text-slate-100 text-sm">
-                  {interaction.proteinA} ↔ {interaction.proteinB}
-                </p>
+          pageSize={8}
+          className="space-y-0"
+          renderItem={(interaction, index) => {
+            const href = stringHref(interaction)
+            return (
+              <div>
+                {index === 0 && (
+                  <div
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    role="row"
+                  >
+                    <span>Protein A</span>
+                    <span>Protein B</span>
+                    <span className="text-right">Score</span>
+                    <span className="text-right">Open</span>
+                  </div>
+                )}
                 <a
-                  href={interaction.url}
+                  href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-xs text-cyan-400 hover:text-cyan-300 underline shrink-0"
+                  onClick={() =>
+                    onDeepLinkClick('string', href, {
+                      panelId: 'string',
+                      label: `${interaction.proteinA}-${interaction.proteinB}`,
+                    })
+                  }
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
-                  STRING →
+                  <span className="text-sm text-slate-100 truncate group-hover:text-indigo-200">
+                    {interaction.proteinA || '—'}
+                  </span>
+                  <span className="text-sm text-slate-100 truncate group-hover:text-indigo-200">
+                    {interaction.proteinB || '—'}
+                  </span>
+                  <span className="text-xs font-mono tabular-nums text-right text-slate-300">
+                    {(interaction.score ?? 0).toFixed(3)}
+                  </span>
+                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
+                    ↗
+                  </span>
                 </a>
               </div>
-
-              <div className="mt-2">
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-xs text-slate-400">Combined score</span>
-                  <span className="text-xs font-mono text-slate-200">{interaction.score.toFixed(3)}</span>
-                </div>
-                <div className="w-full bg-slate-700 rounded-full h-1.5">
-                  <div
-                    className="bg-indigo-500 h-1.5 rounded-full"
-                    style={{ width: `${(interaction.score * 100).toFixed(1)}%` }}
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {interaction.experimentalScore && interaction.experimentalScore > 0 && (
-                  <span className="text-xs bg-teal-900/40 text-teal-300 border border-teal-700/30 px-2 py-0.5 rounded">
-                    exp {interaction.experimentalScore.toFixed(3)}
-                  </span>
-                )}
-                {interaction.databaseScore && interaction.databaseScore > 0 && (
-                  <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/30 px-2 py-0.5 rounded">
-                    db {interaction.databaseScore.toFixed(3)}
-                  </span>
-                )}
-                {interaction.textminingScore && interaction.textminingScore > 0 && (
-                  <span className="text-xs bg-slate-700/60 text-slate-300 border border-slate-600/30 px-2 py-0.5 rounded">
-                    text {interaction.textminingScore.toFixed(3)}
-                  </span>
-                )}
-              </div>
-            </div>
-          )}
+            )
+          }}
         />
       )}
     </Panel>

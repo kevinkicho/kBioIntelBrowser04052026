@@ -169,6 +169,36 @@ export async function getTargetDetails(targetId: string): Promise<{
   }
 }
 
+const MOLECULE_URL = 'https://www.ebi.ac.uk/chembl/api/data/molecule.json'
+
+/** Batch-resolve pref_name + max_phase for ChEMBL molecule ids (activity rows often omit both). */
+async function enrichMoleculesById(
+  chemblIds: string[],
+): Promise<Map<string, { name: string; maxPhase: number }>> {
+  const map = new Map<string, { name: string; maxPhase: number }>()
+  const ids = chemblIds.filter(Boolean).slice(0, 40)
+  if (ids.length === 0) return map
+  try {
+    const url =
+      `${MOLECULE_URL}?molecule_chembl_id__in=${encodeURIComponent(ids.join(','))}` +
+      `&limit=${ids.length}`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) return map
+    const data = await res.json()
+    for (const m of data.molecules ?? []) {
+      const id = String(m.molecule_chembl_id || '')
+      if (!id) continue
+      map.set(id, {
+        name: String(m.pref_name || '').trim(),
+        maxPhase: Number(m.max_phase) || 0,
+      })
+    }
+  } catch {
+    /* optional enrichment */
+  }
+  return map
+}
+
 /**
  * Get compounds related to a specific target (IC50 activities).
  * @param targetId ChEMBL target id (e.g. CHEMBL203)
@@ -182,38 +212,73 @@ export async function getRelatedCompoundsByTarget(
   try {
     const cap = Math.max(1, Math.min(limit, 50))
     // Over-fetch activities so dedupe can still fill `cap` unique molecules
-    const fetchLimit = Math.min(cap * 3, 100)
-    const url = `${ACTIVITY_URL}?target_chembl_id=${encodeURIComponent(targetId)}&standard_type=IC50&limit=${fetchLimit}&format=json`
+    const fetchLimit = Math.min(cap * 4, 120)
+    // Prefer potency-ranked IC50 rows when available
+    const url =
+      `${ACTIVITY_URL}?target_chembl_id=${encodeURIComponent(targetId)}` +
+      `&standard_type=IC50&limit=${fetchLimit}&order_by=standard_value&format=json`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()
 
     const seenMolecules = new Set<string>()
-    const results: RelatedCompound[] = []
+    const draft: RelatedCompound[] = []
 
-    for (const a of (data.activities ?? [])) {
-      if (!a.molecule_chembl_id || seenMolecules.has(a.molecule_chembl_id)) continue
-      seenMolecules.add(a.molecule_chembl_id)
+    for (const a of data.activities ?? []) {
+      const molId = normalizeChemblId(a.molecule_chembl_id) || String(a.molecule_chembl_id || '')
+      if (!molId || seenMolecules.has(molId)) continue
+      seenMolecules.add(molId)
 
-      results.push({
-        compoundId: a.molecule_chembl_id,
-        compoundName: a.molecule_pref_name || a.molecule_chembl_id,
-        name: a.molecule_pref_name || a.molecule_chembl_id,
+      const pref = String(a.molecule_pref_name || '').trim()
+      const stdVal = Number(a.standard_value)
+      const pchembl = a.pchembl_value != null ? Number(a.pchembl_value) : null
+
+      draft.push({
+        compoundId: molId,
+        compoundName: pref || molId,
+        name: pref || molId,
         similarity: 100,
         relationship: 'Related',
-        chemblId: a.molecule_chembl_id,
-        maxPhase: a.molecule_max_phase || 0,
-        activityValue: Number(a.standard_value) || 0,
-        activityType: a.standard_type || 'IC50',
+        chemblId: molId,
+        maxPhase: Number(a.molecule_max_phase) || 0,
+        activityValue: Number.isFinite(stdVal) ? stdVal : undefined,
+        activityUnits: String(a.standard_units || a.units || '').trim() || undefined,
+        activityType: String(a.standard_type || a.type || 'IC50').trim() || 'IC50',
+        pchemblValue: Number.isFinite(pchembl as number) ? (pchembl as number) : null,
+        targetChemblId: String(a.target_chembl_id || targetId),
+        targetName: String(a.target_pref_name || '').trim() || undefined,
+        url: chemblCompoundUrl(molId) || undefined,
       })
-      if (results.length >= cap) break
+      if (draft.length >= cap) break
     }
 
-    return results.sort((a, b) =>
-      a.maxPhase === b.maxPhase
-        ? (a.activityValue ?? 0) - (b.activityValue ?? 0)
-        : b.maxPhase - a.maxPhase,
-    )
+    // Enrich missing names / max_phase from molecule records
+    const needEnrich = draft
+      .filter((c) => !c.name || c.name === c.chemblId || !c.maxPhase)
+      .map((c) => c.chemblId)
+    if (needEnrich.length > 0) {
+      const enriched = await enrichMoleculesById(needEnrich)
+      for (const c of draft) {
+        const meta = enriched.get(c.chemblId)
+        if (!meta) continue
+        if (meta.name && (!c.name || c.name === c.chemblId)) {
+          c.name = meta.name
+          c.compoundName = meta.name
+        }
+        if (!c.maxPhase && meta.maxPhase) c.maxPhase = meta.maxPhase
+      }
+    }
+
+    return draft.sort((a, b) => {
+      // Prefer clinical maturity, then potency (lower IC50 / higher pChEMBL)
+      if (a.maxPhase !== b.maxPhase) return b.maxPhase - a.maxPhase
+      const pa = a.pchemblValue ?? 0
+      const pb = b.pchemblValue ?? 0
+      if (pa !== pb) return pb - pa
+      const va = a.activityValue ?? Number.POSITIVE_INFINITY
+      const vb = b.activityValue ?? Number.POSITIVE_INFINITY
+      return va - vb
+    })
   } catch {
     return []
   }

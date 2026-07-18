@@ -10,103 +10,14 @@ import {
   dateSortOptions,
   numberSortOptions,
 } from '@/lib/listControls'
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 const STATUS_COLORS: Record<string, string> = {
-  COMPLETED: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30',
-  RECRUITING: 'bg-blue-900/40 text-blue-300 border-blue-700/30',
-  ACTIVE_NOT_RECRUITING: 'bg-yellow-900/40 text-yellow-300 border-yellow-700/30',
-  TERMINATED: 'bg-red-900/40 text-red-300 border-red-700/30',
-}
-
-function statusClass(status: string): string {
-  return STATUS_COLORS[status] ?? 'bg-slate-700 text-slate-300 border-slate-600'
-}
-
-function ClinicalTrialItem({
-  trial,
-  diseaseMatch,
-}: {
-  trial: ClinicalTrial
-  diseaseMatch: boolean
-}) {
-  const ctGov = trial.nctId
-    ? `https://clinicaltrials.gov/study/${encodeURIComponent(trial.nctId)}`
-    : undefined
-  return (
-    <div
-      className={`py-2 border-b border-slate-700/60 last:border-0 ${
-        diseaseMatch ? 'bg-amber-950/20 -mx-2 px-2 rounded-md' : ''
-      }`}
-    >
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          {ctGov ? (
-            <a
-              href={ctGov}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="font-semibold text-slate-100 text-sm hover:text-indigo-300"
-            >
-              {trial.title}
-            </a>
-          ) : (
-            <p className="font-semibold text-slate-100 text-sm">{trial.title}</p>
-          )}
-          <p className="text-[11px] text-slate-500 mt-0.5">
-            {[trial.nctId, trial.sponsor].filter(Boolean).join(' · ')}
-          </p>
-          <div className="flex gap-1.5 mt-1 flex-wrap">
-            {trial.phase && trial.phase !== 'N/A' && (
-              <span className="text-[10px] bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded">
-                {trial.phase}
-              </span>
-            )}
-            {trial.conditions?.slice(0, 3).map((c, j) => (
-              <span
-                key={j}
-                className={`text-[10px] px-1.5 py-0.5 rounded ${
-                  diseaseMatch
-                    ? 'bg-amber-700/30 text-amber-200'
-                    : 'bg-slate-700/50 text-slate-400'
-                }`}
-              >
-                {c}
-              </span>
-            ))}
-          </div>
-          <p className="text-[10px] text-slate-600 mt-0.5">
-            {[
-              trial.startDate && `Start ${trial.startDate}`,
-              trial.completionDate && `End ${trial.completionDate}`,
-              trial.enrollment != null && `n=${trial.enrollment}`,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {diseaseMatch && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded bg-amber-900/40 text-amber-300 border border-amber-700/40">
-              Match
-            </span>
-          )}
-          <span className={`text-[10px] border px-1.5 py-0.5 rounded ${statusClass(trial.status)}`}>
-            {trial.status}
-          </span>
-          {ctGov && (
-            <a
-              href={ctGov}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-[10px] text-indigo-400 hover:text-indigo-300"
-            >
-              CT.gov ↗
-            </a>
-          )}
-        </div>
-      </div>
-    </div>
-  )
+  COMPLETED: 'text-emerald-300',
+  RECRUITING: 'text-blue-300',
+  ACTIVE_NOT_RECRUITING: 'text-yellow-300',
+  TERMINATED: 'text-red-300',
 }
 
 export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
@@ -124,14 +35,10 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
 
   const sortOptions = useMemo(
     () => [
-      ...dateSortOptions<ClinicalTrial>(
-        (t) => t.startDate || t.completionDate,
-        { newest: 'Newest start', oldest: 'Oldest start' },
-      ),
-      ...dateSortOptions<ClinicalTrial>((t) => t.completionDate, {
-        newest: 'Newest completion',
-        oldest: 'Oldest completion',
-      }).map((o) => ({ ...o, id: `end-${o.id}` })),
+      ...dateSortOptions<ClinicalTrial>((t) => t.startDate || t.completionDate, {
+        newest: 'Newest start',
+        oldest: 'Oldest start',
+      }),
       ...alphaSortOptions<ClinicalTrial>((t) => t.title || t.nctId),
       ...numberSortOptions<ClinicalTrial>((t) => t.enrollment ?? 0, {
         high: 'Largest enrollment',
@@ -161,9 +68,12 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
 
   if (list.length === 0) {
     return (
-      <Panel title="Clinical Trials" panelId={panelId} lastFetched={lastFetched}>
-        <p className="text-slate-500 text-sm">No clinical trials found for this molecule.</p>
-      </Panel>
+      <Panel
+        title="Clinical Trials"
+        panelId={panelId}
+        lastFetched={lastFetched}
+        empty="No clinical trials found for this molecule."
+      />
     )
   }
 
@@ -184,9 +94,6 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
             t.phase,
             t.sponsor,
             ...(t.conditions || []),
-            ...(t.interventions || []),
-            t.startDate,
-            t.completionDate,
           ]
             .filter(Boolean)
             .join(' ')
@@ -195,11 +102,83 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
         defaultSortId="date-desc"
         filterPlaceholder="Filter trials (title, NCT, status, condition…)"
         getKey={(t, i) => `${t.nctId}-${i}`}
-        pageSize={5}
-        renderItem={(trial) => {
+        pageSize={8}
+        className="space-y-0"
+        renderItem={(trial, index) => {
           const conditionText = [trial.title, ...(trial.conditions || [])].join(' ')
           const diseaseMatch = diseaseName ? isMatch(conditionText, diseaseName) : false
-          return <ClinicalTrialItem trial={trial} diseaseMatch={diseaseMatch} />
+          const href = trial.nctId
+            ? `https://clinicaltrials.gov/study/${encodeURIComponent(trial.nctId)}`
+            : null
+          const phaseEmpty = isEmptyMetric(trial.phase) || trial.phase === 'N/A'
+          const statusColor = STATUS_COLORS[trial.status] || 'text-slate-400'
+          const content = (
+            <div
+              className={`grid grid-cols-[minmax(0,1.5fr)_5.5rem_4rem_minmax(0,0.8fr)_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group ${
+                diseaseMatch ? 'bg-amber-950/20' : ''
+              }`}
+            >
+              <div className="min-w-0">
+                <div className="text-sm font-medium text-slate-100 group-hover:text-indigo-200 truncate">
+                  {trial.title || '—'}
+                  {diseaseMatch && (
+                    <span className="ml-1.5 text-[10px] text-amber-300 font-normal">Match</span>
+                  )}
+                </div>
+                <div className="text-[10px] text-slate-600 truncate">
+                  {[trial.nctId, trial.sponsor].filter(Boolean).join(' · ')}
+                </div>
+              </div>
+              <span className={`text-[11px] truncate ${statusColor}`}>{trial.status || '—'}</span>
+              <span className={`text-[11px] text-slate-400 truncate ${emptyDataClass(phaseEmpty)}`}>
+                {phaseEmpty ? '—' : trial.phase}
+              </span>
+              <span
+                className={`text-[11px] text-slate-500 truncate ${emptyDataClass(isEmptyMetric(trial.enrollment))}`}
+              >
+                {trial.enrollment != null && trial.enrollment > 0
+                  ? `n=${trial.enrollment}`
+                  : '—'}
+              </span>
+              <span className="text-xs text-indigo-400 group-hover:text-indigo-300 text-right">
+                ↗
+              </span>
+            </div>
+          )
+          return (
+            <div>
+              {index === 0 && (
+                <div
+                  className="grid grid-cols-[minmax(0,1.5fr)_5.5rem_4rem_minmax(0,0.8fr)_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                  role="row"
+                >
+                  <span>Title</span>
+                  <span>Status</span>
+                  <span>Phase</span>
+                  <span>Enroll</span>
+                  <span className="text-right">Open</span>
+                </div>
+              )}
+              {href ? (
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open on ClinicalTrials.gov"
+                  onClick={() =>
+                    onDeepLinkClick('clinicaltrials', href, {
+                      panelId: 'clinical-trials',
+                      label: trial.nctId,
+                    })
+                  }
+                >
+                  {content}
+                </a>
+              ) : (
+                content
+              )}
+            </div>
+          )
         }}
       />
     </Panel>

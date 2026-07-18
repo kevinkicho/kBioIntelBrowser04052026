@@ -342,6 +342,8 @@ export interface ChemblMechanism {
 export interface ChemblIndication {
   indicationId: string
   moleculeName: string
+  /** ChEMBL molecule id e.g. CHEMBL25 — used for stable deep links */
+  moleculeChemblId?: string
   condition: string
   maxPhase: number
   maxPhaseForIndication: number
@@ -484,6 +486,8 @@ export interface AtcClassification {
   code: string
   name: string
   classType: string
+  /** WHO ATC/DDD Index deep link for the class code */
+  url?: string
 }
 
 // BindingDB Types
@@ -557,6 +561,11 @@ export interface CompToxData {
   synonyms: string[]
   toxcastTotal: number
   toxcastActive: number
+  /**
+   * False when free CompTox/ToxCast count APIs did not return assay totals.
+   * UI must not treat total=0 as “0% active”.
+   */
+  toxcastAvailable?: boolean
   url: string
   exposurePrediction?: string
 }
@@ -843,6 +852,13 @@ export interface RelatedCompound {
   activityValue?: number
   activityUnits?: string
   activityType?: string
+  /** pChEMBL when available (higher = more potent) */
+  pchemblValue?: number | null
+  /** Target this competitor was measured against */
+  targetChemblId?: string
+  targetName?: string
+  /** Deep link to ChEMBL compound explore page */
+  url?: string
 }
 
 // SEC Filing Types
@@ -936,6 +952,8 @@ export interface MyChemAnnotation {
   molecularWeight: number
   smiles: string
   sources: string[]
+  /** MyChem annotation deep link: https://mychem.info/v1/chem/{id} */
+  url?: string
   chembl?: {
     moleculeType: string
     maxPhase: number
@@ -1382,14 +1400,19 @@ export interface IRISAssessment {
   oralRfD: number | null
   oralRfDUnits: string
   oralRfDConfidence: 'High' | 'Medium' | 'Low'
+  /** Original RfD string from source (e.g. "4 x 10^-3 mg/kg-day") when available */
+  oralRfDDisplay?: string
   inhalationRfC: number | null
   inhalationRfCUnits: string
   inhalationRfCConfidence: 'High' | 'Medium' | 'Low'
+  inhalationRfCDisplay?: string
   cancerClassification: 'Carcinogenic' | 'Likely Carcinogenic' | 'Suggestive' | 'Inadequate' | 'Not Likely'
   cancerWeightOfEvidence: string
   criticalEffects: string[]
   organsAffected: string[]
   url: string
+  /** True when PubChem EPA IRIS section was found (real tox values) */
+  hasIrisData?: boolean
 }
 
 // ISRCTN Types - UK Clinical Trials

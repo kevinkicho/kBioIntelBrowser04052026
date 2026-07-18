@@ -118,8 +118,9 @@ async function fetchCategorySoft(
   if (signal?.aborted) return {}
   try {
     const data = await withTimeout(
-      fetchCategoryData(cid, categoryId),
+      fetchCategoryData(cid, categoryId, undefined, undefined, { signal }),
       PACK_PANEL_TIMEOUT_MS,
+      { signal },
     )
     return data && typeof data === 'object' ? data : {}
   } catch {

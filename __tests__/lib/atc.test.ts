@@ -1,46 +1,95 @@
-import { getAtcClassificationsByName } from '@/lib/api/atc'
+import {
+  atcDeepLink,
+  atcLevelLabel,
+  getAtcClassificationsByName,
+  isWhoAtcCode,
+} from '@/lib/api/atc'
 import * as rxnorm from '@/lib/api/rxnorm'
 
 jest.mock('@/lib/api/rxnorm')
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
+describe('isWhoAtcCode / atcDeepLink', () => {
+  test('accepts WHO ATC hierarchy codes', () => {
+    expect(isWhoAtcCode('N')).toBe(true)
+    expect(isWhoAtcCode('N02')).toBe(true)
+    expect(isWhoAtcCode('N02B')).toBe(true)
+    expect(isWhoAtcCode('N02BA')).toBe(true)
+    expect(isWhoAtcCode('N02BA01')).toBe(true)
+    expect(isWhoAtcCode('A10BA02')).toBe(true)
+  })
+
+  test('rejects VA and junk class ids', () => {
+    expect(isWhoAtcCode('CN103')).toBe(false)
+    expect(isWhoAtcCode('GA110')).toBe(false)
+    expect(isWhoAtcCode('')).toBe(false)
+  })
+
+  test('builds WHO ATC/DDD Index deep links', () => {
+    expect(atcDeepLink('A10BA02')).toBe(
+      'https://atcddd.fhi.no/atc_ddd_index/?code=A10BA02&showdescription=yes',
+    )
+    expect(atcDeepLink('cn103')).toBe('https://atcddd.fhi.no/atc_ddd_index/')
+  })
+
+  test('level labels', () => {
+    expect(atcLevelLabel('N02BA01')).toContain('Level 5')
+    expect(atcLevelLabel('N02BA')).toContain('Level 4')
+    expect(atcLevelLabel('N')).toContain('Level 1')
+  })
+})
+
 describe('getAtcClassificationsByName', () => {
-  test('returns parsed ATC classifications on success', async () => {
-    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('6809')
+  test('returns deduped WHO ATC rows with deep links', async () => {
+    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('1191')
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       json: async () => ({
-        rxclassMinConceptList: {
-          rxclassMinConcept: [
-            { classId: 'A10BA02', className: 'metformin', classType: 'ATC1-4' },
-            { classId: 'A10BA', className: 'Biguanides', classType: 'ATC1-3' },
+        rxclassDrugInfoList: {
+          rxclassDrugInfo: [
+            {
+              rxclassMinConceptItem: {
+                classId: 'N02BA',
+                className: 'Salicylic acid and derivatives',
+                classType: 'ATC1-4',
+              },
+            },
+            {
+              rxclassMinConceptItem: {
+                classId: 'N02BA',
+                className: 'Salicylic acid and derivatives',
+                classType: 'ATC1-4',
+              },
+            },
+            {
+              rxclassMinConceptItem: {
+                classId: 'CN103',
+                className: 'NON-OPIOID ANALGESICS',
+                classType: 'VA',
+              },
+            },
+            {
+              rxclassMinConceptItem: {
+                classId: 'B01AC',
+                className: 'Platelet aggregation inhibitors excl. heparin',
+                classType: 'ATC1-4',
+              },
+            },
           ],
         },
       }),
     })
-    const results = await getAtcClassificationsByName('metformin')
-    expect(results).toHaveLength(2)
-    expect(results[0].code).toBe('A10BA02')
-    expect(results[0].name).toBe('metformin')
-    expect(results[0].classType).toBe('ATC1-4')
-    expect(results[1].code).toBe('A10BA')
+    const results = await getAtcClassificationsByName('aspirin')
+    expect(results.map((r) => r.code)).toEqual(['B01AC', 'N02BA'])
+    expect(results.every((r) => r.url.includes('code='))).toBe(true)
+    expect(results.find((r) => r.code === 'CN103')).toBeUndefined()
+    const called = String((fetch as jest.Mock).mock.calls[0][0])
+    expect(called).toContain('relaSource=ATC')
   })
 
-  test('returns empty array when RxCUI not found', async () => {
+  test('returns empty when RxCUI missing', async () => {
     ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue(null)
-    expect(await getAtcClassificationsByName('unknownxyz')).toEqual([])
-  })
-
-  test('returns empty array when no classifications found', async () => {
-    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('6809')
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: true, json: async () => ({}) })
-    expect(await getAtcClassificationsByName('metformin')).toEqual([])
-  })
-
-  test('returns empty array on network error', async () => {
-    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('6809')
-    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getAtcClassificationsByName('metformin')).toEqual([])
+    expect(await getAtcClassificationsByName('zzz')).toEqual([])
   })
 })

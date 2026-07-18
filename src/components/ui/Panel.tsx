@@ -123,15 +123,21 @@ export function Panel({
       ? 'Next work target: enable a verified free public JSON endpoint for this source'
       : undefined)
 
+  // Dim when we render the empty/disabled message (not when list children show data).
+  // Important: parents may still pass `children` while `empty` is set — UI shows emptyText
+  // branch only, so dim based on emptyText/sourceDisabled, not on children presence.
+  const emptyOnly = Boolean(emptyText) || Boolean(sourceDisabled)
+
   return (
     <div
       className={`bg-slate-800/50 border rounded-xl p-5 ${
         sourceDisabled
           ? 'border-amber-900/40 opacity-90'
           : 'border-slate-700'
-      } ${className}`}
+      } ${emptyOnly ? 'opacity-20' : ''} ${className}`}
       data-testid={panelId ? `panel-${panelId}` : undefined}
       data-source-disabled={sourceDisabled ? 'true' : undefined}
+      data-empty={emptyOnly ? 'true' : 'false'}
       title={nextWorkTitle}
     >
       <div className="flex justify-between items-start mb-4 gap-2">

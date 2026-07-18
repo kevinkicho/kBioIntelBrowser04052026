@@ -1,6 +1,7 @@
 'use client'
 
 import { DiscoveryState } from '../hooks/useDiscovery'
+import { ElapsedTimer } from '@/components/ui/ElapsedTimer'
 
 interface Props {
   state: DiscoveryState
@@ -16,19 +17,27 @@ export function DiscoveryProgress({ state }: Props) {
   if (state.status !== 'loading') return null
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-6">
+    <div className="w-full max-w-2xl mx-auto mb-6" data-testid="discover-progress">
       <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-5">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center gap-3 mb-2">
           <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
-          <span className="text-sm text-slate-300">{state.progressLabel}</span>
+          <span className="text-sm text-slate-300 flex-1">{state.progressLabel}</span>
+          <span className="text-xs text-slate-500 tabular-nums">{state.progress}%</span>
         </div>
-        <div className="w-full bg-slate-700 rounded-full h-2">
+        <ElapsedTimer
+          active
+          showHint
+          className="mb-3 text-left"
+          testId="discover-elapsed"
+        />
+        <div className="w-full bg-slate-700 rounded-full h-2 overflow-hidden">
           <div
-            className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-700 ease-out"
+            className="bg-gradient-to-r from-indigo-500 to-purple-500 h-2 rounded-full transition-all duration-700 ease-out relative"
             style={{ width: `${state.progress}%` }}
-          />
+          >
+            <span className="absolute inset-0 animate-pulse bg-white/10" aria-hidden />
+          </div>
         </div>
-        <p className="text-xs text-slate-500 mt-2 text-right">{state.progress}%</p>
       </div>
     </div>
   )

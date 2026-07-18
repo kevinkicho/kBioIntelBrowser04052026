@@ -1,5 +1,8 @@
 const IS_DEV = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
 
+/** Hard ceiling so hung TCP cannot pin the in-flight dedupe map forever. */
+export const DEFAULT_CLIENT_FETCH_TIMEOUT_MS = 40_000
+
 function logFetchOutcome(
   url: string,
   method: string,
@@ -79,6 +82,11 @@ export interface ClientFetchOptions {
   retryDelayMs?: number
   /** Override which HTTP statuses trigger a retry. */
   retryStatuses?: number[]
+  /**
+   * Hard wall-clock timeout for the whole attempt chain (including retries).
+   * Default 40s. Pass `0` to disable.
+   */
+  timeoutMs?: number
 }
 
 function sleep(ms: number): Promise<void> {
@@ -87,6 +95,73 @@ function sleep(ms: number): Promise<void> {
 
 function shouldRetryStatus(status: number, retryStatuses: Set<number>): boolean {
   return retryStatuses.has(status)
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    (error instanceof DOMException && error.name === 'AbortError') ||
+    (error instanceof Error && error.name === 'AbortError')
+  )
+}
+
+/**
+ * Combine caller AbortSignal with an internal timeout controller.
+ * Aborting either aborts the merged signal.
+ */
+function mergeAbortSignals(
+  external: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal; cleanup: () => void } {
+  const timeoutController = new AbortController()
+  let timer: ReturnType<typeof setTimeout> | undefined
+
+  if (timeoutMs > 0) {
+    timer = setTimeout(() => {
+      timeoutController.abort(
+        new DOMException(`Request timed out after ${timeoutMs}ms`, 'AbortError'),
+      )
+    }, timeoutMs)
+  }
+
+  if (!external) {
+    return {
+      signal: timeoutController.signal,
+      cleanup: () => {
+        if (timer) clearTimeout(timer)
+      },
+    }
+  }
+
+  if (external.aborted) {
+    if (timer) clearTimeout(timer)
+    return { signal: external, cleanup: () => {} }
+  }
+
+  const merged = new AbortController()
+  const onEither = () => {
+    if (!merged.signal.aborted) {
+      const reason =
+        external.aborted
+          ? external.reason
+          : timeoutController.signal.reason
+      try {
+        merged.abort(reason)
+      } catch {
+        merged.abort()
+      }
+    }
+  }
+  external.addEventListener('abort', onEither, { once: true })
+  timeoutController.signal.addEventListener('abort', onEither, { once: true })
+
+  return {
+    signal: merged.signal,
+    cleanup: () => {
+      if (timer) clearTimeout(timer)
+      external.removeEventListener('abort', onEither)
+      timeoutController.signal.removeEventListener('abort', onEither)
+    },
+  }
 }
 
 function metricSource(url: string): string | null {
@@ -101,7 +176,7 @@ function metricSource(url: string): string | null {
 }
 
 /**
- * Browser fetch with GET dedupe, optional retries, and dev logging.
+ * Browser fetch with GET dedupe, optional retries, hard timeout, and dev logging.
  * Use `retries` for profile/category/pipeline loads that race Fast Refresh
  * or transient PubChem/upstream failures.
  */
@@ -114,11 +189,17 @@ export async function clientFetch(
   const retryDelayMs = options?.retryDelayMs ?? 350
   const retryStatuses = new Set(options?.retryStatuses ?? DEFAULT_RETRY_STATUSES)
   const maxAttempts = 1 + retries
+  const timeoutMs =
+    options?.timeoutMs === undefined
+      ? DEFAULT_CLIENT_FETCH_TIMEOUT_MS
+      : Math.max(0, options.timeoutMs)
 
   const key = getKey(input, init)
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
   const method = init?.method || 'GET'
-  const isDedupable = !init?.method || init.method === 'GET'
+  // Do not dedupe when caller attaches a signal — abort must not kill shared waiters
+  const isDedupable =
+    (!init?.method || init.method === 'GET') && !init?.signal
 
   if (isDedupable) {
     const existing = inFlight.get(key)
@@ -132,40 +213,57 @@ export async function clientFetch(
   const start = performance.now()
   if (IS_DEV) console.group(`%c→ ${method} %c${url}`, LOG_STYLE, DIM_STYLE)
 
+  const { signal, cleanup: cleanupSignal } = mergeAbortSignals(
+    init?.signal ?? undefined,
+    timeoutMs,
+  )
+  const fetchInit: RequestInit = { ...init, signal }
+
   const promise = (async (): Promise<Response> => {
     let lastError: unknown
-    for (let attempt = 0; attempt < maxAttempts; attempt++) {
-      try {
-        const response = await fetch(input, init)
-        if (
-          response.ok ||
-          attempt === maxAttempts - 1 ||
-          !shouldRetryStatus(response.status, retryStatuses)
-        ) {
-          return response
+    try {
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        if (signal.aborted) {
+          throw signal.reason instanceof Error
+            ? signal.reason
+            : new DOMException('Aborted', 'AbortError')
         }
-        if (IS_DEV) {
-          console.warn(
-            `%c↻ retry ${attempt + 1}/${retries} after ${response.status}`,
-            ERR_STYLE,
-          )
+        try {
+          const response = await fetch(input, fetchInit)
+          if (
+            response.ok ||
+            attempt === maxAttempts - 1 ||
+            !shouldRetryStatus(response.status, retryStatuses)
+          ) {
+            return response
+          }
+          if (IS_DEV) {
+            console.warn(
+              `%c↻ retry ${attempt + 1}/${retries} after ${response.status}`,
+              ERR_STYLE,
+            )
+          }
+          // Drain body so the connection can close cleanly before retry
+          await response.arrayBuffer().catch(() => {})
+          await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
+        } catch (error) {
+          lastError = error
+          // Never retry user/system aborts or hard timeouts
+          if (isAbortError(error)) throw error
+          if (attempt === maxAttempts - 1) throw error
+          if (IS_DEV) {
+            console.warn(
+              `%c↻ retry ${attempt + 1}/${retries} after network error`,
+              ERR_STYLE,
+            )
+          }
+          await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
         }
-        // Drain body so the connection can close cleanly before retry
-        await response.arrayBuffer().catch(() => {})
-        await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
-      } catch (error) {
-        lastError = error
-        if (attempt === maxAttempts - 1) throw error
-        if (IS_DEV) {
-          console.warn(
-            `%c↻ retry ${attempt + 1}/${retries} after network error`,
-            ERR_STYLE,
-          )
-        }
-        await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
       }
+      throw lastError instanceof Error ? lastError : new Error('clientFetch failed')
+    } finally {
+      cleanupSignal()
     }
-    throw lastError instanceof Error ? lastError : new Error('clientFetch failed')
   })().finally(() => {
     if (isDedupable) {
       inFlight.delete(key)

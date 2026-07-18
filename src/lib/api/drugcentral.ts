@@ -28,16 +28,33 @@ export interface DrugCentralProduct {
   marketingStartDate: string
 }
 
-export async function getDrugCentralData(name: string): Promise<{
+export async function getDrugCentralData(
+  name: string,
+  opts?: { drugbankId?: string | null; inchiKey?: string | null },
+): Promise<{
   drug: DrugCentralDrug | null
   targets: DrugCentralTarget[]
 }> {
   try {
-    const searchUrl = `${BASE_URL}/search?q=${encodeURIComponent(name)}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return { drug: null, targets: [] }
-    const searchData = await searchRes.json()
-    const firstResult = Array.isArray(searchData) ? searchData[0] : searchData?.results?.[0]
+    // Identity-first: DrugBank id or InChIKey before free-text name
+    const identityQueries = [
+      opts?.drugbankId?.trim(),
+      opts?.inchiKey?.trim(),
+      name?.trim(),
+    ].filter(Boolean) as string[]
+
+    let firstResult: Record<string, unknown> | null = null
+    for (const q of identityQueries) {
+      const searchUrl = `${BASE_URL}/search?q=${encodeURIComponent(q)}`
+      const searchRes = await fetch(searchUrl, fetchOptions)
+      if (!searchRes.ok) continue
+      const searchData = await searchRes.json()
+      const hit = Array.isArray(searchData) ? searchData[0] : searchData?.results?.[0]
+      if (hit) {
+        firstResult = hit as Record<string, unknown>
+        break
+      }
+    }
     if (!firstResult) return { drug: null, targets: [] }
 
     const drugId = firstResult.id || firstResult.STRUCT_ID || firstResult.inchikey
@@ -48,7 +65,7 @@ export async function getDrugCentralData(name: string): Promise<{
     if (!detailRes.ok) {
       const drug: DrugCentralDrug = {
         id: typeof drugId === 'number' ? drugId : 0,
-        name: firstResult.name || name,
+        name: String(firstResult.name || name || ''),
         synonym: [],
         indication: [],
         actionType: [],
@@ -103,9 +120,12 @@ export async function getDrugCentralData(name: string): Promise<{
   }
 }
 
-export async function getDrugCentralEnhanced(name: string): Promise<DrugCentralEnhanced | null> {
-  const { drug, targets } = await getDrugCentralData(name)
-  
+export async function getDrugCentralEnhanced(
+  name: string,
+  opts?: { drugbankId?: string | null; inchiKey?: string | null },
+): Promise<DrugCentralEnhanced | null> {
+  const { drug, targets } = await getDrugCentralData(name, opts)
+
   if (!drug) return null
 
   return {

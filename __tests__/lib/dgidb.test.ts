@@ -34,7 +34,37 @@ describe('getDrugGeneInteractionsByName', () => {
     expect(results[0].drugName).toBe('aspirin')
     expect(results[0].interactionType).toBe('inhibitor')
     expect(results[0].source).toBe('DrugBank, ChEMBL')
-    expect(results[0].url).toContain('dgidb.org/genes/PTGS2')
+    // Gene record pages require conceptId (symbol-only /genes/PTGS2 404s on DGIdb v5)
+    expect(results[0].url).toBe('https://www.dgidb.org/genes/ncbi:5743')
+  })
+
+  test('falls back to results search when gene has no conceptId', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        data: {
+          drugs: {
+            nodes: [
+              {
+                conceptId: 'rxcui:1191',
+                name: 'ASPIRIN',
+                interactions: [
+                  {
+                    gene: { name: 'PTGS2' },
+                    interactionTypes: [{ type: 'inhibitor' }],
+                    sources: [{ sourceDbName: 'DrugBank' }],
+                  },
+                ],
+              },
+            ],
+          },
+        },
+      }),
+    })
+    const results = await getDrugGeneInteractionsByName('aspirin')
+    expect(results[0].url).toBe(
+      'https://www.dgidb.org/results?searchType=gene&searchTerms=PTGS2',
+    )
   })
 
   test('returns empty array when no matched drugs', async () => {

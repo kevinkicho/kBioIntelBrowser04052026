@@ -128,12 +128,15 @@ export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceSt
         {BUCKET_ORDER.map((bucket) => {
           const n = counts[bucket]
           const meta = BUCKET_META[bucket]
+          // Dim zero counts so real load/empty/issue signal stands out (summary empty-data contract)
+          const dim = n === 0
           return (
             <span
               key={bucket}
               data-testid={`source-status-count-${bucket}`}
               data-count={n}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${meta.className}`}
+              data-empty={dim ? 'true' : 'false'}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${meta.className} ${dim ? 'opacity-20' : ''}`}
               title={
                 byBucket[bucket].length > 0
                   ? byBucket[bucket].map(statusDetailLabel).join('\n')

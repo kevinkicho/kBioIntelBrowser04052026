@@ -4,6 +4,9 @@ import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MyChemAnnotation } from '@/lib/types'
+import { mychemDeepLinks } from '@/lib/api/mychem'
+import { isBrokenSourceShellUrl, preferStableDeepLink } from '@/lib/deepLinkPolicy'
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
 interface MyChemPanelProps {
@@ -13,13 +16,22 @@ interface MyChemPanelProps {
 }
 
 function displayName(chem: MyChemAnnotation): string {
-  if (chem.name) return chem.name
+  if (chem.name?.trim() && chem.name.trim().toLowerCase() !== 'unknown compound') {
+    return chem.name.trim()
+  }
   if (chem.chebi?.name) return chem.chebi.name
-  const firstId = chem.chemblId || chem.chebiId || chem.drugbankId || chem.pubchemCid
-  return firstId || 'Unknown compound'
+  if (chem.chemblId) return chem.chemblId
+  if (chem.drugbankId) return chem.drugbankId
+  if (chem.pubchemCid) return `PubChem CID ${chem.pubchemCid}`
+  if (chem.inchiKey) return chem.inchiKey
+  return 'Unknown compound'
 }
 
-export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastFetched }: MyChemPanelProps) {
+export const MyChemPanel = memo(function MyChemPanel({
+  chemicals,
+  panelId,
+  lastFetched,
+}: MyChemPanelProps) {
   const list = Array.isArray(chemicals) ? chemicals : []
   const isEmpty = list.length === 0
   const title = isEmpty ? 'MyChem' : 'MyChem.info Annotations'
@@ -61,7 +73,6 @@ export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastF
               chem.drugbankId,
               chem.formula,
               ...(chem.synonyms || []),
-              ...(chem.drugbank?.groups || []),
             ]
               .filter(Boolean)
               .join(' ')
@@ -70,103 +81,87 @@ export const MyChemPanel = memo(function MyChemPanel({ chemicals, panelId, lastF
           defaultSortId="name-asc"
           filterPlaceholder="Filter chemicals (name, ID, formula…)"
           getKey={(chem, idx) =>
-            `${chem.chemblId || chem.pubchemCid || chem.chebiId || chem.inchiKey || idx}`
+            `${chem.inchiKey || chem.chemblId || chem.pubchemCid || chem.chebiId || idx}`
           }
-          renderItem={(chem) => (
-            <div className="py-2 border-b border-slate-700/50 last:border-0">
-              <div className="flex items-start justify-between gap-2">
-                <div className="flex-1">
-                  <h4 className="text-sm font-medium text-slate-200">{displayName(chem)}</h4>
-                  {chem.inchiKey && (
-                    <p className="text-xs font-mono text-slate-500 mt-0.5">{chem.inchiKey}</p>
-                  )}
-                  <div className="flex flex-wrap gap-1 mt-1">
-                    {chem.chemblId && (
-                      <a
-                        href={`https://www.ebi.ac.uk/chembl/compound_report_card/${chem.chemblId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded hover:bg-green-900/70"
-                      >
-                        ChEMBL: {chem.chemblId}
-                      </a>
-                    )}
-                    {chem.pubchemCid && (
-                      <a
-                        href={`https://pubchem.ncbi.nlm.nih.gov/compound/${chem.pubchemCid}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-900/70"
-                      >
-                        PubChem: {chem.pubchemCid}
-                      </a>
-                    )}
-                    {chem.chebiId && (
-                      <a
-                        href={`https://www.ebi.ac.uk/chebi/searchId.do?chebiId=${chem.chebiId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs px-1.5 py-0.5 bg-orange-900/50 text-orange-300 rounded hover:bg-orange-900/70"
-                      >
-                        ChEBI: {chem.chebiId}
-                      </a>
-                    )}
-                    {chem.drugbankId && (
-                      <a
-                        href={`https://go.drugbank.com/drugs/${chem.drugbankId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-xs px-1.5 py-0.5 bg-purple-900/50 text-purple-300 rounded hover:bg-purple-900/70"
-                      >
-                        DrugBank: {chem.drugbankId}
-                      </a>
-                    )}
+          pageSize={8}
+          className="space-y-0"
+          renderItem={(chem, index) => {
+            const links = mychemDeepLinks(chem)
+            const primaryHref = preferStableDeepLink(
+              isBrokenSourceShellUrl(chem.url) ? null : chem.url,
+              links.mychem ||
+                links.chembl ||
+                links.pubchem ||
+                links.drugbank ||
+                links.chebi ||
+                'https://mychem.info/',
+            )
+            const titleName = displayName(chem)
+            const phase = chem.chembl?.maxPhase
+            const emptyPhase = isEmptyMetric(phase ?? 0)
+
+            return (
+              <div>
+                {index === 0 && (
+                  <div
+                    className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    role="row"
+                  >
+                    <span>Name / IDs</span>
+                    <span>Formula</span>
+                    <span>MW</span>
+                    <span className="text-right">Phase</span>
+                    <span className="text-right">Open</span>
                   </div>
-                </div>
+                )}
+                <a
+                  href={primaryHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`Open ${titleName}`}
+                  className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem_2.5rem] gap-x-2 items-start px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                >
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
+                      {titleName}
+                    </div>
+                    <div className="mt-0.5 flex flex-wrap gap-1 text-[10px]">
+                      {chem.chemblId && links.chembl && (
+                        <span className="text-green-400/90 font-mono">{chem.chemblId}</span>
+                      )}
+                      {chem.pubchemCid && (
+                        <span className="text-blue-400/90 font-mono">CID {chem.pubchemCid}</span>
+                      )}
+                      {chem.drugbankId && (
+                        <span className="text-purple-400/90 font-mono">{chem.drugbankId}</span>
+                      )}
+                      {chem.chebiId && (
+                        <span className="text-orange-400/90 font-mono">{chem.chebiId}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span
+                    className={`text-xs font-mono text-slate-400 truncate ${emptyDataClass(isEmptyMetric(chem.formula))}`}
+                  >
+                    {chem.formula || '—'}
+                  </span>
+                  <span
+                    className={`text-xs tabular-nums text-slate-400 ${emptyDataClass(isEmptyMetric(chem.molecularWeight))}`}
+                  >
+                    {chem.molecularWeight > 0 ? chem.molecularWeight.toFixed(1) : '—'}
+                  </span>
+                  <span
+                    className={`text-xs text-right tabular-nums text-slate-400 ${emptyDataClass(emptyPhase)}`}
+                  >
+                    {phase != null && phase > 0 ? phase : '—'}
+                  </span>
+                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
+                    ↗
+                  </span>
+                </a>
               </div>
-
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-2 mt-2 text-xs text-slate-400">
-                {chem.formula && (
-                  <div>
-                    <span className="text-slate-500">Formula:</span>{' '}
-                    <span className="font-mono">{chem.formula}</span>
-                  </div>
-                )}
-                {chem.molecularWeight > 0 && (
-                  <div>
-                    <span className="text-slate-500">MW:</span>{' '}
-                    <span>{chem.molecularWeight.toFixed(2)} Da</span>
-                  </div>
-                )}
-                {chem.chembl?.maxPhase !== undefined && chem.chembl.maxPhase > 0 && (
-                  <div>
-                    <span className="text-slate-500">Max Phase:</span>{' '}
-                    <span>{chem.chembl.maxPhase}</span>
-                  </div>
-                )}
-              </div>
-
-              {chem.synonyms && chem.synonyms.length > 0 && (
-                <p className="text-xs text-slate-500 mt-1 line-clamp-1">
-                  Synonyms: {chem.synonyms.slice(0, 5).join(', ')}
-                  {chem.synonyms.length > 5 && ` +${chem.synonyms.length - 5} more`}
-                </p>
-              )}
-
-              {chem.drugbank?.groups && chem.drugbank.groups.length > 0 && (
-                <div className="flex gap-1 mt-1">
-                  {chem.drugbank.groups.map((group) => (
-                    <span
-                      key={group}
-                      className="text-xs px-1.5 py-0.5 bg-slate-700 text-slate-300 rounded"
-                    >
-                      {group}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+            )
+          }}
         />
       )}
     </Panel>

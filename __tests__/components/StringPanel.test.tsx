@@ -24,9 +24,11 @@ const mockInteractions: StringInteraction[] = [
 ]
 
 describe('StringPanel', () => {
-  test('renders protein pair with arrow separator', () => {
+  test('renders protein pair columns', () => {
     render(<StringPanel interactions={mockInteractions} />)
-    expect(screen.getByText('ACE ↔ AGT')).toBeInTheDocument()
+    expect(screen.getAllByText('ACE').length).toBeGreaterThanOrEqual(1)
+    expect(screen.getByText('AGT')).toBeInTheDocument()
+    expect(screen.getByText('Protein A')).toBeInTheDocument()
   })
 
   test('renders combined score formatted to 3 decimal places', () => {
@@ -34,35 +36,13 @@ describe('StringPanel', () => {
     expect(screen.getByText('0.999')).toBeInTheDocument()
   })
 
-  test('renders experimental score badge with teal styling', () => {
+  test('row deep-links to STRING', () => {
     render(<StringPanel interactions={mockInteractions} />)
-    expect(screen.getByText('exp 0.800')).toBeInTheDocument()
+    const links = screen.getAllByRole('link')
+    expect(links.some((l) => l.getAttribute('href')?.includes('string-db.org'))).toBe(true)
   })
 
-  test('renders database score badge with blue styling', () => {
-    render(<StringPanel interactions={mockInteractions} />)
-    expect(screen.getByText('db 0.900')).toBeInTheDocument()
-  })
-
-  test('renders textmining score badge with slate styling', () => {
-    render(<StringPanel interactions={mockInteractions} />)
-    expect(screen.getByText('text 0.700')).toBeInTheDocument()
-  })
-
-  test('does not render zero-value evidence score badges', () => {
-    render(<StringPanel interactions={mockInteractions} />)
-    const expBadges = screen.getAllByText(/^exp/)
-    expect(expBadges).toHaveLength(1)
-  })
-
-  test('renders STRING link for each interaction', () => {
-    render(<StringPanel interactions={mockInteractions} />)
-    const links = screen.getAllByRole('link', { name: /string →/i })
-    expect(links).toHaveLength(2)
-    expect(links[0]).toHaveAttribute('href', 'https://string-db.org/network/9606.ENSP00000290421')
-  })
-
-  test('renders empty state when interactions array is empty', () => {
+  test('renders empty state', () => {
     render(<StringPanel interactions={[]} />)
     expect(screen.getByText(/no protein interactions found/i)).toBeInTheDocument()
   })

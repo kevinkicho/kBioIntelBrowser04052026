@@ -1,12 +1,12 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { DiseaseAssociation } from '@/lib/types'
-import { DataPoint } from '@/components/ui/DataPoint'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
+import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 function diseaseHref(disease: DiseaseAssociation): string {
   if (disease.diseaseId) {
@@ -67,86 +67,60 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
           defaultSortId="num-desc"
           filterPlaceholder="Filter diseases (name, ID, area…)"
           getKey={(disease, i) => `${disease.diseaseId || disease.diseaseName}-${i}`}
-          renderItem={(disease) => {
+          pageSize={8}
+          className="space-y-0"
+          renderItem={(disease, index) => {
             const otUrl = diseaseHref(disease)
-            const localDisease = `/disease?q=${encodeURIComponent(disease.diseaseName)}`
-            const discoverHref = `/discover?q=${encodeURIComponent(disease.diseaseName)}${
-              disease.diseaseId ? `&diseaseId=${encodeURIComponent(disease.diseaseId)}` : ''
-            }`
+            const scoreEmpty = isEmptyMetric(disease.score)
+            const evEmpty = isEmptyMetric(disease.evidenceCount)
             return (
-              <DataPoint
-                sourceKey="opentargets"
-                label={disease.diseaseName}
-                recordUrl={otUrl}
-                fetchedAt={lastFetched}
-              >
-                <div className="py-2.5 border-b border-slate-700 last:border-0 pr-1">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <a
-                        href={otUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="font-semibold text-sm text-indigo-300 hover:text-indigo-200 hover:underline"
-                      >
-                        {disease.diseaseName}
-                      </a>
-                      {disease.diseaseId && (
-                        <p className="text-[10px] font-mono text-slate-600 mt-0.5">
-                          {disease.diseaseId}
-                        </p>
-                      )}
-                      {disease.description && (
-                        <p className="text-[11px] text-slate-500 mt-1 line-clamp-2 leading-relaxed">
-                          {disease.description}
-                        </p>
-                      )}
-                    </div>
-                    <div className="shrink-0 text-right space-y-1">
-                      {typeof disease.score === 'number' && disease.score > 0 && (
-                        <span className="block text-xs tabular-nums text-emerald-300/90 bg-emerald-900/30 border border-emerald-800/40 px-1.5 py-0.5 rounded">
-                          {disease.score.toFixed(2)}
-                        </span>
-                      )}
-                      {disease.evidenceCount > 0 && (
-                        <span className="block text-[10px] text-slate-500">
-                          {disease.evidenceCount} evidence
-                        </span>
-                      )}
-                    </div>
+              <div>
+                {index === 0 && (
+                  <div
+                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.8fr)_3.5rem_3.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    role="row"
+                  >
+                    <span>Disease</span>
+                    <span>ID</span>
+                    <span className="text-right">Score</span>
+                    <span className="text-right">Evid.</span>
+                    <span className="text-right">Open</span>
                   </div>
-                  <div className="flex flex-wrap gap-1.5 mt-1.5 items-center">
-                    {disease.therapeuticAreas?.slice(0, 6).map((area, j) => (
-                      <span
-                        key={j}
-                        className="text-[10px] bg-indigo-900/40 text-indigo-300 border border-indigo-700/30 px-1.5 py-0.5 rounded"
-                      >
-                        {area}
-                      </span>
-                    ))}
-                    <Link
-                      href={localDisease}
-                      className="text-[10px] text-slate-500 hover:text-cyan-300 ml-auto"
-                    >
-                      BioIntel disease →
-                    </Link>
-                    <Link
-                      href={discoverHref}
-                      className="text-[10px] text-emerald-500/80 hover:text-emerald-300"
-                    >
-                      Discover →
-                    </Link>
-                    <a
-                      href={otUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-slate-500 hover:text-indigo-300"
-                    >
-                      Open Targets ↗
-                    </a>
-                  </div>
-                </div>
-              </DataPoint>
+                )}
+                <a
+                  href={otUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Open on Open Targets Platform"
+                  onClick={() =>
+                    onDeepLinkClick('opentargets', otUrl, {
+                      panelId: 'opentargets',
+                      label: disease.diseaseName,
+                    })
+                  }
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.8fr)_3.5rem_3.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                >
+                  <span className="text-sm font-medium text-indigo-300 group-hover:text-indigo-200 truncate">
+                    {disease.diseaseName || '—'}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-600 truncate">
+                    {disease.diseaseId || '—'}
+                  </span>
+                  <span
+                    className={`text-xs tabular-nums text-right text-emerald-300/90 ${emptyDataClass(scoreEmpty)}`}
+                  >
+                    {scoreEmpty ? '—' : disease.score.toFixed(2)}
+                  </span>
+                  <span
+                    className={`text-xs tabular-nums text-right text-slate-400 ${emptyDataClass(evEmpty)}`}
+                  >
+                    {evEmpty ? '—' : disease.evidenceCount}
+                  </span>
+                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
+                    ↗
+                  </span>
+                </a>
+              </div>
             )
           }}
         />

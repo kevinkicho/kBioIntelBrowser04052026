@@ -19,9 +19,19 @@ describe('OpenTargetsPanel', () => {
     expect(screen.getByText('Type 2 diabetes mellitus')).toBeInTheDocument()
   })
 
-  test('renders therapeutic area', () => {
+  test('renders disease id and score in table', () => {
     render(<OpenTargetsPanel diseases={mockDiseases} />)
-    expect(screen.getByText('Metabolic disease')).toBeInTheDocument()
+    expect(screen.getByText('EFO_0000311')).toBeInTheDocument()
+    expect(screen.getByText('0.95')).toBeInTheDocument()
+  })
+
+  test('deep-links to Open Targets disease page', () => {
+    render(<OpenTargetsPanel diseases={mockDiseases} />)
+    const link = screen.getByRole('link', { name: /Type 2 diabetes mellitus/i })
+    expect(link).toHaveAttribute(
+      'href',
+      expect.stringContaining('platform.opentargets.org/disease/EFO_0000311'),
+    )
   })
 
   test('renders empty state when no diseases', () => {

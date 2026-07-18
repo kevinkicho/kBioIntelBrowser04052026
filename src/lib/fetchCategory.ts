@@ -62,9 +62,15 @@ export async function fetchCategoryData(
   categoryId: CategoryId,
   apiOverrides?: Record<string, ApiIdentifierType>,
   apiParams?: Record<string, ApiParamValue>,
-  opts?: { refresh?: boolean },
+  opts?: { refresh?: boolean; signal?: AbortSignal },
 ): Promise<Record<string, unknown>> {
   const cacheKey = categoryProfileCacheKey(cid, categoryId, apiOverrides, apiParams)
+
+  if (opts?.signal?.aborted) {
+    throw opts.signal.reason instanceof Error
+      ? opts.signal.reason
+      : new DOMException('Aborted', 'AbortError')
+  }
 
   // History / SPA / hard-reload: L1 memory then L2 IDB without network.
   if (!opts?.refresh) {
@@ -92,13 +98,20 @@ export async function fetchCategoryData(
     }
   }
   if (opts?.refresh) {
+    // Bust client session cache + browser HTTP cache so soft-refresh never serves stale deep links/payloads
     params.set('refresh', '1')
+    params.set('_t', String(Date.now()))
   }
   const qs = params.toString()
   if (qs) url += `?${qs}`
 
   // Retries cover Fast Refresh route races (transient 404) and PubChem 502s.
-  const res = await clientFetch(url, undefined, { retries: 2, retryDelayMs: 400 })
+  // Pass signal so force/remount aborts in-flight category work.
+  const res = await clientFetch(
+    url,
+    opts?.signal ? { signal: opts.signal } : undefined,
+    { retries: 2, retryDelayMs: 400 },
+  )
   if (!res.ok) {
     throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)
   }

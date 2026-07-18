@@ -845,10 +845,22 @@ const PANEL_CONFIG: Record<string, {
   'myChemData': {
     category: 'molecular-chemical',
     limitKey: 'MY_CHEM',
-    fetcher: async (name, _synonyms, _limit) => {
+    fetcher: async (name, _synonyms, limit) => {
+      // Fielded MyChem queries (chembl.pref_name / chebi.name) — not free-text NDC packaging
       const result = await getMyChemData(name)
-      const data = result ? [result] : []
-      return { data, total: data.length, hasMore: false }
+      const all = result.chemicals ?? []
+      const data = all.slice(0, limit)
+      return { data, total: all.length, hasMore: all.length > limit }
+    }
+  },
+  'myChemAnnotations': {
+    category: 'molecular-chemical',
+    limitKey: 'MY_CHEM',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await getMyChemData(name)
+      const all = result.chemicals ?? []
+      const data = all.slice(0, limit)
+      return { data, total: all.length, hasMore: all.length > limit }
     }
   },
 

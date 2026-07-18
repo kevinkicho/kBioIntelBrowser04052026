@@ -51,18 +51,18 @@ function chemblSearch(ctx: OriginLinkContext): string | null {
           ? `CHEMBL${raw}`
           : null
       if (id && id.length > 6) {
-        return `https://www.ebi.ac.uk/chembl/compound_report_card/${id}/`
+        return `https://www.ebi.ac.uk/chembl/explore/compound/${id}`
       }
     }
   } catch {
     /* fall through */
   }
   if (ctx.cid != null && ctx.cid > 0) {
-    // PubChem CID search on ChEMBL (still a working entry when no CHEMBL id)
-    return `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${enc(String(ctx.cid))}`
+    // Explore compounds free-text (avoid /g/# SPA shells that open the homepage)
+    return `https://www.ebi.ac.uk/chembl/explore/compounds/QUERYSTRING:${enc(String(ctx.cid))}`
   }
   if (ctx.name?.trim()) {
-    return `https://www.ebi.ac.uk/chembl/g/#search_results/all/query=${enc(ctx.name.trim())}`
+    return `https://www.ebi.ac.uk/chembl/explore/compounds/QUERYSTRING:${enc(ctx.name.trim())}`
   }
   return null
 }
@@ -108,20 +108,26 @@ export function originSourceDeepLink(
     }
   }
 
-  // --- DGIdb ---
+  // --- DGIdb (v5 SPA: /results?searchType=gene|drug — /search is not a route) ---
   if (key === 'dgidb' || key.includes('dgidb')) {
-    const term = gene || name
-    if (term) {
+    if (gene) {
       return {
         label,
-        href: `https://www.dgidb.org/search?searchType=interactions&searchTerms=${enc(term)}`,
-        title: `DGIdb interactions for ${term}`,
+        href: `https://www.dgidb.org/results?searchType=gene&searchTerms=${enc(gene)}`,
+        title: `DGIdb gene interactions for ${gene}`,
+      }
+    }
+    if (name) {
+      return {
+        label,
+        href: `https://www.dgidb.org/results?searchType=drug&searchTerms=${enc(name)}`,
+        title: `DGIdb drug interactions for ${name}`,
       }
     }
     return {
       label,
-      href: 'https://www.dgidb.org/search',
-      title: 'DGIdb search',
+      href: 'https://www.dgidb.org/',
+      title: 'DGIdb',
     }
   }
 
