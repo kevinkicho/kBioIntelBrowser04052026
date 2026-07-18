@@ -38,9 +38,6 @@ export const OLLAMA_CLOUD_URL = 'https://ollama.com'
 /** Transport is always server-side proxy for Cloud. Kept for API compatibility. */
 export type AITransport = 'server'
 
-const RETRY_INTERVAL_MS = 15000
-const RETRY_MAX_ATTEMPTS = 20
-
 export interface ModelInfo {
   contextLength: number | null
   parameterSize: string | null
@@ -202,10 +199,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
     progress: number
   } | null>(null)
   const abortRef = useRef<AbortController | null>(null)
-  const retryCountRef = useRef(0)
-  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const healthInProgressRef = useRef(false)
   const apiKeyRef = useRef('')
+  const modelRef = useRef('')
+  const restoredOnceRef = useRef(false)
 
   useEffect(() => {
     const saved = loadAIConfig()
@@ -216,10 +213,13 @@ export function AIProvider({ children }: { children: ReactNode }) {
         ollamaUrl,
         enabled: saved.enabled,
       })
+      modelRef.current = saved.model || ''
       setConfig((prev) => ({
         ...prev,
         ...saved,
         ollamaUrl,
+        // status is not persisted — will re-validate after mount
+        status: 'unknown' as AIStatus,
       }))
     }
     const key = loadLocalOllamaApiKey()
@@ -239,26 +239,40 @@ export function AIProvider({ children }: { children: ReactNode }) {
     })
   }, [mounted])
 
-  const reconnect = useCallback(async () => {
+  const reconnect = useCallback(async (opts?: { quiet?: boolean }) => {
     if (healthInProgressRef.current) return
     if (!apiKeyRef.current?.trim()) {
       setConfig((prev) => ({
         ...prev,
         ollamaUrl: cloudBase(),
         status: 'unavailable' as AIStatus,
+        enabled: false,
         error: 'Add your Ollama Cloud API key in AI settings to connect.',
         statusNote: undefined,
       }))
       return
     }
     healthInProgressRef.current = true
-    console.log('[ai] Checking Ollama Cloud connection')
-    setConfig((prev) => ({ ...prev, status: 'checking' as AIStatus, ollamaUrl: cloudBase() }))
+    if (!opts?.quiet) {
+      console.log('[ai] Checking Ollama Cloud connection')
+    }
+    setConfig((prev) => ({
+      ...prev,
+      status: 'checking' as AIStatus,
+      ollamaUrl: cloudBase(),
+      error: undefined,
+    }))
 
     try {
       const result = await checkCloudHealth(apiKeyRef.current)
       if (result.available) {
-        const model = config.model || pickFirstModel(result.models) || ''
+        const preferred = modelRef.current
+        const model =
+          (preferred && result.models.includes(preferred) ? preferred : '') ||
+          pickFirstModel(result.models) ||
+          preferred ||
+          ''
+        modelRef.current = model
         const effectiveUrl = result.effectiveUrl || cloudBase()
         console.log(
           `[ai] Connected to Ollama Cloud | models: [${result.models.join(', ')}] | using: ${model || 'none'}`,
@@ -267,11 +281,12 @@ export function AIProvider({ children }: { children: ReactNode }) {
           ...prev,
           ollamaUrl: effectiveUrl,
           status: model ? ('available' as AIStatus) : ('unavailable' as AIStatus),
-          availableModels: result.models,
+          availableModels: result.models.length ? result.models : prev.availableModels,
           model: model || prev.model,
+          enabled: Boolean(model),
           error: model
             ? undefined
-            : 'No models available on Ollama Cloud for this key. Pull or pick a cloud model.',
+            : 'No models available on Ollama Cloud for this key. Pick a model in settings.',
           statusNote: model ? 'Using Ollama Cloud with your API key' : undefined,
         }))
         if (model) {
@@ -279,71 +294,69 @@ export function AIProvider({ children }: { children: ReactNode }) {
           setModelInfo(info)
         }
       } else {
-        console.warn('[ai] Ollama Cloud unavailable:', result.error)
-        setConfig((prev) => ({
-          ...prev,
-          ollamaUrl: cloudBase(),
-          status: 'unavailable' as AIStatus,
-          availableModels: [],
-          error:
-            result.error ||
-            'Cannot connect to Ollama Cloud. Check your API key and try again.',
-          statusNote: undefined,
-        }))
-        setModelInfo(null)
+        console.warn('[ai] Ollama Cloud health failed:', result.error)
+        // Soft fail: keep model + key so Pack AI / chat still work if key is valid
+        setConfig((prev) => {
+          if (prev.model && apiKeyRef.current) {
+            return {
+              ...prev,
+              ollamaUrl: cloudBase(),
+              status: 'available' as AIStatus,
+              enabled: true,
+              error: undefined,
+              statusNote:
+                'Using saved model & key (last health check failed — click Connect to refresh).',
+            }
+          }
+          return {
+            ...prev,
+            ollamaUrl: cloudBase(),
+            status: 'unavailable' as AIStatus,
+            error:
+              result.error ||
+              'Cannot connect to Ollama Cloud. Check your API key and try again.',
+            statusNote: undefined,
+          }
+        })
       }
     } catch (err) {
       console.error('[ai] Health check error:', err)
-      setConfig((prev) => ({
-        ...prev,
-        status: 'error' as AIStatus,
-        error: err instanceof Error ? err.message : 'Failed to check Ollama Cloud',
-        statusNote: undefined,
-      }))
-      setModelInfo(null)
+      setConfig((prev) => {
+        if (prev.model && apiKeyRef.current) {
+          return {
+            ...prev,
+            status: 'available' as AIStatus,
+            enabled: true,
+            error: undefined,
+            statusNote: 'Using saved model & key (health check error — try Connect to refresh).',
+          }
+        }
+        return {
+          ...prev,
+          status: 'error' as AIStatus,
+          error: err instanceof Error ? err.message : 'Failed to check Ollama Cloud',
+          statusNote: undefined,
+        }
+      })
     } finally {
       healthInProgressRef.current = false
     }
-  }, [config.model])
+  }, [])
+
+  // One restore re-validate when we have a stored API key (no 20× retry spam)
+  useEffect(() => {
+    if (!mounted || restoredOnceRef.current) return
+    restoredOnceRef.current = true
+    if (apiKeyRef.current?.trim()) {
+      void reconnect({ quiet: true })
+    }
+  }, [mounted, reconnect])
 
   useEffect(() => {
     if (!mounted) return
-
-    if (config.status === 'unavailable' || config.status === 'error') {
-      if (retryCountRef.current < RETRY_MAX_ATTEMPTS) {
-        const delay = RETRY_INTERVAL_MS + Math.min(retryCountRef.current * 2000, 30000)
-        console.log(
-          `[ai] Will retry in ${delay / 1000}s (attempt ${retryCountRef.current + 1}/${RETRY_MAX_ATTEMPTS})`,
-        )
-        retryTimerRef.current = setTimeout(() => {
-          retryCountRef.current++
-          void reconnect()
-        }, delay)
-      }
-    }
-
-    if (config.status === 'available') {
-      retryCountRef.current = 0
-    }
-
-    return () => {
-      if (retryTimerRef.current) {
-        clearTimeout(retryTimerRef.current)
-        retryTimerRef.current = null
-      }
-    }
-  }, [mounted, config.status]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!config.enabled && config.status === 'available') {
-      setConfig((prev) => ({ ...prev, enabled: true }))
-    }
-  }, [config.status]) // eslint-disable-line react-hooks/exhaustive-deps
-
-  useEffect(() => {
-    if (!mounted) return
+    // Persist config without ephemeral status
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { status: _status, ...toSave } = config
+    const { status: _status, error: _error, statusNote: _note, ...toSave } = config
     saveAIConfig({ ...toSave, ollamaUrl: cloudBase() })
   }, [mounted, config])
 
@@ -380,77 +393,19 @@ export function AIProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const connect = useCallback(async () => {
-    if (!apiKeyRef.current?.trim()) {
-      setConfig((prev) => ({
-        ...prev,
-        ollamaUrl: cloudBase(),
-        status: 'unavailable' as AIStatus,
-        error:
-          'Add your Ollama Cloud API key first (AI settings). Keys are per-user — not stored in server .env.',
-        statusNote: undefined,
-      }))
-      return
-    }
-    retryCountRef.current = 0
-    setConfig((prev) => ({
-      ...prev,
-      ollamaUrl: cloudBase(),
-      status: 'checking' as AIStatus,
-      error: undefined,
-      statusNote: undefined,
-    }))
-
-    const result = await checkCloudHealth(apiKeyRef.current)
-    if (result.available) {
-      const model = pickFirstModel(result.models) || ''
-      const effectiveUrl = result.effectiveUrl || cloudBase()
-      console.log(
-        `[ai] Connected to Ollama Cloud | models: [${result.models.join(', ')}] | using: ${model || 'none'}`,
-      )
-      setConfig((prev) => ({
-        ...prev,
-        ollamaUrl: effectiveUrl,
-        status: model ? ('available' as AIStatus) : ('unavailable' as AIStatus),
-        availableModels: result.models,
-        model: model || prev.model,
-        enabled: model ? true : prev.enabled,
-        error: model
-          ? undefined
-          : 'No models available on Ollama Cloud for this key.',
-        statusNote: model ? 'Using Ollama Cloud with your API key' : undefined,
-      }))
-      if (model) {
-        const info = await fetchModelInfo(model, apiKeyRef.current)
-        setModelInfo(info)
-      }
-    } else {
-      setConfig((prev) => ({
-        ...prev,
-        ollamaUrl: cloudBase(),
-        status: 'unavailable' as AIStatus,
-        availableModels: [],
-        error:
-          result.error ||
-          'Cannot connect to Ollama Cloud. Check your API key at ollama.com/settings/keys.',
-        statusNote: undefined,
-      }))
-      setModelInfo(null)
-    }
-  }, [])
+    await reconnect({ quiet: false })
+  }, [reconnect])
 
   const disconnect = useCallback(() => {
     console.log('[ai] Disconnecting')
     abortRef.current?.abort()
-    retryCountRef.current = 0
-    if (retryTimerRef.current) {
-      clearTimeout(retryTimerRef.current)
-      retryTimerRef.current = null
-    }
+    modelRef.current = ''
     setConfig((prev) => ({
       ...prev,
       enabled: false,
       status: 'unknown' as AIStatus,
       availableModels: [],
+      model: '',
       error: undefined,
       statusNote: undefined,
       ollamaUrl: cloudBase(),
@@ -458,14 +413,19 @@ export function AIProvider({ children }: { children: ReactNode }) {
     setModelInfo(null)
   }, [])
 
-  const selectModel = useCallback(
-    (model: string) => {
-      console.log('[ai] Selecting model:', model)
-      setConfig((prev) => ({ ...prev, model }))
-      void fetchModelInfo(model, apiKeyRef.current || undefined).then(setModelInfo)
-    },
-    [],
-  )
+  const selectModel = useCallback((model: string) => {
+    console.log('[ai] Selecting model:', model)
+    modelRef.current = model
+    setConfig((prev) => ({
+      ...prev,
+      model,
+      enabled: true,
+      status: 'available' as AIStatus,
+      error: undefined,
+      statusNote: 'Using Ollama Cloud with your API key',
+    }))
+    void fetchModelInfo(model, apiKeyRef.current || undefined).then(setModelInfo)
+  }, [])
 
   const pullModelFn = useCallback(
     async (model: string): Promise<{ success: boolean; error?: string }> => {

@@ -79,8 +79,11 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       setError('Enter a question or prompt first.')
       return
     }
-    if (!ai.enabled || !ai.model) {
-      setError('Connect Ollama Cloud (AI button) with your API key to run pack analysis.')
+    // Real Cloud call — needs API key + model; chip status may lag but key/model is enough
+    if (!ai.hasUserApiKey || !ai.model) {
+      setError(
+        'Add your Ollama Cloud API key and connect (top-bar AI button), then pick a model. Pack AI is not dummy data — it calls the live model.',
+      )
       return
     }
     setBusy(true)
