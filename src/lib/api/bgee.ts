@@ -78,7 +78,6 @@ function pushUnique(
   out: BgeeExpression[],
   seen: Set<string>,
   row: BgeeExpression,
-  max = 40,
 ): void {
   const name = row.anatomicalEntityName.trim()
   if (!name) return
