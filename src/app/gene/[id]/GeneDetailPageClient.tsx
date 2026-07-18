@@ -166,13 +166,14 @@ function GeneDiseasesPanel({
   data,
   status,
   geneSymbol,
-  fetchedAt: _fetchedAt,
+  fetchedAt,
 }: {
   data: Record<string, unknown> | null
   status?: SectionStatus
   geneSymbol?: string
   fetchedAt?: Date | null
 }) {
+  void fetchedAt
   const geneDiseases = data?.geneDiseases as Record<string, unknown> | undefined
   type DisgenetRow = {
     diseaseName: string
@@ -987,11 +988,12 @@ type GtexTissueRow = { tissueName?: string; tpm?: number; geneSymbol?: string }
 
 function GeneExpressionPanel({
   data,
-  fetchedAt: _fetchedAt,
+  fetchedAt,
 }: {
   data: Record<string, unknown> | null
   fetchedAt?: Date | null
 }) {
+  void fetchedAt
   const gtexExps = ((data?.geneExpressionData as Record<string, unknown>)?.gtexExpressions ??
     []) as GtexTissueRow[]
   const bgeeExps = ((data?.geneExpressionData as Record<string, unknown>)?.bgeeExpressions ??
@@ -1522,11 +1524,12 @@ function aspectBadgeClass(aspect: string | undefined): string {
 
 function GenePathwaysPanel({
   data,
-  fetchedAt: _fetchedAt,
+  fetchedAt,
 }: {
   data: Record<string, unknown> | null
   fetchedAt?: Date | null
 }) {
+  void fetchedAt
   const bundle = (data?.genePathways ?? {}) as Record<string, unknown>
   const reactome = (bundle.reactomePathways ?? []) as ReactomePathway[]
   const wikipathways = (bundle.wikiPathways ?? []) as WikiPathway[]
