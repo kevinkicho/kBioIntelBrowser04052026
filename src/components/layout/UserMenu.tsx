@@ -243,20 +243,18 @@ export function UserMenu() {
         >
           {!configured ? (
             <div className="space-y-2 px-3 py-4" data-testid="user-menu-unconfigured">
-              <p className="text-sm font-medium text-slate-200">Firebase not configured</p>
+              <p className="text-sm font-medium text-slate-200">Cloud sign-in unavailable</p>
               <p className="text-[11px] leading-relaxed text-slate-500">
-                Add <code className="text-slate-400">NEXT_PUBLIC_FIREBASE_*</code> to{' '}
-                <code className="text-slate-400">.env</code> and restart the dev server. See{' '}
-                <code className="text-slate-400">docs/firebase.md</code>.
+                Optional account sync is not set up for this deployment. You can still use BioIntel
+                fully offline with local projects and file export.
               </p>
             </div>
           ) : !user ? (
             <div className="p-3" data-testid="user-menu-signed-out">
               <p className="mb-1 text-sm font-medium text-slate-100">Sign in to BioIntel</p>
               <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                Optional Google sign-in via Firebase Auth. After sign-in, local projects and discovery
-                prefs can sync to your private cloud (owner-only rules). Solo local mode still works
-                without an account.
+                Optional Google sign-in. After sign-in, local projects and discovery prefs can sync to
+                your private cloud. Solo local mode still works without an account.
               </p>
               <button
                 type="button"
@@ -321,14 +319,11 @@ export function UserMenu() {
                         {email}
                       </p>
                     )}
-                    <p className="mt-0.5 font-mono text-[9px] text-slate-600" title={user.uid}>
-                      uid {user.uid.slice(0, 12)}…
-                    </p>
                   </div>
                 </div>
                 <div className="mt-2 flex flex-wrap gap-1.5">
                   <span className="rounded-full border border-sky-900/50 bg-sky-950/40 px-2 py-0.5 text-[9px] text-sky-300/90">
-                    Firebase Auth
+                    Signed in
                   </span>
                   {projectCount != null && (
                     <span className="rounded-full border border-slate-700 bg-slate-900/80 px-2 py-0.5 text-[9px] text-slate-400">
@@ -396,17 +391,6 @@ export function UserMenu() {
                     {projectCount != null ? ` · ${projectCount} in cloud` : ' · local default'}
                   </span>
                 </Link>
-                <a
-                  href="https://console.firebase.google.com/project/kbiointelbrowser04052026/overview"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  role="menuitem"
-                  className="flex flex-col px-3 py-2 hover:bg-slate-800/60"
-                  data-testid="user-menu-firebase-console"
-                >
-                  <span className="text-xs text-slate-200">Firebase console ↗</span>
-                  <span className="text-[10px] text-slate-600">Auth, Firestore, Storage, Hosting</span>
-                </a>
               </div>
 
               <div className="border-b border-slate-800 py-1">
