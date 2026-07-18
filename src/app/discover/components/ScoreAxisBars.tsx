@@ -1,13 +1,23 @@
 'use client'
 
+import { useState } from 'react'
 import type { AxisStatus, ScoreAxisKey, ScoreRubric, ScoreVector } from '@/lib/domain'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
+import {
+  AXIS_HELP,
+  axisStatusHelp,
+  formatAxisTooltip,
+  formatCompositeTooltip,
+} from '@/lib/domain/scoreAxisHelp'
+import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 
 export interface ScoreAxisBarsProps {
   scores: ScoreVector
   rubric?: ScoreRubric
   compact?: boolean
   onOpenBreakdown?: () => void
+  /** Show inline ? explainer next to footnote (default true when not compact) */
+  showExplainer?: boolean
 }
 
 function axisBarColor(key: ScoreAxisKey): string {
@@ -49,14 +59,14 @@ function epistemicLabel(status: AxisStatus | undefined): string {
   }
 }
 
-function EpistemicChip({ status }: { status: AxisStatus | undefined }) {
+function EpistemicChip({ status, tip }: { status: AxisStatus | undefined; tip: string }) {
   const label = epistemicLabel(status)
   return (
     <span
-      className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-800/60 text-slate-500 font-medium whitespace-nowrap"
+      className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-800/60 text-slate-500 font-medium whitespace-nowrap cursor-help"
       data-testid="score-axis-epistemic"
       data-status={label}
-      title={`Axis status: ${label}`}
+      title={tip}
     >
       {label}
     </span>
@@ -66,15 +76,19 @@ function EpistemicChip({ status }: { status: AxisStatus | undefined }) {
 /**
  * Multi-axis ScoreVector bars using shared AXIS_ORDER.
  * Null axes render an epistemic chip — never a zero bar.
+ * Each row has a rich tooltip (weight, contribution, sources, status).
  */
 export function ScoreAxisBars({
   scores,
   rubric,
   compact = false,
   onOpenBreakdown,
+  showExplainer,
 }: ScoreAxisBarsProps) {
   const weights = rubric?.weights ?? scores.weights
   const labelWidth = compact ? 'w-[72px]' : 'w-24'
+  const explainerOn = showExplainer ?? !compact
+  const [hoverKey, setHoverKey] = useState<ScoreAxisKey | null>(null)
 
   return (
     <div
@@ -83,24 +97,39 @@ export function ScoreAxisBars({
       data-score-phase={scores.scorePhase}
     >
       {!compact && (
-        <p
-          className="text-[9px] leading-snug text-slate-600 mb-0.5"
-          data-testid="score-trust-footnote"
-        >
-          Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
-          {onOpenBreakdown ? (
-            <>
-              {' '}
-              <button
-                type="button"
-                onClick={onOpenBreakdown}
-                className="text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
-              >
-                How scoring works
-              </button>
-            </>
-          ) : null}
-        </p>
+        <div className="flex items-start gap-1.5 mb-0.5">
+          <p
+            className="text-[9px] leading-snug text-slate-600 flex-1"
+            data-testid="score-trust-footnote"
+            title={formatCompositeTooltip(scores, rubric)}
+          >
+            Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
+            Composite{' '}
+            <span className="text-slate-400 tabular-nums">
+              {Math.round(scores.composite * 100)}%
+            </span>
+            {onOpenBreakdown ? (
+              <>
+                {' '}
+                <button
+                  type="button"
+                  onClick={onOpenBreakdown}
+                  className="text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
+                >
+                  How scoring works
+                </button>
+              </>
+            ) : null}
+          </p>
+          {explainerOn && (
+            <ScoreExplainer rubric={rubric} scores={scores} compact />
+          )}
+        </div>
+      )}
+      {compact && explainerOn && (
+        <div className="flex justify-end -mt-0.5 mb-0.5">
+          <ScoreExplainer rubric={rubric} scores={scores} compact />
+        </div>
       )}
       {AXIS_ORDER.map((key) => {
         const v = scores.axes[key]
@@ -110,31 +139,40 @@ export function ScoreAxisBars({
           weights && typeof weights[key] === 'number'
             ? Math.round(weights[key] * 100)
             : null
+        const tip = formatAxisTooltip(key, scores, rubric)
+        const help = AXIS_HELP[key]
+        const showFlyout = hoverKey === key && !compact
 
         return (
           <div
             key={key}
-            className="flex items-center gap-2"
+            className="relative flex items-center gap-2"
             data-testid={`score-axis-row-${key}`}
             data-axis={key}
             data-missing={missing ? 'true' : 'false'}
+            onMouseEnter={() => setHoverKey(key)}
+            onMouseLeave={() => setHoverKey(null)}
+            onFocus={() => setHoverKey(key)}
+            onBlur={() => setHoverKey(null)}
           >
             <span
-              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate`}
-              title={
-                weightPct != null
-                  ? `${AXIS_LABELS[key]} (${weightPct}% weight)`
-                  : AXIS_LABELS[key]
-              }
+              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate cursor-help`}
+              title={tip}
             >
               {AXIS_LABELS[key]}
+              {weightPct != null && !compact && (
+                <span className="ml-0.5 text-[8px] text-slate-600 tabular-nums">{weightPct}%</span>
+              )}
             </span>
             {missing ? (
               <div className="flex-1 flex items-center min-h-[6px]">
-                <EpistemicChip status={status} />
+                <EpistemicChip status={status} tip={`${tip}\n${axisStatusHelp(status)}`} />
               </div>
             ) : (
-              <div className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden">
+              <div
+                className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden cursor-help"
+                title={tip}
+              >
                 <div
                   className={`h-1.5 rounded-full transition-all duration-500 ${axisBarColor(key)}`}
                   style={{ width: `${Math.round((v as number) * 100)}%` }}
@@ -142,12 +180,32 @@ export function ScoreAxisBars({
               </div>
             )}
             <span
-              className={`text-[10px] w-8 text-right tabular-nums shrink-0 ${
+              className={`text-[10px] w-8 text-right tabular-nums shrink-0 cursor-help ${
                 missing ? 'text-slate-600' : 'text-slate-400'
               }`}
+              title={tip}
             >
               {axisPct(v)}
             </span>
+            {showFlyout && (
+              <div
+                className="absolute left-0 top-full z-40 mt-1 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-[10px] text-slate-300 leading-snug"
+                data-testid={`score-axis-flyout-${key}`}
+                role="tooltip"
+              >
+                <div className="font-semibold text-slate-100 mb-0.5">
+                  {AXIS_LABELS[key]}
+                  {weightPct != null ? ` · ${weightPct}% weight` : ''}
+                </div>
+                <p className="text-slate-400">{help.summary}</p>
+                <p className="mt-1 text-slate-500">
+                  <span className="text-slate-400">Sources:</span> {help.sources}
+                </p>
+                <p className="mt-0.5 text-emerald-400/80">↑ {help.highMeans}</p>
+                <p className="text-amber-400/80">↓ {help.lowMeans}</p>
+                <p className="mt-1 text-slate-600">{axisStatusHelp(status)}</p>
+              </div>
+            )}
           </div>
         )
       })}
@@ -157,8 +215,8 @@ export function ScoreAxisBars({
           {scores.safetyFlags.map((flag) => (
             <span
               key={`${flag.kind}:${flag.label}`}
-              className="text-[9px] px-1.5 py-0.5 rounded border border-amber-700/50 bg-amber-900/30 text-amber-300"
-              title={`${flag.kind} · ${flag.severity}`}
+              className="text-[9px] px-1.5 py-0.5 rounded border border-amber-700/50 bg-amber-900/30 text-amber-300 cursor-help"
+              title={`${flag.kind} · ${flag.severity}\nSoft flag: may not hard-penalize composite unless AE policy is hard-penalty.`}
             >
               {flag.label}
             </span>
@@ -169,7 +227,10 @@ export function ScoreAxisBars({
       {!compact && (scores.scorePhase || onOpenBreakdown) && (
         <div className="flex items-center gap-2 pt-0.5">
           {scores.scorePhase && (
-            <p className="text-[9px] text-slate-600">
+            <p
+              className="text-[9px] text-slate-600 cursor-help"
+              title={formatCompositeTooltip(scores, rubric)}
+            >
               Phase: {scores.scorePhase}
               {scores.rubricId ? ` · ${scores.rubricId}` : ''}
             </p>

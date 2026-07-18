@@ -136,7 +136,7 @@ export function BoardTable({
                     </div>
                   )}
                   {c.scores ? (
-                    <ScoreAxisBars scores={c.scores} compact />
+                    <ScoreAxisBars scores={c.scores} compact showExplainer={false} />
                   ) : (
                     <div className="text-center text-slate-600">—</div>
                   )}

@@ -12,8 +12,10 @@ import type {
 } from '@/lib/domain'
 import {
   appendNextExperiment,
+  appendSignalNotesToThesis,
   buildEvidenceGapMap,
   buildMechanismStoryboard,
+  collectThesisSignalTouches,
   createRivalHypothesis,
   getProject,
   getResearchHypothesis,
@@ -26,12 +28,16 @@ import {
   saveResearchHypothesis,
   sectionsToThesis,
   updateResearchHypothesis,
+  type ThesisSignalTouch,
 } from '@/lib/project'
 import type { RhAiMode, RhStructuredInsight } from '@/lib/ai/rhContracts'
 import { emitProductEvent } from '@/lib/productEvents'
 import { downloadFile } from '@/lib/exportData'
 import { originSourceDeepLink, claimProvenanceDeepLink } from '@/lib/originDeepLinks'
 import { RhAiPanel } from '@/components/evidence/RhAiPanel'
+import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
+import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
+import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
 
 const STATUSES: ResearchHypothesisStatus[] = [
   'draft',
@@ -63,6 +69,10 @@ export default function ResearchHypothesisEditorPage() {
     insight: RhStructuredInsight
   } | null>(null)
   const [killedReason, setKilledReason] = useState('')
+  const [signalRows, setSignalRows] = useState<CandidateSignalRow[] | null>(null)
+  const [signalsLoading, setSignalsLoading] = useState(false)
+  const [signalBannerDismissed, setSignalBannerDismissed] = useState(false)
+  const [touches, setTouches] = useState<ThesisSignalTouch[]>([])
 
   const flash = (msg: string) => {
     setBanner(msg)
@@ -120,11 +130,22 @@ export default function ResearchHypothesisEditorPage() {
     setTitle(res.value.title)
     setThesis(res.value.thesis)
     setKilledReason(res.value.killedReason ?? '')
+    setSignalBannerDismissed(false)
     const proj = getProject(res.value.projectId)
     setProject(proj)
     emitProductEvent('research_hypothesis_opened', { hypId, projectId: res.value.projectId })
     if (res.value.claimIds.length > 0) {
       void runRehydrate(res.value)
+    }
+    // Load board signals for linked candidates (do not refresh baseline — keep badges for thesis review)
+    if (proj) {
+      setSignalsLoading(true)
+      void loadProjectSignals(proj, { refreshBaseline: false, concurrency: 2 })
+        .then((rows) => {
+          setSignalRows(rows)
+        })
+        .catch(() => setSignalRows([]))
+        .finally(() => setSignalsLoading(false))
     }
   }, [hypId, projectId, runRehydrate])
 
@@ -132,6 +153,20 @@ export default function ResearchHypothesisEditorPage() {
     if (!project || !hyp) return []
     return project.candidates.filter((c) => hyp.candidateIds.includes(c.candidateId))
   }, [project, hyp])
+
+  useEffect(() => {
+    if (!hyp || !signalRows) {
+      setTouches([])
+      return
+    }
+    const next = collectThesisSignalTouches(
+      { ...hyp, thesis, title },
+      claims,
+      signalRows,
+      { max: 10 },
+    )
+    setTouches(next)
+  }, [hyp, thesis, title, claims, signalRows])
 
   const gapMap = useMemo(
     () =>
@@ -367,6 +402,84 @@ export default function ResearchHypothesisEditorPage() {
           </div>
         )}
 
+        {/* Live: board signals that touch this thesis */}
+        {!signalBannerDismissed && touches.length > 0 && (
+          <div
+            className="mt-3 rounded-xl border border-amber-800/50 bg-amber-950/25 px-3 py-3"
+            data-testid="rh-signal-touch-banner"
+            role="status"
+          >
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <p className="text-xs font-semibold text-amber-200">
+                  Live signals touch this thesis ({touches.length})
+                </p>
+                <p className="mt-0.5 text-[10px] text-amber-200/70">
+                  Count changes on linked candidates since last snapshot — review kill criteria and
+                  experiments. Not auto-appended until you confirm.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  className="rounded border border-amber-700/50 px-2 py-1 text-[10px] text-amber-100 hover:bg-amber-900/40"
+                  data-testid="rh-signal-append-notes"
+                  onClick={() => {
+                    if (!hyp) return
+                    const nextThesis = appendSignalNotesToThesis(thesis, touches)
+                    setThesis(nextThesis)
+                    const next = updateResearchHypothesis(hyp, { thesis: nextThesis })
+                    persist(next, 'Appended signal review notes to thesis')
+                    setSignalBannerDismissed(true)
+                  }}
+                >
+                  Append review notes
+                </button>
+                <button
+                  type="button"
+                  className="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-slate-200"
+                  data-testid="rh-signal-dismiss"
+                  onClick={() => setSignalBannerDismissed(true)}
+                >
+                  Dismiss
+                </button>
+              </div>
+            </div>
+            <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
+              {touches.map((t) => (
+                <li
+                  key={`${t.candidateId}-${t.signal.panelId}-${t.signal.type}`}
+                  className="rounded border border-amber-900/40 bg-slate-950/40 px-2 py-1.5 text-[11px] text-slate-300"
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium text-amber-100/90">{t.name}</span>
+                    <span className="rounded border border-slate-700 px-1 text-[9px] uppercase text-slate-500">
+                      {t.relevance}
+                    </span>
+                    <span className="text-slate-500">
+                      {t.signal.type} · {t.signal.label}
+                      {t.signal.count != null ? ` (n≈${t.signal.count})` : ''}
+                    </span>
+                    <a
+                      href={t.signal.href}
+                      className="text-[10px] text-indigo-400 hover:underline"
+                      data-testid="rh-signal-panel-link"
+                    >
+                      Open panel →
+                    </a>
+                  </div>
+                  <p className="mt-0.5 text-[10px] text-slate-500">{t.reason}</p>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+        {signalsLoading && (
+          <p className="mt-2 text-[10px] text-slate-600 animate-pulse" data-testid="rh-signals-loading">
+            Checking board signals for linked candidates…
+          </p>
+        )}
+
         <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
           <div className="min-w-0 space-y-6">
             {/* Portfolio status */}
@@ -489,6 +602,24 @@ export default function ResearchHypothesisEditorPage() {
                 Export one-pager
               </button>
             </div>
+
+            {/* Multi-pack contrast */}
+            {project && (
+              <MultiPackContrastPicker
+                project={project}
+                hyp={hyp}
+                claims={claims}
+                onAppendNarrative={(md) => {
+                  const nextThesis = `${thesis.trimEnd()}\n\n${md}\n`
+                  setThesis(nextThesis)
+                  const next = updateResearchHypothesis(hyp, { thesis: nextThesis })
+                  persist(next, 'Appended pack contrast to thesis')
+                }}
+                onRivalCreated={(id) => {
+                  flash(`Rival hypothesis saved (${id.slice(0, 12)}…) — open from project list`)
+                }}
+              />
+            )}
 
             {/* RH AI */}
             <RhAiPanel
@@ -774,6 +905,7 @@ export default function ResearchHypothesisEditorPage() {
                 <ul className="mt-2 space-y-2">
                   {linkedCandidates.map((c) => {
                     const cid = c.identity.pubchemCid
+                    const row = signalRows?.find((r) => r.candidateId === c.candidateId)
                     return (
                       <li
                         key={c.candidateId}
@@ -784,7 +916,22 @@ export default function ResearchHypothesisEditorPage() {
                           {c.boardStatus ?? 'untriaged'}
                           {cid != null ? ` · CID ${cid}` : ''}
                           {c.identity.chemblId ? ` · ${c.identity.chemblId}` : ''}
+                          {row && row.signals.length > 0
+                            ? ` · ${row.signals.length} signal(s)`
+                            : row?.status === 'baseline'
+                              ? ' · baseline set'
+                              : ''}
                         </div>
+                        {c.scores && (
+                          <div className="mt-1.5">
+                            <ScoreAxisBars
+                              scores={c.scores}
+                              rubric={project?.rubric}
+                              compact
+                              showExplainer
+                            />
+                          </div>
+                        )}
                         {cid != null && (
                           <Link
                             href={`/molecule/${cid}?project=${hyp.projectId}`}

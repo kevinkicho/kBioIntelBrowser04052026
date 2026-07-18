@@ -85,6 +85,23 @@ export {
 } from './rhHelpers'
 
 export {
+  signalTouchesThesis,
+  collectThesisSignalTouches,
+  appendSignalNotesToThesis,
+  type ThesisSignalTouch,
+  type ThesisSignalRelevance,
+} from './signalTouchesThesis'
+
+export {
+  contrastEvidencePacks,
+  contrastPackIndexEntries,
+  contrastSides,
+  packContrastDistance,
+  type PackContrastResult,
+  type PackContrastSide,
+} from './packContrast'
+
+export {
   intersectMatchToCandidate,
   sendIntersectMatchesToBoard,
   type SendIntersectToBoardInput,

@@ -63,8 +63,21 @@ describe('ScoreAxisBars', () => {
   })
 
   it('supports compact mode', () => {
-    render(<ScoreAxisBars scores={makeScores()} compact />)
+    render(<ScoreAxisBars scores={makeScores()} compact showExplainer={false} />)
     expect(screen.getByTestId('score-axis-bars')).toBeInTheDocument()
     expect(screen.queryByText(/Phase:/)).not.toBeInTheDocument()
+  })
+
+  it('exposes rich axis title tooltips with weight and sources', () => {
+    render(<ScoreAxisBars scores={makeScores()} showExplainer={false} />)
+    const row = screen.getByTestId('score-axis-row-efficacy')
+    const labeled = row.querySelector('[title]')
+    expect(labeled?.getAttribute('title') || '').toMatch(/Efficacy/i)
+    expect(labeled?.getAttribute('title') || '').toMatch(/weight|Open Targets|Sources/i)
+  })
+
+  it('renders score explainer toggle when enabled', () => {
+    render(<ScoreAxisBars scores={makeScores()} />)
+    expect(screen.getByTestId('score-explainer-toggle')).toBeInTheDocument()
   })
 })

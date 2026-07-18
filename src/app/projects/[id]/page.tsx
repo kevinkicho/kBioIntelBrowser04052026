@@ -32,6 +32,7 @@ import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
+import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
 import { emitProductEvent } from '@/lib/productEvents'
 import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
 
@@ -631,6 +632,15 @@ export default function ProjectBoardPage() {
             per-candidate attribution. Enable “Share links when available” in Discover
             preferences for Share pack.
           </p>
+          {(project.packIndex?.length ?? 0) >= 2 && (
+            <MultiPackContrastPicker
+              project={project}
+              onRivalCreated={(id) => {
+                refresh()
+                showBanner('ok', `Contrast rival hypothesis created — open from list below (${id.slice(0, 10)}…)`)
+              }}
+            />
+          )}
         </section>
 
         {/* Research hypotheses — narrative theses, distinct from set-ops /hypothesis */}

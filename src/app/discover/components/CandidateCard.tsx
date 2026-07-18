@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useMemo } from 'react'
 import Link from 'next/link'
 import type { CandidateMolecule } from '@/lib/candidateRanker'
 import {
@@ -8,17 +8,16 @@ import {
   type MoleculeCandidate,
   type ScoreRubric,
   type ScoreVector,
-  createDefaultScoreRubric,
 } from '@/lib/domain'
 import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
 import {
   SaveToProjectButton,
   type SaveProjectContext,
 } from '@/components/projects/SaveToProjectButton'
-import { buildMoleculeLinkUrl, AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
-import { emitProductEvent } from '@/lib/productEvents'
+import { buildMoleculeLinkUrl } from '@/lib/profileMode'
 import { DataPoint } from '@/components/ui/DataPoint'
 import { originSourceDeepLink } from '@/lib/originDeepLinks'
+import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
 
@@ -127,80 +126,7 @@ function SourcePill({
   )
 }
 
-/** Weight-aware composite explainer from live rubric (five axes). */
-function ScoreExplainer({
-  rubric,
-  scores,
-}: {
-  rubric?: ScoreRubric
-  scores?: ScoreVector
-}) {
-  const [open, setOpen] = useState(false)
-  const weights = rubric?.weights ?? scores?.weights ?? createDefaultScoreRubric('balanced').weights
-  const preset = rubric?.preset ?? scores?.rubricId ?? 'balanced'
-
-  return (
-    <div className="relative inline-block">
-      <button
-        onClick={() => {
-          const next = !open
-          setOpen(next)
-          if (next) {
-            emitProductEvent('score_breakdown_opened', { preset: String(preset) })
-          }
-        }}
-        className="text-slate-500 hover:text-slate-300 transition-colors"
-        aria-label="How is this score calculated?"
-        type="button"
-        data-testid="score-explainer-toggle"
-      >
-        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            strokeWidth={2}
-            d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-          />
-        </svg>
-      </button>
-      {open && (
-        <div
-          className="absolute z-50 left-0 top-5 w-72 bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl text-xs text-slate-300 leading-relaxed"
-          data-testid="score-explainer-panel"
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-semibold text-slate-200">Multi-axis composite</span>
-            <button
-              onClick={() => setOpen(false)}
-              className="text-slate-500 hover:text-slate-300"
-              type="button"
-            >
-              &times;
-            </button>
-          </div>
-          <p className="mb-2">
-            Weighted sum over five axes (preset: <span className="text-slate-200">{String(preset)}</span>
-            ). Missing axes are renormalized or penalized per rubric — never invented by AI.
-          </p>
-          <div className="space-y-1 mb-2">
-            {AXIS_ORDER.map((key) => (
-              <div key={key} className="flex justify-between">
-                <span className="text-indigo-400">{AXIS_LABELS[key]}</span>
-                <span className="text-slate-400 tabular-nums">
-                  {Math.round(weights[key] * 100)}%
-                </span>
-              </div>
-            ))}
-          </div>
-          <p className="text-[10px] text-slate-500">
-            Safety / novelty fill after harvest. Null axes show status chips (not zero). Soft AE
-            flags appear as badges and do not hard-penalize unless configured.
-          </p>
-        </div>
-      )}
-    </div>
-  )
-}
+// ScoreExplainer lives in @/components/score/ScoreExplainer (shared polish)
 
 function CompositeScoreRing({ score }: { score: number }) {
   const pct = Math.round(score * 100)
@@ -331,7 +257,8 @@ export function CandidateCard({
           </div>
           {scores ? (
             <div className="mb-2">
-              <ScoreAxisBars scores={scores} rubric={rubric} />
+              {/* Explainer is above; bars keep per-axis hover flyouts without a second ? icon */}
+              <ScoreAxisBars scores={scores} rubric={rubric} showExplainer={false} />
             </div>
           ) : (
             <p className="text-[10px] text-slate-600 mb-2">No multi-axis scores available.</p>
