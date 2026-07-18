@@ -47,7 +47,7 @@ export function MultiPackContrastPicker({
   onRivalCreated,
   onAppendNarrative,
 }: MultiPackContrastPickerProps) {
-  const entries = project.packIndex ?? []
+  const entries = useMemo(() => project.packIndex ?? [], [project.packIndex])
   const defaultPrimary = hyp?.packId && entries.some((e) => e.id === hyp.packId)
     ? hyp.packId
     : entries[0]?.id ?? ''

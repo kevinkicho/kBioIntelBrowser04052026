@@ -7,7 +7,6 @@ import {
   mapLegacyCandidateToMoleculeCandidate,
   type MoleculeCandidate,
   type ScoreRubric,
-  type ScoreVector,
 } from '@/lib/domain'
 import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
 import {
