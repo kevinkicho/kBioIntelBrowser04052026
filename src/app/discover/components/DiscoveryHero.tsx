@@ -40,10 +40,26 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
   const debounceRef = useRef<ReturnType<typeof setTimeout>>()
   const containerRef = useRef<HTMLDivElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
+  /**
+   * Typeahead only after the user types in the field.
+   * History / URL / example chips set the query without enabling suggestions
+   * (avoids a surprise dropdown when reopening a search-history session).
+   */
+  const typeaheadEnabled = useRef(false)
 
-  // Sync when URL deep-link changes initial query
+  function closeSuggestions() {
+    setOpen(false)
+    setSuggestions([])
+    setActiveIndex(-1)
+    setLoadingSuggest(false)
+  }
+
+  // Sync when URL / search-history deep-link changes — no dropdown
   useEffect(() => {
+    typeaheadEnabled.current = false
     setQuery(initialQuery)
+    closeSuggestions()
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only when initialQuery changes
   }, [initialQuery])
 
   useEffect(() => {
@@ -58,6 +74,10 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
   }, [])
 
   const fetchSuggestions = useCallback(async (term: string) => {
+    if (!typeaheadEnabled.current) {
+      closeSuggestions()
+      return
+    }
     if (term.trim().length < 2) {
       setSuggestions([])
       setOpen(false)
@@ -69,6 +89,11 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
       const res = await clientFetch(
         `/api/search/disease?q=${encodeURIComponent(term.trim())}&limit=10`,
       )
+      // History/URL may have disabled typeahead while this request was in flight
+      if (!typeaheadEnabled.current) {
+        closeSuggestions()
+        return
+      }
       if (!res.ok) {
         setSuggestions([])
         setOpen(false)
@@ -89,7 +114,10 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
 
   useEffect(() => {
     if (isLoading) {
-      setOpen(false)
+      closeSuggestions()
+      return
+    }
+    if (!typeaheadEnabled.current) {
       return
     }
     clearTimeout(debounceRef.current)
@@ -103,7 +131,8 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
     e.preventDefault()
     const trimmed = query.trim()
     if (trimmed.length < 2) return
-    setOpen(false)
+    typeaheadEnabled.current = false
+    closeSuggestions()
     // Prefer highlighted / first suggestion id when name matches closely
     const match =
       (activeIndex >= 0 && suggestions[activeIndex]) ||
@@ -112,10 +141,9 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
   }
 
   function pickSuggestion(s: DiseaseSuggestion) {
+    typeaheadEnabled.current = false
     setQuery(s.name)
-    setOpen(false)
-    setSuggestions([])
-    setActiveIndex(-1)
+    closeSuggestions()
     onSearch(s.name, s.id ? { diseaseId: s.id } : undefined)
   }
 
@@ -163,9 +191,14 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
               <input
                 type="text"
                 value={query}
-                onChange={(e) => setQuery(e.target.value)}
+                onChange={(e) => {
+                  // Only user keystrokes enable typeahead (not history/URL sync)
+                  typeaheadEnabled.current = true
+                  setQuery(e.target.value)
+                }}
                 onFocus={() => {
-                  if (suggestions.length > 0) setOpen(true)
+                  // Do not open a stale list on focus after history restore
+                  if (typeaheadEnabled.current && suggestions.length > 0) setOpen(true)
                 }}
                 onKeyDown={onKeyDown}
                 placeholder="What disease are you investigating?"
@@ -267,8 +300,9 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
               key={d}
               type="button"
               onClick={() => {
+                typeaheadEnabled.current = false
                 setQuery(d)
-                setOpen(false)
+                closeSuggestions()
                 onSearch(d)
               }}
               disabled={isLoading}
