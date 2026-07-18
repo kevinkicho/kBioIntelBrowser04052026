@@ -25,7 +25,40 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
     trackedSafe('crossref', searchCrossRef(queryFor('crossref')), []),
     trackedSafe('arxiv', searchArXiv(queryFor('arxiv')), []),
   ])
-  const dois = (literature as Array<{doi?: string}>).map(l => l.doi).filter(Boolean) as string[]
+  // Collect DOIs from multiple free lit sources (EuropePMC alone often yields 0-cite stubs)
+  const doiSet = new Set<string>()
+  const pushDoi = (raw?: string | null) => {
+    if (!raw) return
+    const d = String(raw)
+      .trim()
+      .replace(/^https?:\/\/(dx\.)?doi\.org\//i, '')
+      .replace(/^doi:/i, '')
+    if (d.includes('/') && d.length > 5) doiSet.add(d)
+  }
+  for (const l of literature as Array<{ doi?: string }>) pushDoi(l.doi)
+  for (const p of semanticPapers as Array<{ doi?: string; externalIds?: { DOI?: string } }>) {
+    pushDoi(p.doi)
+    pushDoi(p.externalIds?.DOI)
+  }
+  for (const w of openAlexWorks as Array<{ doi?: string }>) pushDoi(w.doi)
+  for (const c of crossRefWorks as Array<{ doi?: string; DOI?: string }>) {
+    pushDoi(c.doi)
+    pushDoi(c.DOI)
+  }
+  for (const a of pubmedArticles as Array<{ doi?: string }>) pushDoi(a.doi)
+
+  const dois = Array.from(doiSet).slice(0, 12)
   const citationMetrics = await trackedSafe('opencitations', getCitationMetrics(dois), [])
-  return { literature, nihGrants, patents, secFilings, semanticPapers, openAlexWorks, citationMetrics, pubmedArticles, crossRefWorks, arxivPapers }
+  return {
+    literature,
+    nihGrants,
+    patents,
+    secFilings,
+    semanticPapers,
+    openAlexWorks,
+    citationMetrics,
+    pubmedArticles,
+    crossRefWorks,
+    arxivPapers,
+  }
 }

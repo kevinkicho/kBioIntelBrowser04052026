@@ -738,9 +738,19 @@ export interface CitationMetric {
   doi: string
   title?: string
   citationCount: number
+  /** Outgoing references counted in OpenCitations index */
+  referenceCount?: number
   citedBy: string[]
   references: string[]
   url: string
+  authors?: string
+  venue?: string
+  year?: string
+  type?: string
+  openAlexId?: string
+  pmid?: string
+  volume?: string
+  pages?: string
 }
 
 // PathwayCommons Types
