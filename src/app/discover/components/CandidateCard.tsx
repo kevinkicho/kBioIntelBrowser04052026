@@ -18,6 +18,7 @@ import {
 import { buildMoleculeLinkUrl, AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import { emitProductEvent } from '@/lib/productEvents'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
 
@@ -62,55 +63,56 @@ const PHASE_LABELS: Record<number, string> = {
   4: 'Approved',
 }
 
-function sourceRecordUrl(source: string, query?: string, cid?: number | null): string | null {
-  switch (source) {
-    case 'DGIdb':
-      return query ? `https://www.dgidb.org/search?terms=${encodeURIComponent(query)}` : null
-    case 'ClinicalTrials':
-      return query ? `https://clinicaltrials.gov/search?term=${encodeURIComponent(query)}` : null
-    case 'ChEMBL':
-      return cid
-        ? `https://www.ebi.ac.uk/chembl/g/#search_results/${cid}`
-        : query
-          ? `https://www.ebi.ac.uk/chembl/g/#search_results/${encodeURIComponent(query)}`
-          : null
-    case 'Open Targets':
-      return query ? `https://www.opentargets.org/search?disease=${encodeURIComponent(query)}` : null
-    case 'DisGeNET':
-      return query
-        ? `https://www.disgenet.org/browser/0/1/0/${encodeURIComponent(query)}/0/25/0/`
-        : null
-    case 'Orphanet':
-      return query
-        ? `https://www.orpha.net/consor/cgi-bin/Disease_Search_Simple.php?Disease_Disease_Search_diseaseGroup=${encodeURIComponent(query)}`
-        : null
-    case 'PubChem':
-      return cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}` : null
-    default:
-      return null
-  }
+function sourceRecordUrl(
+  source: string,
+  query?: string,
+  cid?: number | null,
+  chemblId?: string | null,
+): string | null {
+  return originSourceDeepLink(source, {
+    name: query,
+    diseaseName: query,
+    cid,
+    chemblId,
+  }).href
 }
 
-function SourcePill({ source, query, cid }: { source: string; query?: string; cid?: number | null }) {
+function SourcePill({
+  source,
+  query,
+  cid,
+  chemblId,
+}: {
+  source: string
+  query?: string
+  cid?: number | null
+  chemblId?: string | null
+}) {
   const colors: Record<string, string> = {
-    'DGIdb': 'bg-purple-900/30 text-purple-300 border-purple-700/50',
-    'ClinicalTrials': 'bg-blue-900/30 text-blue-300 border-blue-700/50',
-    'ChEMBL': 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50',
+    DGIdb: 'bg-purple-900/30 text-purple-300 border-purple-700/50',
+    ClinicalTrials: 'bg-blue-900/30 text-blue-300 border-blue-700/50',
+    ChEMBL: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/50',
     'Open Targets': 'bg-cyan-900/30 text-cyan-300 border-cyan-700/50',
-    'DisGeNET': 'bg-amber-900/30 text-amber-300 border-amber-700/50',
-    'Orphanet': 'bg-rose-900/30 text-rose-300 border-rose-700/50',
-    'PubChem': 'bg-orange-900/30 text-orange-300 border-orange-700/50',
+    DisGeNET: 'bg-amber-900/30 text-amber-300 border-amber-700/50',
+    Orphanet: 'bg-rose-900/30 text-rose-300 border-rose-700/50',
+    PubChem: 'bg-orange-900/30 text-orange-300 border-orange-700/50',
   }
 
-  const url = sourceRecordUrl(source, query, cid)
+  const link = originSourceDeepLink(source, {
+    name: query,
+    diseaseName: query,
+    cid,
+    chemblId,
+  })
   const colorClass = colors[source] ?? 'bg-slate-700/50 text-slate-400 border-slate-600/50'
 
-  if (url) {
+  if (link.href) {
     return (
       <a
-        href={url}
+        href={link.href}
         target="_blank"
         rel="noopener noreferrer"
+        title={link.title}
         className={`text-[9px] px-1.5 py-0.5 rounded border hover:brightness-125 transition-colors ${colorClass}`}
       >
         {source} ↗
@@ -119,7 +121,7 @@ function SourcePill({ source, query, cid }: { source: string; query?: string; ci
   }
 
   return (
-    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${colorClass}`}>
+    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${colorClass}`} title={link.title}>
       {source}
     </span>
   )
@@ -337,13 +339,23 @@ export function CandidateCard({
           <div className="flex items-center gap-1.5 flex-wrap">
             {candidate.sources.map((s) => {
               const recordUrl =
-                sourceRecordUrl(s, diseaseName, candidate.cid) ||
+                sourceRecordUrl(
+                  s,
+                  candidate.name || diseaseName,
+                  candidate.cid,
+                  identity.chemblId,
+                ) ||
                 (hasCid
                   ? `https://pubchem.ncbi.nlm.nih.gov/compound/${candidate.cid}`
                   : undefined)
               return (
                 <div key={s} className="inline-flex items-center gap-1">
-                  <SourcePill source={s} query={diseaseName} cid={candidate.cid} />
+                  <SourcePill
+                    source={s}
+                    query={candidate.name || diseaseName}
+                    cid={candidate.cid}
+                    chemblId={identity.chemblId}
+                  />
                   <DataPoint
                     sourceKey={discoverSourceKey(s)}
                     label={`${candidate.name} · ${s}`}

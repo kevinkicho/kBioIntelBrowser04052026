@@ -6,6 +6,7 @@ import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
 import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
 import { SignalBadges } from '@/components/projects/SignalBadges'
 import type { CandidateSignalRow } from '@/lib/signals'
+import { originSourceDeepLink } from '@/lib/originDeepLinks'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
 
@@ -180,15 +181,43 @@ export function BoardTable({
                 <td className="px-3 py-3">
                   <div className="flex flex-wrap gap-1">
                     {(c.evidenceBreadthSources.length ? c.evidenceBreadthSources : c.origins)
-                      .slice(0, 4)
-                      .map((s) => (
-                        <span
-                          key={s}
-                          className="rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[9px] text-slate-400"
-                        >
-                          {s}
-                        </span>
-                      ))}
+                      .slice(0, 6)
+                      .map((s) => {
+                        const link = originSourceDeepLink(s, {
+                          name: c.identity.name,
+                          cid: cid ?? c.identity.pubchemCid,
+                          chemblId: c.identity.chemblId,
+                          diseaseName: project.disease?.name,
+                          geneSymbol: project.targetIds?.[0],
+                        })
+                        const chipClass =
+                          'rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[9px] text-slate-400'
+                        if (link.href) {
+                          return (
+                            <a
+                              key={s}
+                              href={link.href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={link.title}
+                              className={`${chipClass} hover:border-indigo-600/50 hover:text-indigo-300 transition-colors`}
+                              data-testid="origin-chip-link"
+                            >
+                              {link.label} ↗
+                            </a>
+                          )
+                        }
+                        return (
+                          <span
+                            key={s}
+                            title={link.title}
+                            className={chipClass}
+                            data-testid="origin-chip"
+                          >
+                            {link.label}
+                          </span>
+                        )
+                      })}
                   </div>
                 </td>
                 <td className="px-3 py-3 text-center">
