@@ -11,6 +11,11 @@ import { getGeneExpressionBySymbols } from '@/lib/api/expression-atlas'
 import { getReactomePathwaysByName } from '@/lib/api/reactome'
 import { getWikiPathwaysByName } from '@/lib/api/wikipathways'
 import { searchGOTerms } from '@/lib/api/gene-ontology'
+import { getGwasAssociationsByName } from '@/lib/api/gwas-catalog'
+import { searchPharmGKBGene } from '@/lib/api/pharmgkb'
+import { searchClinGenByGene, getClinGenDosage } from '@/lib/api/clingen'
+import { getUniProtByGene } from '@/lib/api/uniprot'
+import { getProteinInteractionsByName } from '@/lib/api/string-db'
 import type { SectionStatus, DataLoadStatus } from '@/lib/dataStatus'
 
 type TrackedResult<T> = { data: T; status: SectionStatus }
@@ -138,43 +143,102 @@ export async function fetchGene(
 
   const ensemblGenes = await trackedSafe('ensembl', getEnsemblGenesBySymbols([symbol]), [])
 
-  const [disgenetResult, clinvarResult, dbsnpResult, drugsResult] = await Promise.all([
-    trackedStatus('disgenet', getDiseasesByGene(symbol), []),
-    trackedStatus('clinvar', getClinVarByGene(symbol), []),
-    trackedStatus('dbsnp', getDbSNPVariants(symbol), []),
-    trackedStatus('dgidb', getTargetedDrugs(symbol), []),
-  ])
+  // Wave 1 — drugs + disease + variants (core genetics)
+  const [disgenetResult, clinvarResult, dbsnpResult, drugsResult, gwasResult, clingenResult, clingenDosageResult] =
+    await Promise.all([
+      trackedStatus('disgenet', getDiseasesByGene(symbol), []),
+      trackedStatus('clinvar', getClinVarByGene(symbol), []),
+      trackedStatus('dbsnp', getDbSNPVariants(symbol), []),
+      trackedStatus('dgidb', getTargetedDrugs(symbol), []),
+      trackedStatus('gwas-catalog', getGwasAssociationsByName(symbol), []),
+      trackedStatus('clingen', searchClinGenByGene(symbol), []),
+      trackedStatus('clingen-dosage', getClinGenDosage(symbol), null as Awaited<ReturnType<typeof getClinGenDosage>>),
+    ])
 
+  // Wave 2 — expression + ontology
   const [gtexResult, bgeeResult, atlasResult, goResult] = await Promise.all([
     trackedStatus('gtex', getGTExTopTissues(symbol, 10), []),
     trackedStatus('bgee', getBgeeData(symbol), { expressions: [] }),
     trackedStatus('expression-atlas', getGeneExpressionBySymbols([symbol]), []),
-    trackedStatus('gene-ontology', searchGOTerms(symbol).then(r => r.terms).catch(() => []), []),
+    trackedStatus('gene-ontology', searchGOTerms(symbol).then((r) => r.terms).catch(() => []), []),
   ])
 
-  const [reactomeResult, wikiResult] = await Promise.all([
+  // Wave 3 — pathways + protein context + pharmacogenomics
+  const [reactomeResult, wikiResult, uniprotResult, stringResult, pharmgkbResult] = await Promise.all([
     trackedStatus('reactome', getReactomePathwaysByName(symbol), []),
     trackedStatus('wikipathways', getWikiPathwaysByName(symbol), []),
+    trackedStatus('uniprot', getUniProtByGene(symbol), []),
+    trackedStatus('string-db', getProteinInteractionsByName(symbol, 25), []),
+    trackedStatus('pharmgkb', searchPharmGKBGene(symbol), []),
   ])
 
-  const sectionStatus: Record<string, SectionStatus> = {
-    drugs: drugsResult.status,
-    diseases: disgenetResult.status,
-    variants: { status: clinvarResult.status.status === 'error' || dbsnpResult.status.status === 'error' ? 'error' : clinvarResult.status.status === 'loaded' || dbsnpResult.status.status === 'loaded' ? 'loaded' : 'empty' as DataLoadStatus, error: clinvarResult.status.error || dbsnpResult.status.error },
-    expression: { status: gtexResult.status.status === 'error' && bgeeResult.status.status === 'error' && atlasResult.status.status === 'error' ? 'error' as DataLoadStatus : (gtexResult.status.status === 'loaded' || bgeeResult.status.status === 'loaded' || atlasResult.status.status === 'loaded') ? 'loaded' as DataLoadStatus : 'empty' as DataLoadStatus, error: gtexResult.status.error || bgeeResult.status.error || atlasResult.status.error },
-    pathways: { status: reactomeResult.status.status === 'error' && wikiResult.status.status === 'error' ? 'error' as DataLoadStatus : (reactomeResult.status.status === 'loaded' || wikiResult.status.status === 'loaded') ? 'loaded' as DataLoadStatus : 'empty' as DataLoadStatus, error: reactomeResult.status.error || wikiResult.status.error },
+  const mergeStatus = (...statuses: SectionStatus[]): SectionStatus => {
+    if (statuses.some((s) => s.status === 'error') && !statuses.some((s) => s.status === 'loaded')) {
+      return {
+        status: 'error',
+        error: statuses.map((s) => s.error).filter(Boolean).join('; ') || 'Request failed',
+      }
+    }
+    if (statuses.some((s) => s.status === 'loaded')) return { status: 'loaded' }
+    return { status: 'empty' }
   }
+
+  const sectionStatus: Record<string, SectionStatus> = {
+    overview: { status: overview.summary || overview.name ? 'loaded' : 'empty' },
+    drugs: mergeStatus(drugsResult.status, pharmgkbResult.status),
+    diseases: mergeStatus(disgenetResult.status, gwasResult.status, clingenResult.status),
+    variants: mergeStatus(clinvarResult.status, dbsnpResult.status, clingenDosageResult.status),
+    expression: mergeStatus(gtexResult.status, bgeeResult.status, atlasResult.status),
+    pathways: mergeStatus(
+      reactomeResult.status,
+      wikiResult.status,
+      goResult.status,
+      uniprotResult.status,
+      stringResult.status,
+    ),
+  }
+
+  /** Provenance map of free public sources hit for this gene query. */
+  const sourcesUsed = [
+    'mygene',
+    'ncbi-gene',
+    'ensembl',
+    'disgenet',
+    'clinvar',
+    'dbsnp',
+    'dgidb',
+    'gwas-catalog',
+    'clingen',
+    'gtex',
+    'bgee',
+    'expression-atlas',
+    'gene-ontology',
+    'reactome',
+    'wikipathways',
+    'uniprot',
+    'string-db',
+    'pharmgkb',
+  ]
 
   return {
     geneOverview: overview,
     geneDrugs: drugsResult.data,
     geneDiseases: {
-      disgenetAssociations: disgenetResult.data as Array<{ geneSymbol: string; diseaseName: string; score: number; diseaseId: string; source: string }>,
+      disgenetAssociations: disgenetResult.data as Array<{
+        geneSymbol: string
+        diseaseName: string
+        score: number
+        diseaseId: string
+        source: string
+      }>,
       ensemblGenes,
+      gwasAssociations: gwasResult.data,
+      clingenGeneDiseases: clingenResult.data,
     },
     geneVariants: {
       clinvarVariants: clinvarResult.data,
       dbsnpVariants: dbsnpResult.data,
+      clingenDosage: clingenDosageResult.data,
     },
     geneExpressionData: {
       gtexExpressions: gtexResult.data,
@@ -185,7 +249,11 @@ export async function fetchGene(
       reactomePathways: reactomeResult.data,
       wikiPathways: wikiResult.data,
       goTerms: Array.isArray(goResult.data) ? goResult.data : [],
+      uniprotProteins: uniprotResult.data,
+      stringInteractions: stringResult.data,
+      pharmgkbGenes: pharmgkbResult.data,
     },
     _sectionStatus: sectionStatus,
+    _sourcesUsed: sourcesUsed,
   }
 }

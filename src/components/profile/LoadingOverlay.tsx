@@ -1,15 +1,25 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { CATEGORIES, type CategoryId, type CategoryDataCount } from '@/lib/categoryConfig'
+import {
+  MOLECULE_CATEGORIES,
+  type CategoryId,
+  type CategoryDataCount,
+  type CategoryDef,
+} from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 
 interface LoadingOverlayProps {
   categoryStatus: Record<CategoryId, CategoryLoadState>
   dataCounts: Record<CategoryId, CategoryDataCount>
+  /**
+   * Categories to track. Default: molecule profile only (excludes gene explorer).
+   * Gene was previously listed but never fetched on molecule pages → stuck idle forever.
+   */
+  categories?: CategoryDef[]
 }
 
-function StatusIcon({ status }: { status: CategoryLoadState }) {
+function StatusIcon({ status }: { status: CategoryLoadState | undefined }) {
   switch (status) {
     case 'loaded':
       return <svg className="w-4 h-4 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
@@ -22,13 +32,21 @@ function StatusIcon({ status }: { status: CategoryLoadState }) {
   }
 }
 
-export function LoadingOverlay({ categoryStatus, dataCounts }: LoadingOverlayProps) {
+export function LoadingOverlay({
+  categoryStatus,
+  dataCounts,
+  categories = MOLECULE_CATEGORIES,
+}: LoadingOverlayProps) {
   const [visible, setVisible] = useState(true)
   const [fading, setFading] = useState(false)
 
-  const totalLoaded = CATEGORIES.filter(c => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error').length
-  const totalAll = CATEGORIES.length
-  const allDone = CATEGORIES.every(c => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error')
+  const totalLoaded = categories.filter(
+    (c) => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error',
+  ).length
+  const totalAll = categories.length
+  const allDone =
+    totalAll > 0 &&
+    categories.every((c) => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error')
 
   useEffect(() => {
     if (allDone && visible && !fading) {
@@ -41,13 +59,17 @@ export function LoadingOverlay({ categoryStatus, dataCounts }: LoadingOverlayPro
   if (!visible) return null
 
   return (
-    <div className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`} style={{ backgroundColor: 'rgba(2, 6, 23, 0.85)', backdropFilter: 'blur(4px)' }}>
+    <div
+      className={`fixed inset-0 z-50 flex items-center justify-center transition-opacity duration-500 ${fading ? 'opacity-0' : 'opacity-100'}`}
+      style={{ backgroundColor: 'rgba(2, 6, 23, 0.85)', backdropFilter: 'blur(4px)' }}
+      data-testid="loading-overlay"
+    >
       <div className="bg-slate-900 border border-slate-700 rounded-2xl p-6 w-full max-w-sm shadow-2xl">
         <div className="text-center mb-4">
           <div className="text-lg font-semibold text-slate-100">
             {allDone ? 'All Data Loaded' : 'Fetching Data...'}
           </div>
-          <div className="text-sm text-slate-400 mt-1">
+          <div className="text-sm text-slate-400 mt-1" data-testid="loading-overlay-progress">
             {totalLoaded}/{totalAll} categories complete
           </div>
         </div>
@@ -55,17 +77,19 @@ export function LoadingOverlay({ categoryStatus, dataCounts }: LoadingOverlayPro
         <div className="w-full bg-slate-800 rounded-full h-2 mb-5">
           <div
             className={`h-2 rounded-full transition-all duration-500 ${allDone ? 'bg-emerald-500' : 'bg-indigo-500'}`}
-            style={{ width: `${(totalLoaded / totalAll) * 100}%` }}
+            style={{ width: `${totalAll ? (totalLoaded / totalAll) * 100 : 0}%` }}
           />
         </div>
 
         <div className="space-y-2 max-h-[50vh] overflow-y-auto">
-          {CATEGORIES.map(cat => {
+          {categories.map((cat) => {
             const status = categoryStatus[cat.id]
             const count = dataCounts[cat.id]
             return (
               <div
                 key={cat.id}
+                data-testid={`loading-overlay-cat-${cat.id}`}
+                data-status={status ?? 'idle'}
                 className={`flex items-center gap-3 px-3 py-2 rounded-lg transition-colors ${
                   status === 'loading'
                     ? 'bg-slate-800/80 border border-indigo-500/30'
@@ -76,16 +100,28 @@ export function LoadingOverlay({ categoryStatus, dataCounts }: LoadingOverlayPro
               >
                 <StatusIcon status={status} />
                 <span className="text-base leading-none">{cat.icon}</span>
-                <span className={`flex-1 text-sm ${status === 'loaded' ? 'text-slate-300' : 'text-slate-400'}`}>
+                <span
+                  className={`flex-1 text-sm ${status === 'loaded' ? 'text-slate-300' : 'text-slate-400'}`}
+                >
                   {cat.label}
                 </span>
                 <span className="text-xs text-slate-500 tabular-nums">
-                  {status === 'loaded' ? `${count.withData}/${count.total}` : status === 'loading' ? '...' : status === 'error' ? 'error' : ''}
+                  {status === 'loaded' && count
+                    ? `${count.withData}/${count.total}`
+                    : status === 'loading'
+                      ? '...'
+                      : status === 'error'
+                        ? 'error'
+                        : ''}
                 </span>
               </div>
             )
           })}
         </div>
+        <p className="mt-3 text-[10px] text-slate-600 text-center leading-relaxed">
+          Molecule profile categories only. Gene explorer data loads on gene pages (search a gene
+          symbol), not here.
+        </p>
       </div>
     </div>
   )

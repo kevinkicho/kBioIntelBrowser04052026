@@ -702,13 +702,13 @@ function GeneDetailPageClientInner({
       id: 'gene-diseases',
       label: 'Diseases',
       count: loaded ? diseaseCount : null,
-      hint: 'DisGeNET associations',
+      hint: 'DisGeNET · GWAS · ClinGen',
     },
     {
       id: 'gene-variants',
       label: 'Variants',
       count: loaded ? variantCount : null,
-      hint: 'ClinVar + dbSNP',
+      hint: 'ClinVar · dbSNP · ClinGen dosage',
     },
     {
       id: 'gene-expression',
@@ -723,9 +723,13 @@ function GeneDetailPageClientInner({
       id: 'gene-pathways',
       label: 'Pathways',
       count: loaded ? pathwayCount : null,
-      hint: 'Reactome / Wiki / GO',
+      hint: 'Reactome · WikiPathways · GO · UniProt · STRING · PharmGKB',
     },
   ]
+
+  const sourcesUsed = Array.isArray(categoryData?._sourcesUsed)
+    ? (categoryData._sourcesUsed as string[])
+    : []
 
   return (
     <div className="min-h-screen bg-[#0f1117] flex flex-col">
@@ -846,12 +850,30 @@ function GeneDetailPageClientInner({
         </div>
 
         {loading && !loaded && (
-          <div className="space-y-4">
-            <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 animate-pulse">
-              <div className="h-6 bg-slate-700 rounded w-1/4 mb-3" />
-              <div className="h-4 bg-slate-700 rounded w-3/4 mb-2" />
-              <div className="h-4 bg-slate-700 rounded w-1/2" />
+          <div
+            className="mb-4 rounded-xl border border-indigo-800/40 bg-slate-900/60 p-4"
+            data-testid="gene-loading-progress"
+          >
+            <div className="flex items-center gap-2 text-sm text-indigo-200">
+              <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
+              Fetching gene data from free public APIs…
             </div>
+            <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
+              MyGene · NCBI Gene · Ensembl · DisGeNET · ClinVar · dbSNP · DGIdb · GWAS Catalog ·
+              ClinGen · GTEx · Bgee · Expression Atlas · GO · Reactome · WikiPathways · UniProt ·
+              STRING · PharmGKB
+            </p>
+            <ul className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] text-slate-400">
+              {GENE_PANELS.map((p) => (
+                <li
+                  key={p.id}
+                  className="flex items-center gap-1.5 rounded border border-slate-800 bg-slate-950/40 px-2 py-1"
+                >
+                  <span className="inline-block w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                  {p.label}
+                </li>
+              ))}
+            </ul>
           </div>
         )}
 
@@ -860,6 +882,12 @@ function GeneDetailPageClientInner({
             <p>{error}</p>
             <button onClick={loadGeneCategory} className="mt-2 text-xs underline text-red-200 hover:text-white">Retry</button>
           </div>
+        )}
+
+        {loaded && sourcesUsed.length > 0 && (
+          <p className="mb-3 text-[10px] text-slate-600" data-testid="gene-sources-used">
+            Sources wired for this query: {sourcesUsed.join(' · ')}
+          </p>
         )}
 
         {loaded && (

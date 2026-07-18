@@ -10,6 +10,11 @@ import * as expressionAtlas from '@/lib/api/expression-atlas'
 import * as reactome from '@/lib/api/reactome'
 import * as wikipathways from '@/lib/api/wikipathways'
 import * as geneOntology from '@/lib/api/gene-ontology'
+import * as gwas from '@/lib/api/gwas-catalog'
+import * as pharmgkb from '@/lib/api/pharmgkb'
+import * as clingen from '@/lib/api/clingen'
+import * as uniprot from '@/lib/api/uniprot'
+import * as stringDb from '@/lib/api/string-db'
 import { fetchGene } from '@/lib/categoryFetchers/gene'
 
 jest.mock('@/lib/api/mygene')
@@ -24,6 +29,11 @@ jest.mock('@/lib/api/expression-atlas')
 jest.mock('@/lib/api/reactome')
 jest.mock('@/lib/api/wikipathways')
 jest.mock('@/lib/api/gene-ontology')
+jest.mock('@/lib/api/gwas-catalog')
+jest.mock('@/lib/api/pharmgkb')
+jest.mock('@/lib/api/clingen')
+jest.mock('@/lib/api/uniprot')
+jest.mock('@/lib/api/string-db')
 jest.mock('@/lib/api-tracker', () => ({
   trackedSafe: (_source: string, promise: Promise<unknown>, fallback: unknown) =>
     Promise.resolve(promise).catch(() => fallback),
@@ -44,6 +54,12 @@ beforeEach(() => {
   ;(geneOntology as jest.Mocked<typeof geneOntology>).searchGOTerms.mockResolvedValue({ terms: [], total: 0 })
   ;(reactome as jest.Mocked<typeof reactome>).getReactomePathwaysByName.mockResolvedValue([])
   ;(wikipathways as jest.Mocked<typeof wikipathways>).getWikiPathwaysByName.mockResolvedValue([])
+  ;(gwas as jest.Mocked<typeof gwas>).getGwasAssociationsByName.mockResolvedValue([])
+  ;(pharmgkb as jest.Mocked<typeof pharmgkb>).searchPharmGKBGene.mockResolvedValue([])
+  ;(clingen as jest.Mocked<typeof clingen>).searchClinGenByGene.mockResolvedValue([])
+  ;(clingen as jest.Mocked<typeof clingen>).getClinGenDosage.mockResolvedValue(null as never)
+  ;(uniprot as jest.Mocked<typeof uniprot>).getUniProtByGene.mockResolvedValue([])
+  ;(stringDb as jest.Mocked<typeof stringDb>).getProteinInteractionsByName.mockResolvedValue([])
 })
 
 describe('fetchGene', () => {

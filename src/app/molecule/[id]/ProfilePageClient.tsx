@@ -12,7 +12,13 @@ import { Panel } from '@/components/ui/Panel'
 import { isPanelSourceDisabled } from '@/lib/api/sourceAvailability'
 import { CategorySection } from '@/components/profile/CategorySection'
 import { PanelSearch } from '@/components/profile/PanelSearch'
-import { CATEGORIES, getCategoryDataCounts, type CategoryId } from '@/lib/categoryConfig'
+import {
+  CATEGORIES,
+  MOLECULE_CATEGORIES,
+  MOLECULE_CATEGORY_IDS,
+  getCategoryDataCounts,
+  type CategoryId,
+} from '@/lib/categoryConfig'
 import { MoleculeSummary } from '@/components/profile/MoleculeSummary'
 import { ExportButton } from '@/components/profile/ExportButton'
 import { CiteButton } from '@/components/profile/CiteButton'
@@ -100,9 +106,8 @@ type PanelRenderer = (panelId: string, lastFetched?: Date) => React.ReactNode
 type CategoriesData = Partial<Record<CategoryId, Record<string, unknown>>>
 type CategoriesStatus = Record<CategoryId, CategoryLoadState>
 
-// 'gene' is a category for the gene detail page, not the molecule profile page.
-// The molecule API route doesn't accept it, so iterating it here would 400.
-const ALL_CATEGORY_IDS: CategoryId[] = CATEGORIES.map(c => c.id).filter(id => id !== 'gene') as CategoryId[]
+// 'gene' is gene-explorer only — never fetch on molecule profile (API would 400; overlay would stall).
+const ALL_CATEGORY_IDS: CategoryId[] = [...MOLECULE_CATEGORY_IDS]
 
 const DISCOVER_PRIORITY_CATEGORIES: CategoryId[] = ['clinical-safety', 'bioactivity-targets', 'molecular-chemical']
 
@@ -1299,10 +1304,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
               {(isDecisionMode
                 ? [
                     // Decision categories first, then any remaining that still host a decision panel
-                    ...CATEGORIES.filter(c => DECISION_CATEGORY_IDS.includes(c.id)),
-                    ...CATEGORIES.filter(c => !DECISION_CATEGORY_IDS.includes(c.id)),
+                    ...MOLECULE_CATEGORIES.filter(c => DECISION_CATEGORY_IDS.includes(c.id)),
+                    ...MOLECULE_CATEGORIES.filter(c => !DECISION_CATEGORY_IDS.includes(c.id)),
                   ]
-                : CATEGORIES
+                : MOLECULE_CATEGORIES
               ).map(cat => {
                 const matchingPanels = cat.panels.filter(p =>
                   (!searchQuery || p.title.toLowerCase().includes(searchLower)) &&

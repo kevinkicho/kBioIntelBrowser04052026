@@ -34,6 +34,26 @@ export interface CategoryDataCount {
   total: number
 }
 
+/**
+ * Molecule profile categories only (excludes `gene`, which is gene-explorer only).
+ * Use this for overlay progress, tiered loads, and molecule profile tabs.
+ */
+export const MOLECULE_CATEGORY_IDS: CategoryId[] = [
+  'pharmaceutical',
+  'clinical-safety',
+  'molecular-chemical',
+  'bioactivity-targets',
+  'protein-structure',
+  'genomics-disease',
+  'interactions-pathways',
+  'research-literature',
+  'nih-high-impact',
+]
+
+export function isMoleculeCategoryId(id: string): id is CategoryId {
+  return (MOLECULE_CATEGORY_IDS as string[]).includes(id)
+}
+
 export const CATEGORIES: CategoryDef[] = [
   {
     id: 'pharmaceutical',
@@ -229,6 +249,9 @@ export const CATEGORIES: CategoryDef[] = [
     ],
   },
 ]
+
+/** Categories shown on molecule profile (never the gene-only explorer category). */
+export const MOLECULE_CATEGORIES: CategoryDef[] = CATEGORIES.filter((c) => c.id !== 'gene')
 
 function hasRealData(value: unknown): boolean {
   if (value === null || value === undefined || value === '' || value === 0) return false
