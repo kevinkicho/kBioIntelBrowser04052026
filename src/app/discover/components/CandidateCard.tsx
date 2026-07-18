@@ -51,6 +51,8 @@ interface Props {
   rubric?: ScoreRubric
   /** Stamp disease/targets/rubric on board save (V2-03). */
   projectContext?: SaveProjectContext
+  /** When rank result was generated or restored from cache (ISO). */
+  rankedAt?: string | null
 }
 
 const PHASE_LABELS: Record<number, string> = {
@@ -58,6 +60,35 @@ const PHASE_LABELS: Record<number, string> = {
   2: 'Phase II',
   3: 'Phase III',
   4: 'Approved',
+}
+
+function sourceRecordUrl(source: string, query?: string, cid?: number | null): string | null {
+  switch (source) {
+    case 'DGIdb':
+      return query ? `https://www.dgidb.org/search?terms=${encodeURIComponent(query)}` : null
+    case 'ClinicalTrials':
+      return query ? `https://clinicaltrials.gov/search?term=${encodeURIComponent(query)}` : null
+    case 'ChEMBL':
+      return cid
+        ? `https://www.ebi.ac.uk/chembl/g/#search_results/${cid}`
+        : query
+          ? `https://www.ebi.ac.uk/chembl/g/#search_results/${encodeURIComponent(query)}`
+          : null
+    case 'Open Targets':
+      return query ? `https://www.opentargets.org/search?disease=${encodeURIComponent(query)}` : null
+    case 'DisGeNET':
+      return query
+        ? `https://www.disgenet.org/browser/0/1/0/${encodeURIComponent(query)}/0/25/0/`
+        : null
+    case 'Orphanet':
+      return query
+        ? `https://www.orpha.net/consor/cgi-bin/Disease_Search_Simple.php?Disease_Disease_Search_diseaseGroup=${encodeURIComponent(query)}`
+        : null
+    case 'PubChem':
+      return cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}` : null
+    default:
+      return null
+  }
 }
 
 function SourcePill({ source, query, cid }: { source: string; query?: string; cid?: number | null }) {
@@ -71,17 +102,7 @@ function SourcePill({ source, query, cid }: { source: string; query?: string; ci
     'PubChem': 'bg-orange-900/30 text-orange-300 border-orange-700/50',
   }
 
-  const sourceUrls: Record<string, () => string | null> = {
-    'DGIdb': () => query ? `https://www.dgidb.org/search?terms=${encodeURIComponent(query)}` : null,
-    'ClinicalTrials': () => query ? `https://clinicaltrials.gov/search?term=${encodeURIComponent(query)}` : null,
-    'ChEMBL': () => cid ? `https://www.ebi.ac.uk/chembl/g/#search_results/${cid}` : (query ? `https://www.ebi.ac.uk/chembl/g/#search_results/${encodeURIComponent(query)}` : null),
-    'Open Targets': () => query ? `https://www.opentargets.org/search?disease=${encodeURIComponent(query)}` : null,
-    'DisGeNET': () => query ? `https://www.disgenet.org/browser/0/1/0/${encodeURIComponent(query)}/0/25/0/` : null,
-    'Orphanet': () => query ? `https://www.orpha.net/consor/cgi-bin/Disease_Search_Simple.php?Disease_Disease_Search_diseaseGroup=${encodeURIComponent(query)}` : null,
-    'PubChem': () => cid ? `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}` : null,
-  }
-
-  const url = sourceUrls[source]?.() ?? null
+  const url = sourceRecordUrl(source, query, cid)
   const colorClass = colors[source] ?? 'bg-slate-700/50 text-slate-400 border-slate-600/50'
 
   if (url) {
@@ -218,6 +239,7 @@ export function CandidateCard({
   domainCandidate: domainCandidateProp,
   rubric,
   projectContext,
+  rankedAt,
 }: Props) {
   const phaseLabel =
     PHASE_LABELS[candidate.clinicalPhaseRaw] ??
@@ -313,23 +335,27 @@ export function CandidateCard({
             <p className="text-[10px] text-slate-600 mb-2">No multi-axis scores available.</p>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {candidate.sources.map((s) => (
-              <div key={s} className="inline-flex items-center gap-1">
-                <SourcePill source={s} query={diseaseName} cid={candidate.cid} />
-                <DataPoint
-                  sourceKey={discoverSourceKey(s)}
-                  label={`${candidate.name} · ${s}`}
-                  recordUrl={
-                    hasCid
-                      ? `https://pubchem.ncbi.nlm.nih.gov/compound/${candidate.cid}`
-                      : undefined
-                  }
-                  className="!gap-0.5"
-                >
-                  <span className="sr-only">Provenance for {s}</span>
-                </DataPoint>
-              </div>
-            ))}
+            {candidate.sources.map((s) => {
+              const recordUrl =
+                sourceRecordUrl(s, diseaseName, candidate.cid) ||
+                (hasCid
+                  ? `https://pubchem.ncbi.nlm.nih.gov/compound/${candidate.cid}`
+                  : undefined)
+              return (
+                <div key={s} className="inline-flex items-center gap-1">
+                  <SourcePill source={s} query={diseaseName} cid={candidate.cid} />
+                  <DataPoint
+                    sourceKey={discoverSourceKey(s)}
+                    label={`${candidate.name} · ${s}`}
+                    recordUrl={recordUrl || undefined}
+                    fetchedAt={rankedAt || undefined}
+                    className="!gap-0.5"
+                  >
+                    <span className="sr-only">Provenance for {s}</span>
+                  </DataPoint>
+                </div>
+              )
+            })}
             {candidate.trialCountRaw > 0 && (
               <span className="text-[10px] text-slate-500">
                 {candidate.trialCountRaw} trial{candidate.trialCountRaw !== 1 ? 's' : ''}

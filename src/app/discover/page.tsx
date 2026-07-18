@@ -482,6 +482,7 @@ export default function DiscoverPage() {
                         domainCandidate={domainCandidate}
                         rubric={state.result?.v2?.rubric}
                         projectContext={projectContext}
+                        rankedAt={state.result?.generatedAt}
                       />
                     )
                   })}

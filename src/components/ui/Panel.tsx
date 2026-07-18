@@ -14,7 +14,7 @@ import {
   isCategoryLoading,
   useProfilePanelContext,
 } from '@/components/profile/ProfilePanelContext'
-import { filterTraceForPanel } from '@/lib/panelApiTrace'
+import { filterTraceForPanel, loadStatusFromPanelTrace } from '@/lib/panelApiTrace'
 import { PanelApiDetailModal } from './PanelApiDetailModal'
 
 type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
@@ -84,17 +84,39 @@ export function Panel({
   const sourceInfo = panelId ? getPanelSource(panelId) : null
   const disabledReason = panelId ? getPanelDisabledReason(panelId) : undefined
   const sourceDisabled = panelId ? isPanelSourceDisabled(panelId) : false
+  // Prefer explicit prop; else derive from category API traces (timeout/error honesty)
+  const derivedFromTrace =
+    !loadStatus && panelId && panelTrace?.sources?.length
+      ? loadStatusFromPanelTrace(panelTrace.sources, panelId)
+      : undefined
   const effectiveLoadStatus: DataLoadStatus | undefined = sourceDisabled
     ? 'disabled'
-    : loadStatus
-  const statusBadge = effectiveLoadStatus ? LOAD_STATUS_BADGE[effectiveLoadStatus] : undefined
+    : loadStatus ?? derivedFromTrace
+  const statusBadge =
+    effectiveLoadStatus && effectiveLoadStatus !== 'loaded'
+      ? LOAD_STATUS_BADGE[effectiveLoadStatus]
+      : undefined
   const tier = panelId ? getPanelTier(panelId) : null
   const showTierBadge = tier === 'supporting' || tier === 'experimental'
+  // Only override empty copy for true failures; do not treat pure "empty" as banner when children exist
+  const failureStatus =
+    effectiveLoadStatus === 'timeout' ||
+    effectiveLoadStatus === 'error' ||
+    effectiveLoadStatus === 'disabled'
   const emptyText = empty
-    ? emptyMessageForStatus(effectiveLoadStatus, empty)
-    : effectiveLoadStatus && effectiveLoadStatus !== 'loaded'
+    ? emptyMessageForStatus(failureStatus ? effectiveLoadStatus : undefined, empty)
+    : failureStatus
       ? emptyMessageForStatus(effectiveLoadStatus, 'No data for this molecule')
       : null
+  // Trace error string for loadError when not provided
+  const derivedError =
+    loadError ||
+    panelTrace?.sources?.find(
+      (s) =>
+        (s.panelId === panelId || s.source === panelId) &&
+        (s.loadStatus === 'error' || s.loadStatus === 'timeout') &&
+        s.error,
+    )?.error
   const nextWorkTitle =
     disabledReason ||
     (sourceDisabled
@@ -201,12 +223,12 @@ export function Panel({
               ? emptyMessageForStatus('disabled', empty || 'No live public endpoint yet.')
               : emptyText}
           </p>
-          {(loadError || disabledReason) && (
+          {(derivedError || disabledReason) && (
             <p
               className="text-[10px] text-amber-500/80 mt-1.5 leading-relaxed"
-              title={disabledReason || loadError}
+              title={disabledReason || derivedError}
             >
-              {disabledReason || loadError}
+              {disabledReason || derivedError}
             </p>
           )}
         </div>

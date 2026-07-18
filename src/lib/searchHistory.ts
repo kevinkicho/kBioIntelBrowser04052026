@@ -295,16 +295,30 @@ export function discoverRankCacheKey(parts: {
   return `${(parts.q ?? '').trim().toLowerCase()}|${parts.diseaseId ?? ''}|${t}`
 }
 
-export function getCachedDiscoverRank(key: string): unknown | null {
+export interface DiscoverRankCacheEntry {
+  data: unknown
+  /** ISO timestamp when this rank was stored */
+  at: string
+}
+
+/** Full cache entry (payload + stored-at) for honest “cached at …” UI. */
+export function getCachedDiscoverRankEntry(key: string): DiscoverRankCacheEntry | null {
   if (!canUseStorage()) return null
   try {
     const raw = localStorage.getItem(DISCOVER_RANK_CACHE_KEY)
     if (!raw) return null
     const map = JSON.parse(raw) as Record<string, { at: string; data: unknown }>
-    return map[key]?.data ?? null
+    const e = map[key]
+    if (!e || e.data == null) return null
+    return { data: e.data, at: e.at || '' }
   } catch {
     return null
   }
+}
+
+/** Payload only (backward compatible). */
+export function getCachedDiscoverRank(key: string): unknown | null {
+  return getCachedDiscoverRankEntry(key)?.data ?? null
 }
 
 export function setCachedDiscoverRank(key: string, data: unknown): void {

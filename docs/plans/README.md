@@ -1,6 +1,8 @@
 # Implementation Plans
 
-Forward-looking plans for BioIntel Explorer. Each plan is **self-contained** — a future contributor (human or Claude) should be able to pick one up cold without reading the others.
+> **Caution (2026-07):** These plans predate Discovery Workbench v2 / v2.1. The **active product law and PR plan** live in `docs/design/discovery-workbench-v2.1.md` and root `AGENTS.md`. Do **not** implement these plans wholesale without re-validating against product law (free APIs only, no LLM ranking, ResearchHypothesis ≠ set-ops `/hypothesis`, claim-bound AI only on packs/RH). Several items are partially overtaken by shipped work.
+
+Forward-looking idea sketches for BioIntel Explorer. Each plan is **self-contained** — a future contributor should re-scope against current main before coding.
 
 | #  | Plan                                                                  | Effort   | Why it matters |
 |----|-----------------------------------------------------------------------|----------|----------------|

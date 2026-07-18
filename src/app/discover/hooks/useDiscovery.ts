@@ -22,7 +22,7 @@ import {
 import {
   clearCachedDiscoverRank,
   discoverRankCacheKey,
-  getCachedDiscoverRank,
+  getCachedDiscoverRankEntry,
   recordSearch,
   setCachedDiscoverRank,
 } from '@/lib/searchHistory'
@@ -273,7 +273,8 @@ export function useDiscovery() {
       try {
         // Client-side rank cache (warm reopen from history sidebar)
         if (!forceRefresh) {
-          const cached = getCachedDiscoverRank(cacheKey) as RankResult | null
+          const entry = getCachedDiscoverRankEntry(cacheKey)
+          const cached = entry?.data as RankResult | null
           if (cached?.candidates && Array.isArray(cached.candidates)) {
             if (progressRef.current) clearTimeout(progressRef.current)
             emitProductEvent('discover_rank_completed', {
@@ -294,12 +295,25 @@ export function useDiscovery() {
                 candidateCount: cached.candidates.length,
               },
             })
+            const atLabel = entry?.at
+              ? (() => {
+                  const t = Date.parse(entry.at)
+                  return Number.isFinite(t) ? new Date(t).toLocaleString() : entry.at
+                })()
+              : null
+            // Preserve honest rank timestamp for provenance (generatedAt or cache store time)
+            const cachedResult: RankResult = {
+              ...cached,
+              generatedAt: cached.generatedAt || entry?.at || undefined,
+            }
             setState((prev) => ({
               ...prev,
               status: 'success',
               progress: 100,
-              progressLabel: `Cached: ${cached.candidates.length} candidates for "${cached.diseaseName || effectiveQuery}"`,
-              result: cached,
+              progressLabel: atLabel
+                ? `Cached rank (${atLabel}): ${cached.candidates.length} candidates for "${cached.diseaseName || effectiveQuery}"`
+                : `Cached: ${cached.candidates.length} candidates for "${cached.diseaseName || effectiveQuery}"`,
+              result: cachedResult,
               diseaseCandidates: [],
               diseaseId: cached.diseaseId ?? diseaseId ?? null,
               targets,

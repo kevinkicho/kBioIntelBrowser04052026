@@ -47,7 +47,7 @@ export interface CategoryApiTrace {
 }
 
 /** Map trackedSafe source keys → panel ids (best-effort). */
-const SOURCE_TO_PANEL: Record<string, string> = {
+export const SOURCE_TO_PANEL: Record<string, string> = {
   clinicaltrials: 'clinical-trials',
   adverseevents: 'adverse-events',
   recalls: 'recalls',
@@ -123,6 +123,79 @@ export function categoryForPanel(panelId: string): CategoryId | null {
     if (cat.panels.some((p) => p.id === panelId)) return cat.id
   }
   return null
+}
+
+/** Panel id for a tracked source key (or the key itself if already a panel id). */
+export function panelIdForSource(sourceKey: string): string {
+  return SOURCE_TO_PANEL[sourceKey] || sourceKey
+}
+
+export type SourceStatusLike = {
+  status?: string
+  error?: string
+  has_data?: boolean
+  duration_ms?: number
+}
+
+/**
+ * Resolve `_sourceStatus` for a profile panel id.
+ * Server keys are tracker sources (e.g. `clinicaltrials`); panel ids use hyphens (`clinical-trials`).
+ */
+export function sourceStatusForPanel(
+  map: Record<string, SourceStatusLike> | null | undefined,
+  panelId: string,
+): SourceStatusLike | undefined {
+  if (!map) return undefined
+  if (map[panelId]) return map[panelId]
+  // Direct reverse: find any tracker key that maps to this panel
+  for (const [source, pid] of Object.entries(SOURCE_TO_PANEL)) {
+    if (pid === panelId && map[source]) return map[source]
+  }
+  // Loose match (strip hyphens)
+  const compact = panelId.replace(/-/g, '')
+  for (const [key, val] of Object.entries(map)) {
+    if (key.replace(/-/g, '') === compact) return val
+  }
+  return undefined
+}
+
+/** Worst-case load status for a panel from category API traces. */
+export function loadStatusFromPanelTrace(
+  sources: Array<{ loadStatus?: string; panelId?: string; source?: string }>,
+  panelId: string,
+): DataLoadStatus | undefined {
+  const related = sources.filter(
+    (s) =>
+      s.panelId === panelId ||
+      s.source === panelId ||
+      (s.source && s.source.replace(/-/g, '') === panelId.replace(/-/g, '')),
+  )
+  const pool = related.length > 0 ? related : sources
+  if (pool.length === 0) return undefined
+  const ranks: DataLoadStatus[] = ['timeout', 'error', 'disabled', 'empty', 'loaded']
+  let worst: DataLoadStatus | undefined
+  for (const s of pool) {
+    const st = s.loadStatus as DataLoadStatus | undefined
+    if (!st || !ranks.includes(st)) continue
+    if (!worst || ranks.indexOf(st) < ranks.indexOf(worst)) worst = st
+  }
+  return worst
+}
+
+/** Prefer durable client stamp, then server API trace finish time. */
+export function resolveCategoryFetchedAt(data: Record<string, unknown> | null | undefined): Date {
+  if (!data) return new Date()
+  const client = data._clientFetchedAt
+  if (typeof client === 'string') {
+    const t = Date.parse(client)
+    if (Number.isFinite(t)) return new Date(t)
+  }
+  const trace = data._apiTrace as { finishedAt?: string } | undefined
+  if (trace?.finishedAt) {
+    const t = Date.parse(trace.finishedAt)
+    if (Number.isFinite(t)) return new Date(t)
+  }
+  return new Date()
 }
 
 export function enrichSourceTrace(m: {

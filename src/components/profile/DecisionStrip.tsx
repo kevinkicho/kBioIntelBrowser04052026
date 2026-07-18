@@ -260,7 +260,19 @@ export function DecisionStrip({
                     <span className="line-clamp-2">{c.statement}</span>
                     {c.provenance?.source && (
                       <span className="block text-[9px] text-slate-600 mt-0.5">
-                        {c.provenance.source}
+                        {c.provenance.sourceUrl ? (
+                          <a
+                            href={c.provenance.sourceUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400/80 hover:text-indigo-300 hover:underline"
+                            data-testid="decision-strip-claim-source"
+                          >
+                            {c.provenance.source} ↗
+                          </a>
+                        ) : (
+                          c.provenance.source
+                        )}
                       </span>
                     )}
                   </span>

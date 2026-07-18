@@ -2,12 +2,13 @@
 
 import { useEffect } from 'react'
 import type {
+  BeachheadPersonaId,
   CollaborationModePref,
   DiscoveryPreferences,
   HarvestTimingPref,
   TourExampleSetPref,
 } from '@/lib/discovery/preferences'
-import { PREFERENCE_TOOLTIPS } from '@/lib/discovery/preferences'
+import { applyBeachheadPersona, PREFERENCE_TOOLTIPS } from '@/lib/discovery/preferences'
 import type { RubricPresetId, ScoreAxisWeights } from '@/lib/domain/score'
 import type { AeAggressivenessPref } from '@/lib/discovery/preferences'
 import { RubricEditor } from '@/app/discover/components/RubricEditor'
@@ -175,6 +176,63 @@ export function DiscoverySettingsDrawer({
                   {label}
                 </button>
               ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
+              Beachhead persona
+            </div>
+            <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
+              One-click presets for repurposing triage (default) vs rare-disease lab. Does not
+              change ranking math — only tour examples, Orphanet pin boost, and soft AE defaults.
+            </p>
+            <div className="flex flex-col gap-2">
+              {(
+                [
+                  [
+                    'repurposing',
+                    'Repurposing triage (default)',
+                    'Balanced rubric · mixed tour · Orphanet boost off',
+                  ],
+                  [
+                    'rare-lab',
+                    'Rare-disease lab',
+                    'Rare-only tour · Orphanet boost on · soft AE',
+                  ],
+                ] as const
+              ).map(([id, label, hint]) => {
+                const active =
+                  id === 'rare-lab'
+                    ? prefs.rareDiseaseBoost && prefs.tourExampleSet === 'rare-only'
+                    : !prefs.rareDiseaseBoost && prefs.tourExampleSet === 'mixed'
+                return (
+                  <button
+                    key={id}
+                    type="button"
+                    onClick={() => {
+                      const next = applyBeachheadPersona(id as BeachheadPersonaId)
+                      onChange({
+                        rubricPreset: next.rubricPreset,
+                        aeAggressiveness: next.aeAggressiveness,
+                        harvestTiming: next.harvestTiming,
+                        tourExampleSet: next.tourExampleSet,
+                        rareDiseaseBoost: next.rareDiseaseBoost,
+                        collaborationMode: next.collaborationMode,
+                      })
+                    }}
+                    className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                      active
+                        ? 'border-violet-500/60 bg-violet-900/30 text-violet-100'
+                        : 'border-slate-700/50 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                    }`}
+                    data-testid={`persona-${id}`}
+                  >
+                    <span className="font-medium">{label}</span>
+                    <span className="block text-[10px] text-slate-500 mt-0.5">{hint}</span>
+                  </button>
+                )
+              })}
             </div>
           </div>
 

@@ -71,7 +71,8 @@ export async function fetchCategoryData(
     const cached = await getProfileClientCacheAsync<Record<string, unknown>>(cacheKey)
     if (cached) {
       logAgentActivity('profile.cache.hit', { cid, categoryId, layer: 'l1_or_l2' }, { source: 'profile' })
-      return cached
+      // Mark hit without rewriting stored _clientFetchedAt (honest freshness trail).
+      return { ...cached, _fromClientCache: true }
     }
     logAgentActivity('profile.cache.miss', { cid, categoryId }, { source: 'profile' })
   }
@@ -101,7 +102,13 @@ export async function fetchCategoryData(
   if (!res.ok) {
     throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)
   }
-  const data = (await res.json()) as Record<string, unknown>
+  const raw = (await res.json()) as Record<string, unknown>
+  // Stamp first-network time so cache hits keep an honest freshness trail.
+  const data: Record<string, unknown> = {
+    ...raw,
+    _clientFetchedAt: new Date().toISOString(),
+    _fromClientCache: false,
+  }
   setProfileClientCache(cacheKey, data)
   return data
 }

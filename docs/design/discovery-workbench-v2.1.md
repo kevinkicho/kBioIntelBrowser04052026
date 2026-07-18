@@ -5,7 +5,7 @@
 **Audience:** Implementers (engineers / coding agents) working in `C:\Users\kevin\workspace\kBioIntelBrowser04052026`  
 **Author role:** Principal product + systems design  
 **Date:** 2026-07-16  
-**Status:** Implementable design — **Draft / Rev 1.1** (review fixes)  
+**Status:** **Implemented on main** (as-built Rev 1.2 — 2026-07-17). Draft Rev 1.1 design retained as SSOT; residual polish only (persona one-click UI shipped; share/e2e/gate already on main).  
 **Constraint law (binding):** Free public APIs only; evidence-first; no regulatory decision support; solo + file export default (share optional); deterministic ranking without LLM; **AI only claim-bound on packs/hypotheses** (no free-form Discover ranking rationales)  
 **Beachhead (default recommendation):** Target-led small-molecule **repurposing / early candidate triage**, with **selectable rare-disease lab persona** for tour, Orphanet depth, and example packs (see §0.2, KD-V21-1)  
 **Canonical project copy (when promoted):** `docs/design/discovery-workbench-v2.1.md`  

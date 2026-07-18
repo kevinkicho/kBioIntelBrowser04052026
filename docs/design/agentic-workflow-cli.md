@@ -111,7 +111,7 @@ Agents should read these before changing related behavior.
 | Funnel UI | `src/components/analytics/ProductFunnelPanel.tsx` |
 | Analytics POST | `src/app/api/analytics/route.ts` |
 | Analytics summary | `src/app/api/analytics/summary/route.ts` |
-| v2.1 funnel helpers (planned) | `src/lib/analytics/m1Funnel.ts` |
+| v2.1 funnel helpers (shipped) | `src/lib/analytics/m1Funnel.ts` |
 
 ### 2.4.1 Search history + profile revisit cache
 

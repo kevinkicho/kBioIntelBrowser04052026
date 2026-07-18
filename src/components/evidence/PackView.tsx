@@ -69,7 +69,19 @@ export function PackView({ pack, compact = false, className = '' }: Props) {
                   </div>
                   <p className="mt-1 text-sm text-slate-300">{c.statement}</p>
                   <p className="mt-0.5 text-[11px] text-slate-500">
-                    {c.provenance.source}
+                    {c.provenance.sourceUrl ? (
+                      <a
+                        href={c.provenance.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-indigo-400/90 hover:text-indigo-300 hover:underline"
+                        data-testid="pack-claim-source-url"
+                      >
+                        {c.provenance.source} ↗
+                      </a>
+                    ) : (
+                      c.provenance.source
+                    )}
                     {c.provenance.retrievedAt
                       ? ` · ${new Date(c.provenance.retrievedAt).toLocaleDateString()}`
                       : ''}

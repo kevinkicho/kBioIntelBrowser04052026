@@ -50,7 +50,12 @@ import {
   invalidateProfileClientCache,
 } from '@/lib/profileClientCache'
 import { logAgentActivity } from '@/lib/agentActivityLog'
-import { categoryForPanel, type CategoryApiTrace } from '@/lib/panelApiTrace'
+import {
+  categoryForPanel,
+  resolveCategoryFetchedAt,
+  sourceStatusForPanel,
+  type CategoryApiTrace,
+} from '@/lib/panelApiTrace'
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import type { ScoreVector } from '@/lib/domain'
 import {
@@ -223,6 +228,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
   categoryStatusRef.current = categoryStatus
   const [quickViewPanel, setQuickViewPanel] = useState<{ categoryId: CategoryId, panelId: string } | null>(null)
   const [fetchedAt, setFetchedAt] = useState<Partial<Record<CategoryId, Date>>>({})
+  /** Category load error messages (durable honesty when fetch fails). */
+  const [categoryErrors, setCategoryErrors] = useState<Partial<Record<CategoryId, string>>>({})
   const [hideEmpty, setHideEmpty] = useState(true)
   const [projectMeta, setProjectMeta] = useState<{
     projectName?: string
@@ -345,9 +352,16 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     if (!doRefresh) {
       const peeked = peekCategoryClientCache(cid, catId, apiOverrides, apiParams)
       if (peeked) {
-        setCategoryData(prev => ({ ...prev, [catId]: peeked }))
+        const peekedMarked = { ...peeked, _fromClientCache: true }
+        setCategoryData(prev => ({ ...prev, [catId]: peekedMarked }))
         setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
-        setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
+        setCategoryErrors(prev => {
+          const next = { ...prev }
+          delete next[catId]
+          return next
+        })
+        // Keep original fetch stamp from cache payload (not “now”).
+        setFetchedAt(prev => ({ ...prev, [catId]: resolveCategoryFetchedAt(peeked) }))
         const trace = peeked._apiTrace as CategoryApiTrace | undefined
         if (trace) setCategoryTraces((prev) => ({ ...prev, [catId]: trace }))
         return
@@ -362,13 +376,20 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       })
       setCategoryData(prev => ({ ...prev, [catId]: data }))
       setCategoryStatus(prev => ({ ...prev, [catId]: 'loaded' }))
-      setFetchedAt(prev => ({ ...prev, [catId]: new Date() }))
+      setCategoryErrors(prev => {
+        const next = { ...prev }
+        delete next[catId]
+        return next
+      })
+      setFetchedAt(prev => ({ ...prev, [catId]: resolveCategoryFetchedAt(data) }))
       const trace = (data as Record<string, unknown>)?._apiTrace as CategoryApiTrace | undefined
       if (trace) {
         setCategoryTraces((prev) => ({ ...prev, [catId]: trace }))
       }
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Failed to load category'
       setCategoryStatus(prev => ({ ...prev, [catId]: 'error' }))
+      setCategoryErrors(prev => ({ ...prev, [catId]: msg }))
     } finally {
       pendingRef.current.delete(catId)
     }
@@ -1003,11 +1024,17 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
 
     if (status === 'error') {
+      const errMsg = categoryErrors[catId]
       return (
         <div className="col-span-2 flex flex-col items-center py-8">
-          <p className="text-red-400 text-sm mb-3">Failed to load data</p>
+          <p className="text-red-400 text-sm mb-1">Failed to load data</p>
+          {errMsg && (
+            <p className="text-[11px] text-red-400/70 mb-3 max-w-md text-center font-mono" data-testid="category-load-error">
+              {errMsg}
+            </p>
+          )}
           <button
-            onClick={() => loadCategory(catId)}
+            onClick={() => loadCategory(catId, { force: true })}
             disabled={isBusy}
             className="text-indigo-400 hover:text-indigo-300 text-sm underline disabled:opacity-50 disabled:cursor-not-allowed"
           >
@@ -1018,10 +1045,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
 
     // Loaded — render panels with freshness tracking
-    const categoryFetchedAt = fetchedAt[catId]
-    const sourceStatusMap = (categoryData[catId] as Record<string, unknown> | undefined)?._sourceStatus as
+    const catPayload = categoryData[catId] as Record<string, unknown> | undefined
+    const categoryFetchedAt = fetchedAt[catId] ?? resolveCategoryFetchedAt(catPayload)
+    const sourceStatusMap = catPayload?._sourceStatus as
       | Record<string, { status?: string; error?: string }>
       | undefined
+    const fromCache = Boolean(catPayload?._fromClientCache)
 
     // Decision mode: only the Core six decision panels (design §4.3)
     const modePanels = isDecisionMode
@@ -1031,7 +1060,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     const visiblePanels = hideEmpty
       ? modePanels.filter(p => {
           // Always show panels that failed/timed out/disabled — scientific honesty
-          const st = sourceStatusMap?.[p.id]?.status
+          // Resolve tracker source keys → panel ids (was broken: looked up panel id only)
+          const st = sourceStatusForPanel(sourceStatusMap, p.id)?.status
           if (st === 'timeout' || st === 'error' || st === 'disabled') return true
 
           const value = mergedData[p.propKey]
@@ -1070,9 +1100,17 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
     return (
       <>
-        {(nTimeout > 0 || nError > 0 || nDisabled > 0) && (
+        {(nTimeout > 0 || nError > 0 || nDisabled > 0 || fromCache) && (
           <div className="col-span-2 text-[10px] text-slate-500 bg-slate-900/40 border border-slate-700/50 rounded-lg px-3 py-2 flex flex-wrap gap-3">
             <span className="text-slate-400 font-medium">Source status:</span>
+            {fromCache && (
+              <span className="text-cyan-400/90" title="Served from local profile cache (memory or IndexedDB)">
+                local cache
+                {categoryFetchedAt
+                  ? ` · fetched ${categoryFetchedAt.toLocaleString()}`
+                  : ''}
+              </span>
+            )}
             {nTimeout > 0 && <span className="text-amber-400/90">{nTimeout} timed out</span>}
             {nError > 0 && <span className="text-red-400/90">{nError} errors</span>}
             {nDisabled > 0 && <span className="text-slate-500">{nDisabled} disabled</span>}
