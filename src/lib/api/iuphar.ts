@@ -31,40 +31,78 @@ interface InteractionResult {
   refIds: number[]
 }
 
+function pickBestLigand(hits: LigandResult[], query: string): LigandResult | null {
+  if (!hits.length) return null
+  const q = query.trim().toLowerCase()
+  // Prefer exact / starts-with name match over first hit (often a salt/analog)
+  const exact = hits.find((h) => (h.name || '').toLowerCase() === q)
+  if (exact) return exact
+  const starts = hits.find((h) => (h.name || '').toLowerCase().startsWith(q))
+  if (starts) return starts
+  const includes = hits.find((h) => (h.name || '').toLowerCase().includes(q))
+  if (includes) return includes
+  // Prefer approved ligands when names are noisy
+  const approved = hits.find((h) => h.approved)
+  return approved || hits[0]
+}
+
 export async function getPharmacologyTargetsByName(name: string): Promise<PharmacologyTarget[]> {
   try {
-    const searchUrl = `${LIGANDS_URL}?search=${encodeURIComponent(name)}`
+    const q = name?.trim()
+    if (!q || q.length < 2) return []
+
+    const searchUrl = `${LIGANDS_URL}?search=${encodeURIComponent(q)}`
     const searchData = await fetchJsonWithSizeLimit<LigandResult[]>(searchUrl, {
       maxBytes: MAX_IUPHAR_BYTES,
       timeoutMs: 12000,
     })
     if (!searchData || !Array.isArray(searchData) || !searchData.length) return []
 
-    const ligand = searchData[0]
-    const ligandId = ligand.ligandId
-    if (!ligandId) return []
+    // Try up to 3 best ligand matches until interactions exist
+    const ordered = [
+      pickBestLigand(searchData, q),
+      ...searchData.filter((h) => h !== pickBestLigand(searchData, q)),
+    ].filter(Boolean) as LigandResult[]
 
-    const interactionsUrl = `${INTERACTIONS_URL}?ligandId=${ligandId}`
-    const interactions = await fetchJsonWithSizeLimit<InteractionResult[]>(interactionsUrl, {
-      maxBytes: MAX_IUPHAR_BYTES,
-      timeoutMs: 12000,
-    })
-    if (!interactions || !Array.isArray(interactions)) return []
+    const seenLigand = new Set<number>()
+    for (const ligand of ordered.slice(0, 3)) {
+      const ligandId = ligand.ligandId
+      if (!ligandId || seenLigand.has(ligandId)) continue
+      seenLigand.add(ligandId)
 
-    const ligandUrl = `https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=${ligandId}`
+      const interactionsUrl = `${INTERACTIONS_URL}?ligandId=${ligandId}`
+      const interactions = await fetchJsonWithSizeLimit<InteractionResult[]>(interactionsUrl, {
+        maxBytes: MAX_IUPHAR_BYTES,
+        timeoutMs: 12000,
+      })
+      if (!interactions || !Array.isArray(interactions) || interactions.length === 0) continue
 
-    return interactions.slice(0, 10).map((interaction) => ({
-      targetId: String(interaction.targetId),
-      targetName: stripHtml(interaction.targetName || ''),
-      ligandName: interaction.ligandName || ligand.name || '',
-      actionType: interaction.type || interaction.action || '',
-      type: interaction.type || '',
-      affinity: interaction.affinity ? parseFloat(interaction.affinity.split('-')[0].trim()) : undefined,
-      affinityUnit: interaction.affinityParameter || undefined,
-      url: ligandUrl,
-      primaryTarget: interaction.primaryTarget ?? false,
-      species: interaction.targetSpecies || '',
-    }))
+      const ligandUrl = `https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=${ligandId}`
+
+      return interactions.slice(0, 15).map((interaction) => {
+        const affRaw = interaction.affinity
+        let affinity: number | undefined
+        if (affRaw != null && String(affRaw).trim() !== '') {
+          const n = parseFloat(String(affRaw).split('-')[0].trim())
+          affinity = Number.isFinite(n) ? n : undefined
+        }
+        return {
+          targetId: String(interaction.targetId ?? ''),
+          targetName: stripHtml(interaction.targetName || '') || `Target ${interaction.targetId}`,
+          ligandName: interaction.ligandName || ligand.name || q,
+          actionType: interaction.action || interaction.type || '',
+          type: interaction.type || interaction.action || '',
+          affinity,
+          affinityUnit: interaction.affinityParameter || undefined,
+          url: interaction.targetId
+            ? `https://www.guidetopharmacology.org/GRAC/ObjectDisplayForward?objectId=${interaction.targetId}`
+            : ligandUrl,
+          primaryTarget: interaction.primaryTarget ?? false,
+          species: interaction.targetSpecies || '',
+        }
+      })
+    }
+    return []
   } catch {
     return []
   }

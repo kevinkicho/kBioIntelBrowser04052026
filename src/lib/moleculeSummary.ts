@@ -46,9 +46,11 @@ export function computeMoleculeSummary(
 
   const adverseEvents = safeArray(props.adverseEvents)
   const drugRecalls = safeArray(props.drugRecalls)
+  const siderSideEffects = safeArray(props.siderSideEffects)
 
   const clinicalTrials = safeArray(props.clinicalTrials)
   const chemblIndications = safeArray(props.chemblIndications)
+  const isrctnTrials = safeArray(props.isrctnTrials)
 
   const literature = safeArray(props.literature)
   const semanticPapers = safeArray(props.semanticPapers)
@@ -59,6 +61,7 @@ export function computeMoleculeSummary(
 
   const chemblActivities = safeArray(props.chemblActivities)
   const chemblMechanisms = safeArray(props.chemblMechanisms)
+  const pharmacologyTargets = safeArray(props.pharmacologyTargets)
   const reactomePathways = safeArray(props.reactomePathways)
   const wikiPathways = safeArray(props.wikiPathways)
   const pathwayCommonsResults = safeArray(props.pathwayCommonsResults)
@@ -88,11 +91,12 @@ export function computeMoleculeSummary(
     0
   )
 
-  // Card 5: unique targets
+  // Card 5: unique targets (ChEMBL activities + IUPHAR)
   const uniqueTargets = new Set(
-    chemblActivities
-      .map((a: Record<string, unknown>) => a?.targetName)
-      .filter((n: unknown) => n != null)
+    [
+      ...chemblActivities.map((a: Record<string, unknown>) => a?.targetName),
+      ...pharmacologyTargets.map((t: Record<string, unknown>) => t?.targetName),
+    ].filter((n: unknown) => n != null && String(n).length > 0),
   )
 
   // Card 5: pathways total
@@ -129,6 +133,7 @@ export function computeMoleculeSummary(
       secondaryMetrics: [
         { label: 'Serious Events', value: seriousCount, panelId: 'adverse-events' },
         { label: 'Recalls', value: drugRecalls.length, panelId: 'recalls' },
+        { label: 'SIDER-like SE', value: siderSideEffects.length, panelId: 'sider' },
       ],
     },
     {
@@ -138,11 +143,12 @@ export function computeMoleculeSummary(
       accentColor: 'border-t-blue-500',
       categoryId: 'clinical-safety',
       primaryLabel: 'Active Trials',
-      primaryValue: clinicalTrials.length,
+      primaryValue: clinicalTrials.length + isrctnTrials.length,
       primaryPanelId: 'clinical-trials',
       secondaryMetrics: [
-        { label: 'Phases', value: buildPhaseBreakdown(clinicalTrials), panelId: 'clinical-trials' },
+        { label: 'Phases', value: buildPhaseBreakdown(clinicalTrials) || '—', panelId: 'clinical-trials' },
         { label: 'Indications', value: chemblIndications.length, panelId: 'chembl-indications' },
+        { label: 'ISRCTN', value: isrctnTrials.length, panelId: 'isrctn' },
       ],
     },
     {
@@ -171,6 +177,7 @@ export function computeMoleculeSummary(
       primaryPanelId: 'chembl',
       secondaryMetrics: [
         { label: 'Mechanisms', value: chemblMechanisms.length, panelId: 'chembl-mechanisms' },
+        { label: 'IUPHAR', value: pharmacologyTargets.length, panelId: 'iuphar' },
         { label: 'Pathways', value: totalPathways, panelId: 'reactome' },
         { label: 'Drug-Gene', value: drugGeneInteractions.length, panelId: 'dgidb' },
       ],

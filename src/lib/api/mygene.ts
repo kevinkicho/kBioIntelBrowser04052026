@@ -73,12 +73,31 @@ function mapMyGeneHit(hit: Record<string, unknown>): MyGeneAnnotation {
  */
 export async function searchGenes(query: string): Promise<MyGeneAnnotation[]> {
   try {
-    const url = `${BASE_URL}/query?q=${encodeURIComponent(query)}&fields=symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name&size=20&species=human`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return (data.hits ?? []).map((hit: Record<string, unknown>) => mapMyGeneHit(hit))
+    const q = query.trim()
+    if (q.length < 1) return []
+    // Prefer symbol match first, then free-text — improves gene hits in unified search
+    const fields =
+      'symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name'
+    const queries = [
+      `${BASE_URL}/query?q=symbol:${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
+      `${BASE_URL}/query?q=${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
+    ]
+    const seen = new Set<string>()
+    const out: MyGeneAnnotation[] = []
+    for (const url of queries) {
+      const res = await fetch(url, fetchOptions)
+      if (!res.ok) continue
+      const data = await res.json()
+      for (const hit of data.hits ?? []) {
+        const mapped = mapMyGeneHit(hit as Record<string, unknown>)
+        const key = mapped.geneId || mapped.symbol
+        if (!key || seen.has(key)) continue
+        seen.add(key)
+        out.push(mapped)
+        if (out.length >= 20) return out
+      }
+    }
+    return out
   } catch {
     return []
   }

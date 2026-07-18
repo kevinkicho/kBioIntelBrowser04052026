@@ -262,13 +262,25 @@ export function Panel({
               </div>
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-500 w-10 shrink-0">Fetch</span>
-                <button
-                  type="button"
-                  onClick={() => navigator.clipboard?.writeText(sourceInfo.endpoint)}
-                  className="font-mono text-emerald-400/70 hover:text-emerald-300 break-all text-left"
-                >
-                  {sourceInfo.endpoint}
-                </button>
+                {sourceInfo.endpoint?.startsWith('http') ? (
+                  <a
+                    href={sourceInfo.endpoint}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-mono text-emerald-400/70 hover:text-emerald-300 break-all text-left"
+                    title="Open API endpoint"
+                  >
+                    {sourceInfo.endpoint}
+                  </a>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => navigator.clipboard?.writeText(sourceInfo.endpoint)}
+                    className="font-mono text-emerald-400/70 hover:text-emerald-300 break-all text-left"
+                  >
+                    {sourceInfo.endpoint}
+                  </button>
+                )}
               </div>
             </div>
           )}

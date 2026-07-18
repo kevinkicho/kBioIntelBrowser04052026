@@ -128,20 +128,45 @@ export function PanelApiDetailModal({
                         <div className="mt-1 text-[10px] text-slate-500">Org: {s.organization}</div>
                       )}
                       {s.endpoint && (
-                        <div className="mt-1 break-all font-mono text-[10px] text-cyan-400/70">
-                          {s.endpoint}
+                        <div className="mt-1">
+                          {s.endpoint.startsWith('http') ? (
+                            <a
+                              href={s.endpoint}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="break-all font-mono text-[10px] text-cyan-400/90 hover:text-cyan-300"
+                            >
+                              {s.endpoint}
+                            </a>
+                          ) : (
+                            <span className="break-all font-mono text-[10px] text-cyan-400/70">
+                              {s.endpoint}
+                            </span>
+                          )}
                         </div>
                       )}
-                      {s.docs && (
-                        <a
-                          href={s.docs}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="mt-0.5 inline-block text-[10px] text-indigo-400 hover:text-indigo-300"
-                        >
-                          Docs ↗
-                        </a>
-                      )}
+                      <div className="mt-0.5 flex flex-wrap gap-2">
+                        {s.docs && (
+                          <a
+                            href={s.docs}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300"
+                          >
+                            Docs ↗
+                          </a>
+                        )}
+                        {s.endpoint?.startsWith('http') && (
+                          <a
+                            href={s.endpoint}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block text-[10px] text-emerald-400/80 hover:text-emerald-300"
+                          >
+                            Endpoint ↗
+                          </a>
+                        )}
+                      </div>
                       {s.error && (
                         <div className="mt-1 break-all font-mono text-[10px] text-red-400/80">
                           {s.error}

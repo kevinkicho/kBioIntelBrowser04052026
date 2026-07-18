@@ -334,32 +334,41 @@ export function SearchBar({
           </div>
           <ul className="max-h-72 overflow-y-auto">
             {candidates.map((c) => (
-              <li key={c.cid}>
-                <button
-                  onClick={() => {
-                    setIsNavigating(true)
-                    goToCid(c.cid)
-                  }}
-                  className="w-full text-left px-4 py-3 text-slate-200 hover:bg-slate-700 transition-colors border-b border-slate-700/50 last:border-0"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm">{c.name}</span>
-                    <span className="font-mono text-[10px] text-cyan-400/80 shrink-0">
-                      CID {c.cid}
-                    </span>
-                  </div>
-                  <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500 font-mono">
-                    {c.formula && <span>{c.formula}</span>}
-                    {c.molecularWeight > 0 && (
-                      <span>{c.molecularWeight.toFixed(2)} g/mol</span>
-                    )}
-                    {c.inchiKey && (
-                      <span className="truncate max-w-[200px]" title={c.inchiKey}>
-                        {c.inchiKey}
+              <li key={c.cid} className="border-b border-slate-700/50 last:border-0">
+                <div className="flex items-stretch">
+                  <button
+                    onClick={() => {
+                      setIsNavigating(true)
+                      goToCid(c.cid, c.name)
+                    }}
+                    className="min-w-0 flex-1 text-left px-4 py-3 text-slate-200 hover:bg-slate-700 transition-colors"
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm">{c.name}</span>
+                      <span className="font-mono text-[10px] text-cyan-400/80 shrink-0">
+                        CID {c.cid}
                       </span>
-                    )}
-                  </div>
-                </button>
+                    </div>
+                    <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1 text-[10px] text-slate-500 font-mono">
+                      {c.formula && <span>{c.formula}</span>}
+                      {c.molecularWeight > 0 && (
+                        <span>{c.molecularWeight.toFixed(2)} g/mol</span>
+                      )}
+                      {c.inchiKey && (
+                        <span className="truncate max-w-[200px]" title={c.inchiKey}>
+                          {c.inchiKey}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                  <a
+                    href={`/molecule/${c.cid}`}
+                    className="shrink-0 self-center mr-3 text-[10px] text-indigo-400 hover:text-indigo-300"
+                    onClick={(e) => e.stopPropagation()}
+                  >
+                    Open →
+                  </a>
+                </div>
               </li>
             ))}
           </ul>
@@ -377,22 +386,61 @@ export function SearchBar({
           className="absolute top-full left-0 right-0 mt-1 bg-slate-800 border border-slate-600 rounded-xl overflow-hidden z-50 shadow-xl max-h-80 overflow-y-auto"
           data-testid="unified-search-results"
         >
-          {hits.map((hit, i) => {
-            const badge = KIND_BADGE[hit.kind]
-            return (
-              <li key={`${hit.kind}:${hit.geneKey || hit.label}:${i}`}>
-                <button
-                  onClick={() => void handleSelectHit(hit)}
-                  disabled={isNavigating}
-                  className="w-full text-left px-5 py-3 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
-                >
-                  <span
-                    className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 ${badge.className}`}
+          {(['disease', 'molecule', 'gene'] as const).map((kind) => {
+            const group = hits.filter((h) => h.kind === kind)
+            if (group.length === 0) {
+              // While loading, show honest empty gene strip so the section is visible
+              if (kind === 'gene' && isLoading) {
+                return (
+                  <li
+                    key="gene-loading"
+                    className="px-5 py-2 text-[10px] text-slate-600 border-b border-slate-700/40"
+                    data-testid="search-gene-loading"
                   >
-                    {badge.label}
-                  </span>
-                  <span>{hit.label}</span>
-                </button>
+                    GENE · looking up symbols…
+                  </li>
+                )
+              }
+              if (kind === 'gene' && !isLoading && hits.length > 0) {
+                return (
+                  <li
+                    key="gene-empty"
+                    className="px-5 py-2 text-[10px] text-slate-600 border-b border-slate-700/40"
+                    data-testid="search-gene-empty"
+                  >
+                    GENE · no symbol matches for this query
+                  </li>
+                )
+              }
+              return null
+            }
+            return (
+              <li key={`group-${kind}`} className="list-none">
+                <div className="px-5 py-1.5 text-[9px] font-semibold uppercase tracking-wide text-slate-500 bg-slate-900/60 border-b border-slate-700/40 sticky top-0">
+                  {KIND_BADGE[kind].label}
+                  <span className="ml-1 font-normal text-slate-600">({group.length})</span>
+                </div>
+                <ul>
+                  {group.map((hit, i) => {
+                    const badge = KIND_BADGE[hit.kind]
+                    return (
+                      <li key={`${hit.kind}:${hit.geneKey || hit.label}:${i}`}>
+                        <button
+                          onClick={() => void handleSelectHit(hit)}
+                          disabled={isNavigating}
+                          className="w-full text-left px-5 py-3 text-slate-200 hover:bg-slate-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+                        >
+                          <span
+                            className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border shrink-0 ${badge.className}`}
+                          >
+                            {badge.label}
+                          </span>
+                          <span>{hit.label}</span>
+                        </button>
+                      </li>
+                    )
+                  })}
+                </ul>
               </li>
             )
           })}

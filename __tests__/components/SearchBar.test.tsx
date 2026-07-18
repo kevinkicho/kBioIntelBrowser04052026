@@ -17,7 +17,7 @@ describe('SearchBar (unified)', () => {
   })
 
   test('shows typed hits with kind badges', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
+    ;(fetch as jest.Mock).mockResolvedValue({
       ok: true,
       json: async () => ({
         searchType: 'all',
@@ -36,9 +36,12 @@ describe('SearchBar (unified)', () => {
 
     await waitFor(() => {
       expect(screen.getByText('aspirin')).toBeInTheDocument()
-      expect(screen.getByText('DISEASE')).toBeInTheDocument()
-      expect(screen.getByText('MOLECULE')).toBeInTheDocument()
-      expect(screen.getByText('GENE')).toBeInTheDocument()
+      expect(screen.getByText('diabetes')).toBeInTheDocument()
+      expect(screen.getByText('BRCA1')).toBeInTheDocument()
+      // Group headers + row badges both use DISEASE/MOLECULE/GENE labels
+      expect(screen.getAllByText('DISEASE').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('MOLECULE').length).toBeGreaterThan(0)
+      expect(screen.getAllByText('GENE').length).toBeGreaterThan(0)
     })
   })
 

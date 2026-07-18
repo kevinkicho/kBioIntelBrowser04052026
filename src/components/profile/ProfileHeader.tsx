@@ -1,15 +1,36 @@
 'use client'
 
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import Image from 'next/image'
 import type { Molecule } from '@/lib/types'
 import { ClassificationBadge as Badge } from '@/components/ui/Badge'
 import { formatMolecularWeight } from '@/lib/utils'
 import { FavoriteButton } from '@/components/profile/FavoriteButton'
 import { MoleculeViewer3D } from '@/components/profile/MoleculeViewer3D'
+import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
+import { mapLegacyCandidateToMoleculeCandidate } from '@/lib/domain'
 
 export function ProfileHeader({ molecule }: { molecule: Molecule }) {
   const [show3D, setShow3D] = useState(false)
+  const projectCandidate = useMemo(
+    () =>
+      mapLegacyCandidateToMoleculeCandidate({
+        name: molecule.name,
+        cid: molecule.cid,
+        sources: ['PubChem'],
+        compositeScore: 0,
+        clinicalPhase: 0,
+        clinicalPhaseRaw: 0,
+        trialCountRaw: 0,
+        trialCountNorm: 0,
+        geneAssociationScore: 0,
+        geneScoreRaw: 0,
+        sharedTargetRatio: 0,
+        sharedTargetCountRaw: 0,
+        confidence: 'preliminary',
+      }),
+    [molecule.cid, molecule.name],
+  )
 
   return (
     <div className="flex flex-col md:flex-row gap-6 items-start">
@@ -41,6 +62,11 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
           <h1 className="text-3xl font-bold text-slate-100">{molecule.name}</h1>
           <Badge classification={molecule.classification} />
           <FavoriteButton cid={molecule.cid} name={molecule.name} />
+          <SaveToProjectButton
+            candidate={projectCandidate}
+            defaultProjectName={`${molecule.name} board`}
+            compact
+          />
         </div>
         <p className="text-slate-400 font-mono text-sm mb-2">{molecule.formula}</p>
         <p className="text-slate-400 text-sm mb-3">{molecule.iupacName}</p>

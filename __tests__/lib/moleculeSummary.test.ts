@@ -81,6 +81,7 @@ describe('computeMoleculeSummary', () => {
     expect(card.secondaryMetrics).toEqual([
       { label: 'Serious Events', value: 3, panelId: 'adverse-events' },
       { label: 'Recalls', value: 2, panelId: 'recalls' },
+      { label: 'SIDER-like SE', value: 0, panelId: 'sider' },
     ])
   })
 
@@ -88,7 +89,7 @@ describe('computeMoleculeSummary', () => {
     const result = computeMoleculeSummary(fullProps)
     const card = result.cards[2]
     expect(card.id).toBe('clinical')
-    expect(card.primaryValue).toBe(5) // clinicalTrials.length
+    expect(card.primaryValue).toBe(5) // clinicalTrials + isrctn
     expect(card.secondaryMetrics[0]).toEqual({
       label: 'Phases',
       value: 'P1: 2 · P2: 2 · P3: 1',
@@ -98,6 +99,11 @@ describe('computeMoleculeSummary', () => {
       label: 'Indications',
       value: 2,
       panelId: 'chembl-indications',
+    })
+    expect(card.secondaryMetrics[2]).toEqual({
+      label: 'ISRCTN',
+      value: 0,
+      panelId: 'isrctn',
     })
   })
 
@@ -120,6 +126,7 @@ describe('computeMoleculeSummary', () => {
     expect(card.primaryValue).toBe(3) // COX-2, COX-1, EGFR
     expect(card.secondaryMetrics).toEqual([
       { label: 'Mechanisms', value: 2, panelId: 'chembl-mechanisms' },
+      { label: 'IUPHAR', value: 0, panelId: 'iuphar' },
       { label: 'Pathways', value: 4, panelId: 'reactome' }, // 1 + 2 + 1
       { label: 'Drug-Gene', value: 3, panelId: 'dgidb' },
     ])
