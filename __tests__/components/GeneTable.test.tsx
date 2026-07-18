@@ -13,9 +13,11 @@ const genes: DiseaseGene[] = [
 ]
 
 describe('GeneTable', () => {
-  test('renders nothing when genes empty', () => {
-    const { container } = render(<GeneTable genes={[]} />)
-    expect(container.firstChild).toBeNull()
+  test('shows honest empty state when no disease associations', () => {
+    render(<GeneTable genes={[]} />)
+    expect(screen.getByTestId('discover-gene-table')).toBeInTheDocument()
+    expect(screen.getByTestId('discover-gene-table-empty')).toBeInTheDocument()
+    expect(screen.getByText(/Disease-associated genes/i)).toBeInTheDocument()
   })
 
   test('renders gene symbols and scores with gene links', () => {

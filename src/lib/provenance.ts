@@ -53,6 +53,13 @@ const SOURCE_ALIASES: Record<string, string> = {
   'nci-cadsr': 'nci-cadsr',
   'niaid-immport': 'niaid-immport',
   foodb: 'foodb',
+  /** Discover candidate card source labels → panelSources keys */
+  'open targets': 'opentargets',
+  opentargets: 'opentargets',
+  'clinical trials': 'clinical-trials',
+  chembl: 'chembl',
+  orphanet: 'orphanet',
+  'pinned-target': 'mygene',
 }
 
 function resolveKey(sourceKey: string): string {

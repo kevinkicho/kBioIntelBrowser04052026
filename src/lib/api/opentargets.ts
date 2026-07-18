@@ -263,16 +263,28 @@ export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
   return drugs.map((d) => d.name).filter(Boolean)
 }
 
+/**
+ * Disease → associated gene targets (Open Targets Platform GraphQL).
+ * Platform 26.x: `associatedTargets` (not legacy `linkedTargets`).
+ * Symbol field is `approvedSymbol` (not target.name).
+ */
 export async function getTargetsForDisease(diseaseId: string): Promise<{ id: string; name: string; overallScore: number }[]> {
+  const id = diseaseId?.trim()
+  if (!id) return []
   try {
     const query = `
-      query {
-        disease(efoId: "${escapeGraphQLString(diseaseId)}") {
-          linkedTargets {
+      query DiseaseTargets($efoId: String!) {
+        disease(efoId: $efoId) {
+          id
+          name
+          associatedTargets(page: { index: 0, size: 40 }) {
+            count
             rows {
-              id
-              target { id name }
               score
+              target {
+                id
+                approvedSymbol
+              }
             }
           }
         }
@@ -280,20 +292,39 @@ export async function getTargetsForDisease(diseaseId: string): Promise<{ id: str
     `
     const res = await fetch(API_URL, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
       ...fetchOptions,
+      headers: {
+        ...((fetchOptions.headers as Record<string, string>) || {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: { efoId: id },
+      }),
     })
-    if (!res.ok) return []
+    if (!res.ok) {
+      console.error('[opentargets] getTargetsForDisease HTTP', res.status)
+      return []
+    }
     const data = await res.json()
-    if (data.errors) return []
-    const rows: { id: string; target: { id: string; name: string }; score: number }[] = data.data?.disease?.linkedTargets?.rows ?? []
-    return rows.map(r => ({
-      id: r.target?.id ?? r.id ?? '',
-      name: r.target?.name ?? '',
-      overallScore: r.score ?? 0,
-    })).filter(t => t.name).slice(0, 30)
-  } catch {
+    if (data.errors) {
+      console.error('[opentargets] getTargetsForDisease GraphQL errors:', data.errors)
+      return []
+    }
+    const rows = (data.data?.disease?.associatedTargets?.rows ?? []) as Array<{
+      score?: number
+      target?: { id?: string; approvedSymbol?: string }
+    }>
+    return rows
+      .map((r) => ({
+        id: r.target?.id ?? '',
+        name: (r.target?.approvedSymbol ?? '').trim(),
+        overallScore: typeof r.score === 'number' ? r.score : 0,
+      }))
+      .filter((t) => t.name)
+      .slice(0, 30)
+  } catch (err) {
+    console.error('[opentargets] getTargetsForDisease', err)
     return []
   }
 }

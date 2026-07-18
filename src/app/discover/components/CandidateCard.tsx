@@ -17,8 +17,22 @@ import {
 } from '@/components/projects/SaveToProjectButton'
 import { buildMoleculeLinkUrl, AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import { emitProductEvent } from '@/lib/productEvents'
+import { DataPoint } from '@/components/ui/DataPoint'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
+
+/** Map Discover source pill labels → provenance keys */
+function discoverSourceKey(source: string): string {
+  const s = source.trim().toLowerCase()
+  if (s.includes('dgidb')) return 'dgidb'
+  if (s.includes('clinical')) return 'clinical-trials'
+  if (s.includes('chembl')) return 'chembl'
+  if (s.includes('open targets')) return 'opentargets'
+  if (s.includes('disgenet')) return 'disgenet'
+  if (s.includes('orphanet')) return 'orphanet'
+  if (s.includes('pubchem')) return 'pubchem'
+  return s.replace(/\s+/g, '-')
+}
 
 export { buildMoleculeLinkUrl }
 
@@ -300,7 +314,21 @@ export function CandidateCard({
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {candidate.sources.map((s) => (
-              <SourcePill key={s} source={s} query={diseaseName} cid={candidate.cid} />
+              <div key={s} className="inline-flex items-center gap-1">
+                <SourcePill source={s} query={diseaseName} cid={candidate.cid} />
+                <DataPoint
+                  sourceKey={discoverSourceKey(s)}
+                  label={`${candidate.name} · ${s}`}
+                  recordUrl={
+                    hasCid
+                      ? `https://pubchem.ncbi.nlm.nih.gov/compound/${candidate.cid}`
+                      : undefined
+                  }
+                  className="!gap-0.5"
+                >
+                  <span className="sr-only">Provenance for {s}</span>
+                </DataPoint>
+              </div>
             ))}
             {candidate.trialCountRaw > 0 && (
               <span className="text-[10px] text-slate-500">

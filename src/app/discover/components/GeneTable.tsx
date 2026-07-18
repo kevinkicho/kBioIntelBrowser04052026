@@ -6,6 +6,25 @@ import type { DiseaseGene } from '@/lib/candidateRanker'
 import { MAX_DISCOVER_TARGETS } from '@/lib/discovery/discoverUrl'
 import { diseaseAssociationGenesOnly } from '@/lib/discovery/sources/genes'
 import { TdlBadge } from '@/components/discover/TdlBadge'
+import { DataPoint } from '@/components/ui/DataPoint'
+
+function geneSourceKey(source: string): string {
+  const s = source.toLowerCase()
+  if (s.includes('open targets')) return 'opentargets'
+  if (s.includes('disgenet')) return 'disgenet'
+  return 'opentargets'
+}
+
+function geneRecordUrl(symbol: string, source: string): string | undefined {
+  const s = source.toLowerCase()
+  if (s.includes('open targets')) {
+    return `https://platform.opentargets.org/target/${encodeURIComponent(symbol)}`
+  }
+  if (s.includes('disgenet')) {
+    return `https://www.disgenet.org/browser/0/1/1/${encodeURIComponent(symbol)}/`
+  }
+  return `/gene/${encodeURIComponent(symbol)}`
+}
 
 export interface GeneTableProps {
   genes: DiseaseGene[]
@@ -83,7 +102,9 @@ export function GeneTable({
         From free public sources (Open Targets disease–target scores, DisGeNET when available) — not
         mock data. User pins live in the panel above and{' '}
         <strong className="font-medium text-slate-500">bias gene→drug gather</strong> when ranking
-        (deterministic; AI is not used in the rank path).
+        (deterministic; AI is not used in the rank path). Use the{' '}
+        <span className="font-semibold text-slate-400">API</span> button on a gene for source
+        provenance.
         {onTogglePin && (
           <>
             {' '}
@@ -162,25 +183,32 @@ export function GeneTable({
                     {pinned ? '●' : '○'}
                   </button>
                 )}
-                <Link
-                  href={`/gene/${encodeURIComponent(gene.symbol)}`}
-                  className="min-w-0 flex-1 flex items-center gap-1.5"
-                  title={`${gene.symbol} · ${gene.source} · assoc. score ${gene.score.toFixed(2)}`}
+                <DataPoint
+                  sourceKey={geneSourceKey(gene.source)}
+                  label={`${gene.symbol} · ${gene.source}`}
+                  recordUrl={geneRecordUrl(gene.symbol, gene.source)}
+                  className="min-w-0 flex-1"
                 >
-                  <span
-                    className={`text-sm font-mono font-semibold truncate ${
-                      pinned
-                        ? 'text-emerald-300 hover:text-emerald-200'
-                        : 'text-indigo-300 hover:text-indigo-200'
-                    }`}
+                  <Link
+                    href={`/gene/${encodeURIComponent(gene.symbol)}`}
+                    className="min-w-0 flex-1 flex items-center gap-1.5"
+                    title={`${gene.symbol} · ${gene.source} · assoc. score ${gene.score.toFixed(2)}`}
                   >
-                    {gene.symbol}
-                  </span>
-                  <TdlBadge tdl={tdl} />
-                  <span className="text-[10px] text-slate-500 shrink-0" title="Association score">
-                    {gene.score.toFixed(2)}
-                  </span>
-                </Link>
+                    <span
+                      className={`text-sm font-mono font-semibold truncate ${
+                        pinned
+                          ? 'text-emerald-300 hover:text-emerald-200'
+                          : 'text-indigo-300 hover:text-indigo-200'
+                      }`}
+                    >
+                      {gene.symbol}
+                    </span>
+                    <TdlBadge tdl={tdl} />
+                    <span className="text-[10px] text-slate-500 shrink-0" title="Association score">
+                      {gene.score.toFixed(2)}
+                    </span>
+                  </Link>
+                </DataPoint>
               </div>
             )
           })}
