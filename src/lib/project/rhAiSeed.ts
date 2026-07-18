@@ -57,7 +57,6 @@ export function buildPromotedHypothesisShell(input: {
   packId?: string
 }): ResearchHypothesis {
   const promoted = promotedCandidates(input.project)
-  const names = promoted.map((c) => c.identity.name).join(', ')
   const disease = input.project.disease?.name ?? input.project.name
   return createResearchHypothesis({
     projectId: input.project.id,
