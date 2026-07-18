@@ -168,6 +168,61 @@ export function listResearchHypothesesForProject(
 }
 
 /**
+ * Delete a research hypothesis from localStorage and unlink from project.
+ */
+export function deleteResearchHypothesis(
+  id: string,
+  storage: ProjectStorage | null = defaultStorage(),
+): StoreResult<{ id: string }> {
+  if (!storage) {
+    return { ok: false, error: 'unavailable', message: 'localStorage is not available.' }
+  }
+  if (!id) {
+    return { ok: false, error: 'invalid', message: 'Hypothesis id required.' }
+  }
+  try {
+    const existing = getResearchHypothesis(id, storage)
+    const projectId = existing.ok ? existing.value.projectId : null
+    storage.removeItem(researchHypothesisKey(id))
+    if (projectId) {
+      const proj = getProject(projectId, storage)
+      if (proj) {
+        const ids = (proj.researchHypothesisIds ?? []).filter((x) => x !== id)
+        const saved = saveProject(
+          { ...proj, researchHypothesisIds: ids, updatedAt: nowIso() },
+          storage,
+        )
+        if (!saved.ok) {
+          return { ok: false, error: saved.error, message: saved.message }
+        }
+      }
+    }
+    return { ok: true, value: { id } }
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    return { ok: false, error: 'invalid', message: msg }
+  }
+}
+
+/**
+ * Delete all RHs for a project that have zero claim ids (template/scaffold noise).
+ * Returns number removed.
+ */
+export function deleteEmptyClaimResearchHypotheses(
+  projectId: string,
+  storage: ProjectStorage | null = defaultStorage(),
+): StoreResult<{ removed: number; ids: string[] }> {
+  const list = listResearchHypothesesForProject(projectId, storage)
+  const empty = list.filter((h) => !h.claimIds?.length)
+  const ids: string[] = []
+  for (const h of empty) {
+    const r = deleteResearchHypothesis(h.id, storage)
+    if (r.ok) ids.push(h.id)
+  }
+  return { ok: true, value: { removed: ids.length, ids } }
+}
+
+/**
  * Seed a ResearchHypothesis from an evidence pack + optional thesis.
  * Pure builder; caller persists via saveResearchHypothesis.
  */

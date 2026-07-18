@@ -58,6 +58,8 @@ export {
   saveResearchHypothesis,
   getResearchHypothesis,
   listResearchHypothesesForProject,
+  deleteResearchHypothesis,
+  deleteEmptyClaimResearchHypotheses,
   seedResearchHypothesisFromPack,
   createRivalHypothesis,
   updateResearchHypothesis,

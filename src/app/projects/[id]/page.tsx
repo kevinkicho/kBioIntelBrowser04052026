@@ -13,6 +13,8 @@ import {
   getProject,
   harvestCandidatesForBoard,
   harvestTimingIsBoardPromote,
+  deleteEmptyClaimResearchHypotheses,
+  deleteResearchHypothesis,
   listResearchHypothesesForProject,
   projectExportFilename,
   removeCandidateFromProject,
@@ -689,18 +691,29 @@ export default function ProjectBoardPage() {
               </button>
               {(
                 [
-                  ['repurposing', 'Template: repurposing'],
-                  ['target-validation', 'Template: target validation'],
-                  ['safety-first-kill', 'Template: safety-first kill'],
+                  ['repurposing', 'Scaffold: repurposing'],
+                  ['target-validation', 'Scaffold: target validation'],
+                  ['safety-first-kill', 'Scaffold: safety-first'],
                 ] as [RhTemplateId, string][]
               ).map(([tid, label]) => (
                 <button
                   key={tid}
                   type="button"
                   data-testid={`rh-template-${tid}`}
+                  title="Creates a draft outline only. Prefer Seed from a downloaded pack for claim-bound AI."
                   className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] text-slate-300 hover:border-indigo-700/50 hover:text-indigo-200"
                   onClick={() => {
                     const pack = project.packIndex?.[0]
+                    const nClaims = pack?.claimIds?.length ?? 0
+                    if (
+                      !window.confirm(
+                        nClaims
+                          ? `Create ${label} draft? It will attach ${nClaims} claim id(s) from your latest pack index.`
+                          : `Create ${label} draft?\n\nWarning: no pack index yet — this will be a 0-claim scaffold (not real evidence). Download an evidence pack first for claim-bound work.`,
+                      )
+                    ) {
+                      return
+                    }
                     const hyp = seedRhFromTemplate({
                       projectId: project.id,
                       templateId: tid,
@@ -714,7 +727,12 @@ export default function ProjectBoardPage() {
                       return
                     }
                     refresh()
-                    showBanner('ok', `Created template: ${label}`)
+                    showBanner(
+                      'ok',
+                      nClaims
+                        ? `Created ${label} with ${nClaims} claim id(s)`
+                        : `Created ${label} scaffold (0 claims — download a pack to bind evidence)`,
+                    )
                   }}
                 >
                   {label}
@@ -776,14 +794,51 @@ export default function ProjectBoardPage() {
             )}
           </div>
 
+          {hypotheses.some((h) => !h.claimIds?.length) && (
+            <div
+              className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2"
+              data-testid="rh-empty-claim-cleanup"
+            >
+              <p className="text-[11px] text-amber-200/90">
+                {hypotheses.filter((h) => !h.claimIds?.length).length} draft(s) have{' '}
+                <strong>0 claims</strong> (template scaffolds, not pack-bound evidence).
+              </p>
+              <button
+                type="button"
+                data-testid="rh-remove-empty-claims"
+                className="rounded border border-rose-800/50 bg-rose-950/40 px-2.5 py-1 text-[10px] text-rose-200 hover:bg-rose-900/40"
+                onClick={() => {
+                  const n = hypotheses.filter((h) => !h.claimIds?.length).length
+                  if (
+                    !window.confirm(
+                      `Delete ${n} research hypothesis draft(s) with 0 claims? This cannot be undone.`,
+                    )
+                  ) {
+                    return
+                  }
+                  const res = deleteEmptyClaimResearchHypotheses(project.id)
+                  if (!res.ok) {
+                    showBanner('err', res.message)
+                    return
+                  }
+                  refresh()
+                  showBanner('ok', `Removed ${res.value.removed} empty draft(s)`)
+                }}
+              >
+                Remove 0-claim drafts
+              </button>
+            </div>
+          )}
+
           {hypotheses.length === 0 ? (
             <p className="text-sm text-slate-600" data-testid="rh-empty">
-              No research hypotheses yet — pick a path above.
+              No research hypotheses yet — download a pack and seed, or pick a path above.
             </p>
           ) : (
             <ul className="space-y-2" data-testid="research-hypotheses-list">
               {hypotheses.map((h) => {
                 const st = h.status ?? 'draft'
+                const emptyClaims = !h.claimIds?.length
                 return (
                   <li
                     key={h.id}
@@ -798,17 +853,47 @@ export default function ProjectBoardPage() {
                         >
                           {RH_STATUS_LABELS[st]}
                         </span>
+                        {emptyClaims && (
+                          <span className="rounded border border-amber-800/40 px-1.5 py-0.5 text-[9px] text-amber-300/90">
+                            scaffold · no claims
+                          </span>
+                        )}
                         {h.role && h.role !== 'primary' && (
                           <span className="text-[9px] uppercase text-slate-500">{h.role}</span>
                         )}
                       </div>
-                      <Link
-                        href={`/projects/${project.id}/hypothesis/${h.id}`}
-                        data-testid={`rh-edit-${h.id}`}
-                        className="text-[10px] text-indigo-400 hover:text-indigo-300"
-                      >
-                        Edit →
-                      </Link>
+                      <div className="flex items-center gap-2">
+                        <Link
+                          href={`/projects/${project.id}/hypothesis/${h.id}`}
+                          data-testid={`rh-edit-${h.id}`}
+                          className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                        >
+                          Edit →
+                        </Link>
+                        <button
+                          type="button"
+                          data-testid={`rh-delete-${h.id}`}
+                          className="text-[10px] text-rose-400/90 hover:text-rose-300"
+                          onClick={() => {
+                            if (
+                              !window.confirm(
+                                `Delete research hypothesis “${h.title}”? This cannot be undone.`,
+                              )
+                            ) {
+                              return
+                            }
+                            const res = deleteResearchHypothesis(h.id)
+                            if (!res.ok) {
+                              showBanner('err', res.message)
+                              return
+                            }
+                            refresh()
+                            showBanner('ok', 'Research hypothesis deleted')
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                     <p className="mt-1 line-clamp-3 text-xs text-slate-400">{h.thesis}</p>
                     <div className="mt-1 text-[10px] text-slate-600">
