@@ -1,13 +1,9 @@
 /**
- * Server-only Ollama Cloud configuration.
- * Prefer per-request user API key; fall back to process.env.OLLAMA_API_KEY.
- *
- * IMPORTANT: Use dynamic env lookup so Next.js does not bake `undefined` into
- * the server bundle when OLLAMA_API_KEY is only available at App Hosting RUNTIME.
+ * Server-side Ollama Cloud configuration.
+ * API keys come from the user's request (UI-stored key) only — no server env fallback.
  */
 
 function envGet(name: string): string | undefined {
-  // Bracket access + runtime read — avoids static inlining of missing BUILD secrets
   try {
     const v = (process.env as Record<string, string | undefined>)[name]
     if (typeof v !== 'string') return undefined
@@ -28,13 +24,16 @@ export function getOllamaCloudBase(): string {
 /** @deprecated use getOllamaCloudBase() — kept for import compatibility */
 export const OLLAMA_CLOUD_BASE = 'https://ollama.com'
 
-/** Server env key only (App Hosting secret). Prefer resolveOllamaApiKey(userKey). */
+/**
+ * Server env shared key — disabled. Users must provide their own Ollama Cloud key.
+ * Kept as a no-op so older call sites compile.
+ */
 export function getOllamaApiKey(): string | undefined {
-  return envGet('OLLAMA_API_KEY')
+  return undefined
 }
 
 /**
- * User-provided key wins; otherwise server env.
+ * Only the user-provided key (request body / browser storage). Never use a shared server secret.
  * Never log the returned value.
  */
 export function resolveOllamaApiKey(userKey?: string | null): string | undefined {
@@ -42,10 +41,10 @@ export function resolveOllamaApiKey(userKey?: string | null): string | undefined
     const t = userKey.trim()
     if (t.length > 0) return t
   }
-  return getOllamaApiKey()
+  return undefined
 }
 
-/** True when a cloud API key is available (user or server env). */
+/** True when a user API key is present on this request. */
 export function hasOllamaCloudFallback(userKey?: string | null): boolean {
   return Boolean(resolveOllamaApiKey(userKey))
 }
@@ -60,7 +59,7 @@ export function isOllamaCloudUrl(url: string): boolean {
   }
 }
 
-/** Authorization headers for ollama.com; empty for local/LAN URLs. */
+/** Authorization headers for ollama.com; empty without a user key. */
 export function getCloudAuthHeaders(
   url: string,
   userKey?: string | null,

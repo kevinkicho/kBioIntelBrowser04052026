@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
         cloudFallbackConfigured: cloudConfigured,
         skippedLocal: true,
         error:
-          'Local Ollama is not available on App Hosting. Set OLLAMA_API_KEY secret or enter an Ollama Cloud API key.',
+          'Ollama Cloud requires your API key in the app AI settings (per-user). No shared server key.',
       })
     }
     const health = await checkOllamaHealth(resolved.url, auth)

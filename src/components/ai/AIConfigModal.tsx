@@ -104,11 +104,12 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
       setKeySaving(false)
       setApiKeyInput('')
     }
-    if (!ai.hasUserApiKey && !apiKeyInput.trim()) {
+    const hasKey = ai.hasUserApiKey || Boolean(apiKeyInput.trim())
+    if (!hasKey) {
       setValidationHint(
-        'Paste your Ollama Cloud API key above, save it, then connect. Get a key at ollama.com.',
+        'Paste your Ollama Cloud API key above and save it, then connect. Get a key at ollama.com/settings/keys.',
       )
-      // Still allow connect — server may have app-level OLLAMA_API_KEY
+      return
     }
     setConnecting(true)
     await ai.connect()

@@ -1,6 +1,6 @@
 /**
  * Per-user Ollama Cloud API key — browser local + optional Firestore under uid.
- * Never log the raw key. Server env OLLAMA_API_KEY is only a fallback when unset.
+ * Never log the raw key. No server env fallback — each user provides their own key.
  */
 
 export const AI_API_KEY_STORAGE_KEY = 'biointel-ai-ollama-api-key-v1'

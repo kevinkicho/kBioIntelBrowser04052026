@@ -71,12 +71,12 @@ npm run firebase:apphosting:env
 npm run firebase:apphosting:env:rollout
 
 # Or skill-style commands:
-npx -y firebase-tools@latest apphosting:secrets:set OLLAMA_API_KEY --data-file - --force
-npx -y firebase-tools@latest apphosting:secrets:grantaccess OLLAMA_API_KEY -b biointel
 npx -y firebase-tools@latest apphosting:rollouts:create biointel -b main -f
 ```
 
 Secrets live in **Cloud Secret Manager**; yaml only has `secret: NAME` references (safe to commit).
+
+**Ollama:** users paste their own Ollama Cloud API keys in the app UI. There is **no** server `OLLAMA_API_KEY` secret.
 
 ### GitHub “Google API Key” secret scanning (normal)
 

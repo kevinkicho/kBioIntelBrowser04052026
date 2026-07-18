@@ -58,8 +58,8 @@ interface AIContextValue extends AIConfig {
   hasUserApiKey: boolean
   setOllamaApiKey: (key: string) => Promise<void>
   clearOllamaApiKey: () => Promise<void>
-  /** Connect to Ollama Cloud (optional url ignored; always cloud). */
-  connect: (url?: string) => Promise<void>
+  /** Connect to Ollama Cloud with the user's stored API key. */
+  connect: () => Promise<void>
   disconnect: () => void
   selectModel: (model: string) => void
   pullModel: (model: string) => Promise<{ success: boolean; error?: string }>
@@ -241,12 +241,22 @@ export function AIProvider({ children }: { children: ReactNode }) {
 
   const reconnect = useCallback(async () => {
     if (healthInProgressRef.current) return
+    if (!apiKeyRef.current?.trim()) {
+      setConfig((prev) => ({
+        ...prev,
+        ollamaUrl: cloudBase(),
+        status: 'unavailable' as AIStatus,
+        error: 'Add your Ollama Cloud API key in AI settings to connect.',
+        statusNote: undefined,
+      }))
+      return
+    }
     healthInProgressRef.current = true
     console.log('[ai] Checking Ollama Cloud connection')
     setConfig((prev) => ({ ...prev, status: 'checking' as AIStatus, ollamaUrl: cloudBase() }))
 
     try {
-      const result = await checkCloudHealth(apiKeyRef.current || undefined)
+      const result = await checkCloudHealth(apiKeyRef.current)
       if (result.available) {
         const model = config.model || pickFirstModel(result.models) || ''
         const effectiveUrl = result.effectiveUrl || cloudBase()
@@ -262,14 +272,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
           error: model
             ? undefined
             : 'No models available on Ollama Cloud for this key. Pull or pick a cloud model.',
-          statusNote: model
-            ? result.usingUserKey
-              ? 'Using Ollama Cloud with your API key'
-              : 'Using Ollama Cloud'
-            : undefined,
+          statusNote: model ? 'Using Ollama Cloud with your API key' : undefined,
         }))
         if (model) {
-          const info = await fetchModelInfo(model, apiKeyRef.current || undefined)
+          const info = await fetchModelInfo(model, apiKeyRef.current)
           setModelInfo(info)
         }
       } else {
@@ -281,7 +287,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
           availableModels: [],
           error:
             result.error ||
-            'Cannot connect to Ollama Cloud. Add your API key from ollama.com and try again.',
+            'Cannot connect to Ollama Cloud. Check your API key and try again.',
           statusNote: undefined,
         }))
         setModelInfo(null)
@@ -373,7 +379,18 @@ export function AIProvider({ children }: { children: ReactNode }) {
     }
   }, [])
 
-  const connect = useCallback(async (_url?: string) => {
+  const connect = useCallback(async () => {
+    if (!apiKeyRef.current?.trim()) {
+      setConfig((prev) => ({
+        ...prev,
+        ollamaUrl: cloudBase(),
+        status: 'unavailable' as AIStatus,
+        error:
+          'Add your Ollama Cloud API key first (AI settings). Keys are per-user — not stored in server .env.',
+        statusNote: undefined,
+      }))
+      return
+    }
     retryCountRef.current = 0
     setConfig((prev) => ({
       ...prev,
@@ -383,7 +400,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
       statusNote: undefined,
     }))
 
-    const result = await checkCloudHealth(apiKeyRef.current || undefined)
+    const result = await checkCloudHealth(apiKeyRef.current)
     if (result.available) {
       const model = pickFirstModel(result.models) || ''
       const effectiveUrl = result.effectiveUrl || cloudBase()
@@ -400,14 +417,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
         error: model
           ? undefined
           : 'No models available on Ollama Cloud for this key.',
-        statusNote: model
-          ? result.usingUserKey
-            ? 'Using Ollama Cloud with your API key'
-            : 'Using Ollama Cloud'
-          : undefined,
+        statusNote: model ? 'Using Ollama Cloud with your API key' : undefined,
       }))
       if (model) {
-        const info = await fetchModelInfo(model, apiKeyRef.current || undefined)
+        const info = await fetchModelInfo(model, apiKeyRef.current)
         setModelInfo(info)
       }
     } else {
@@ -418,7 +431,7 @@ export function AIProvider({ children }: { children: ReactNode }) {
         availableModels: [],
         error:
           result.error ||
-          'Cannot connect to Ollama Cloud. Paste your API key from ollama.com, save, then connect.',
+          'Cannot connect to Ollama Cloud. Check your API key at ollama.com/settings/keys.',
         statusNote: undefined,
       }))
       setModelInfo(null)

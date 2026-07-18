@@ -31,18 +31,18 @@ describe('ollamaRuntime', () => {
     expect(getCachedOllamaHealth(healthCacheKey('http://localhost:11434', false))).toBeNull()
   })
 
-  test('resolvePrimary skips localhost on Cloud Run when cloud key present', () => {
+  test('resolvePrimary skips localhost on Cloud Run when user key present', () => {
     process.env.K_SERVICE = 'biointel'
-    process.env.OLLAMA_API_KEY = 'test-key'
     delete process.env.OLLAMA_ALLOW_LOCALHOST
-    const r = resolvePrimaryOllamaUrlForServer('http://localhost:11434')
+    const r = resolvePrimaryOllamaUrlForServer('http://localhost:11434', {
+      apiKey: 'user-test-key',
+    })
     expect(r.skippedLocal).toBe(true)
     expect(r.url).toContain('ollama.com')
   })
 
-  test('resolvePrimary skips localhost with no key → empty url', () => {
+  test('resolvePrimary skips localhost with no user key → empty url', () => {
     process.env.K_SERVICE = 'biointel'
-    delete process.env.OLLAMA_API_KEY
     delete process.env.OLLAMA_ALLOW_LOCALHOST
     const r = resolvePrimaryOllamaUrlForServer('http://127.0.0.1:11434')
     expect(r.skippedLocal).toBe(true)
@@ -58,10 +58,9 @@ describe('ollamaRuntime', () => {
     expect(r.url).toContain('localhost')
   })
 
-  test('empty url with cloud key → cloud base', () => {
+  test('empty url with user key → cloud base', () => {
     process.env.K_SERVICE = 'biointel'
-    process.env.OLLAMA_API_KEY = 'k'
-    const r = resolvePrimaryOllamaUrlForServer('')
+    const r = resolvePrimaryOllamaUrlForServer('', { apiKey: 'k' })
     expect(r.url).toContain('ollama.com')
     expect(r.skippedLocal).toBe(true)
   })

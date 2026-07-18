@@ -23,9 +23,9 @@ const DO_ROLLOUT = process.argv.includes('--rollout')
 
 /** Secrets that must never be plain values in apphosting.yaml */
 const SECRET_KEYS = new Set([
-  'OLLAMA_API_KEY',
   'FIREBASE_ADMIN_CREDENTIALS_JSON',
   'NEXT_PUBLIC_FIREBASE_API_KEY', // GitHub secret scanning flags AIza… in yaml
+  // OLLAMA_API_KEY is per-user in the browser — not a server secret
 ])
 
 /** Non-secret env to keep as plain `value` in apphosting.yaml (also re-written). */
@@ -195,11 +195,7 @@ function writeAppHostingYaml(env) {
     '    secret: FIREBASE_ADMIN_CREDENTIALS_JSON',
     '    availability:',
     '      - RUNTIME',
-    '  - variable: OLLAMA_API_KEY',
-    '    secret: OLLAMA_API_KEY',
-    '    availability:',
-    '      - BUILD',
-    '      - RUNTIME',
+    '  # Ollama Cloud: per-user API keys from the browser only (no server OLLAMA_API_KEY)',
     '',
   )
 
@@ -238,11 +234,7 @@ function main() {
     console.warn('! Missing NEXT_PUBLIC_FIREBASE_API_KEY in .env')
   }
 
-  if (env.OLLAMA_API_KEY) {
-    setSecret('OLLAMA_API_KEY', env.OLLAMA_API_KEY)
-  } else {
-    console.warn('! Missing OLLAMA_API_KEY in .env — cloud AI fallback will fail')
-  }
+  // OLLAMA_API_KEY is not deployed — users paste keys in the AI settings UI
 
   if (adminJson) {
     // minify JSON for env safety

@@ -18,8 +18,7 @@ env:
   # --- Secret parameters (docs: secret: myApiKeySecret) ---
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     secret: NEXT_PUBLIC_FIREBASE_API_KEY
-  - variable: OLLAMA_API_KEY
-    secret: OLLAMA_API_KEY
+  # Ollama: per-user API keys from the browser only — no server OLLAMA_API_KEY secret
   - variable: FIREBASE_ADMIN_CREDENTIALS_JSON
     secret: FIREBASE_ADMIN_CREDENTIALS_JSON
     availability:

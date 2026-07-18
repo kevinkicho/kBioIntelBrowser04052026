@@ -40,26 +40,15 @@ OPENFDA_API_KEY=your_key_here          # Increases openFDA rate limits
 NCBI_EMAIL=your_email_here             # NCBI Entrez (recommended)
 NCBI_API_KEY=your_key_here             # NCBI API key (increases rate limits)
 OMIM_API_KEY=your_key_here             # OMIM genetic disorder data
-OLLAMA_API_KEY=your_key_here           # Ollama Cloud fallback (https://ollama.com/settings/keys)
-OLLAMA_ALLOW_LAN=1                     # Allow private-LAN Ollama hosts on server AI routes
 ```
 
 Copy `.env.local.example` → `.env` and fill in secrets. **`.env` is gitignored** and must never be committed.
 
 ### AI Copilot (optional)
 
-For AI-driven summaries, prior-art queries, differential safety profiles, and the hypothesis seed feature, install [Ollama](https://ollama.com) and pull a small local model:
+AI uses **Ollama Cloud** only. Each user pastes their own API key in the app (**AI** button → Configure AI) from [ollama.com/settings/keys](https://ollama.com/settings/keys). Keys are stored in the browser (and optionally under a signed-in account) — **not** in server `.env` or App Hosting secrets.
 
-```bash
-ollama pull gemma3:4b
-```
-
-Everything runs on your machine — no data leaves your computer.
-
-**Ollama URL policy (SSRF):**
-- **Client UI:** localhost and private LAN (`10.x`, `172.16–31.x`, `192.168.x`, `*.local`) only. Public hostnames are rejected.
-- **Server AI routes** (`/api/ai/*`): localhost only by default. Set `OLLAMA_ALLOW_LAN=1` to allow private LAN hosts. Public hostnames are never proxied from the client.
-- **Ollama Cloud fallback:** when local Ollama is down and `OLLAMA_API_KEY` is set in `.env`, the server calls `https://ollama.com` with a Bearer token (key never sent to the browser).
+Traffic: browser → same-origin `/api/ai/*` → `https://ollama.com` with the user’s Bearer key.
 
 ![Molecule profile with AI Copilot](screenshots/molecule-profile.png)
 

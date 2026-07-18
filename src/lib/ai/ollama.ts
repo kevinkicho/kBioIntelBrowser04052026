@@ -159,7 +159,7 @@ export async function checkOllamaHealth(
       available: false,
       models: [],
       error:
-        'Local Ollama is not available on App Hosting. Configure OLLAMA_API_KEY (Ollama Cloud) or pass a user API key.',
+        'Ollama Cloud requires your API key. Paste it in AI settings (no shared server key).',
       effectiveUrl: undefined,
     }
     setCachedOllamaHealth(cacheKey, result)
