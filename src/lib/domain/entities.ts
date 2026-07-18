@@ -133,6 +133,43 @@ export interface NextExperiment {
   rationale?: string
   priority?: 'high' | 'medium' | 'low'
   relatedClaimIds?: string[]
+  /** Optional experiment class for Monday-plan UX */
+  experimentType?:
+    | 'biochemical'
+    | 'cellular'
+    | 'in-vivo'
+    | 'literature'
+    | 'computational'
+    | 'clinical-review'
+    | 'other'
+  /** Qualitative success/fail criteria (not efficacy claims) */
+  successCriteria?: string
+  failCriteria?: string
+  costTier?: 'low' | 'medium' | 'high'
+}
+
+/** Portfolio lifecycle for project-scoped research hypotheses. */
+export type ResearchHypothesisStatus =
+  | 'draft'
+  | 'active'
+  | 'shelved'
+  | 'killed'
+  | 'graduated'
+
+/** Role among competing theses (primary vs rival vs null). */
+export type ResearchHypothesisRole = 'primary' | 'rival' | 'null'
+
+/**
+ * Structured claim-bound thesis sections (optional; thesis remains canonical prose).
+ */
+export interface ResearchHypothesisSections {
+  workingClaim?: string
+  supporting?: string[]
+  killCriteria?: string[]
+  openQuestions?: string[]
+  falsifiers?: string[]
+  /** Claim ids referenced across sections */
+  claimIds?: string[]
 }
 
 /**
@@ -151,6 +188,16 @@ export interface ResearchHypothesis {
   claimIds: string[]
   packId?: string
   nextExperiments?: NextExperiment[]
+  /** Portfolio status (default draft for new seeds). */
+  status?: ResearchHypothesisStatus
+  /** Primary / rival / null competing story */
+  role?: ResearchHypothesisRole
+  /** When role is rival/null, link to primary RH id */
+  rivalOfId?: string
+  /** Optional structured sections from claim-bound thesis studio */
+  sections?: ResearchHypothesisSections
+  /** Free-text reason when status=killed */
+  killedReason?: string
   createdAt: string
   updatedAt: string
 }

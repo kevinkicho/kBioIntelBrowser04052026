@@ -59,9 +59,30 @@ export {
   getResearchHypothesis,
   listResearchHypothesesForProject,
   seedResearchHypothesisFromPack,
+  createRivalHypothesis,
   updateResearchHypothesis,
   appendNextExperiment,
 } from './researchHypothesis'
+
+export {
+  RH_STATUS_LABELS,
+  RH_STATUS_STYLES,
+  buildEvidenceGapMap,
+  buildMechanismStoryboard,
+  rhTemplateThesis,
+  seedRhFromTemplate,
+  seedRhFromPromoted,
+  seedRhFromPaste,
+  sectionsToThesis,
+  researchHypothesisToLabMeetingMd,
+  researchHypothesisToSpecificAimsMd,
+  researchHypothesisToCollaboratorOnePager,
+  parseNextExperimentsFromInsight,
+  type EvidenceGapItem,
+  type StoryboardNode,
+  type StoryboardEdge,
+  type RhTemplateId,
+} from './rhHelpers'
 
 export {
   intersectMatchToCandidate,

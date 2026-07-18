@@ -17,7 +17,7 @@ import { FIRESTORE_COLLECTIONS } from './paths'
 import { approxJsonBytes, FIRESTORE_DOC_SOFT_MAX_BYTES, stripUndefined } from './sanitize'
 import { logAgentActivity } from '@/lib/agentActivityLog'
 
-export type AiDataKind = 'copilot' | 'pack' | 'disease' | 'other'
+export type AiDataKind = 'copilot' | 'pack' | 'disease' | 'rh' | 'other'
 
 export type AiGeneratedEntry = {
   kind: AiDataKind
@@ -32,6 +32,7 @@ export type AiGeneratedEntry = {
     geneSymbol?: string
     packId?: string
     diseaseId?: string
+    hypId?: string
   }
   model?: string
   ollamaUrl?: string

@@ -3,7 +3,13 @@
  * Distinct from set-ops `/hypothesis` types (KD17).
  */
 
-import type { ResearchHypothesis, NextExperiment } from '@/lib/domain'
+import type {
+  ResearchHypothesis,
+  ResearchHypothesisRole,
+  ResearchHypothesisSections,
+  ResearchHypothesisStatus,
+  NextExperiment,
+} from '@/lib/domain'
 import type { StoreResult, ProjectStorage } from './store'
 import { getProject, saveProject } from './store'
 
@@ -42,6 +48,11 @@ export interface CreateResearchHypothesisInput {
   claimIds?: string[]
   packId?: string
   nextExperiments?: NextExperiment[]
+  status?: ResearchHypothesisStatus
+  role?: ResearchHypothesisRole
+  rivalOfId?: string
+  sections?: ResearchHypothesisSections
+  killedReason?: string
 }
 
 export function createResearchHypothesis(input: CreateResearchHypothesisInput): ResearchHypothesis {
@@ -58,6 +69,11 @@ export function createResearchHypothesis(input: CreateResearchHypothesisInput): 
     claimIds: input.claimIds ?? [],
     packId: input.packId,
     nextExperiments: input.nextExperiments,
+    status: input.status ?? 'draft',
+    role: input.role ?? 'primary',
+    rivalOfId: input.rivalOfId,
+    sections: input.sections,
+    killedReason: input.killedReason,
     createdAt: ts,
     updatedAt: ts,
   }
@@ -162,26 +178,81 @@ export function seedResearchHypothesisFromPack(input: {
   claimIds: string[]
   candidateIds?: string[]
   diseaseId?: string
+  targetIds?: string[]
   thesis?: string
+  status?: ResearchHypothesisStatus
+  role?: ResearchHypothesisRole
+  sections?: ResearchHypothesisSections
 }): ResearchHypothesis {
   return createResearchHypothesis({
     projectId: input.projectId,
     title: `From pack: ${input.packTitle}`.slice(0, 200),
     thesis:
       input.thesis?.trim() ||
-      `Working thesis seeded from evidence pack "${input.packTitle}" (${input.claimIds.length} claims). Edit this narrative with mechanisms, risks, and next experiments.`,
+      [
+        `Working claim: Investigation thesis seeded from evidence pack "${input.packTitle}" (${input.claimIds.length} claims).`,
+        '',
+        'Supporting scaffold: edit with mechanisms, indication links, and trial landscape from pack claims.',
+        'Kill criteria: safety / identity / empty target link — fill after claim-bound AI or manual review.',
+        'Open questions: what free public panels are still missing?',
+        'Falsifiers: which result would make this thesis wrong?',
+        '',
+        'Use RH AI (thesis draft, gap map, next experiments, adversarial review) with rehydrated claims — investigation priority only.',
+      ].join('\n'),
     diseaseId: input.diseaseId,
+    targetIds: input.targetIds ?? [],
     candidateIds: input.candidateIds ?? [],
     claimIds: input.claimIds.slice(0, 200),
     packId: input.packId,
+    status: input.status ?? 'draft',
+    role: input.role ?? 'primary',
+    sections: input.sections,
   })
 }
 
-/** Update thesis/title/experiments and bump version. */
+/** Create a rival / null hypothesis linked to a primary. */
+export function createRivalHypothesis(
+  primary: ResearchHypothesis,
+  input: {
+    title: string
+    thesis: string
+    role: 'rival' | 'null'
+    claimIds?: string[]
+  },
+): ResearchHypothesis {
+  return createResearchHypothesis({
+    projectId: primary.projectId,
+    title: input.title.slice(0, 200),
+    thesis: input.thesis.slice(0, MAX_THESIS_CHARS),
+    diseaseId: primary.diseaseId,
+    targetIds: primary.targetIds,
+    candidateIds: primary.candidateIds,
+    claimIds: input.claimIds ?? primary.claimIds,
+    packId: primary.packId,
+    status: 'draft',
+    role: input.role,
+    rivalOfId: primary.id,
+  })
+}
+
+/** Update thesis/title/experiments/status and bump version. */
 export function updateResearchHypothesis(
   hyp: ResearchHypothesis,
   patch: Partial<
-    Pick<ResearchHypothesis, 'title' | 'thesis' | 'claimIds' | 'candidateIds' | 'nextExperiments'>
+    Pick<
+      ResearchHypothesis,
+      | 'title'
+      | 'thesis'
+      | 'claimIds'
+      | 'candidateIds'
+      | 'nextExperiments'
+      | 'status'
+      | 'role'
+      | 'rivalOfId'
+      | 'sections'
+      | 'killedReason'
+      | 'targetIds'
+    >
   >,
 ): ResearchHypothesis {
   return {
@@ -194,6 +265,13 @@ export function updateResearchHypothesis(
     claimIds: patch.claimIds ?? hyp.claimIds,
     candidateIds: patch.candidateIds ?? hyp.candidateIds,
     nextExperiments: patch.nextExperiments ?? hyp.nextExperiments,
+    status: patch.status !== undefined ? patch.status : hyp.status,
+    role: patch.role !== undefined ? patch.role : hyp.role,
+    rivalOfId: patch.rivalOfId !== undefined ? patch.rivalOfId : hyp.rivalOfId,
+    sections: patch.sections !== undefined ? patch.sections : hyp.sections,
+    killedReason:
+      patch.killedReason !== undefined ? patch.killedReason : hyp.killedReason,
+    targetIds: patch.targetIds ?? hyp.targetIds,
     version: hyp.version + 1,
     updatedAt: nowIso(),
   }

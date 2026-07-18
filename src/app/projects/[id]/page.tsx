@@ -17,10 +17,16 @@ import {
   projectExportFilename,
   removeCandidateFromProject,
   renameProjectAndSave,
+  RH_STATUS_LABELS,
+  RH_STATUS_STYLES,
   saveProject,
   saveResearchHypothesis,
   seedResearchHypothesisFromPack,
+  seedRhFromPaste,
+  seedRhFromPromoted,
+  seedRhFromTemplate,
   setBoardStatusAndSave,
+  type RhTemplateId,
 } from '@/lib/project'
 import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
@@ -48,6 +54,8 @@ export default function ProjectBoardPage() {
   const [signalsLoading, setSignalsLoading] = useState(false)
   const [expandBusy, setExpandBusy] = useState<string | null>(null)
   const [hypotheses, setHypotheses] = useState<ResearchHypothesis[]>([])
+  const [pasteThesis, setPasteThesis] = useState('')
+  const [showPaste, setShowPaste] = useState(false)
   const [harvestingIds, setHarvestingIds] = useState<string[]>([])
   const [harvestBusy, setHarvestBusy] = useState(false)
   const [boardPanels, setBoardPanels] = useState<CorePanelEvidenceInput>({})
@@ -568,6 +576,7 @@ export default function ProjectBoardPage() {
                         claimIds: entry.claimIds ?? [],
                         candidateIds: project.candidates.map((c) => c.candidateId),
                         diseaseId: project.disease?.id,
+                        targetIds: project.targetIds,
                       })
                       const saved = saveResearchHypothesis(hyp)
                       if (!saved.ok) {
@@ -628,36 +637,177 @@ export default function ProjectBoardPage() {
         <section className="mt-8 space-y-3" data-testid="research-hypotheses-section">
           <h2 className="text-lg font-semibold text-slate-100">Research hypotheses</h2>
           <p className="text-[11px] text-slate-500">
-            Project-scoped narrative theses (not set-ops filter intersections). Seed from an evidence
-            pack index entry above.
+            Project-scoped narrative theses (not set-ops filter intersections). Claim-bound AI on
+            the editor: thesis studio, rivals, Monday experiments, gap map, adversarial review,
+            exports.
           </p>
+
+          {/* Guided path chooser */}
+          <div
+            className="rounded-xl border border-slate-800 bg-slate-900/40 p-3"
+            data-testid="rh-path-chooser"
+          >
+            <p className="text-[11px] font-medium text-slate-300">Start a hypothesis</p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              <button
+                type="button"
+                data-testid="rh-seed-promoted"
+                className="rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-2.5 py-1.5 text-[10px] text-emerald-200 hover:bg-emerald-900/40"
+                onClick={() => {
+                  const promoted = project.candidates.filter((c) => c.boardStatus === 'promote')
+                  if (promoted.length === 0) {
+                    showBanner('err', 'Promote at least one board candidate first.')
+                    return
+                  }
+                  const pack = project.packIndex?.[0]
+                  const hyp = seedRhFromPromoted({
+                    projectId: project.id,
+                    project,
+                    claimIds: pack?.claimIds ?? [],
+                    packId: pack?.id,
+                  })
+                  const saved = saveResearchHypothesis(hyp)
+                  if (!saved.ok) {
+                    showBanner('err', saved.message)
+                    return
+                  }
+                  refresh()
+                  showBanner('ok', `Seeded from ${promoted.length} promoted candidate(s)`)
+                }}
+              >
+                From promoted candidates
+              </button>
+              {(
+                [
+                  ['repurposing', 'Template: repurposing'],
+                  ['target-validation', 'Template: target validation'],
+                  ['safety-first-kill', 'Template: safety-first kill'],
+                ] as [RhTemplateId, string][]
+              ).map(([tid, label]) => (
+                <button
+                  key={tid}
+                  type="button"
+                  data-testid={`rh-template-${tid}`}
+                  className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] text-slate-300 hover:border-indigo-700/50 hover:text-indigo-200"
+                  onClick={() => {
+                    const pack = project.packIndex?.[0]
+                    const hyp = seedRhFromTemplate({
+                      projectId: project.id,
+                      templateId: tid,
+                      project,
+                      claimIds: pack?.claimIds ?? [],
+                      packId: pack?.id,
+                    })
+                    const saved = saveResearchHypothesis(hyp)
+                    if (!saved.ok) {
+                      showBanner('err', saved.message)
+                      return
+                    }
+                    refresh()
+                    showBanner('ok', `Created template: ${label}`)
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                type="button"
+                data-testid="rh-paste-toggle"
+                className="rounded-lg border border-cyan-800/40 px-2.5 py-1.5 text-[10px] text-cyan-200 hover:bg-cyan-950/30"
+                onClick={() => setShowPaste((v) => !v)}
+              >
+                Paste my draft
+              </button>
+            </div>
+            {project.packIndex?.length ? (
+              <p className="mt-2 text-[10px] text-slate-600">
+                Or use <strong className="font-medium text-slate-400">Seed research hypothesis</strong>{' '}
+                on a pack index entry above (best claim binding).
+              </p>
+            ) : (
+              <p className="mt-2 text-[10px] text-amber-500/80">
+                No pack index yet — download an evidence pack so claim ids can bind AI modes.
+              </p>
+            )}
+            {showPaste && (
+              <div className="mt-3 space-y-2" data-testid="rh-paste-form">
+                <textarea
+                  value={pasteThesis}
+                  onChange={(e) => setPasteThesis(e.target.value)}
+                  rows={4}
+                  placeholder="Paste a draft thesis. Later: open the editor and run adversarial review / thesis draft to bind claims."
+                  className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200"
+                />
+                <button
+                  type="button"
+                  disabled={!pasteThesis.trim()}
+                  className="rounded-lg bg-cyan-800 px-3 py-1.5 text-[10px] text-white hover:bg-cyan-700 disabled:opacity-50"
+                  onClick={() => {
+                    const hyp = seedRhFromPaste({
+                      projectId: project.id,
+                      project,
+                      thesis: pasteThesis,
+                      claimIds: project.packIndex?.[0]?.claimIds ?? [],
+                    })
+                    const saved = saveResearchHypothesis(hyp)
+                    if (!saved.ok) {
+                      showBanner('err', saved.message)
+                      return
+                    }
+                    setPasteThesis('')
+                    setShowPaste(false)
+                    refresh()
+                    showBanner('ok', 'Saved pasted draft — open editor to claim-bind with RH AI')
+                  }}
+                >
+                  Save draft hypothesis
+                </button>
+              </div>
+            )}
+          </div>
+
           {hypotheses.length === 0 ? (
-            <p className="text-sm text-slate-600">No research hypotheses yet.</p>
+            <p className="text-sm text-slate-600" data-testid="rh-empty">
+              No research hypotheses yet — pick a path above.
+            </p>
           ) : (
             <ul className="space-y-2" data-testid="research-hypotheses-list">
-              {hypotheses.map((h) => (
-                <li
-                  key={h.id}
-                  className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
-                  data-testid={`rh-item-${h.id}`}
-                >
-                  <div className="flex flex-wrap items-start justify-between gap-2">
-                    <div className="text-sm font-medium text-slate-200">{h.title}</div>
-                    <Link
-                      href={`/projects/${project.id}/hypothesis/${h.id}`}
-                      data-testid={`rh-edit-${h.id}`}
-                      className="text-[10px] text-indigo-400 hover:text-indigo-300"
-                    >
-                      Edit →
-                    </Link>
-                  </div>
-                  <p className="mt-1 line-clamp-3 text-xs text-slate-400">{h.thesis}</p>
-                  <div className="mt-1 text-[10px] text-slate-600">
-                    {h.claimIds.length} claims · {h.candidateIds.length} candidates · updated{' '}
-                    {new Date(h.updatedAt).toLocaleString()}
-                  </div>
-                </li>
-              ))}
+              {hypotheses.map((h) => {
+                const st = h.status ?? 'draft'
+                return (
+                  <li
+                    key={h.id}
+                    className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
+                    data-testid={`rh-item-${h.id}`}
+                  >
+                    <div className="flex flex-wrap items-start justify-between gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <div className="text-sm font-medium text-slate-200">{h.title}</div>
+                        <span
+                          className={`rounded-full border px-1.5 py-0.5 text-[9px] ${RH_STATUS_STYLES[st]}`}
+                        >
+                          {RH_STATUS_LABELS[st]}
+                        </span>
+                        {h.role && h.role !== 'primary' && (
+                          <span className="text-[9px] uppercase text-slate-500">{h.role}</span>
+                        )}
+                      </div>
+                      <Link
+                        href={`/projects/${project.id}/hypothesis/${h.id}`}
+                        data-testid={`rh-edit-${h.id}`}
+                        className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                      >
+                        Edit →
+                      </Link>
+                    </div>
+                    <p className="mt-1 line-clamp-3 text-xs text-slate-400">{h.thesis}</p>
+                    <div className="mt-1 text-[10px] text-slate-600">
+                      {h.claimIds.length} claims · {h.candidateIds.length} candidates · v{h.version} ·
+                      updated {new Date(h.updatedAt).toLocaleString()}
+                    </div>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </section>
