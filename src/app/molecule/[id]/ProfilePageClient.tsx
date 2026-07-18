@@ -870,10 +870,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           <LazyPanels.LazyNciCadsrPanel
             data={concepts}
             isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+            panelId={panelId}
+            lastFetched={lastFetched}
           />
         )
       },
-      'ncats-translator': () => {
+      'ncats-translator': (panelId, lastFetched) => {
         const raw = d('translatorData')
         const associations = (raw?.data?.associations ??
           (Array.isArray(raw) ? raw : [])) as TranslatorAssociation[]
@@ -881,16 +883,20 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           <LazyPanels.LazyNcatsTranslatorPanel
             data={associations}
             isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+            panelId={panelId}
+            lastFetched={lastFetched}
           />
         )
       },
-      'nhgri-anvil': () => {
+      'nhgri-anvil': (panelId, lastFetched) => {
         const raw = d('anvilData')
         const datasets = (raw?.data?.datasets ?? (Array.isArray(raw) ? raw : [])) as AnvilDataset[]
         return (
           <LazyPanels.LazyNhgriAnvilPanel
             data={datasets}
             isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+            panelId={panelId}
+            lastFetched={lastFetched}
           />
         )
       },
@@ -912,10 +918,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           <LazyPanels.LazyNiaidImmportPanel
             data={studies}
             isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+            panelId={panelId}
+            lastFetched={lastFetched}
           />
         )
       },
-      'ninds-neurommsig': () => {
+      'ninds-neurommsig': (panelId, lastFetched) => {
         const raw = d('neuroMMSigData')
         const signatures = (raw?.data?.signatures ??
           (Array.isArray(raw) ? raw : [])) as NeuroMMSigSignature[]
@@ -923,6 +931,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           <LazyPanels.LazyNindsNeurommsigPanel
             data={signatures}
             isLoading={categoryStatusRef.current['nih-high-impact'] === 'loading'}
+            panelId={panelId}
+            lastFetched={lastFetched}
           />
         )
       },

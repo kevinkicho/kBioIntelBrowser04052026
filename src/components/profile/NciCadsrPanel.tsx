@@ -1,61 +1,113 @@
-/** Panel component for NCI Cancer Data Standards Registry (caDSR). */
+/** NCI EVS / caDSR-adjacent concepts — free public EVS REST. */
 
+import { memo } from 'react'
 import type { CadsrConcept } from '@/lib/types'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { Panel } from '@/components/ui/Panel'
+import { PaginatedList } from '@/components/ui/PaginatedList'
+import { DataPoint } from '@/components/ui/DataPoint'
 
 interface NciCadsrPanelProps {
   data: CadsrConcept[]
-  isLoading: boolean
+  isLoading?: boolean
+  panelId?: string
+  lastFetched?: Date
 }
 
-export function NciCadsrPanel({ data, isLoading }: NciCadsrPanelProps) {
-  if (isLoading) {
-    return <div className="p-4">Loading NCI caDSR data...</div>
+function conceptUrl(c: CadsrConcept): string {
+  const code = c.conceptId || ''
+  if (code) {
+    return `https://evsexplore.semantics.cancer.gov/evsexplore/concept/ncit/${encodeURIComponent(code)}`
   }
-  
-  if (!Array.isArray(data) || data.length === 0) {
-    return (
-      <Alert>
-        <AlertTitle>No Data</AlertTitle>
-        <AlertDescription>No cancer data standards found for this molecule.</AlertDescription>
-      </Alert>
-    )
-  }
-  
-  return (
-    <Card>
-      <CardHeader>
-        <CardTitle>NCI Cancer Data Standards</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <ScrollArea className="max-h-[400px] rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Concept ID</TableHead>
-                <TableHead>Preferred Name</TableHead>
-                <TableHead>Context</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead>Source</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {data.map((concept) => (
-                <TableRow key={concept.conceptId}>
-                  <TableCell>{concept.conceptId}</TableCell>
-                  <TableCell>{concept.preferredName}</TableCell>
-                  <TableCell>{concept.context}</TableCell>
-                  <TableCell>{concept.workflowStatus}</TableCell>
-                  <TableCell>{concept.evsSource || 'N/A'}</TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </ScrollArea>
-      </CardContent>
-    </Card>
-  )
+  return 'https://api-evsrest.nci.nih.gov/'
 }
+
+export const NciCadsrPanel = memo(function NciCadsrPanel({
+  data,
+  isLoading,
+  panelId = 'nci-cadsr',
+  lastFetched,
+}: NciCadsrPanelProps) {
+  const list = Array.isArray(data) ? data : []
+  const isEmpty = !isLoading && list.length === 0
+
+  return (
+    <Panel
+      title={
+        isEmpty
+          ? 'NCI caDSR / EVS (NCIt)'
+          : `NCI caDSR / EVS (NCIt) (${list.length})`
+      }
+      panelId={panelId}
+      lastFetched={lastFetched}
+      empty={
+        isLoading
+          ? 'Loading NCI EVS concepts…'
+          : isEmpty
+            ? 'No NCI Thesaurus concepts found for this query.'
+            : undefined
+      }
+    >
+      {!isEmpty && !isLoading && (
+        <PaginatedList className="space-y-1">
+          {list.map((c, i) => {
+            const href = conceptUrl(c)
+            return (
+              <DataPoint
+                key={`${c.conceptId}-${i}`}
+                sourceKey="nci-cadsr"
+                label={c.preferredName}
+                recordUrl={href}
+                fetchedAt={lastFetched}
+              >
+                <div className="py-2 border-b border-slate-700/60 last:border-0 pr-1">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-slate-100 hover:text-cyan-300"
+                        >
+                          {c.preferredName}
+                        </a>
+                        {c.conceptId && (
+                          <span className="text-[10px] font-mono bg-cyan-900/30 text-cyan-300 border border-cyan-800/40 px-1.5 py-0.5 rounded">
+                            {c.conceptId}
+                          </span>
+                        )}
+                        {c.workflowStatus && (
+                          <span className="text-[10px] text-slate-500 border border-slate-700 px-1.5 py-0.5 rounded">
+                            {c.workflowStatus}
+                          </span>
+                        )}
+                      </div>
+                      {(c.context || c.evsSource) && (
+                        <p className="mt-0.5 text-[11px] text-slate-500">
+                          {[c.context, c.evsSource].filter(Boolean).join(' · ')}
+                        </p>
+                      )}
+                      {c.definition && (
+                        <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
+                          {c.definition}
+                        </p>
+                      )}
+                    </div>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-[10px] text-cyan-400 hover:text-cyan-300"
+                    >
+                      EVS ↗
+                    </a>
+                  </div>
+                </div>
+              </DataPoint>
+            )
+          })}
+        </PaginatedList>
+      )}
+    </Panel>
+  )
+})
