@@ -47,14 +47,14 @@ describe('NciThesaurusPanel', () => {
 
   test('renders leaf indicator', () => {
     render(<NciThesaurusPanel concepts={mockConcepts} />)
-    expect(screen.getByText('Leaf node')).toBeInTheDocument()
-    expect(screen.getByText('Branch node')).toBeInTheDocument()
+    expect(screen.getByText('leaf')).toBeInTheDocument()
+    expect(screen.getByText('branch')).toBeInTheDocument()
   })
 
   test('renders link to NCI Thesaurus', () => {
     render(<NciThesaurusPanel concepts={mockConcepts} />)
-    const links = screen.getAllByRole('link', { name: /view in nci thesaurus/i })
-    expect(links[0].getAttribute('href')).toContain('C61948')
+    const links = screen.getAllByRole('link', { name: /nci/i })
+    expect(links.some((l) => l.getAttribute('href')?.includes('C61948'))).toBe(true)
   })
 
   test('renders empty state', () => {

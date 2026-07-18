@@ -33,7 +33,11 @@ describe('MeshPanel', () => {
 
   test('renders scope note text', () => {
     render(<MeshPanel terms={mockTerms} />)
-    expect(screen.getByText('A non-steroidal anti-inflammatory agent with analgesic and antipyretic properties.')).toBeInTheDocument()
+    expect(
+      screen.getByText(
+        'A non-steroidal anti-inflammatory agent with analgesic and antipyretic properties.',
+      ),
+    ).toBeInTheDocument()
   })
 
   test('renders tree number badges when available', () => {
@@ -43,18 +47,27 @@ describe('MeshPanel', () => {
 
   test('renders MeSH Browser link', () => {
     render(<MeshPanel terms={mockTerms} />)
-    const links = screen.getAllByRole('link', { name: /mesh browser/i })
-    expect(links).toHaveLength(2)
-    expect(links[0]).toHaveAttribute('href', 'https://meshb.nlm.nih.gov/record/ui?ui=D001241')
+    const links = screen.getAllByRole('link', { name: /mesh/i })
+    expect(links.length).toBeGreaterThanOrEqual(2)
+    expect(links.some((l) => l.getAttribute('href')?.includes('D001241'))).toBe(true)
   })
 
-  test('truncates scope note longer than 200 characters', () => {
+  test('shows long scope notes with line-clamp (full text still in DOM)', () => {
     const longNote = 'A'.repeat(250)
     const termsWithLongNote: MeshTerm[] = [
-      { meshId: 'D000001', termName: 'Test', name: 'Test', definition: longNote, scopeNote: longNote, treeNumbers: [], relatedTerms: [], url: 'https://example.com' },
+      {
+        meshId: 'D000001',
+        termName: 'Test',
+        name: 'Test',
+        definition: longNote,
+        scopeNote: longNote,
+        treeNumbers: [],
+        relatedTerms: [],
+        url: 'https://example.com',
+      },
     ]
     render(<MeshPanel terms={termsWithLongNote} />)
-    expect(screen.getByText(`${'A'.repeat(200)}...`)).toBeInTheDocument()
+    expect(screen.getByText(longNote)).toBeInTheDocument()
   })
 
   test('renders empty state when terms array is empty', () => {

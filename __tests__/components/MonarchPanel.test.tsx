@@ -48,8 +48,10 @@ describe('MonarchPanel', () => {
 
   test('renders external Monarch links', () => {
     render(<MonarchPanel diseases={mockDiseases} />)
-    const externalLinks = screen.getAllByTitle('View on Monarch')
-    expect(externalLinks[0]).toHaveAttribute('href', 'https://monarchinitiative.org/MONDO:0011993')
+    const externalLinks = screen.getAllByRole('link', { name: /monarch/i })
+    expect(
+      externalLinks.some((l) => l.getAttribute('href') === 'https://monarchinitiative.org/MONDO:0011993'),
+    ).toBe(true)
   })
 
   test('renders description', () => {
@@ -59,13 +61,7 @@ describe('MonarchPanel', () => {
 
   test('renders phenotype count when > 0', () => {
     render(<MonarchPanel diseases={mockDiseases} />)
-    expect(screen.getByText('Phenotypes: 42')).toBeInTheDocument()
-  })
-
-  test('renders link to Monarch', () => {
-    render(<MonarchPanel diseases={mockDiseases} />)
-    const links = screen.getAllByRole('link', { name: /view on monarch/i })
-    expect(links[0].getAttribute('href')).toBe('https://monarchinitiative.org/MONDO:0011993')
+    expect(screen.getByText(/42 phenotypes/i)).toBeInTheDocument()
   })
 
   test('renders empty state', () => {

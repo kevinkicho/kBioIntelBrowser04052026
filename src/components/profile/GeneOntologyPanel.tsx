@@ -4,7 +4,6 @@ import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { GoAnnotation } from '@/lib/types'
 
 function goAspectBadge(aspect: string): string {
-  // Handle both goAspect from API and standard aspect values
   const normalizedAspect = aspect?.toLowerCase() || ''
   if (normalizedAspect.includes('biological') || normalizedAspect.includes('process')) {
     return 'bg-green-900/40 text-green-300 border-green-700/30'
@@ -19,55 +18,95 @@ function goAspectBadge(aspect: string): string {
 }
 
 function normalizeAspect(aspect: string): string {
-  // Convert goAspect format (e.g., "biological_process") to readable format
   if (!aspect) return ''
-  return aspect.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())
+  return aspect.replace(/_/g, ' ').replace(/\b\w/g, (l) => l.toUpperCase())
 }
 
-export const GeneOntologyPanel = memo(function GeneOntologyPanel({ 
-  terms, 
-  panelId, 
-  lastFetched 
-}: { 
-  terms: GoAnnotation[], 
-  panelId?: string, 
-  lastFetched?: Date 
+function shortAspect(aspect: string): string {
+  const n = aspect?.toLowerCase() || ''
+  if (n.includes('biological') || n.includes('process')) return 'BP'
+  if (n.includes('molecular') || n.includes('function')) return 'MF'
+  if (n.includes('cellular') || n.includes('component')) return 'CC'
+  return normalizeAspect(aspect).slice(0, 12) || 'GO'
+}
+
+export const GeneOntologyPanel = memo(function GeneOntologyPanel({
+  terms,
+  panelId,
+  lastFetched,
+}: {
+  terms: GoAnnotation[]
+  panelId?: string
+  lastFetched?: Date
 }) {
-  const isEmpty = !Array.isArray(terms) || terms.length === 0
+  const list = Array.isArray(terms) ? terms : []
+  const isEmpty = list.length === 0
 
   return (
     <Panel
-      title="Gene Ontology Terms"
+      title={isEmpty ? 'Gene Ontology Terms' : `Gene Ontology Terms (${list.length})`}
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No Gene Ontology terms found." : undefined}
+      empty={isEmpty ? 'No Gene Ontology terms found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {terms.map((term, i) => (
-            <div key={`${term.goId || i}-${i}`} className="py-3 border-b border-slate-700 last:border-0">
-              <div className="flex items-start justify-between gap-2">
-                <span className={`text-xs border px-2 py-0.5 rounded shrink-0 ${goAspectBadge(term.goAspect)}`}>
-                  {normalizeAspect(term.goAspect)}
-                </span>
-                <a
-                  href={term.url || `https://amigo.geneontology.org/amigo/term/${term.goId}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  {term.goId}
-                </a>
+        <PaginatedList className="space-y-1">
+          {list.map((term, i) => {
+            const href = term.url || `https://amigo.geneontology.org/amigo/term/${term.goId}`
+            return (
+              <div
+                key={`${term.goId || i}-${i}`}
+                className="py-2 border-b border-slate-700/60 last:border-0"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span
+                        className={`text-[10px] border px-1.5 py-0.5 rounded shrink-0 ${goAspectBadge(term.goAspect)}`}
+                        title={normalizeAspect(term.goAspect)}
+                      >
+                        {shortAspect(term.goAspect)}
+                      </span>
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-slate-100 hover:text-blue-300"
+                      >
+                        {term.goName}
+                      </a>
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-mono text-blue-400/80 hover:text-blue-300"
+                      >
+                        {term.goId}
+                      </a>
+                    </div>
+                    {(term.qualifier || term.evidence) && (
+                      <p className="mt-0.5 text-[11px] text-slate-500">
+                        {[
+                          term.qualifier && `Qualifier: ${term.qualifier}`,
+                          term.evidence && `Evidence: ${term.evidence}`,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-[10px] text-blue-400 hover:text-blue-300"
+                  >
+                    AmiGO ↗
+                  </a>
+                </div>
               </div>
-              <p className="font-semibold text-slate-100 text-sm mt-1">{term.goName}</p>
-              {term.qualifier && (
-                <p className="text-xs text-slate-500 mt-1">Qualifier: {term.qualifier}</p>
-              )}
-              {term.evidence && (
-                <p className="text-xs text-slate-500 mt-1">Evidence: {term.evidence}</p>
-              )}
-            </div>
-          ))}
+            )
+          })}
         </PaginatedList>
       )}
     </Panel>

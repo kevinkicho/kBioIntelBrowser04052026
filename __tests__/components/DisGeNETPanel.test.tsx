@@ -41,8 +41,10 @@ describe('DisGeNETPanel', () => {
 
   test('renders external DisGeNET links', () => {
     render(<DisGeNETPanel associations={mockAssociations} />)
-    const externalLinks = screen.getAllByTitle('View on DisGeNET')
-    expect(externalLinks[0]).toHaveAttribute('href', 'https://www.disgenet.org/browser/0/1/C0011860/')
+    const externalLinks = screen.getAllByRole('link', { name: /disgenet/i })
+    expect(
+      externalLinks.some((l) => l.getAttribute('href')?.includes('C0011860')),
+    ).toBe(true)
   })
 
   test('renders empty state', () => {

@@ -14,36 +14,53 @@ function ConceptItem({ concept }: { concept: MedGenConcept }) {
   const omimIds = Array.isArray(concept.omimIds) ? concept.omimIds : []
 
   return (
-    <div className="py-3 border-b border-slate-700 last:border-0">
+    <div className="py-2 border-b border-slate-700/60 last:border-0">
       <div className="flex items-start justify-between gap-2">
-        <a
-          href={concept.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="font-semibold text-slate-100 text-sm hover:text-cyan-400 transition-colors line-clamp-2"
-        >
-          {displayName}
-        </a>
-        <span className="text-xs bg-blue-900/40 text-blue-300 border border-blue-700/30 px-2 py-0.5 rounded shrink-0">
-          {concept.conceptId}
-        </span>
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <a
+              href={concept.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-slate-100 text-sm hover:text-cyan-400 transition-colors"
+            >
+              {displayName}
+            </a>
+            <span className="text-[10px] font-mono bg-blue-900/40 text-blue-300 border border-blue-700/30 px-1.5 py-0.5 rounded shrink-0">
+              {concept.conceptId}
+            </span>
+          </div>
+          {definition && (
+            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{definition}</p>
+          )}
+          <div className="flex flex-wrap gap-1 mt-1">
+            {semanticTypes.slice(0, 6).map((type, i) => (
+              <span
+                key={`${type}-${i}`}
+                className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded"
+              >
+                {type}
+              </span>
+            ))}
+            {omimIds.length > 0 && (
+              <span className="text-[10px] text-slate-600">
+                OMIM: {omimIds.slice(0, 3).join(', ')}
+                {omimIds.length > 3 ? ` +${omimIds.length - 3}` : ''}
+              </span>
+            )}
+          </div>
+        </div>
+        {concept.url && (
+          <a
+            href={concept.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="shrink-0 text-[10px] text-cyan-400 hover:text-cyan-300"
+          >
+            MedGen ↗
+          </a>
+        )}
       </div>
-      {definition && (
-        <p className="text-xs text-slate-400 mt-2 line-clamp-2">{definition}</p>
-      )}
-      <div className="flex flex-wrap gap-1 mt-2">
-        {semanticTypes.map((type, i) => (
-          <span key={`${type}-${i}`} className="text-xs bg-slate-700/50 text-slate-400 px-1.5 py-0.5 rounded">
-            {type}
-          </span>
-        ))}
-      </div>
-      {omimIds.length > 0 && (
-        <p className="text-xs text-slate-500 mt-2">
-          OMIM: {omimIds.slice(0, 3).join(', ')}
-          {omimIds.length > 3 && ` +${omimIds.length - 3} more`}
-        </p>
-      )}
     </div>
   )
 }
@@ -70,8 +87,7 @@ export const MedGenPanel = memo(function MedGenPanel({
     >
       {!isEmpty && (
         <>
-          <p className="text-xs text-slate-400 mb-3">Medical genetics concepts from NCBI</p>
-          <PaginatedList className="space-y-3">
+          <PaginatedList className="space-y-1">
             {safeConcepts.map((concept, i) => (
               <ConceptItem key={`${concept.conceptId || i}-${i}`} concept={concept} />
             ))}

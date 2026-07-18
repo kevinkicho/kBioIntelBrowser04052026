@@ -7,7 +7,8 @@ const mockGenes: GeneInfo[] = [
     geneId: '1636',
     symbol: 'ACE',
     name: 'angiotensin I converting enzyme',
-    summary: 'This gene encodes an enzyme involved in catalyzing the conversion of angiotensin I into a physiologically active peptide angiotensin II.',
+    summary:
+      'This gene encodes an enzyme involved in catalyzing the conversion of angiotensin I into a physiologically active peptide angiotensin II.',
     chromosome: '17',
     mapLocation: '17q23.3',
     organism: 'Homo sapiens',
@@ -28,7 +29,7 @@ describe('GeneInfoPanel', () => {
 
   test('renders chromosome', () => {
     render(<GeneInfoPanel genes={mockGenes} />)
-    expect(screen.getByText('Chr 17')).toBeInTheDocument()
+    expect(screen.getByText(/chr 17/i)).toBeInTheDocument()
   })
 
   test('renders summary text', () => {
@@ -38,7 +39,7 @@ describe('GeneInfoPanel', () => {
 
   test('renders link to NCBI Gene', () => {
     render(<GeneInfoPanel genes={mockGenes} />)
-    const link = screen.getByRole('link', { name: /view in ncbi gene/i })
+    const link = screen.getByRole('link', { name: /ncbi/i })
     expect(link).toHaveAttribute('href', 'https://www.ncbi.nlm.nih.gov/gene/1636')
   })
 

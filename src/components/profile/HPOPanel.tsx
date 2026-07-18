@@ -3,55 +3,86 @@ import { Panel } from '@/components/ui/Panel'
 import { PaginatedList } from '@/components/ui/PaginatedList'
 import type { HPOTerm } from '@/lib/types'
 
-export const HPOPanel = memo(function HPOPanel({ 
-  terms, 
-  panelId, 
-  lastFetched 
-}: { 
-  terms: HPOTerm[], 
-  panelId?: string, 
-  lastFetched?: Date 
+export const HPOPanel = memo(function HPOPanel({
+  terms,
+  panelId,
+  lastFetched,
+}: {
+  terms: HPOTerm[]
+  panelId?: string
+  lastFetched?: Date
 }) {
-  // Safeguard: ensure terms is an array
   const safeTerms = Array.isArray(terms) ? terms : []
   const isEmpty = safeTerms.length === 0
 
   return (
     <Panel
-      title="Human Phenotype Ontology"
+      title={isEmpty ? 'Human Phenotype Ontology' : `Human Phenotype Ontology (${safeTerms.length})`}
       panelId={panelId}
       lastFetched={lastFetched}
-      empty={isEmpty ? "No HPO terms found." : undefined}
+      empty={isEmpty ? 'No HPO terms found.' : undefined}
     >
       {!isEmpty && (
-        <PaginatedList className="space-y-3">
-          {safeTerms.map((term, i) => (
-            <div key={`${term.id || i}-${i}`} className="py-3 border-b border-slate-700 last:border-0">
-              <div className="flex items-start justify-between gap-2">
-                <a
-                  href={`https://hpo.jax.org/app/web/term/${term.id}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300"
-                >
-                  {term.id}
-                </a>
-              </div>
-              <p className="font-semibold text-slate-100 text-sm mt-1">{term.name}</p>
-              {term.definition && (
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{term.definition}</p>
-              )}
-              {term.synonyms && term.synonyms.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {term.synonyms.slice(0, 3).map((syn, j) => (
-                    <span key={j} className="text-xs bg-slate-700/40 text-slate-400 px-1.5 py-0.5 rounded">
-                      {syn}
-                    </span>
-                  ))}
+        <PaginatedList className="space-y-1">
+          {safeTerms.map((term, i) => {
+            const href = `https://hpo.jax.org/app/web/term/${term.id}`
+            return (
+              <div key={`${term.id || i}-${i}`} className="py-2 border-b border-slate-700/60 last:border-0">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-sm font-medium text-slate-100 hover:text-emerald-300"
+                      >
+                        {term.name}
+                      </a>
+                      <span className="text-[10px] font-mono text-emerald-400/80 bg-emerald-900/20 border border-emerald-800/40 px-1.5 py-0.5 rounded">
+                        {term.id}
+                      </span>
+                    </div>
+                    {term.definition && (
+                      <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
+                        {term.definition}
+                      </p>
+                    )}
+                    {term.synonyms?.length > 0 && (
+                      <div className="mt-1 flex flex-wrap gap-1">
+                        {term.synonyms.slice(0, 5).map((syn, j) => (
+                          <span
+                            key={j}
+                            className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded"
+                          >
+                            {syn}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    {(term.parents?.length > 0 || term.children?.length > 0) && (
+                      <p className="mt-0.5 text-[10px] text-slate-600">
+                        {[
+                          term.parents?.length ? `${term.parents.length} parents` : null,
+                          term.children?.length ? `${term.children.length} children` : null,
+                        ]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </p>
+                    )}
+                  </div>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 text-[10px] text-emerald-400 hover:text-emerald-300"
+                  >
+                    HPO ↗
+                  </a>
                 </div>
-              )}
-            </div>
-          ))}
+              </div>
+            )
+          })}
         </PaginatedList>
       )}
     </Panel>

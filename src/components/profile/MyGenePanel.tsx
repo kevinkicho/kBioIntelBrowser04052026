@@ -29,20 +29,20 @@ export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetch
               <div className="flex-1">
                 <div className="flex items-center gap-2">
                   <h4 className="text-sm font-medium text-slate-200">
-                    {gene.entrezId ? (
-                      <Link href={`/gene/${gene.entrezId}-${gene.symbol}`} className="text-indigo-300 hover:text-indigo-200 hover:underline">{gene.symbol}</Link>
+                    {gene.geneId ? (
+                      <Link href={`/gene/${gene.geneId}-${gene.symbol}`} className="text-indigo-300 hover:text-indigo-200 hover:underline">{gene.symbol}</Link>
                     ) : (
                       <Link href={`/gene?q=${encodeURIComponent(gene.symbol)}`} className="text-indigo-300 hover:text-indigo-200 hover:underline">{gene.symbol}</Link>
                     )}
                   </h4>
-                  {gene.entrezId && (
+                  {gene.geneId && (
                     <a
-                      href={`https://www.ncbi.nlm.nih.gov/gene/${gene.entrezId}`}
+                      href={`https://www.ncbi.nlm.nih.gov/gene/${gene.geneId}`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs px-1.5 py-0.5 bg-blue-900/50 text-blue-300 rounded hover:bg-blue-900/70"
                     >
-                      Entrez: {gene.entrezId}
+                      Entrez: {gene.geneId}
                     </a>
                   )}
                   {gene.ensemblId && (
