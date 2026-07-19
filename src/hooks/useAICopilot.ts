@@ -14,25 +14,39 @@ import {
 } from '@/lib/ai/copilot/tools'
 import { runAgentToolLoop } from '@/lib/ai/runtime/agentLoop'
 import { extractStreamError } from '@/lib/ai/runtime/streamChat'
-import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
-import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, buildPriorArtQueryPrompt, buildDifferentialSafetyPrompt, buildSuggestNextPrompt, buildHypothesisSeedPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
+import {
+  buildMoleculeContext,
+  contextToPromptBlock,
+  extractRichData,
+  buildDiseaseContext,
+  diseaseContextToPromptBlock,
+  buildGeneContext,
+  geneContextToPromptBlock,
+} from '@/lib/ai/contextBuilder'
+import {
+  buildFollowUpPrompt,
+  buildFreeQAPrompt,
+  buildDiseaseQAPrompt,
+  buildGeneQAPrompt,
+  type PromptMode,
+  type SessionMoleculeSummary,
+} from '@/lib/ai/promptTemplates'
+import {
+  isCopilotTaskMode,
+  resolveInsightPrompt,
+} from '@/lib/ai/copilot/resolveInsightPrompt'
+import {
+  validateTaskModeOutput,
+  type CopilotTaskPayload,
+} from '@/lib/ai/copilot/validateTaskMode'
 import { sessionHistory } from '@/lib/sessionHistory'
-import { validatePriorArtQuery } from '@/lib/ai/aiTasks/priorArt'
-import { validateDiffSafety } from '@/lib/ai/aiTasks/diffSafety'
-import { validateSuggestNext, type SuggestedEntity } from '@/lib/ai/aiTasks/suggestNext'
-import { validateHypothesisSeed, buildHypothesisSeedUrl } from '@/lib/ai/aiTasks/hypothesisSeed'
-import type { Filter } from '@/lib/hypothesis/types'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 
 export interface CopilotTaskResult {
   /** Structured payload that survived validation; UI may render specially. */
   kind: 'prior_art' | 'diff_safety' | 'suggest_next' | 'hypothesis_seed'
-  data:
-    | { kind: 'prior_art'; query: string }
-    | { kind: 'diff_safety'; text: string; paragraphCount: number; currentName: string; otherName: string }
-    | { kind: 'suggest_next'; entities: SuggestedEntity[] }
-    | { kind: 'hypothesis_seed'; filters: Filter[]; url: string }
+  data: CopilotTaskPayload
 }
 
 export interface CopilotToolTrace {
@@ -197,7 +211,7 @@ export function useAICopilot(
     }
 
     // Plan-06 task modes are gated to molecule entities only.
-    const isTaskMode = mode === 'prior_art_query' || mode === 'differential_safety' || mode === 'suggest_next' || mode === 'hypothesis_seed'
+    const isTaskMode = isCopilotTaskMode(mode)
     if (isTaskMode && (isDiseaseContext || isGeneContext)) {
       addMessage('system', `The "${mode.replace(/_/g, ' ')}" task is only available for molecule entities.`, mode)
       return
@@ -239,115 +253,38 @@ export function useAICopilot(
     const controller = new AbortController()
     abortRef.current = controller
 
-    let prompts: { system: string; user: string }
-
-    if (isDiseaseContext && diseaseCtx) {
-      const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
-      switch (mode) {
-        case 'auto_insight':
-          prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
-          break
-        case 'executive_brief':
-          prompts = buildDiseaseSearchBriefPrompt(diseaseBlock)
-          break
-        case 'gap_analysis':
-          prompts = buildDiseaseSearchGapPrompt(diseaseBlock)
-          break
-        case 'mechanism_analysis':
-          prompts = buildDiseaseSearchMechanismPrompt(diseaseBlock)
-          break
-        case 'therapeutic_hypothesis':
-          prompts = buildDiseaseSearchHypothesisPrompt(diseaseBlock)
-          break
-        case 'repurposing_scan':
-          prompts = buildDiseaseSearchRepurposingPrompt(diseaseBlock)
-          break
-        default:
-          prompts = buildDiseaseAutoInsightPrompt(diseaseBlock)
-      }
-    } else if (isGeneContext && geneCtx) {
-      switch (mode) {
-        case 'auto_insight':
-        case 'gene_therapeutic':
-          prompts = buildGeneTherapeuticPrompt(geneCtx)
-          break
-        case 'gene_repurposing':
-          prompts = buildGeneRepurposingPrompt(geneCtx)
-          break
-        case 'gene_mechanism':
-          prompts = buildGeneMechanismPrompt(geneCtx)
-          break
-        case 'gene_target_assessment':
-          prompts = buildGeneTargetAssessmentPrompt(geneCtx)
-          break
-        case 'executive_brief':
-          prompts = buildGeneTherapeuticPrompt(geneCtx)
-          break
-        case 'gap_analysis':
-          prompts = buildGeneTargetAssessmentPrompt(geneCtx)
-          break
-        default:
-          prompts = buildGeneTherapeuticPrompt(geneCtx)
-      }
-    } else {
-      switch (mode) {
-        case 'auto_insight':
-          prompts = buildAutoInsightPrompt(context, snapshot)
-          break
-        case 'executive_brief':
-          prompts = buildExecutiveBriefPrompt(context, snapshot)
-          break
-        case 'gap_analysis':
-          prompts = buildGapAnalysisPrompt(context, snapshot)
-          break
-        case 'safety_deep_dive':
-          prompts = buildSafetyDeepDivePrompt(context)
-          break
-        case 'mechanism_analysis':
-          prompts = buildMechanismAnalysisPrompt(context)
-          break
-        case 'therapeutic_hypothesis':
-          prompts = buildTherapeuticHypothesisPrompt(context)
-          break
-        case 'competitive_position':
-          prompts = buildCompetitivePositionPrompt(context)
-          break
-        case 'repurposing_scan':
-          prompts = buildRepurposingScanPrompt(context)
-          break
-        case 'cross_molecule_compare': {
-          const others = sessionHistory.getRecentMolecules(5)
-            .filter(m => m.name !== identity.name)
+    const otherSessionMolecules =
+      mode === 'cross_molecule_compare'
+        ? sessionHistory
+            .getRecentMolecules(5)
+            .filter((m) => m.name !== identity.name)
             .map((m): SessionMoleculeSummary => {
               const rd = extractRichData(m.drugData)
               return {
                 name: m.name,
                 searchedAt: m.searchedAt,
-                topTargets: rd.topTargetActivities.slice(0, 5).map(t => t.targetName),
-                topAEs: rd.topAdverseEvents.slice(0, 5).map(ae => ae.reactionName),
-                mechanisms: rd.mechanismDetails.slice(0, 3).map(mech => `${mech.mechanismOfAction} -> ${mech.targetName}`),
-                indications: rd.indicationDetails.slice(0, 5).map(i => i.condition),
+                topTargets: rd.topTargetActivities.slice(0, 5).map((t) => t.targetName),
+                topAEs: rd.topAdverseEvents.slice(0, 5).map((ae) => ae.reactionName),
+                mechanisms: rd.mechanismDetails
+                  .slice(0, 3)
+                  .map((mech) => `${mech.mechanismOfAction} -> ${mech.targetName}`),
+                indications: rd.indicationDetails.slice(0, 5).map((i) => i.condition),
               }
             })
-          prompts = buildCrossMoleculeComparePrompt(context, others)
-          break
-        }
-        case 'prior_art_query':
-          prompts = buildPriorArtQueryPrompt(context)
-          break
-        case 'differential_safety':
-          prompts = buildDifferentialSafetyPrompt(context, diffTarget!)
-          break
-        case 'suggest_next':
-          prompts = buildSuggestNextPrompt(context)
-          break
-        case 'hypothesis_seed':
-          prompts = buildHypothesisSeedPrompt(context, opts.researchQuestion!)
-          break
-        default:
-          prompts = buildAutoInsightPrompt(context, snapshot)
-      }
-    }
+        : undefined
+
+    const prompts = resolveInsightPrompt({
+      mode,
+      isDiseaseContext,
+      isGeneContext,
+      diseaseContextBlock: diseaseCtx ? diseaseContextToPromptBlock(diseaseCtx) : null,
+      geneCtx,
+      moleculeCtx: context,
+      snapshot,
+      otherSessionMolecules,
+      diffTarget,
+      researchQuestion: opts.researchQuestion,
+    })
 
     setLastPrompt({
       mode,
@@ -388,48 +325,15 @@ export function useAICopilot(
     const rawForValidation = finalContent || fullContent
 
     if (!msgError && isTaskMode && rawForValidation) {
-      if (mode === 'prior_art_query') {
-        const v = validatePriorArtQuery(rawForValidation, {
-          name: context.identity.name,
-          synonyms: context.identity.synonyms,
-        })
-        if (v.ok) {
-          taskPayload = { kind: 'prior_art', query: v.query }
-        } else {
-          validationError = `AI response was unclear, try again. (${v.reason})`
-        }
-      } else if (mode === 'differential_safety' && diffTarget) {
-        const v = validateDiffSafety(rawForValidation, context.identity.name, diffTarget.name)
-        if (v.ok) {
-          taskPayload = {
-            kind: 'diff_safety',
-            text: v.text,
-            paragraphCount: v.paragraphCount,
-            currentName: context.identity.name,
-            otherName: diffTarget.name,
-          }
-        } else {
-          validationError = `AI response was unclear, try again. (${v.reason})`
-        }
-      } else if (mode === 'suggest_next') {
-        const v = validateSuggestNext(rawForValidation)
-        if (v.ok) {
-          taskPayload = { kind: 'suggest_next', entities: v.entities }
-        } else {
-          validationError = `AI response was unclear, try again. (${v.reason})`
-        }
-      } else if (mode === 'hypothesis_seed') {
-        const v = validateHypothesisSeed(rawForValidation)
-        if (v.ok) {
-          taskPayload = {
-            kind: 'hypothesis_seed',
-            filters: v.filters,
-            url: buildHypothesisSeedUrl(v.filters),
-          }
-        } else {
-          validationError = `AI response was unclear, try again. (${v.reason})`
-        }
-      }
+      const validated = validateTaskModeOutput({
+        mode,
+        raw: rawForValidation,
+        moleculeName: context.identity.name,
+        synonyms: context.identity.synonyms,
+        diffOtherName: diffTarget?.name,
+      })
+      taskPayload = validated.task
+      validationError = validated.validationError
     }
 
     if (msgError || validationError || taskPayload || finalContent !== fullContent) {

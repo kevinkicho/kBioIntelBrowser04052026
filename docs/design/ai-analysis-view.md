@@ -1,6 +1,6 @@
 # AI analysis view (Discover / board) — design note
 
-**Status:** Implemented foundation (Discover toggle + validated reorder)  
+**Status:** Shipped (Discover toggle + board recommend + export dual attach + events)  
 **Product law:** Free public APIs only; deterministic **of-record** rank; optional AI analysis is non-of-record
 
 ## Dual plane

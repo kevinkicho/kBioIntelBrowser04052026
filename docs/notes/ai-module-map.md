@@ -1,12 +1,14 @@
 # AI module map (post-refactor)
 
-**Product law:** free public APIs; claim-/evidence-bound AI; no LLM in Discover rank.
+**Product law:** free public APIs; claim-/evidence-bound AI; no LLM in Discover of-record rank. Optional dual-view analysis is non-of-record (`docs/design/ai-analysis-view.md`).
 
 ## Surfaces
 
 | Surface | Path | Style |
 |---------|------|--------|
 | **Profile Copilot** | `components/ai/AICopilot.tsx` + `components/ai/copilot/*` | Open tools + profile context |
+| **Discover AI analysis** | `components/discover/AiAnalysisView.tsx` + `lib/ai/aiRank/*` | Opt-in reorder; validated keys |
+| **Board AI recommend** | `components/projects/BoardAiRecommend.tsx` | Non-of-record triage order |
 | **Disease Intelligence** | `components/disease/DiseaseIntelligencePanel.tsx` | Claim-bound disease prompts; user-triggered |
 | **Pack AI** | `components/evidence/PackAiPanel.tsx` + `lib/ai/contracts.ts` | Structured JSON over pack claims |
 | **RH AI** | `components/evidence/RhAiPanel.tsx` + `lib/ai/rhContracts.ts` | Structured JSON over hypothesis claims |
@@ -21,14 +23,17 @@ src/lib/ai/
   runtime/
     streamChat.ts           # extractStreamError, collectStream
     agentLoop.ts            # pure tool loop
+  aiRank/                   # dual-view of-record vs analysis
   copilot/
     types.ts
-    tools/                  # allowlisted agent tools
+    tools/                  # allowlisted agent tools (Phase A+B)
     retrieval/              # Monitor world-model (snapshot)
-    prompts/                # prompt catalog (via prompts/all + index)
-    context/                # context builders (via context/all + index)
+    prompts/                # domain-split: types, shared, molecule, disease, gene, discover, tasks
+    context/                # domain-split: types, helpers, molecule, disease, gene
+    resolveInsightPrompt.ts # pure mode → prompt selection
+    validateTaskMode.ts     # plan-06 task validators
   contracts.ts / rhContracts.ts
-  aiTasks/                  # task validators
+  aiTasks/                  # task validators (prior art, etc.)
 
 src/hooks/useAICopilot.ts   # composes snapshot + insights + agentic ask
 src/components/ai/copilot/  # MonitorTab, InsightsTab, AskTab, Settings, bubbles
@@ -46,4 +51,8 @@ Prefer new paths in new code; shims stay until call sites migrate.
 ## Agent tools (Copilot Ask only)
 
 Allowlisted in `copilot/tools/catalog.ts`. Max steps: `COPILOT_MAX_TOOL_STEPS`.
-No Discover ranking tools.
+
+Phase A: retrieval snapshot, panel summary, load/retry category, session molecules, suggest next.  
+Phase B: `open_panel`, `fix_gap`, `get_pack_claims`, `seed_research_hypothesis`, `compare_board`.
+
+No Discover of-record ranking tools.

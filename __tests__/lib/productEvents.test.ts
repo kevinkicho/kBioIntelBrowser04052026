@@ -54,6 +54,19 @@ describe('productEvents clean-cut (canonical only)', () => {
     expect(PRODUCT_EVENT_LABELS.source_deep_link_opened).toMatch(/deep link/i)
   })
 
+  test('AI analysis events are first-class (non-of-record M5)', () => {
+    emitProductEvent('ai_rank_view_toggled', { enabled: true })
+    emitProductEvent('ai_rank_completed', { count: 5, refused: false })
+    emitProductEvent('ai_recommend_completed', { count: 3 })
+    const names = readQueuedProductEvents().map((e) => e.name)
+    expect(names).toContain('ai_rank_view_toggled')
+    expect(names).toContain('ai_rank_completed')
+    expect(names).toContain('ai_recommend_completed')
+    expect(PRODUCT_EVENT_METRIC.ai_rank_completed).toBe('M5')
+    expect(PRODUCT_EVENT_METRIC.ai_recommend_completed).toBe('M5')
+    expect(PRODUCT_EVENT_LABELS.ai_rank_view_toggled).toMatch(/analysis/i)
+  })
+
   test('labels cover all event names', () => {
     expect(productEventLabel('pack_exported')).toBe('Pack exported')
     expect(productEventLabel('unknown_event')).toMatch(/unknown/)
