@@ -33,6 +33,8 @@ import { emitProductEvent } from '@/lib/productEvents'
 import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
+import { BoardClaimStrip } from '@/components/projects/BoardClaimStrip'
+import { BoardAiRecommend } from '@/components/projects/BoardAiRecommend'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
 import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
 import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
@@ -522,6 +524,13 @@ export default function ProjectBoardPage() {
           >
             {banner.text}
           </div>
+        )}
+
+        {project.candidates.length > 0 && (
+          <>
+            <BoardClaimStrip project={project} />
+            <BoardAiRecommend project={project} />
+          </>
         )}
 
         {project.candidates.length === 0 ? (

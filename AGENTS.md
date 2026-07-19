@@ -7,8 +7,9 @@ Coding agents and human implementers: read this before changing product behavior
 - Free public APIs only (no paid DBs / keys as product requirements)
 - Evidence-first; no regulatory decision support language
 - Solo + file export default (localStorage / IDB / download); share optional
-- Deterministic ranking; never put LLMs in the rank path
-- AI only claim-bound on packs / research hypotheses (no free-form Discover Why AI)
+- **Discover of-record ranking is deterministic (no LLM in the rank path)**
+- **Optional AI analysis views** may reorder or recommend candidates with model-generated reasoning, using only retrieved evidence and the user’s connected model (e.g. Ollama Cloud). AI views must be labeled non-of-record, must not overwrite deterministic scores/axes, and must not auto-apply board decisions. Users verify before wet-lab / grant / clinical use
+- Pack / RH AI remains claim-bound structured output; Copilot may use allowlisted evidence tools
 - Canonical product events only — do not reintroduce dual-emit aliases
 - Board packs: 5 extractor panels max; preserve claim `subjectCandidateId`
 
@@ -19,6 +20,7 @@ Coding agents and human implementers: read this before changing product behavior
 - `docs/design/discovery-workbench-v2.1.md` — post-v2 hardening + measurement (active plan)
 - `docs/design/profile-revisit-cache.md` — search-history reopen: session cache (shipped) + IDB durability (Phase B)
 - `docs/design/agentic-workflow-cli.md` — full CLI cookbook, playbooks, API surfaces
+- `docs/design/ai-analysis-view.md` — dual-view: of-record rank vs optional AI analysis
 
 ## Canonical code areas
 

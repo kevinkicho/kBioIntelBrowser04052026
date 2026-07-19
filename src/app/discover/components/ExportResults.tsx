@@ -1,10 +1,13 @@
 'use client'
 
 import type { RankResult } from '@/lib/candidateRanker'
+import type { AiRankResult } from '@/lib/ai/aiRank'
 import { downloadFile } from '@/lib/exportData'
 
 interface Props {
   result: RankResult
+  /** Optional non-of-record AI analysis (attached without replacing of-record ranks) */
+  aiRankResult?: AiRankResult | null
 }
 
 function slugify(name: string): string {
@@ -62,11 +65,28 @@ function exportCsv(result: RankResult): string {
   return lines.join('\n')
 }
 
-function exportJson(result: RankResult): string {
-  return JSON.stringify(result, null, 2)
+function exportJson(result: RankResult, aiRankResult?: AiRankResult | null): string {
+  return JSON.stringify(
+    {
+      ...result,
+      ofRecordNote: 'candidates[] order is of-record deterministic rank',
+      aiAnalysis: aiRankResult
+        ? {
+            nonOfRecord: true,
+            ordering: aiRankResult.ordering,
+            caveats: aiRankResult.caveats,
+            refused: aiRankResult.refused,
+            model: aiRankResult.model,
+            generatedAt: aiRankResult.generatedAt,
+          }
+        : null,
+    },
+    null,
+    2,
+  )
 }
 
-export function ExportResults({ result }: Props) {
+export function ExportResults({ result, aiRankResult }: Props) {
   const slug = slugify(result.diseaseName)
 
   return (
@@ -79,7 +99,13 @@ export function ExportResults({ result }: Props) {
         CSV
       </button>
       <button
-        onClick={() => downloadFile(exportJson(result), `${slug}-candidates.json`, 'application/json')}
+        onClick={() =>
+          downloadFile(
+            exportJson(result, aiRankResult),
+            `${slug}-candidates.json`,
+            'application/json',
+          )
+        }
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700/40 text-xs font-medium text-slate-400 hover:text-slate-200 hover:border-slate-600 transition-colors"
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>

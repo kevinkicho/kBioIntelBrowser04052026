@@ -60,6 +60,10 @@ export interface CopilotMessage {
 export interface CopilotActions {
   refreshCategory?: (categoryId: CategoryId) => void
   loadCategory?: (categoryId: CategoryId) => void
+  /** Scroll/focus a profile panel (agent tool open_panel). */
+  openPanel?: (panelId: string, categoryId?: CategoryId) => void
+  /** Default project for pack/board tools when URL has ?project=. */
+  defaultProjectId?: string
 }
 
 export interface CopilotState {
@@ -475,6 +479,8 @@ export function useAICopilot(
       },
       refreshCategory: act?.refreshCategory,
       loadCategory: act?.loadCategory,
+      openPanel: act?.openPanel,
+      defaultProjectId: act?.defaultProjectId,
     }
   }, [snapshot, identity.name, identity.cid, identity.geneSymbol])
 

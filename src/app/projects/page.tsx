@@ -23,6 +23,7 @@ import {
   listCloudExports,
   type CloudExportItem,
 } from '@/lib/firebase/storageSync'
+import { MissionControlStrip } from '@/components/projects/MissionControlStrip'
 
 const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
 
@@ -316,6 +317,8 @@ export default function ProjectsPage() {
             {banner.text}
           </div>
         )}
+
+        <MissionControlStrip projects={projects} lastOpened={lastOpened} />
 
         <div className="mb-8 flex flex-wrap gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <input

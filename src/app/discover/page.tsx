@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useDiscovery } from './hooks/useDiscovery'
 import { DiscoveryHero } from './components/DiscoveryHero'
@@ -32,6 +32,8 @@ import {
   deleteDiscoverSession,
   type DiscoverSessionSnapshot,
 } from '@/lib/discovery/discoverSessions'
+import { AiAnalysisView } from '@/components/discover/AiAnalysisView'
+import type { AiRankResult } from '@/lib/ai/aiRank'
 
 /** Stable key for discover URL params — used to re-run rank when history changes q/diseaseId/targets. */
 function discoverUrlKey(
@@ -76,6 +78,33 @@ export default function DiscoverPage() {
   const appliedUrlKey = useRef<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sessions, setSessions] = useState<DiscoverSessionSnapshot[]>([])
+  const [aiRankResult, setAiRankResult] = useState<AiRankResult | null>(null)
+  const [showingAiList, setShowingAiList] = useState(false)
+
+  /** Shared Save-to-project context for of-record + AI analysis lists */
+  const baseProjectContext = useMemo(() => {
+    if (state.status !== 'success' || !state.result) return undefined
+    try {
+      const prefs = loadDiscoveryPreferences()
+      const rubric = state.result.v2?.rubric ?? scoreRubricFromPreferences(prefs)
+      return {
+        disease: state.result.v2?.disease ?? null,
+        targetIds: state.targets,
+        rubric,
+        preferencesSnapshot: snapshotDiscoveryPreferences(prefs),
+        defaultProjectName: state.result.diseaseName
+          ? `${state.result.diseaseName} board`
+          : undefined,
+        rankedAt: state.result.generatedAt ?? null,
+      }
+    } catch {
+      return {
+        disease: state.result.v2?.disease ?? null,
+        targetIds: state.targets,
+        rankedAt: state.result.generatedAt ?? null,
+      }
+    }
+  }, [state.status, state.result, state.targets])
 
   useEffect(() => {
     setSessions(listDiscoverSessions())
@@ -446,7 +475,7 @@ export default function DiscoverPage() {
                       {state.result.candidates.length} candidate
                       {state.result.candidates.length !== 1 ? 's' : ''}
                     </span>
-                    <ExportResults result={state.result} />
+                    <ExportResults result={state.result} aiRankResult={aiRankResult} />
                   </div>
                 </div>
 
@@ -491,7 +520,19 @@ export default function DiscoverPage() {
                   diseaseName={state.result.diseaseName}
                 />
 
-                <div className="space-y-3">
+                <AiAnalysisView
+                  diseaseName={state.result.diseaseName}
+                  ofRecordCandidates={state.result.candidates}
+                  domainCandidates={state.result.v2?.candidates}
+                  diseaseGenes={state.result.genes}
+                  rubric={state.result.v2?.rubric}
+                  rankedAt={state.result.generatedAt}
+                  onResult={setAiRankResult}
+                  onShowingAiList={setShowingAiList}
+                  projectContext={baseProjectContext}
+                />
+
+                <div className="space-y-3" hidden={showingAiList || undefined}>
                   {state.result.candidates.map((candidate, i) => {
                     const domainCandidate = matchDomainCandidate(
                       candidate,

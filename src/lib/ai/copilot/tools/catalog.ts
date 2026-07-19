@@ -1,6 +1,9 @@
 /**
  * Allowlisted Copilot agent tools (evidence-bound, free public APIs only).
  * No Discover ranking tools. Deterministic executors; LLM only proposes calls.
+ *
+ * Phase A: retrieval / category / session
+ * Phase B: open panel, fix gap, pack claims, seed RH, compare board
  */
 
 export const COPILOT_MAX_TOOL_STEPS = 5
@@ -13,6 +16,11 @@ export type CopilotToolName =
   | 'load_category'
   | 'list_session_molecules'
   | 'suggest_next_actions'
+  | 'open_panel'
+  | 'fix_gap'
+  | 'get_pack_claims'
+  | 'seed_research_hypothesis'
+  | 'compare_board'
 
 export interface CopilotToolDef {
   name: CopilotToolName
@@ -59,6 +67,45 @@ export const COPILOT_TOOLS: CopilotToolDef[] = [
     description:
       'Deterministic next actions from the retrieval snapshot (retry failed, load idle Core categories). No LLM.',
     parameters: {},
+  },
+  {
+    name: 'open_panel',
+    description:
+      'Scroll/focus a profile panel in the UI by panel id (e.g. clinical-trials, adverse-events). Use when the user asks to open or jump to a panel.',
+    parameters: {
+      panelId: 'string — panel id used in the profile UI',
+      categoryId: 'optional string — parent category to load if idle',
+    },
+  },
+  {
+    name: 'fix_gap',
+    description:
+      'Act on a Monitor gap: retry on error/timeout, load on pending/idle. Prefer panelKey or categoryId from get_retrieval_snapshot.',
+    parameters: {
+      panelKey: 'optional string — panel propKey or title fragment',
+      categoryId: 'optional string — category id when known',
+    },
+  },
+  {
+    name: 'get_pack_claims',
+    description:
+      'Summarize local board pack index claim ids and promote-set evidence tags for a project (no invented claims). Requires projectId.',
+    parameters: { projectId: 'string — local project id' },
+  },
+  {
+    name: 'seed_research_hypothesis',
+    description:
+      'Seed a draft research hypothesis from the latest pack on a project (claim-bound scaffold). Persists to local storage. Requires projectId; optional packId.',
+    parameters: {
+      projectId: 'string — local project id',
+      packId: 'optional string — pack index id; defaults to most recent pack',
+    },
+  },
+  {
+    name: 'compare_board',
+    description:
+      'Compare board candidates on a project: statuses, scores, origins, CIDs. Read-only local project store.',
+    parameters: { projectId: 'string — local project id' },
   },
 ]
 

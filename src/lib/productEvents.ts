@@ -39,6 +39,12 @@ export type ProductEventName =
    * Not dual-emit.
    */
   | 'ui_surface_action'
+  /** User toggled Discover/board AI analysis view (non-of-record) */
+  | 'ai_rank_view_toggled'
+  /** Optional AI reorder completed (validated against of-record shortlist) */
+  | 'ai_rank_completed'
+  /** Board AI triage recommend completed */
+  | 'ai_recommend_completed'
 
 /**
  * Known `ui_surface_action.surface` values and intended product use.
@@ -101,6 +107,9 @@ export const PRODUCT_EVENT_LABELS: Record<ProductEventName, string> = {
   preference_tooltip_opened: 'Preference tooltip opened',
   source_deep_link_opened: 'Source deep link opened',
   ui_surface_action: 'UI surface action',
+  ai_rank_view_toggled: 'AI analysis view toggled',
+  ai_rank_completed: 'AI analysis rank completed',
+  ai_recommend_completed: 'Board AI recommend completed',
 }
 
 export const PRODUCT_EVENT_METRIC: Record<ProductEventName, ProductMetricId> = {
@@ -129,6 +138,9 @@ export const PRODUCT_EVENT_METRIC: Record<ProductEventName, ProductMetricId> = {
   preference_tooltip_opened: 'M9',
   source_deep_link_opened: 'M6',
   ui_surface_action: '—',
+  ai_rank_view_toggled: '—',
+  ai_rank_completed: 'M5',
+  ai_recommend_completed: 'M5',
 }
 
 export const PRODUCT_METRIC_LABELS: Record<ProductMetricId, string> = {

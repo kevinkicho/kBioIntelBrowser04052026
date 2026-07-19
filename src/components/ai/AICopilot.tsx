@@ -29,7 +29,9 @@ interface Props {
   /** Initial load for idle categories. */
   loadCategory?: (categoryId: CategoryId) => void
   /** Jump profile UI to a panel (hash / tab). */
-  onNavigateToPanel?: (panelId: string, categoryId: CategoryId) => void
+  onNavigateToPanel?: (panelId: string, categoryId?: CategoryId) => void
+  /** Project context for board/pack agent tools (e.g. ?project=). */
+  projectId?: string
 }
 
 export function AICopilot(props: Props) {
@@ -45,10 +47,16 @@ function AICopilotInner({
   refreshCategory,
   loadCategory,
   onNavigateToPanel,
+  projectId,
 }: Props) {
   const actions = useMemo(
-    () => ({ refreshCategory, loadCategory }),
-    [refreshCategory, loadCategory],
+    () => ({
+      refreshCategory,
+      loadCategory,
+      openPanel: onNavigateToPanel,
+      defaultProjectId: projectId,
+    }),
+    [refreshCategory, loadCategory, onNavigateToPanel, projectId],
   )
   const copilot = useAICopilot(
     categoryData,
