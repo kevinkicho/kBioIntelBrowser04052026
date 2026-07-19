@@ -30,6 +30,8 @@ export {
   CLINICAL_TRIALS_SOURCE,
   extractClaimsFromOpenTargets,
   OPEN_TARGETS_SOURCE,
+  extractClaimsFromRelatedMolecules,
+  RELATED_MOLECULE_SOURCE,
 } from './extractors'
 
 export {

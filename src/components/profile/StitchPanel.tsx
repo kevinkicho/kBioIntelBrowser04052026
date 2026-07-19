@@ -72,13 +72,12 @@ export const StitchPanel = memo(function StitchPanel({
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Chemical</span>
                     <span>Protein</span>
                     <span className="text-right">Score</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
                 <a
@@ -91,7 +90,7 @@ export const StitchPanel = memo(function StitchPanel({
                       label: interaction.proteinName,
                     })
                   }
-                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
                   <span className="text-sm text-slate-100 truncate group-hover:text-orange-200">
                     {interaction.chemicalName || '—'}
@@ -101,9 +100,6 @@ export const StitchPanel = memo(function StitchPanel({
                   </span>
                   <span className="text-xs font-mono tabular-nums text-right text-slate-300">
                     {(interaction.combinedScore ?? 0).toFixed(3)}
-                  </span>
-                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
-                    ↗
                   </span>
                 </a>
               </div>

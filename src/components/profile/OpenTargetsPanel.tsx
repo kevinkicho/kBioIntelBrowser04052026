@@ -77,14 +77,13 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.8fr)_3.5rem_3.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.8fr)_3.5rem_3.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Disease</span>
                     <span>ID</span>
                     <span className="text-right">Score</span>
                     <span className="text-right">Evid.</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
                 <a
@@ -98,7 +97,7 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
                       label: disease.diseaseName,
                     })
                   }
-                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.8fr)_3.5rem_3.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.8fr)_3.5rem_3.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
                   <span className="text-sm font-medium text-indigo-300 group-hover:text-indigo-200 truncate">
                     {disease.diseaseName || '—'}
@@ -115,9 +114,6 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
                     className={`text-xs tabular-nums text-right text-slate-400 ${emptyDataClass(evEmpty)}`}
                   >
                     {evEmpty ? '—' : disease.evidenceCount}
-                  </span>
-                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
-                    ↗
                   </span>
                 </a>
               </div>

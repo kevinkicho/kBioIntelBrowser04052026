@@ -167,7 +167,8 @@ describe('fetchCategoryData cache short-circuit', () => {
     const fetchMock = jest.fn()
     global.fetch = fetchMock as unknown as typeof fetch
     const data = await fetchCategoryData(99, 'molecular-chemical')
-    expect(data).toEqual({ from: 'cache' })
+    // Cache hits stamp _fromClientCache without rewriting stored payload
+    expect(data).toEqual({ from: 'cache', _fromClientCache: true })
     expect(fetchMock).not.toHaveBeenCalled()
   })
 })

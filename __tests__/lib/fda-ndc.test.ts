@@ -37,6 +37,8 @@ describe('getNdcProductsByName', () => {
     expect(results[0].productType).toBe('HUMAN PRESCRIPTION DRUG')
     expect(results[0].pharmClass).toEqual(['Serotonin Reuptake Inhibitor [EPC]'])
     expect(results[0].url).toContain('0002-3227')
+    expect(results[0].url).toContain('api.fda.gov/drug/ndc.json')
+    expect(results[0].url).toContain('product_ndc')
   })
 
   test('joins multiple routes', async () => {

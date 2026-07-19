@@ -42,9 +42,21 @@ describe('OpenAlexPanel', () => {
     expect(screen.getByText('2023')).toBeInTheDocument()
   })
 
-  test('renders type badge', () => {
+  test('type chip is a deep link to the work', () => {
     render(<OpenAlexPanel works={mockWorks} />)
-    expect(screen.getByText('article')).toBeInTheDocument()
+    const articleChip = screen.getByRole('link', { name: /^article$/i })
+    expect(articleChip).toHaveAttribute('href', 'https://doi.org/10.1234/test')
+    expect(articleChip).toHaveAttribute('target', '_blank')
+    const reviewChip = screen.getByRole('link', { name: /^review$/i })
+    expect(reviewChip).toHaveAttribute('href', 'https://doi.org/10.1234/test2')
+  })
+
+  test('title is also a deep link', () => {
+    render(<OpenAlexPanel works={mockWorks} />)
+    const titleLink = screen.getByRole('link', {
+      name: 'Effects of Aspirin on Inflammation',
+    })
+    expect(titleLink).toHaveAttribute('href', 'https://doi.org/10.1234/test')
   })
 
   test('renders Open Access badge when URL available', () => {

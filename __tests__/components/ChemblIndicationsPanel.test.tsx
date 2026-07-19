@@ -35,14 +35,15 @@ describe('ChemblIndicationsPanel', () => {
     expect(screen.getByText('D010146')).toBeInTheDocument()
   })
 
-  test('list item deep-links to ChEMBL drug indications (not homepage)', () => {
+  test('list item deep-links to MeSH for the condition (not ChEMBL embed/SPA)', () => {
     render(<ChemblIndicationsPanel indications={mockIndications} />)
     const nameLink = screen.getByRole('link', { name: /Pain/i })
     expect(nameLink).toHaveAttribute(
       'href',
-      'https://www.ebi.ac.uk/chembl/embed/report_cards/compound/sections/drug_indications/CHEMBL25',
+      'https://meshb.nlm.nih.gov/record/ui?ui=D010146',
     )
     expect(nameLink.getAttribute('href')).not.toMatch(/\/g\/#/)
+    expect(nameLink.getAttribute('href')).not.toMatch(/\/embed\//)
     expect(nameLink.getAttribute('href')).not.toMatch(/\/chembl\/?$/)
   })
 
@@ -60,27 +61,31 @@ describe('ChemblIndicationsPanel', () => {
     const nameLink = screen.getByRole('link', { name: /Pain/i })
     expect(nameLink).toHaveAttribute(
       'href',
-      expect.stringContaining('drug_indications/CHEMBL25'),
+      'https://meshb.nlm.nih.gov/record/ui?ui=D010146',
     )
   })
 
-  test('falls back to efoTerm when meshHeading is empty', () => {
-    const indications: ChemblIndication[] = [{
-      indicationId: 'IND002',
-      moleculeName: 'TestDrug',
-      moleculeChemblId: 'CHEMBL1',
-      condition: 'hypertension',
-      maxPhase: 3,
-      maxPhaseForIndication: 3,
-      meshHeading: '',
-      meshId: '',
-      efoTerm: 'hypertension',
-      efoId: 'EFO_0000537',
-      url: 'https://example.com',
-    }]
+  test('falls back to EFO OLS when meshHeading is empty', () => {
+    const indications: ChemblIndication[] = [
+      {
+        indicationId: 'IND002',
+        moleculeName: 'TestDrug',
+        moleculeChemblId: 'CHEMBL1',
+        condition: 'hypertension',
+        maxPhase: 3,
+        maxPhaseForIndication: 3,
+        meshHeading: '',
+        meshId: '',
+        efoTerm: 'hypertension',
+        efoId: 'EFO_0000537',
+        url: 'https://example.com',
+      },
+    ]
     render(<ChemblIndicationsPanel indications={indications} />)
     expect(screen.getByText('hypertension')).toBeInTheDocument()
     expect(screen.getByText('EFO_0000537')).toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /hypertension/i })
+    expect(link.getAttribute('href')).toContain('ols4/ontologies/efo')
   })
 
   test('renders empty state when no indications', () => {

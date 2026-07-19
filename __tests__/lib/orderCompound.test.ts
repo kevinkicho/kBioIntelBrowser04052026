@@ -18,13 +18,18 @@ describe('vendorCatalogLinks', () => {
     expect(byName['Fisher Scientific']).toContain(
       'fishersci.com/us/en/catalog/search/products?keyword=',
     )
-    expect(byName['Fisher Scientific']).toMatch(/50-78-2|Aspirin/)
+    expect(byName['Fisher Scientific']).toContain('50-78-2')
     expect(byName['Thermo Fisher']).toContain('thermofisher.com/search/results?query=')
-    expect(byName['Cayman Chemical']).toContain('caymanchem.com/product/s?term=')
-    expect(byName['Selleck Chemicals']).toContain('searchDTO.searchValue=')
+    expect(byName['Cayman Chemical']).toContain('caymanchem.com/search?q=')
+    expect(byName['Cayman Chemical']).toContain('50-78-2')
+    expect(byName['Selleck Chemicals']).toContain('selleckchem.com/searchResult.html?searchValue=')
+    expect(byName['Alfa Aesar']).toContain('fishersci.com/us/en/catalog/search/products?keyword=')
+    expect(byName['Alfa Aesar']).toMatch(/Alfa/)
     expect(byName['Enamine']).toContain('enamine.net/search?q=')
     expect(byName['TargetMol']).toContain('targetmol.com/search?keyword=')
-    expect(byName['TCI Chemicals']).toContain('tcichemicals.com/US/en/search?text=')
+    expect(byName['TCI Chemicals']).toContain('tcichemicals.com/US/en/search/')
+    expect(byName['TCI Chemicals']).toContain('resulttype=product')
+    expect(byName['TCI Chemicals']).toContain('50-78-2')
     expect(byName['Sigma-Aldrich']).toContain('sigmaaldrich.com/US/en/search/')
     expect(byName['Sigma-Aldrich']).toContain('term=')
     expect(byName['Sigma-Aldrich']).toContain('type=product')
@@ -33,12 +38,15 @@ describe('vendorCatalogLinks', () => {
     expect(byName['Sigma (CAS)']).toContain('type=cas_number')
   })
 
-  test('no legacy path-only Fisher search URL', () => {
+  test('no legacy broken vendor search URLs', () => {
     const links = buildOrderCatalogLinks({ name: 'Metformin', cid: 4091 })
     for (const l of links) {
       expect(l.url).not.toMatch(/fishersci\.com\/us\/en\/search\/[^?]+$/)
       expect(l.url).not.toMatch(/molport\.com\/shop\/index\/search/)
       expect(l.url).not.toMatch(/emolecules\.com\/search-structure/)
+      expect(l.url).not.toMatch(/caymanchem\.com\/product\/s\?/)
+      expect(l.url).not.toMatch(/selleckchem\.com\/search\.html\?/)
+      expect(l.url).not.toMatch(/alfa\.com\/en\/search/)
     }
   })
 

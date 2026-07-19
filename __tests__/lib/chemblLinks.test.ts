@@ -24,10 +24,10 @@ describe('chemblLinks', () => {
     expect(chemblTargetUrl('CHEMBL230')).toBe(
       'https://www.ebi.ac.uk/chembl/explore/target/CHEMBL230',
     )
-    expect(chemblCompoundIndicationsUrl('25')).toContain('CHEMBL25')
-    expect(chemblCompoundIndicationsUrl('25')).toContain(
-      'drug_indications/CHEMBL25',
+    expect(chemblCompoundIndicationsUrl('25')).toBe(
+      'https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL25#DrugIndications',
     )
+    expect(chemblCompoundIndicationsUrl('25')).not.toContain('/embed/')
   })
 
   it('rejects homepage and SPA hash URLs as unstable', () => {
@@ -37,11 +37,6 @@ describe('chemblLinks', () => {
         'https://www.ebi.ac.uk/chembl/g/#browse/drug_indications/filter/molecule_chembl_id:CHEMBL25',
       ),
     ).toBe(false)
-    expect(
-      isStableChemblDeepLink(
-        'https://www.ebi.ac.uk/chembl/embed/report_cards/compound/sections/drug_indications/CHEMBL25',
-      ),
-    ).toBe(true)
     expect(
       isStableChemblDeepLink(
         'https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL25',
@@ -62,16 +57,39 @@ describe('chemblLinks', () => {
     expect(href).toContain('explore/compound/CHEMBL25')
   })
 
-  it('indication uses drug_indications embed not SPA browse hash or homepage', () => {
-    const href = chemblIndicationDeepLink({ moleculeChemblId: 'CHEMBL25', meshId: 'D008173' })
-    expect(href).toContain('drug_indications/CHEMBL25')
+  it('indication prefers MeSH (condition-specific) over compound page', () => {
+    const href = chemblIndicationDeepLink({
+      moleculeChemblId: 'CHEMBL25',
+      meshId: 'D008173',
+    })
+    expect(href).toContain('meshb.nlm.nih.gov')
+    expect(href).toContain('D008173')
+    expect(href).not.toContain('/embed/')
     expect(href).not.toContain('/g/#browse')
-    expect(href).not.toMatch(/\/chembl\/?$/)
   })
 
   it('indication falls back to MeSH when no molecule id', () => {
     const href = chemblIndicationDeepLink({ meshId: 'D008173', condition: 'Pain' })
     expect(href).toContain('meshb.nlm.nih.gov')
     expect(href).toContain('D008173')
+  })
+
+  it('indication uses compound#DrugIndications when no ontology ids', () => {
+    const href = chemblIndicationDeepLink({
+      moleculeChemblId: 'CHEMBL25',
+      condition: 'Pain',
+    })
+    expect(href).toBe(
+      'https://www.ebi.ac.uk/chembl/explore/compound/CHEMBL25#DrugIndications',
+    )
+  })
+
+  it('indication falls back to EFO OLS when mesh missing', () => {
+    const href = chemblIndicationDeepLink({
+      moleculeChemblId: 'CHEMBL25',
+      efoId: 'EFO_0003843',
+    })
+    expect(href).toContain('ols4/ontologies/efo')
+    expect(href).toContain('EFO_0003843')
   })
 })

@@ -83,7 +83,7 @@ describe('getAtcClassificationsByName', () => {
     })
     const results = await getAtcClassificationsByName('aspirin')
     expect(results.map((r) => r.code)).toEqual(['B01AC', 'N02BA'])
-    expect(results.every((r) => r.url.includes('code='))).toBe(true)
+    expect(results.every((r) => (r.url ?? '').includes('code='))).toBe(true)
     expect(results.find((r) => r.code === 'CN103')).toBeUndefined()
     const called = String((fetch as jest.Mock).mock.calls[0][0])
     expect(called).toContain('relaSource=ATC')

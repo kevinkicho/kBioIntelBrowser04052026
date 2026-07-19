@@ -185,6 +185,25 @@ export async function resolveCidViaMyChem(name: string): Promise<number | null> 
   return null
 }
 
+/** Minimal CID shell so profile panels can still load when identity APIs are down. */
+function identityShell(
+  cid: number,
+  description: string,
+): Molecule {
+  return {
+    cid,
+    name: `CID ${cid}`,
+    formula: '',
+    molecularWeight: 0,
+    synonyms: [],
+    inchiKey: '',
+    iupacName: '',
+    classification: 'unknown',
+    structureImageUrl: buildStructureImageUrl(cid),
+    description,
+  }
+}
+
 /** Build a minimal Molecule from MyChem when PubChem property PUG is down. */
 export async function getMoleculeByCidViaMyChem(
   cid: number,
@@ -194,26 +213,22 @@ export async function getMoleculeByCidViaMyChem(
       `${MYCHEM_QUERY}?q=pubchem.cid:${cid}` +
       `&fields=name,pubchem.cid,chembl.pref_name,chebi.name,formula,mass,inchi_key,synonyms&size=1`
     const res = await fetch(url, fetchOpts)
-    if (!res.ok) return null
+    if (!res.ok) {
+      // Still shell so category routes do not 502 the whole profile on App Hosting
+      return identityShell(
+        cid,
+        'Minimal identity shell (upstream identity APIs unavailable).',
+      )
+    }
     const data = (await res.json()) as {
       hits?: Array<Record<string, unknown>>
     }
     const hit = data.hits?.[0]
     if (!hit) {
-      // Still allow a shell molecule so the profile page can load panels by CID
-      return {
+      return identityShell(
         cid,
-        name: `CID ${cid}`,
-        formula: '',
-        molecularWeight: 0,
-        synonyms: [],
-        inchiKey: '',
-        iupacName: '',
-        classification: 'unknown',
-        structureImageUrl: buildStructureImageUrl(cid),
-        description:
-          'CID resolved; full structure metadata unavailable (PubChem PUG / MyChem limited).',
-      }
+        'CID resolved; full structure metadata unavailable (PubChem PUG / MyChem limited).',
+      )
     }
 
     const name = extractNameFromHit(hit) || `CID ${cid}`
@@ -242,18 +257,10 @@ export async function getMoleculeByCidViaMyChem(
         'Identity resolved via MyChem fallback (PubChem PUG unavailable from this host).',
     }
   } catch {
-    return {
+    return identityShell(
       cid,
-      name: `CID ${cid}`,
-      formula: '',
-      molecularWeight: 0,
-      synonyms: [],
-      inchiKey: '',
-      iupacName: '',
-      classification: 'unknown',
-      structureImageUrl: buildStructureImageUrl(cid),
-      description: 'Minimal identity shell (upstream identity APIs unavailable).',
-    }
+      'Minimal identity shell (upstream identity APIs unavailable).',
+    )
   }
 }
 

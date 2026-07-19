@@ -33,6 +33,11 @@ export type ProductEventName =
   | 'preference_tooltip_opened'
   /** User opened an external source record deep link from a list row / chip */
   | 'source_deep_link_opened'
+  /**
+   * Generic surface telemetry (props: surface, action, …).
+   * Used for CT table, related molecules, 3D structure, disease intel — not dual-emit.
+   */
+  | 'ui_surface_action'
 
 /** Success-metric tags from design v1 §1.5 / v2 §6.10. */
 export type ProductMetricId = 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9' | '—'
@@ -62,6 +67,7 @@ export const PRODUCT_EVENT_LABELS: Record<ProductEventName, string> = {
   rubric_changed: 'Rubric changed',
   preference_tooltip_opened: 'Preference tooltip opened',
   source_deep_link_opened: 'Source deep link opened',
+  ui_surface_action: 'UI surface action',
 }
 
 export const PRODUCT_EVENT_METRIC: Record<ProductEventName, ProductMetricId> = {
@@ -89,6 +95,7 @@ export const PRODUCT_EVENT_METRIC: Record<ProductEventName, ProductMetricId> = {
   rubric_changed: 'M4',
   preference_tooltip_opened: 'M9',
   source_deep_link_opened: 'M6',
+  ui_surface_action: '—',
 }
 
 export const PRODUCT_METRIC_LABELS: Record<ProductMetricId, string> = {

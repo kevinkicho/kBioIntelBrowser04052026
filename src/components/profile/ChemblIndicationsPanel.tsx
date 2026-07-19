@@ -15,6 +15,7 @@ import {
   isStableChemblDeepLink,
   normalizeChemblId,
 } from '@/lib/chemblLinks'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 const phaseColors: Record<number, { bg: string; label: string }> = {
   4: { bg: 'bg-emerald-900/40 text-emerald-300 border-emerald-700/30', label: 'Phase 4' },
@@ -144,33 +145,52 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
               normalizeChemblId(ind.moleculeChemblId) ||
               extractChemblId(ind.url) ||
               moleculeChemblId
-            const href = isStableChemblDeepLink(ind.url)
-              ? ind.url
-              : chemblIndicationDeepLink({
-                  moleculeChemblId: rowMolId,
-                  meshId: ind.meshId,
-                  efoId: ind.efoId,
-                  condition: displayName,
-                })
+            // Always prefer condition-specific ontology (MeSH/EFO) or compound#DrugIndications.
+            // Ignore stored legacy SPA / embed URLs that dump users in odd ChEMBL shells.
+            const href =
+              (isStableChemblDeepLink(ind.url) &&
+              !/\/embed\//i.test(ind.url || '') &&
+              !/\/g\/#/i.test(ind.url || '')
+                ? ind.url
+                : null) ||
+              chemblIndicationDeepLink({
+                moleculeChemblId: rowMolId,
+                meshId: ind.meshId,
+                efoId: ind.efoId,
+                condition: displayName,
+              })
+            const openTitle = ind.meshId
+              ? `Open MeSH: ${ind.meshId}`
+              : ind.efoId
+                ? `Open EFO: ${ind.efoId}`
+                : rowMolId
+                  ? `Open ChEMBL compound ${rowMolId} (Drug Indications)`
+                  : 'Open indication source'
             return (
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_4.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Indication</span>
                     <span>ID</span>
                     <span className="text-right">Phase</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
                 <a
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title="Open drug indications in ChEMBL"
-                  className={`grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group ${
+                  title={openTitle}
+                  data-testid={`chembl-indication-row-${ind.meshId || ind.efoId || displayName}`}
+                  onClick={() =>
+                    onDeepLinkClick('chembl', href, {
+                      panelId: 'chembl-indications',
+                      label: displayName,
+                    })
+                  }
+                  className={`grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_4.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group ${
                     diseaseMatch ? 'bg-amber-950/20' : ''
                   }`}
                 >
@@ -188,7 +208,6 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
                   <span className={`text-[11px] text-right border px-1.5 py-0.5 rounded justify-self-end ${phase.bg}`}>
                     {phase.label.replace('Phase ', 'P')}
                   </span>
-                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
                 </a>
               </div>
             )

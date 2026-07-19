@@ -18,7 +18,9 @@ import {
   extractClaimsFromChemblMechanisms,
   extractClaimsFromClinicalTrials,
   extractClaimsFromOpenTargets,
+  extractClaimsFromRelatedMolecules,
 } from './extractors'
+import type { DedupedDiseaseMolecule, DiseaseMolecule } from '@/lib/diseaseSearch'
 
 /** Design §5.4 — versioned packs ≤200 claims. */
 export const DEFAULT_CLAIM_TOTAL_CAP = 200
@@ -30,6 +32,9 @@ export interface CorePanelEvidenceInput {
   adverseEvents?: readonly AdverseEvent[] | null
   clinicalTrials?: readonly ClinicalTrial[] | null
   diseaseAssociations?: readonly DiseaseAssociation[] | null
+  /** Disease-related molecules with selection reasons (board density). */
+  relatedMolecules?: readonly (DiseaseMolecule | DedupedDiseaseMolecule)[] | null
+  diseaseName?: string
 }
 
 export interface ExtractAllOptions extends ClaimExtractorContext {
@@ -95,6 +100,10 @@ export function extractClaimsFromCorePanels(
     ...extractClaimsFromOpenTargets(panels.diseaseAssociations, ctx),
     ...extractClaimsFromClinicalTrials(panels.clinicalTrials, ctx),
     ...extractClaimsFromAdverseEvents(panels.adverseEvents, ctx),
+    ...extractClaimsFromRelatedMolecules(panels.relatedMolecules, {
+      ...ctx,
+      diseaseName: panels.diseaseName,
+    }),
   ]
 
   let claims = dedupeClaimsById(raw)

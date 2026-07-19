@@ -69,48 +69,57 @@ export const SUPPLIER_CATALOG_TEMPLATES: CatalogTemplate[] = [
     hint: 'MilliporeSigma product search',
   },
   {
-    pattern: /\bTCI\b.*Chemical|Tokyo Chemical/i,
+    pattern: /\bTCI\b.*Chemical|Tokyo Chemical|Tokyo Chemical Industry/i,
     name: 'TCI Chemicals',
-    urlTemplate: 'https://www.tcichemicals.com/US/en/search?text={name}',
-    hint: 'TCI catalog text search',
+    // Trailing slash + resulttype=product required — bare /search?text= 404s on TCI’s storefront
+    // Prefer CAS when available (catalog is CAS-keyed); {cas} falls back to name in fillCatalogTemplate
+    urlTemplate:
+      'https://www.tcichemicals.com/US/en/search/?text={cas}&resulttype=product',
+    hint: 'TCI America product search (CAS or name)',
   },
   {
     pattern: /\bFisher\s*(Scientific|Chem)/i,
     name: 'Fisher Scientific',
-    urlTemplate: 'https://www.fishersci.com/us/en/catalog/search/products?keyword={name}',
-    hint: 'Fisher catalog product search',
+    // Prefer CAS when known; keyword search is the live results endpoint (200 OK)
+    urlTemplate:
+      'https://www.fishersci.com/us/en/catalog/search/products?keyword={cas}',
+    hint: 'Fisher Scientific product search (CAS or name)',
   },
   {
     pattern: /\bAcros\s*Organics\b/i,
     name: 'Acros Organics',
-    urlTemplate: 'https://www.fishersci.com/us/en/catalog/search/products?keyword={name}',
-    hint: 'Via Fisher Scientific catalog',
+    urlTemplate:
+      'https://www.fishersci.com/us/en/catalog/search/products?keyword={cas}',
+    hint: 'Acros via Fisher catalog search',
   },
   {
     pattern: /\bThermo\s*Fisher/i,
     name: 'Thermo Fisher Scientific',
-    urlTemplate: 'https://www.thermofisher.com/search/results?query={name}',
-    hint: 'Thermo Fisher results page',
+    urlTemplate:
+      'https://www.thermofisher.com/search/results?query={cas}&resultPage=1&resultsPerPage=30',
+    hint: 'Thermo Fisher product search',
   },
   {
     pattern: /\bAlfa\s*(Aesar|Chemistry)/i,
     name: 'Alfa Aesar',
-    // Alfa is Thermo-hosted; /en/search/?q= works
-    urlTemplate: 'https://www.alfa.com/en/search/?q={name}',
-    hint: 'Alfa Aesar (Thermo) search',
+    // alfa.com search redirects to Thermo chemicals home without query — use Fisher brand search
+    urlTemplate:
+      'https://www.fishersci.com/us/en/catalog/search/products?keyword=Alfa%20Aesar%20{cas}',
+    hint: 'Alfa Aesar products via Fisher Scientific',
   },
   {
     pattern: /\bCayman\s*Chem/i,
     name: 'Cayman Chemical',
-    urlTemplate: 'https://www.caymanchem.com/product/s?term={name}',
-    hint: 'Cayman product search',
+    // /product/s?term= 301s to homepage without search; /search?q= is live (200)
+    urlTemplate: 'https://www.caymanchem.com/search?q={cas}',
+    hint: 'Cayman catalog search (CAS or name)',
   },
   {
-    pattern: /\bSelleck(?:Chem)?\b/i,
+    pattern: /\bSelleck(?:Chem)?\b|Selleck\s*Chemicals/i,
     name: 'Selleck Chemicals',
-    urlTemplate:
-      'https://www.selleckchem.com/search.html?searchDTO.searchValue={name}&searchDTO.searchSites=Selleck',
-    hint: 'Selleck inhibitors search',
+    // search.html returns 500; searchResult.html is the working endpoint
+    urlTemplate: 'https://www.selleckchem.com/searchResult.html?searchValue={name}',
+    hint: 'Selleck product search results',
   },
   {
     pattern: /\bMedChem\s*Express\b|MCE\b/i,
@@ -227,29 +236,31 @@ export const ORDER_PANEL_VENDORS: { name: string; urlTemplate: string; hint: str
   },
   {
     name: 'TCI Chemicals',
-    urlTemplate: 'https://www.tcichemicals.com/US/en/search?text={name}',
-    hint: 'Catalog text search',
+    urlTemplate:
+      'https://www.tcichemicals.com/US/en/search/?text={cas}&resulttype=product',
+    hint: 'TCI America product search (CAS or name)',
   },
   {
     name: 'Fisher Scientific',
-    urlTemplate: 'https://www.fishersci.com/us/en/catalog/search/products?keyword={name}',
-    hint: 'Catalog product search',
+    urlTemplate:
+      'https://www.fishersci.com/us/en/catalog/search/products?keyword={cas}',
+    hint: 'Fisher product search (CAS or name)',
   },
   {
     name: 'Thermo Fisher',
-    urlTemplate: 'https://www.thermofisher.com/search/results?query={name}',
-    hint: 'Search results page',
+    urlTemplate:
+      'https://www.thermofisher.com/search/results?query={cas}&resultPage=1&resultsPerPage=30',
+    hint: 'Thermo Fisher product search',
   },
   {
     name: 'Cayman Chemical',
-    urlTemplate: 'https://www.caymanchem.com/product/s?term={name}',
-    hint: 'Product search results',
+    urlTemplate: 'https://www.caymanchem.com/search?q={cas}',
+    hint: 'Cayman catalog search (CAS or name)',
   },
   {
     name: 'Selleck Chemicals',
-    urlTemplate:
-      'https://www.selleckchem.com/search.html?searchDTO.searchValue={name}&searchDTO.searchSites=Selleck',
-    hint: 'Inhibitor catalog results',
+    urlTemplate: 'https://www.selleckchem.com/searchResult.html?searchValue={name}',
+    hint: 'Selleck product search results',
   },
   {
     name: 'MedChemExpress',
@@ -273,8 +284,10 @@ export const ORDER_PANEL_VENDORS: { name: string; urlTemplate: string; hint: str
   },
   {
     name: 'Alfa Aesar',
-    urlTemplate: 'https://www.alfa.com/en/search/?q={name}',
-    hint: 'Thermo/Alfa catalog search',
+    // alfa.com search no longer carries the query (redirects to Thermo chemicals home)
+    urlTemplate:
+      'https://www.fishersci.com/us/en/catalog/search/products?keyword=Alfa%20Aesar%20{cas}',
+    hint: 'Alfa Aesar via Fisher Scientific search',
   },
 ]
 

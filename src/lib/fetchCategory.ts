@@ -105,12 +105,20 @@ export async function fetchCategoryData(
   const qs = params.toString()
   if (qs) url += `?${qs}`
 
-  // Retries cover Fast Refresh route races (transient 404) and PubChem 502s.
+  // Category fetches fan out to many free APIs (often 8–15s). Give more wall time
+  // than the default 40s clientFetch budget when a soft stampede is in flight.
+  // Retries cover Fast Refresh 404s, PubChem 502s, and transient category 500s.
   // Pass signal so force/remount aborts in-flight category work.
   const res = await clientFetch(
     url,
     opts?.signal ? { signal: opts.signal } : undefined,
-    { retries: 2, retryDelayMs: 400 },
+    {
+      retries: 3,
+      retryDelayMs: 600,
+      // Include 408 in case proxies surface timeouts as such
+      retryStatuses: [404, 408, 429, 500, 502, 503, 504],
+      timeoutMs: 90_000,
+    },
   )
   if (!res.ok) {
     throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)

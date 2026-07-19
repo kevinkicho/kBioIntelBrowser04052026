@@ -8,7 +8,13 @@ export interface DiseaseDetailContext {
   therapeuticAreas: string[]
   genes: GeneAssociation[]
   drugInterventions: { name: string; trialCount: number }[]
-  molecules: { name: string; cid: number | null; sources: string[] }[]
+  molecules: {
+    name: string
+    cid: number | null
+    sources: string[]
+    reason?: string
+    relationKind?: string
+  }[]
   trialSummary: {
     total: number
     recruiting: number
@@ -64,13 +70,25 @@ function formatDrugsTable(drugs: { name: string; trialCount: number }[], limit: 
   return lines.join('\n')
 }
 
-function formatMoleculesTable(molecules: { name: string; cid: number | null; sources: string[] }[], limit: number): string {
+function formatMoleculesTable(
+  molecules: {
+    name: string
+    cid: number | null
+    sources: string[]
+    reason?: string
+    relationKind?: string
+  }[],
+  limit: number,
+): string {
   if (molecules.length === 0) return '  (none found)'
   const top = molecules.slice(0, limit)
   const remainder = molecules.length - top.length
-  const lines = top.map(m =>
-    `  - ${m.name} | ${m.cid != null ? `CID ${m.cid}` : 'no PubChem entry'} | from=${m.sources.join(',')}`
-  )
+  const lines = top.map((m) => {
+    const why = m.reason?.trim() || `from=${m.sources.join(',')}`
+    return `  - ${m.name} | ${m.cid != null ? `CID ${m.cid}` : 'no PubChem entry'} | ${why}${
+      m.relationKind ? ` | kind=${m.relationKind}` : ''
+    }`
+  })
   if (remainder > 0) lines.push(`  ... and ${remainder} more candidate molecules`)
   return lines.join('\n')
 }
@@ -115,7 +133,7 @@ function escapeRegex(s: string): string {
 export function findGenesWithoutDrugs(
   genes: GeneAssociation[],
   drugInterventions: { name: string; trialCount: number }[],
-  molecules: { name: string; cid: number | null; sources: string[] }[],
+  molecules: { name: string; cid: number | null; sources?: string[] }[],
 ): GeneAssociation[] {
   const allNames = [
     ...drugInterventions.map(d => d.name),
@@ -214,6 +232,109 @@ For each therapeutic gap (generate 3-5):
 Also address: Are there entire pathways or therapeutic areas that are well-served by existing drugs, creating a contrast with the undruggable gaps? This contrast highlights where investment should focus.`
 
   return { system: DISEASE_SYSTEM_PROMPT, user }
+}
+
+export type DiseaseIntelligenceMode =
+  | 'summary'
+  | 'repurposing'
+  | 'gap'
+  | 'connections'
+  | 'custom'
+
+export const DISEASE_INTELLIGENCE_MODES: {
+  id: DiseaseIntelligenceMode
+  title: string
+  shortLabel: string
+  description: string
+}[] = [
+  {
+    id: 'summary',
+    title: 'Quick Summary',
+    shortLabel: 'Summary',
+    description:
+      '2–3 paragraphs: dominant mechanism, non-obvious gene–drug finding, and a concrete next step.',
+  },
+  {
+    id: 'repurposing',
+    title: 'Drug Repurposing Opportunities',
+    shortLabel: 'Repurposing',
+    description:
+      'Approved drugs for other conditions that hit disease-associated genes but are not yet in trials here.',
+  },
+  {
+    id: 'gap',
+    title: 'Therapeutic Gap Analysis',
+    shortLabel: 'Gaps',
+    description:
+      'Undrugged or hard-to-drug genes, modality suggestions, and validation experiments.',
+  },
+  {
+    id: 'connections',
+    title: 'Disease–Drug Connection Map',
+    shortLabel: 'Connections',
+    description:
+      'Wiring diagram of gene ↔ drug links, missing links, and over/under-invested pathways.',
+  },
+  {
+    id: 'custom',
+    title: 'Ask a question',
+    shortLabel: 'Ask',
+    description: 'Your own research question with the same disease evidence block and system rules.',
+  },
+]
+
+/** Build prompts for a mode; custom requires a non-empty question. */
+export function buildDiseaseIntelligencePrompt(
+  mode: DiseaseIntelligenceMode,
+  ctx: DiseaseDetailContext,
+  customQuestion?: string,
+): { system: string; user: string } {
+  switch (mode) {
+    case 'summary':
+      return buildDiseaseQuickSummaryPrompt(ctx)
+    case 'repurposing':
+      return buildDiseaseRepurposingPrompt(ctx)
+    case 'gap':
+      return buildDiseaseTherapeuticGapPrompt(ctx)
+    case 'connections':
+      return buildDiseaseConnectionMapPrompt(ctx)
+    case 'custom': {
+      const q = (customQuestion || '').trim() || 'What should a researcher investigate next for this disease?'
+      const dataBlock = buildDataContextBlock(ctx)
+      const user = `Answer the researcher's question about ${ctx.diseaseName} using ONLY the evidence block below. Cite gene symbols, drug names, trial counts, and scores. Do not invent clinical efficacy claims.
+
+Researcher question:
+${q}
+
+${dataBlock}
+
+Respond with clear structure: short paragraphs or numbered points. Prefer connections and gaps over restating tables.`
+      return { system: DISEASE_SYSTEM_PROMPT, user }
+    }
+    default:
+      return buildDiseaseQuickSummaryPrompt(ctx)
+  }
+}
+
+/** Compact parameter summary for UI transparency (not the full data dump). */
+export function diseasePromptParameters(ctx: DiseaseDetailContext): Record<string, string | number> {
+  return {
+    diseaseName: ctx.diseaseName,
+    diseaseId: ctx.diseaseId ?? '(none)',
+    geneCount: ctx.genes.length,
+    genesInPrompt: Math.min(ctx.genes.length, GENE_LIMIT),
+    drugInterventionCount: ctx.drugInterventions.length,
+    drugsInPrompt: Math.min(ctx.drugInterventions.length, DRUG_LIMIT),
+    moleculeCount: ctx.molecules.length,
+    moleculesInPrompt: Math.min(ctx.molecules.length, MOLECULE_LIMIT),
+    trialTotal: ctx.trialSummary.total,
+    trialRecruiting: ctx.trialSummary.recruiting,
+    therapeuticAreas: ctx.therapeuticAreas.join(', ') || '(none)',
+    topGenes: ctx.genes
+      .slice(0, 5)
+      .map((g) => g.geneSymbol)
+      .join(', '),
+  }
 }
 
 export function buildDiseaseConnectionMapPrompt(ctx: DiseaseDetailContext): { system: string; user: string } {

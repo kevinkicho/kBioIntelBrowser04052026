@@ -1,4 +1,4 @@
-import { searchMolecules, getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
+import { searchMolecules, getMoleculeById } from '@/lib/api/pubchem'
 import { clearCache } from '@/lib/cache'
 
 // Mock global fetch
@@ -99,16 +99,28 @@ describe('getMoleculeById', () => {
     expect(result).toBeNull()
   })
 
-  test('throws PubChemUpstreamError on transient PubChem failure', async () => {
-    ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-      .mockResolvedValueOnce({ ok: false, status: 503 })
-    await expect(getMoleculeById(3080836)).rejects.toBeInstanceOf(PubChemUpstreamError)
+  test('falls back to identity shell when PubChem is 503 and MyChem unavailable', async () => {
+    // PUG property/synonyms/description all 503, then MyChem fallback also fails → shell
+    ;(fetch as jest.Mock).mockImplementation(async (url: string) => {
+      const u = String(url)
+      if (u.includes('mychem.info')) {
+        return { ok: false, status: 503, json: async () => ({}) }
+      }
+      return { ok: false, status: 503, json: async () => ({}) }
+    })
+    const molecule = await getMoleculeById(3080836)
+    // App Hosting resilience: never 502 the whole profile when only identity PUG is down
+    expect(molecule).not.toBeNull()
+    expect(molecule!.cid).toBe(3080836)
+    expect(molecule!.name).toMatch(/CID 3080836/)
+    expect(molecule!.description || '').toMatch(/unavailable|shell|MyChem|limited/i)
   })
 
-  test('throws PubChemUpstreamError on network error', async () => {
+  test('falls back to identity shell on total network failure', async () => {
     ;(fetch as jest.Mock).mockRejectedValue(new Error('Network error'))
-    await expect(getMoleculeById(3080836)).rejects.toBeInstanceOf(PubChemUpstreamError)
+    const molecule = await getMoleculeById(3080836)
+    expect(molecule).not.toBeNull()
+    expect(molecule!.cid).toBe(3080836)
+    expect(molecule!.description || '').toMatch(/unavailable|shell|MyChem|limited/i)
   })
 })

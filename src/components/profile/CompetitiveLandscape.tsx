@@ -131,7 +131,8 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
         <span>Competitive Landscape</span>
       </h3>
       <p className="text-[11px] text-slate-500 mb-3">
-        Other molecules with measured IC50 on shared ChEMBL targets (most potent / later phase first).
+        Other molecules with measured IC50 on shared ChEMBL targets (most potent / later phase
+        first). Click a row to open that compound in ChEMBL.
       </p>
 
       <div className="space-y-5">
@@ -147,10 +148,9 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 truncate block"
-                      title={name}
+                      title={`Open target ${name} in ChEMBL`}
                     >
                       Target: {name}
-                      <span className="ml-1 text-[9px] text-indigo-500/80">↗</span>
                     </a>
                   ) : (
                     <div className="text-[11px] font-medium text-indigo-400 truncate" title={name}>
@@ -164,16 +164,15 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                 </span>
               </div>
 
-              {/* Aligned listview columns */}
+              {/* Aligned listview — no Open column; entire row is the deep link */}
               <div
-                className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem_2.5rem] gap-x-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem] gap-x-2 px-2 py-1 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                 role="row"
               >
                 <span>Compound</span>
                 <span>Phase</span>
                 <span>Potency</span>
                 <span>Type</span>
-                <span className="text-right">Open</span>
               </div>
 
               <div className="divide-y divide-slate-800/80">
@@ -191,8 +190,8 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`Open ${label} in ChEMBL`}
-                      className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem_2.5rem] gap-x-2 items-center px-2 py-1.5 hover:bg-slate-900/50 transition-colors group"
+                      title={`${label} in ChEMBL`}
+                      className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem] gap-x-2 items-center px-2 py-1.5 hover:bg-slate-900/50 transition-colors group"
                     >
                       <div className="min-w-0">
                         <div className="text-xs font-medium text-slate-100 group-hover:text-indigo-300 truncate">
@@ -220,9 +219,6 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                       </span>
                       <span className="text-[10px] text-slate-500 uppercase truncate">
                         {comp.activityType || 'IC50'}
-                      </span>
-                      <span className="text-[11px] text-cyan-400 group-hover:text-cyan-300 text-right">
-                        ↗
                       </span>
                     </a>
                   )

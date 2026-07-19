@@ -18,3 +18,7 @@ export {
   extractClaimsFromOpenTargets,
   OPEN_TARGETS_SOURCE,
 } from './openTargets'
+export {
+  extractClaimsFromRelatedMolecules,
+  RELATED_MOLECULE_SOURCE,
+} from './relatedMolecules'

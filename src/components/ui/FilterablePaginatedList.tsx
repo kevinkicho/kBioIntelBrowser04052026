@@ -25,7 +25,10 @@ export interface FilterablePaginatedListProps<T> {
   sortOptions: ListSortOption<T>[]
   /** Default sort id (e.g. date-desc for timestamped data) */
   defaultSortId?: string
-  renderItem: (item: T, index: number) => ReactNode
+  /**
+   * Row renderer. Optional when `columnVisibility.renderItemWithColumns` is set.
+   */
+  renderItem?: (item: T, index: number) => ReactNode
   pageSize?: number
   className?: string
   filterPlaceholder?: string
@@ -38,10 +41,8 @@ export interface FilterablePaginatedListProps<T> {
     columns: CsvColumn<T>[]
   }
   /**
-   * Optional column visibility toggles. Keys are opaque ids; parent reads
-   * `visibleColumns` via render prop or external state if needed later.
-   * For now: toggles are local and passed to renderItem via data attribute only
-   * if parent uses the `columnVisibility` keys for conditional cells.
+   * Optional column visibility toggles. When `renderItemWithColumns` is set,
+   * it is used instead of `renderItem`.
    */
   columnVisibility?: {
     columns: { id: string; label: string; defaultVisible?: boolean }[]
@@ -98,6 +99,18 @@ export function FilterablePaginatedList<T>({
     const headers = csvExport.columns.map((c) => c.header)
     const rows = filtered.map((item) => csvExport.columns.map((c) => c.get(item)))
     downloadCsv(csvExport.filename, rowsToCsv(headers, rows))
+    try {
+      void import('@/lib/productEvents').then(({ emitProductEvent }) => {
+        emitProductEvent('ui_surface_action', {
+          surface: 'list_csv_export',
+          action: 'export',
+          filename: csvExport.filename,
+          count: filtered.length,
+        })
+      })
+    } catch {
+      /* ignore */
+    }
   }
 
   function toggleCol(id: string) {
@@ -113,10 +126,10 @@ export function FilterablePaginatedList<T>({
     })
   }
 
-  const render =
+  const render: (item: T, i: number) => ReactNode =
     columnVisibility?.renderItemWithColumns != null
-      ? (item: T, i: number) => columnVisibility.renderItemWithColumns!(item, i, visibleCols)
-      : renderItem
+      ? (item, i) => columnVisibility.renderItemWithColumns!(item, i, visibleCols)
+      : renderItem ?? (() => null)
 
   return (
     <div className={className}>

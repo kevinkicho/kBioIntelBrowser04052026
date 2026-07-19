@@ -159,22 +159,28 @@ export function sourceStatusForPanel(
   return undefined
 }
 
-/** Worst-case load status for a panel from category API traces. */
+/**
+ * Worst-case load status for a *single* panel from category API traces.
+ * Never falls back to the whole category — that made every unmapped card inherit
+ * another source's timeout/error (false Retry/error badges until a lone refresh).
+ */
 export function loadStatusFromPanelTrace(
   sources: Array<{ loadStatus?: string; panelId?: string; source?: string }>,
   panelId: string,
 ): DataLoadStatus | undefined {
+  if (!panelId) return undefined
+  const compactPanel = panelId.replace(/-/g, '')
   const related = sources.filter(
     (s) =>
       s.panelId === panelId ||
       s.source === panelId ||
-      (s.source && s.source.replace(/-/g, '') === panelId.replace(/-/g, '')),
+      (s.panelId && s.panelId.replace(/-/g, '') === compactPanel) ||
+      (s.source && s.source.replace(/-/g, '') === compactPanel),
   )
-  const pool = related.length > 0 ? related : sources
-  if (pool.length === 0) return undefined
+  if (related.length === 0) return undefined
   const ranks: DataLoadStatus[] = ['timeout', 'error', 'disabled', 'empty', 'loaded']
   let worst: DataLoadStatus | undefined
-  for (const s of pool) {
+  for (const s of related) {
     const st = s.loadStatus as DataLoadStatus | undefined
     if (!st || !ranks.includes(st)) continue
     if (!worst || ranks.indexOf(st) < ranks.indexOf(worst)) worst = st
@@ -272,16 +278,24 @@ export function buildCategoryApiTrace(input: {
   }
 }
 
-/** Filter category trace to sources relevant to one panel card. */
+/**
+ * Filter category trace to sources relevant to one panel card.
+ * Prefer panel-matched sources only so status badges stay accurate.
+ * When nothing matches, return an empty sources list (caller can still show
+ * category path/timing from the outer trace fields).
+ */
 export function filterTraceForPanel(
   trace: CategoryApiTrace | null | undefined,
   panelId: string,
 ): CategoryApiTrace | null {
   if (!trace) return null
+  const compactPanel = panelId.replace(/-/g, '')
   const related = trace.sources.filter(
-    (s) => s.panelId === panelId || s.source === panelId || s.source.replace(/-/g, '') === panelId.replace(/-/g, ''),
+    (s) =>
+      s.panelId === panelId ||
+      s.source === panelId ||
+      (s.panelId && s.panelId.replace(/-/g, '') === compactPanel) ||
+      (s.source && s.source.replace(/-/g, '') === compactPanel),
   )
-  // If no specific match, show full category trace (honest: category is the fetch unit)
-  const sources = related.length > 0 ? related : trace.sources
-  return { ...trace, sources }
+  return { ...trace, sources: related }
 }

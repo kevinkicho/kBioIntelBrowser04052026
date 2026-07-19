@@ -64,13 +64,12 @@ export const StringPanel = memo(function StringPanel({
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Protein A</span>
                     <span>Protein B</span>
                     <span className="text-right">Score</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
                 <a
@@ -83,7 +82,7 @@ export const StringPanel = memo(function StringPanel({
                       label: `${interaction.proteinA}-${interaction.proteinB}`,
                     })
                   }
-                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                  className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)_4.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
                   <span className="text-sm text-slate-100 truncate group-hover:text-indigo-200">
                     {interaction.proteinA || '—'}
@@ -93,9 +92,6 @@ export const StringPanel = memo(function StringPanel({
                   </span>
                   <span className="text-xs font-mono tabular-nums text-right text-slate-300">
                     {(interaction.score ?? 0).toFixed(3)}
-                  </span>
-                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
-                    ↗
                   </span>
                 </a>
               </div>

@@ -16,6 +16,8 @@ let mockAiState: {
   pullModel: jest.Mock
   pullProgress: null
   askAI: jest.Mock
+  cancelAskAI: jest.Mock
+  isChatStreaming: boolean
 }
 
 jest.mock('@/lib/ai/useAI', () => ({
@@ -62,6 +64,8 @@ function makeAiUnavailable() {
     pullModel: jest.fn(),
     pullProgress: null,
     askAI: jest.fn(),
+    cancelAskAI: jest.fn(),
+    isChatStreaming: false,
   }
 }
 
@@ -80,6 +84,8 @@ function makeAiAvailable() {
     pullModel: jest.fn(),
     pullProgress: null,
     askAI: jest.fn(),
+    cancelAskAI: jest.fn(),
+    isChatStreaming: false,
   }
 }
 
@@ -96,13 +102,13 @@ describe('DiseaseIntelligencePanel', () => {
 
   it('renders subtitle', () => {
     render(<DiseaseIntelligencePanel context={baseContext} />)
-    expect(screen.getByText(/AI-synthesized insights/)).toBeInTheDocument()
+    expect(screen.getByText(/Evidence-bound synthesis/)).toBeInTheDocument()
   })
 
   it('shows Connect Ollama message when AI is unavailable', () => {
     makeAiUnavailable()
     render(<DiseaseIntelligencePanel context={baseContext} />)
-    expect(screen.getByText(/Connect Ollama/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Connect Ollama/).length).toBeGreaterThan(0)
   })
 
   it('shows no-data message when AI is available but context is empty', () => {
@@ -111,12 +117,16 @@ describe('DiseaseIntelligencePanel', () => {
     expect(screen.getByText(/No gene, drug, or molecule data/)).toBeInTheDocument()
   })
 
-  it('renders 3 expandable analysis cards when AI is available with data', () => {
+  it('renders intelligence mode tabs when AI is available with data', () => {
     makeAiAvailable()
     render(<DiseaseIntelligencePanel context={baseContext} />)
-    expect(screen.getByText('Drug Repurposing Opportunities')).toBeInTheDocument()
-    expect(screen.getByText('Therapeutic Gap Analysis')).toBeInTheDocument()
-    expect(screen.getByText('Disease-Drug Connection Map')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-tabs')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-tab-summary')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-tab-repurposing')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-tab-gap')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-tab-connections')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-tab-custom')).toBeInTheDocument()
+    expect(screen.getByText('Quick Summary')).toBeInTheDocument()
   })
 
   it('handles empty data gracefully', () => {

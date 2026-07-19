@@ -64,7 +64,7 @@ export const PatentsPanel = memo(function PatentsPanel({
             : null
           const date = patent.filingDate || patent.publicationDate || ''
           const row = (
-            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_minmax(0,0.9fr)_4.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group">
+            <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_minmax(0,0.9fr)_4.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group">
               <div className="min-w-0">
                 <div className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
                   {patent.title || '—'}
@@ -84,21 +84,19 @@ export const PatentsPanel = memo(function PatentsPanel({
               >
                 {date || '—'}
               </span>
-              <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
             </div>
           )
           return (
             <div>
               {index === 0 && (
                 <div
-                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_minmax(0,0.9fr)_4.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                  className="grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.7fr)_minmax(0,0.9fr)_4.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                   role="row"
                 >
                   <span>Title</span>
                   <span>Number</span>
                   <span>Assignee</span>
                   <span>Date</span>
-                  <span className="text-right">Open</span>
                 </div>
               )}
               {href ? (

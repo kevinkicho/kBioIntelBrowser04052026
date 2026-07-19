@@ -76,21 +76,48 @@ export function sortTrials(trials: ClinicalTrial[]): ClinicalTrial[] {
   })
 }
 
-export function extractDrugInterventions(trials: ClinicalTrial[]): { name: string; type: string; trialCount: number }[] {
+export interface DrugInterventionGroup {
+  name: string
+  type: string
+  trialCount: number
+  /** Trials that list this drug/biological as an intervention (for nested table UI). */
+  trials: ClinicalTrial[]
+}
+
+/**
+ * Group DRUG / BIOLOGICAL / COMBINATION_PRODUCT interventions by name.
+ * Each group carries the list of trials (deduped by nctId) for collapsible UI.
+ */
+export function extractDrugInterventions(trials: ClinicalTrial[]): DrugInterventionGroup[] {
   const drugTypes = new Set(['DRUG', 'BIOLOGICAL', 'COMBINATION_PRODUCT'])
-  const counts = new Map<string, { name: string; type: string; trialCount: number }>()
+  const groups = new Map<
+    string,
+    { name: string; type: string; trialIds: Set<string>; trials: ClinicalTrial[] }
+  >()
   for (const t of trials) {
     if (!t.interventionDetails) continue
     for (const i of t.interventionDetails) {
       if (!drugTypes.has(i.type)) continue
       const key = i.name.toUpperCase()
-      const existing = counts.get(key)
-      if (existing) {
-        existing.trialCount++
-      } else {
-        counts.set(key, { name: i.name, type: i.type, trialCount: 1 })
+      let g = groups.get(key)
+      if (!g) {
+        g = { name: i.name, type: i.type, trialIds: new Set(), trials: [] }
+        groups.set(key, g)
+      }
+      if (t.nctId && !g.trialIds.has(t.nctId)) {
+        g.trialIds.add(t.nctId)
+        g.trials.push(t)
+      } else if (!t.nctId) {
+        g.trials.push(t)
       }
     }
   }
-  return Array.from(counts.values()).sort((a, b) => b.trialCount - a.trialCount)
+  return Array.from(groups.values())
+    .map((g) => ({
+      name: g.name,
+      type: g.type,
+      trialCount: g.trials.length,
+      trials: g.trials,
+    }))
+    .sort((a, b) => b.trialCount - a.trialCount || a.name.localeCompare(b.name))
 }

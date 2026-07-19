@@ -104,14 +104,13 @@ export const MyChemPanel = memo(function MyChemPanel({
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Name / IDs</span>
                     <span>Formula</span>
                     <span>MW</span>
                     <span className="text-right">Phase</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
                 <a
@@ -119,7 +118,7 @@ export const MyChemPanel = memo(function MyChemPanel({
                   target="_blank"
                   rel="noopener noreferrer"
                   title={`Open ${titleName}`}
-                  className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem_2.5rem] gap-x-2 items-start px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
+                  className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem] gap-x-2 items-start px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
                   <div className="min-w-0">
                     <div className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
@@ -154,9 +153,6 @@ export const MyChemPanel = memo(function MyChemPanel({
                     className={`text-xs text-right tabular-nums text-slate-400 ${emptyDataClass(emptyPhase)}`}
                   >
                     {phase != null && phase > 0 ? phase : '—'}
-                  </span>
-                  <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">
-                    ↗
                   </span>
                 </a>
               </div>

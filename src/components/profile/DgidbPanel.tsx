@@ -1,7 +1,6 @@
 'use client'
 
 import { memo, useMemo } from 'react'
-import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { DrugGeneInteraction } from '@/lib/types'
@@ -73,29 +72,35 @@ export const DgidbPanel = memo(function DgidbPanel({
           renderItem={(interaction, index) => {
             const href = dgidbHref(interaction)
             const gene = interaction.geneName || interaction.geneSymbol || '—'
-            const symbol = interaction.geneSymbol || interaction.geneName || ''
             return (
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Gene</span>
                     <span>Type</span>
                     <span>Sources</span>
                     <span className="text-right">Score</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
-                <div className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors">
-                  <Link
-                    href={`/gene?q=${encodeURIComponent(symbol)}`}
-                    className="text-xs font-semibold text-cyan-300 hover:text-cyan-200 truncate"
-                    title={gene}
-                  >
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={`View ${gene} interaction in DGIdb`}
+                  onClick={() =>
+                    onDeepLinkClick('dgidb', href, {
+                      panelId: 'dgidb',
+                      label: gene,
+                    })
+                  }
+                  className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors group"
+                >
+                  <span className="text-xs font-semibold text-cyan-300 group-hover:text-cyan-200 truncate" title={gene}>
                     {gene}
-                  </Link>
+                  </span>
                   <span className="text-xs text-violet-300/90 truncate">
                     {interaction.interactionType || '—'}
                   </span>
@@ -105,22 +110,7 @@ export const DgidbPanel = memo(function DgidbPanel({
                   <span className="text-[11px] text-slate-500 text-right tabular-nums">
                     {interaction.score > 0 ? interaction.score.toFixed(1) : '—'}
                   </span>
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-400 hover:text-blue-300 text-right"
-                    title="View in DGIdb"
-                    onClick={() =>
-                      onDeepLinkClick('dgidb', href, {
-                        panelId: 'dgidb',
-                        label: gene,
-                      })
-                    }
-                  >
-                    ↗
-                  </a>
-                </div>
+                </a>
               </div>
             )
           }}

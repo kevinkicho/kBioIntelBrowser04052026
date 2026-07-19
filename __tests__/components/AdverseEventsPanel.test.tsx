@@ -46,4 +46,22 @@ describe('AdverseEventsPanel', () => {
     render(<AdverseEventsPanel adverseEvents={[]} />)
     expect(screen.getByText(/no adverse events found/i)).toBeInTheDocument()
   })
+
+  test('list rows deep-link to FAERS dashboard; API↗ is secondary evidence link', () => {
+    render(
+      <AdverseEventsPanel adverseEvents={mockEvents} moleculeName="Aspirin" />,
+    )
+    const row = screen.getByTestId('ae-row-nausea')
+    expect(row).toHaveAttribute('href')
+    const href = row.getAttribute('href') || ''
+    expect(href).toContain('fis.fda.gov')
+    expect(href).not.toContain('open.fda.gov/apis')
+
+    const api = screen.getByTestId('ae-api-nausea')
+    const apiHref = api.getAttribute('href') || ''
+    expect(apiHref).toContain('api.fda.gov/drug/event.json')
+    expect(apiHref).toMatch(/nausea/i)
+    expect(apiHref).toMatch(/Aspirin/i)
+  })
 })
+

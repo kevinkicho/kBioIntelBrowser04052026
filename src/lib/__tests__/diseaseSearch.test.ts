@@ -158,6 +158,9 @@ describe('searchDiseases integration', () => {
     expect(opentargets.getDrugsForDisease).toHaveBeenCalledWith('EFO_0000311')
     expect(results[0].molecules?.some((m) => m.name === 'Metformin')).toBe(true)
     expect(results[0].molecules?.every((m) => !/^(APP|PSEN1)$/i.test(m.name))).toBe(true)
+    const metformin = results[0].molecules?.find((m) => m.name === 'Metformin')
+    expect(metformin?.relationKind).toBe('known_drug')
+    expect(metformin?.reason).toMatch(/Open Targets known drug|clinical candidate/i)
   })
 
   test('respects limit parameter', async () => {

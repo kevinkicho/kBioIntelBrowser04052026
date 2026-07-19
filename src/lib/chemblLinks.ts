@@ -57,22 +57,34 @@ export function chemblCompoundUrl(chemblId: string | null | undefined): string |
 }
 
 /**
- * Compound page focused on Drug Indications.
- * Uses the dedicated embed section (full indications table) when possible.
+ * Compound explore page focused on Drug Indications (user-facing navigation).
+ * Prefer this over embed/* — embed URLs are iframe shells and feel “weird” in a new tab.
  */
 export function chemblCompoundIndicationsUrl(chemblId: string | null | undefined): string | null {
   const id = normalizeChemblId(chemblId)
   if (!id) return null
-  // Embed section = indications table only; compound#DrugIndications also works on explore UI
-  return `${CHEMBL_WEB}/embed/report_cards/compound/sections/drug_indications/${id}`
+  return `${CHEMBL_WEB}/explore/compound/${id}#DrugIndications`
 }
 
-/** Compound explore page + DrugIndications hash (full report card context). */
+/**
+ * @deprecated Prefer chemblCompoundIndicationsUrl (same destination now).
+ * Kept for callers that want an explicit “section” name.
+ */
 export function chemblCompoundIndicationsSectionUrl(
   chemblId: string | null | undefined,
 ): string | null {
-  const base = chemblCompoundUrl(chemblId)
-  return base ? `${base}#DrugIndications` : null
+  return chemblCompoundIndicationsUrl(chemblId)
+}
+
+/**
+ * Embed-only indications table (iframe). Prefer chemblCompoundIndicationsUrl for deep links.
+ */
+export function chemblCompoundIndicationsEmbedUrl(
+  chemblId: string | null | undefined,
+): string | null {
+  const id = normalizeChemblId(chemblId)
+  if (!id) return null
+  return `${CHEMBL_WEB}/embed/report_cards/compound/sections/drug_indications/${id}`
 }
 
 export function chemblTargetUrl(targetChemblId: string | null | undefined): string | null {
@@ -133,8 +145,11 @@ export function chemblMechanismDeepLink(input: {
 }
 
 /**
- * Indication list-item: ChEMBL drug-indications table for the molecule,
- * else disease ontology (MeSH/EFO), else explore search — never bare homepage.
+ * Indication list-item deep link (user opens in a new tab).
+ *
+ * Prefer **condition-specific** ontology pages when we have MeSH/EFO ids —
+ * those match the row the user clicked. Fall back to the molecule’s ChEMBL
+ * compound card (#DrugIndications). Never use embed/* or /g/# SPA shells.
  */
 export function chemblIndicationDeepLink(input: {
   moleculeChemblId?: string | null
@@ -142,10 +157,6 @@ export function chemblIndicationDeepLink(input: {
   efoId?: string | null
   condition?: string | null
 }): string {
-  const compoundInd =
-    chemblCompoundIndicationsUrl(input.moleculeChemblId) ||
-    chemblCompoundIndicationsSectionUrl(input.moleculeChemblId)
-  if (compoundInd) return compoundInd
   const mesh = input.meshId?.trim()
   if (mesh) {
     const meshClean = mesh.replace(/^MESH:/i, '')
@@ -153,11 +164,14 @@ export function chemblIndicationDeepLink(input: {
   }
   const efo = input.efoId?.trim()
   if (efo) {
+    // OLS4 term page — stable for EFO_##### and full IRIs
     const efoIri = efo.includes('http')
       ? efo
-      : `http://www.ebi.ac.uk/efo/${efo.replace(':', '_')}`
+      : `http://www.ebi.ac.uk/efo/${efo.replace(/:/g, '_')}`
     return `https://www.ebi.ac.uk/ols4/ontologies/efo/terms?iri=${encodeURIComponent(efoIri)}`
   }
+  const compoundInd = chemblCompoundIndicationsUrl(input.moleculeChemblId)
+  if (compoundInd) return compoundInd
   return (
     chemblSearchUrl(input.condition) || `${CHEMBL_WEB}/explore/drug_indications/`
   )

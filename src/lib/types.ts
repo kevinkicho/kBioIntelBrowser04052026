@@ -377,6 +377,17 @@ export interface PdbStructure {
   chains: string[]
   url?: string
   depositionDate?: string
+  /** Space group (crystallography) when reported */
+  spaceGroup?: string
+  /** e.g. Protein (only) from RCSB selected_polymer_entity_types */
+  polymerTypes?: string
+  /** Approximate assembly molecular weight (kDa) from RCSB */
+  molecularWeightKda?: number
+  /** Primary citation DOI */
+  citationDoi?: string
+  /** Primary citation PubMed id */
+  citationPmid?: number | string
+  keywords?: string
 }
 
 export interface ReactomePathway {
@@ -1523,6 +1534,12 @@ export interface UniChemMapping {
   sourceName: string
   externalId: string
   url: string
+  /** Longer registry name when UniChem provides nameLong / nameLabel */
+  sourceFullName?: string
+  /**
+   * Coarse bucket for UI chips: drug | chemistry | metabolomics | structure | assay | other
+   */
+  sourceCategory?: string
 }
 
 // FooDB Types - Food Compound Database

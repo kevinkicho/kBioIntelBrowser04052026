@@ -48,4 +48,16 @@ describe('panelApiTrace accuracy helpers', () => {
     )
     expect(st).toBe('timeout')
   })
+
+  test('loadStatusFromPanelTrace does not inherit other sources in the category', () => {
+    const st = loadStatusFromPanelTrace(
+      [
+        { panelId: 'clinical-trials', source: 'clinicaltrials', loadStatus: 'loaded' },
+        { panelId: 'chembl', source: 'chembl', loadStatus: 'timeout' },
+      ],
+      'adverse-events',
+    )
+    // Unrelated panel must not pick up chembl timeout
+    expect(st).toBeUndefined()
+  })
 })

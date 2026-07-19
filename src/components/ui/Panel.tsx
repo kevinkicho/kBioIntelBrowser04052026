@@ -10,10 +10,7 @@ import {
   getPanelDisabledReason,
   isPanelSourceDisabled,
 } from '@/lib/api/sourceAvailability'
-import {
-  isCategoryLoading,
-  useProfilePanelContext,
-} from '@/components/profile/ProfilePanelContext'
+import { useProfilePanelContext } from '@/components/profile/ProfilePanelContext'
 import { filterTraceForPanel, loadStatusFromPanelTrace } from '@/lib/panelApiTrace'
 import { PanelApiDetailModal } from './PanelApiDetailModal'
 
@@ -31,7 +28,11 @@ interface PanelProps {
   /** Scientific honesty: data vs empty vs timeout/error/disabled */
   loadStatus?: DataLoadStatus
   loadError?: string
-  /** Optional override; otherwise uses ProfilePanelContext */
+  /**
+   * Optional panel-level refresh. Category-level refresh lives on CategorySection
+   * (one button next to “Clinical & Safety 3/3”) because all panels in a category
+   * share the same multi-source fetch — do not pass this for normal profile cards.
+   */
   onRefresh?: () => void
   refreshing?: boolean
 }
@@ -67,14 +68,9 @@ export function Panel({
   const profileCtx = useProfilePanelContext()
 
   const catId = panelId && profileCtx ? profileCtx.getCategoryForPanel(panelId) : null
-  const refreshing =
-    refreshingProp ??
-    (catId && profileCtx ? isCategoryLoading(profileCtx.loadingCategories, catId) : false)
-  const onRefresh =
-    onRefreshProp ??
-    (catId && profileCtx
-      ? () => profileCtx.refreshCategory(catId)
-      : undefined)
+  // Card-level refresh only when explicitly provided — category header owns refresh.
+  const refreshing = refreshingProp ?? false
+  const onRefresh = onRefreshProp
 
   const fullTrace =
     catId && profileCtx?.categoryTraces[catId] ? profileCtx.categoryTraces[catId]! : null
@@ -194,19 +190,18 @@ export function Panel({
               </svg>
             </button>
           )}
-          {/* Discreet refresh — re-runs parent category multi-source fetch */}
+          {/* Optional explicit panel refresh only (category refresh is on CategorySection) */}
           {onRefresh && (
             <button
               type="button"
               onClick={(e) => {
                 e.preventDefault()
                 e.stopPropagation()
-                // Keep focus/scroll where the user is — only re-fetch category data
                 onRefresh()
               }}
               disabled={Boolean(refreshing)}
               className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-amber-300 transition-colors disabled:opacity-40"
-              title="Refresh this card (re-query category sources — stays on this view)"
+              title="Refresh this panel"
               aria-label={`Refresh ${title}`}
               data-testid={panelId ? `panel-refresh-${panelId}` : 'panel-refresh'}
             >

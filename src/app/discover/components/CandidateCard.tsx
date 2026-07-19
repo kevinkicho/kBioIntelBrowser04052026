@@ -19,6 +19,7 @@ import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
+import { buildCandidateWhy } from '@/lib/discovery/candidateWhy'
 
 /** Map Discover source pill labels → provenance keys */
 function discoverSourceKey(source: string): string {
@@ -306,6 +307,14 @@ export function CandidateCard({
               </span>
             )}
           </div>
+          <p
+            className="mt-2 text-[11px] text-slate-500 leading-snug border-t border-slate-800/80 pt-2"
+            data-testid="candidate-why"
+            title={buildCandidateWhy(candidate, diseaseName)}
+          >
+            <span className="text-slate-600 font-medium">Why this row: </span>
+            {buildCandidateWhy(candidate, diseaseName)}
+          </p>
         </div>
       </div>
     </>

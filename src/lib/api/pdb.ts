@@ -1,8 +1,20 @@
 import type { PdbStructure } from '../types'
+import { pdbStructureDeepLink } from '../pdbLinks'
 
 const SEARCH_URL = 'https://search.rcsb.org/rcsbsearch/v2/query'
 const ENTRY_URL = 'https://data.rcsb.org/rest/v1/core/entry'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
+
+function firstCitation(entry: Record<string, unknown>): Record<string, unknown> | null {
+  const primary = entry.rcsb_primary_citation as Record<string, unknown> | undefined
+  if (primary) return primary
+  const citations = entry.citation as Record<string, unknown>[] | undefined
+  if (Array.isArray(citations) && citations.length > 0) {
+    const p = citations.find((c) => c.rcsb_is_primary === 'Y' || c.id === 'primary')
+    return p || citations[0]
+  }
+  return null
+}
 
 export async function getPdbStructuresByName(name: string): Promise<PdbStructure[]> {
   try {
@@ -40,36 +52,81 @@ export async function getPdbStructuresByName(name: string): Promise<PdbStructure
           if (!res.ok) return null
           const entry = await res.json()
 
-          const rawResolution = entry?.rcsb_entry_info?.resolution_combined
+          const info = entry?.rcsb_entry_info ?? {}
+          const rawResolution = info.resolution_combined
           const resolution = Array.isArray(rawResolution)
             ? Number(rawResolution[0]) || 0
             : typeof rawResolution === 'number'
               ? rawResolution
               : 0
 
-          const rawMethod = entry?.rcsb_entry_info?.experimental_method ?? ''
+          const rawMethod = info.experimental_method ?? entry?.exptl?.[0]?.method ?? ''
           const method = Array.isArray(rawMethod) ? rawMethod.join(', ') : String(rawMethod)
+
+          const deposit = entry?.rcsb_accession_info?.deposit_date
+            ? String(entry.rcsb_accession_info.deposit_date).split('T')[0]
+            : ''
+          const release = entry?.rcsb_accession_info?.initial_release_date
+            ? String(entry.rcsb_accession_info.initial_release_date).split('T')[0]
+            : ''
+
+          const spaceGroup =
+            entry?.symmetry?.space_group_name_H_M ||
+            entry?.symmetry?.['space_group_name_H-M'] ||
+            ''
+
+          const polymerTypes = info.selected_polymer_entity_types
+            ? String(info.selected_polymer_entity_types)
+            : ''
+
+          const mw =
+            typeof info.molecular_weight === 'number' && info.molecular_weight > 0
+              ? info.molecular_weight
+              : undefined
+
+          const cit = firstCitation(entry as Record<string, unknown>)
+          const citationDoi = cit?.pdbx_database_id_DOI
+            ? String(cit.pdbx_database_id_DOI)
+            : undefined
+          const citationPmid =
+            cit?.pdbx_database_id_PubMed != null
+              ? cit.pdbx_database_id_PubMed
+              : entry?.rcsb_entry_container_identifiers?.pubmed_id
+
+          const keywords =
+            entry?.struct_keywords?.pdbx_keywords ||
+            entry?.struct_keywords?.text ||
+            ''
+
+          const url = pdbStructureDeepLink({ pdbId: id })
 
           return {
             pdbId: id,
             title: entry?.struct?.title ?? '',
-            resolution: resolution,
+            resolution,
             method,
-            depositionDate: entry?.rcsb_accession_info?.deposit_date
-              ? String(entry.rcsb_accession_info.deposit_date).split('T')[0]
-              : '',
-            releaseDate: '',
+            depositionDate: deposit,
+            releaseDate: release,
             organisms: [],
             chains: [],
-            url: `https://www.rcsb.org/structure/${id}`,
-          } as PdbStructure
+            url,
+            spaceGroup: spaceGroup || undefined,
+            polymerTypes: polymerTypes || undefined,
+            molecularWeightKda: mw,
+            citationDoi,
+            citationPmid,
+            keywords: keywords ? String(keywords) : undefined,
+          } satisfies PdbStructure
         } catch {
           return null
         }
-      })
+      }),
     )
 
-    const structures = results.filter((s): s is PdbStructure => s !== null)
+    const structures: PdbStructure[] = []
+    for (const s of results) {
+      if (s) structures.push(s)
+    }
 
     structures.sort((a, b) => {
       if (a.resolution === 0 && b.resolution === 0) return 0

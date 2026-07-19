@@ -54,10 +54,11 @@ describe('NciThesaurusPanel', () => {
     expect(defs[0].getAttribute('title')).toMatch(/anti-inflammatory/i)
   })
 
-  test('renders link to NCI Thesaurus', () => {
+  test('concept name deep-links to NCI Thesaurus (no NCI ↗ column)', () => {
     render(<NciThesaurusPanel concepts={mockConcepts} />)
-    const links = screen.getAllByRole('link', { name: /nci/i })
-    expect(links.some((l) => l.getAttribute('href')?.includes('C61948'))).toBe(true)
+    expect(screen.queryByText(/NCI ↗/)).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: 'Aspirin' })
+    expect(link).toHaveAttribute('href', expect.stringContaining('C61948'))
   })
 
   test('renders empty state', () => {

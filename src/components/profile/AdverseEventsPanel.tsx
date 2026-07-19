@@ -11,21 +11,24 @@ import {
 } from '@/lib/listControls'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
-
-function faersHref(event: AdverseEvent): string {
-  const term = event.reactionName || event.reaction || event.drugName || ''
-  if (!term) return 'https://open.fda.gov/apis/drug/event/'
-  return `https://open.fda.gov/apis/drug/event/?search=patient.reaction.reactionmeddrapt:"${encodeURIComponent(term)}"`
-}
+import {
+  faersApiLinkTitle,
+  faersEvidenceApiUrl,
+  faersRowDeepLink,
+  faersSearchTitle,
+} from '@/lib/faersLinks'
 
 export const AdverseEventsPanel = memo(function AdverseEventsPanel({
   adverseEvents,
   panelId,
   lastFetched,
+  moleculeName,
 }: {
   adverseEvents: AdverseEvent[]
   panelId?: string
   lastFetched?: Date
+  /** Molecule name for openFDA drug+reaction deep links */
+  moleculeName?: string
 }) {
   const list = Array.isArray(adverseEvents) ? adverseEvents : []
   const maxCount = useMemo(() => Math.max(...list.map((e) => e.count), 1), [list])
@@ -61,6 +64,10 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
 
   return (
     <Panel title={`Adverse Events (${list.length})`} panelId={panelId} lastFetched={lastFetched}>
+      <p className="mb-2 text-[10px] text-slate-600 leading-relaxed">
+        openFDA FAERS reaction counts. Row opens the FDA FAERS Public Dashboard; use API ↗ for the
+        exact openFDA JSON query (± this drug).
+      </p>
       <FilterablePaginatedList
         items={list}
         getSearchText={(e) =>
@@ -71,14 +78,28 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
         sortOptions={sortOptions}
         defaultSortId="num-desc"
         filterPlaceholder="Filter reactions…"
-        getKey={(e, i) => `${e.reactionName}-${i}`}
+        getKey={(e, i) => `${e.reactionName || e.reaction || 'ae'}-${i}`}
         pageSize={8}
         className="space-y-0"
         renderItem={(event, index) => {
           const name = event.reactionName || event.reaction || '—'
-          const href = faersHref(event)
+          const drug = event.drugName || moleculeName || ''
+          const href = faersRowDeepLink({
+            reactionName: event.reactionName,
+            reaction: event.reaction,
+            drugName: event.drugName,
+            moleculeName,
+          })
+          const apiHref = faersEvidenceApiUrl({
+            reactionName: event.reactionName,
+            reaction: event.reaction,
+            drugName: event.drugName,
+            moleculeName,
+          })
           const pct = Math.round((event.count / maxCount) * 100)
           const seriousEmpty = isEmptyMetric(event.serious)
+          const linkTitle = faersSearchTitle(name === '—' ? '' : name, drug)
+          const apiTitle = faersApiLinkTitle(name === '—' ? '' : name, drug)
           return (
             <div>
               {index === 0 && (
@@ -90,22 +111,23 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
                   <span className="text-right">Count</span>
                   <span className="text-right">Serious</span>
                   <span>Share</span>
-                  <span className="text-right">Open</span>
+                  <span className="text-right">API</span>
                 </div>
               )}
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Explore openFDA drug event API"
-                onClick={() =>
-                  onDeepLinkClick('faers', href, { panelId: 'adverse-events', label: name })
-                }
-                className="grid grid-cols-[minmax(0,1.3fr)_4rem_4rem_minmax(4rem,0.8fr)_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
-              >
-                <span className="text-sm text-slate-100 capitalize truncate group-hover:text-rose-200">
+              <div className="grid grid-cols-[minmax(0,1.3fr)_4rem_4rem_minmax(4rem,0.8fr)_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group">
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={linkTitle}
+                  data-testid={`ae-row-${name}`}
+                  onClick={() =>
+                    onDeepLinkClick('faers', href, { panelId: 'adverse-events', label: name })
+                  }
+                  className="text-sm text-slate-100 capitalize truncate group-hover:text-rose-200 min-w-0"
+                >
                   {name}
-                </span>
+                </a>
                 <span className="text-xs font-mono tabular-nums text-slate-300 text-right">
                   {event.count.toLocaleString()}
                 </span>
@@ -127,10 +149,23 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
                     {pct}%
                   </span>
                 </div>
-                <span className="text-xs text-indigo-400 group-hover:text-indigo-300 text-right">
-                  ↗
-                </span>
-              </a>
+                <a
+                  href={apiHref}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title={apiTitle}
+                  data-testid={`ae-api-${name}`}
+                  onClick={() =>
+                    onDeepLinkClick('faers', apiHref, {
+                      panelId: 'adverse-events',
+                      label: `api:${name}`,
+                    })
+                  }
+                  className="text-[10px] text-slate-500 hover:text-cyan-300 text-right shrink-0"
+                >
+                  API↗
+                </a>
+              </div>
             </div>
           )
         }}

@@ -606,12 +606,13 @@ export function useAICopilot(
   }, [identity.cid, identity.geneSymbol, identity.name])
 
   useEffect(() => {
-    const loadedCount = Object.values(categoryStatus).filter(s => s === 'loaded').length
+    const loadedCount = Object.values(categoryStatus).filter((s) => s === 'loaded').length
     if (loadedCount >= 3 && !autoInsightGenerated && aiAvailable) {
+      // Set immediately so re-renders / Strict Mode cannot schedule multiple autos
+      setAutoInsightGenerated(true)
       const timer = setTimeout(() => {
-        setAutoInsightGenerated(true)
         generateInsightRef.current?.('auto_insight')
-      }, 100)
+      }, 150)
       return () => clearTimeout(timer)
     }
   }, [categoryStatus, autoInsightGenerated, aiAvailable])

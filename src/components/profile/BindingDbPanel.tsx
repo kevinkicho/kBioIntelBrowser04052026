@@ -64,49 +64,64 @@ export const BindingDbPanel = memo(function BindingDbPanel({
               <div>
                 {index === 0 && (
                   <div
-                    className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                    className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                     role="row"
                   >
                     <span>Target</span>
                     <span>Type</span>
                     <span>Value</span>
                     <span>Source</span>
-                    <span className="text-right">Open</span>
                   </div>
                 )}
-                <div className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors">
-                  <span className="text-sm font-medium text-slate-100 truncate" title={aff.targetName}>
-                    {aff.targetName || '—'}
-                  </span>
-                  <span
-                    className={`text-xs font-medium ${AFFINITY_TYPE_COLORS[aff.affinityType] ?? 'text-slate-300'}`}
+                {doiHref ? (
+                  <a
+                    href={doiHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    title={`Open DOI for ${aff.targetName || 'affinity'}`}
+                    className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors group"
                   >
-                    {aff.affinityType || '—'}
-                  </span>
-                  <span
-                    className={`text-xs font-mono tabular-nums text-slate-300 ${emptyDataClass(emptyVal)}`}
-                  >
-                    {emptyVal
-                      ? '—'
-                      : `${aff.affinityValue} ${aff.affinityUnits || aff.affinityUnit || ''}`.trim()}
-                  </span>
-                  <span className="text-[11px] text-slate-500 truncate" title={aff.source}>
-                    {aff.source || '—'}
-                  </span>
-                  {doiHref ? (
-                    <a
-                      href={doiHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-xs text-sky-400 hover:text-sky-300 text-right"
-                      title="Open DOI"
+                    <span className="text-sm font-medium text-slate-100 group-hover:text-sky-200 truncate" title={aff.targetName}>
+                      {aff.targetName || '—'}
+                    </span>
+                    <span
+                      className={`text-xs font-medium ${AFFINITY_TYPE_COLORS[aff.affinityType] ?? 'text-slate-300'}`}
                     >
-                      ↗
-                    </a>
-                  ) : (
-                    <span className="text-xs text-slate-600 text-right">—</span>
-                  )}
-                </div>
+                      {aff.affinityType || '—'}
+                    </span>
+                    <span
+                      className={`text-xs font-mono tabular-nums text-slate-300 ${emptyDataClass(emptyVal)}`}
+                    >
+                      {emptyVal
+                        ? '—'
+                        : `${aff.affinityValue} ${aff.affinityUnits || aff.affinityUnit || ''}`.trim()}
+                    </span>
+                    <span className="text-[11px] text-slate-500 truncate" title={aff.source}>
+                      {aff.source || '—'}
+                    </span>
+                  </a>
+                ) : (
+                  <div className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0">
+                    <span className="text-sm font-medium text-slate-100 truncate" title={aff.targetName}>
+                      {aff.targetName || '—'}
+                    </span>
+                    <span
+                      className={`text-xs font-medium ${AFFINITY_TYPE_COLORS[aff.affinityType] ?? 'text-slate-300'}`}
+                    >
+                      {aff.affinityType || '—'}
+                    </span>
+                    <span
+                      className={`text-xs font-mono tabular-nums text-slate-300 ${emptyDataClass(emptyVal)}`}
+                    >
+                      {emptyVal
+                        ? '—'
+                        : `${aff.affinityValue} ${aff.affinityUnits || aff.affinityUnit || ''}`.trim()}
+                    </span>
+                    <span className="text-[11px] text-slate-500 truncate" title={aff.source}>
+                      {aff.source || '—'}
+                    </span>
+                  </div>
+                )}
               </div>
             )
           }}

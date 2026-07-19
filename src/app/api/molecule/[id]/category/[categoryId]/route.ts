@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
-import { flushApiMetrics, metricsToSourceStatus } from '@/lib/api-tracker'
+import { metricsToSourceStatus, runWithApiMetrics, type ApiMetric } from '@/lib/api-tracker'
 import { recordMetric } from '@/lib/analytics/db'
 import { buildCategoryApiTrace } from '@/lib/panelApiTrace'
 import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
@@ -168,39 +168,43 @@ export async function GET(
   let data: Record<string, unknown>
   let sourceStatus: ReturnType<typeof metricsToSourceStatus> = {}
   try {
-    const fetchPromise = (async () => {
-      switch (categoryId) {
-        case 'pharmaceutical':
-          return await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
-        case 'clinical-safety':
-          return await fetchClinicalSafety(name, queryFor, apiParams)
-        case 'molecular-chemical':
-          return await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
-        case 'bioactivity-targets':
-          return await fetchBioactivityTargets(name, queryFor, apiParams)
-        case 'protein-structure':
-          return await fetchProteinStructure(name, queryFor, apiParams)
-        case 'genomics-disease':
-          return await fetchGenomicsDisease(name, queryFor, apiParams)
-        case 'interactions-pathways':
-          return await fetchInteractionsPathways(name, queryFor, apiParams)
-        case 'research-literature':
-          return await fetchResearchLiterature(name, queryFor, apiParams)
-        case 'nih-high-impact':
-          return await fetchNihHighImpact(name, queryFor)
-        default:
-          return null
-      }
-    })()
+    // Isolate perApiMetrics for this request — concurrent category loads on the
+    // same Node process must not steal/merge each other's timeout/error rows.
+    const { value, metrics } = await runWithApiMetrics(async () => {
+      const fetchPromise = (async () => {
+        switch (categoryId) {
+          case 'pharmaceutical':
+            return await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
+          case 'clinical-safety':
+            return await fetchClinicalSafety(name, queryFor, apiParams)
+          case 'molecular-chemical':
+            return await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
+          case 'bioactivity-targets':
+            return await fetchBioactivityTargets(name, queryFor, apiParams)
+          case 'protein-structure':
+            return await fetchProteinStructure(name, queryFor, apiParams)
+          case 'genomics-disease':
+            return await fetchGenomicsDisease(name, queryFor, apiParams)
+          case 'interactions-pathways':
+            return await fetchInteractionsPathways(name, queryFor, apiParams)
+          case 'research-literature':
+            return await fetchResearchLiterature(name, queryFor, apiParams)
+          case 'nih-high-impact':
+            return await fetchNihHighImpact(name, queryFor)
+          default:
+            return null
+        }
+      })()
 
-    // AbortController linked so slow upstream work can stop when wall-clock expires
-    const ac = new AbortController()
-    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000, {
-      abortController: ac,
-      signal: request.signal,
+      // AbortController linked so slow upstream work can stop when wall-clock expires
+      const ac = new AbortController()
+      return await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000, {
+        abortController: ac,
+        signal: request.signal,
+      })
     })
 
-    const metrics = flushApiMetrics()
+    data = value
     sourceStatus = metricsToSourceStatus(metrics)
     for (const m of metrics) {
       recordMetric({
@@ -213,7 +217,8 @@ export async function GET(
       })
     }
   } catch (err) {
-    const metrics = flushApiMetrics()
+    const metrics: ApiMetric[] =
+      (err as { __apiMetrics?: ApiMetric[] })?.__apiMetrics ?? []
     sourceStatus = metricsToSourceStatus(metrics)
     for (const m of metrics) {
       recordMetric({

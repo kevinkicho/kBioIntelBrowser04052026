@@ -32,10 +32,11 @@ describe('DgidbPanel', () => {
     expect(screen.getByText('8.5')).toBeInTheDocument()
   })
 
-  test('opens DGIdb deep links', () => {
+  test('row is a DGIdb deep link (no Open column)', () => {
     render(<DgidbPanel interactions={mockInteractions} />)
-    const links = screen.getAllByRole('link', { name: '↗' })
-    expect(links[0]).toHaveAttribute('href', expect.stringContaining('dgidb.org'))
+    expect(screen.queryByText('Open')).not.toBeInTheDocument()
+    const link = screen.getByRole('link', { name: /PTGS2/i })
+    expect(link).toHaveAttribute('href', expect.stringContaining('dgidb.org'))
   })
 
   test('renders empty state', () => {

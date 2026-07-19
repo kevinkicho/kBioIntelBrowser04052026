@@ -134,7 +134,7 @@ describe('extractDrugInterventions', () => {
     expect(drugs[0].name).toBe('Aspirin')
   })
 
-  it('counts trials per drug', () => {
+  it('counts trials per drug and attaches trial list', () => {
     const trials: ClinicalTrial[] = [
       {
         nctId: '1', title: '', status: '', phase: '', startDate: '', completionDate: '',
@@ -151,6 +151,7 @@ describe('extractDrugInterventions', () => {
     expect(drugs).toHaveLength(2)
     const aspirin = drugs.find(d => d.name === 'Aspirin')
     expect(aspirin?.trialCount).toBe(2)
+    expect(aspirin?.trials.map((t) => t.nctId).sort()).toEqual(['1', '2'])
   })
 
   it('deduplicates case-insensitively', () => {

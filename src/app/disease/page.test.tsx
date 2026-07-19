@@ -48,8 +48,9 @@ describe('deduplicateMolecules', () => {
     })]
     const mol = deduplicateMolecules(results)
     expect(mol).toHaveLength(2)
-    expect(mol[0]).toEqual({ name: 'Metformin', cid: 4048, sources: ['Open Targets'] })
-    expect(mol[1]).toEqual({ name: 'Insulin', cid: null, sources: ['Open Targets'] })
+    expect(mol[0]).toMatchObject({ name: 'Metformin', cid: 4048, sources: ['Open Targets'] })
+    expect(mol[0].reason).toMatch(/Open Targets|known drug/i)
+    expect(mol[1]).toMatchObject({ name: 'Insulin', cid: null, sources: ['Open Targets'] })
   })
 
   test('merges sources when same CID appears in multiple results', () => {

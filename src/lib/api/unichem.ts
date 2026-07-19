@@ -214,19 +214,70 @@ async function postCompounds(body: Record<string, unknown>): Promise<UniChemApiC
   }
 }
 
+/** Coarse category for denser list chips (free public UniChem sources). */
+export function unichemSourceCategory(
+  sourceName: string,
+  sourceId?: string,
+): string {
+  const key = normalizeSourceKey(sourceName, sourceId)
+  if (
+    ['chembl', 'drugbank', 'drugcentral', 'pharmgkb', 'iuphar', 'gtopdb', 'surechembl'].includes(
+      key,
+    )
+  ) {
+    return 'drug'
+  }
+  if (['hmdb', 'metabolights', 'swisslipids', 'foodb'].includes(key)) {
+    return 'metabolomics'
+  }
+  if (['pdb', 'pdbe', 'rcsb'].includes(key)) {
+    return 'structure'
+  }
+  if (['bindingdb', 'lincs', 'pubchem_bioassay'].includes(key)) {
+    return 'assay'
+  }
+  if (
+    ['pubchem', 'chebi', 'zinc', 'kegg_ligand', 'kegg', 'mcule', 'emolecules', 'comptox', 'nmrshiftdb2'].includes(
+      key,
+    )
+  ) {
+    return 'chemistry'
+  }
+  return 'other'
+}
+
+function friendlySourceName(sourceName: string, sourceId: string): string {
+  const short = SOURCE_ID_NAMES[sourceId]
+  if (short && (!sourceName || sourceName === sourceId || /^\d+$/.test(sourceName))) {
+    return short
+  }
+  return sourceName || short || sourceId || 'source'
+}
+
 function mapApiSources(sources: UniChemApiSource[]): UniChemMapping[] {
   const out: UniChemMapping[] = []
   const seen = new Set<string>()
   for (const s of sources) {
     const sourceId = String(s.sourceID ?? s.src_id ?? '')
-    const sourceName = String(s.nameLabel || s.nameLong || s.name || s.shortName || SOURCE_ID_NAMES[sourceId] || sourceId)
+    const fullName = String(s.nameLong || s.nameLabel || s.name || '').trim()
+    const shortName = String(
+      s.shortName || SOURCE_ID_NAMES[sourceId] || s.nameLabel || s.name || sourceId,
+    ).trim()
+    const sourceName = friendlySourceName(shortName || fullName, sourceId)
     const externalId = String(s.src_compound_id ?? s.compoundId ?? s.id ?? '').trim()
     if (!externalId) continue
     const key = `${sourceId}|${externalId}`
     if (seen.has(key)) continue
     seen.add(key)
     const url = resolveUrl(sourceName, externalId, sourceId, s.url || s.srcUrl, s.baseIdUrl)
-    out.push({ sourceId, sourceName, externalId, url })
+    out.push({
+      sourceId,
+      sourceName,
+      externalId,
+      url,
+      sourceFullName: fullName && fullName !== sourceName ? fullName : undefined,
+      sourceCategory: unichemSourceCategory(sourceName, sourceId),
+    })
   }
   return out
 }

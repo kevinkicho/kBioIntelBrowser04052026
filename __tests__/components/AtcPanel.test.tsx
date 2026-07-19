@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react'
+import { render, screen } from '@testing-library/react'
 import { AtcPanel } from '@/components/profile/AtcPanel'
 import type { AtcClassification } from '@/lib/types'
 
@@ -18,12 +18,13 @@ const mockClassifications: AtcClassification[] = [
 ]
 
 describe('AtcPanel', () => {
-  test('renders table column headers', () => {
+  test('renders table column headers (no Open column)', () => {
     render(<AtcPanel classifications={mockClassifications} />)
     expect(screen.getByText('Code')).toBeInTheDocument()
     expect(screen.getByText('Class name')).toBeInTheDocument()
     expect(screen.getByText('Level')).toBeInTheDocument()
-    expect(screen.getByText('Open')).toBeInTheDocument()
+    expect(screen.queryByText('Open')).not.toBeInTheDocument()
+    expect(screen.queryByText('View ↗')).not.toBeInTheDocument()
   })
 
   test('renders ATC codes and names', () => {
@@ -41,7 +42,6 @@ describe('AtcPanel', () => {
       'https://atcddd.fhi.no/atc_ddd_index/?code=A10BA02&showdescription=yes',
     )
     expect(row).toHaveAttribute('target', '_blank')
-    expect(within(row).getByText('View ↗')).toBeInTheDocument()
   })
 
   test('builds deep link when url omitted', () => {

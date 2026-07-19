@@ -6,18 +6,12 @@ import { clientFetch } from '@/lib/clientFetch'
 import { AICopilot } from '@/components/ai/AICopilot'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
-import { deduplicateMolecules } from '@/lib/diseaseSearch'
+import {
+  deduplicateMolecules,
+  type DiseaseResult,
+} from '@/lib/diseaseSearch'
+import { DiseaseRelatedMoleculesTable } from '@/components/disease/DiseaseRelatedMoleculesTable'
 import Link from 'next/link'
-
-
-interface DiseaseResult {
-  id: string
-  name: string
-  description?: string
-  therapeuticAreas?: string[]
-  source: string
-  molecules?: { name: string; cid: number | null }[]
-}
 
 export default function DiseasePage() {
   const searchParams = useSearchParams()
@@ -176,45 +170,10 @@ export default function DiseasePage() {
 
             {allMolecules.length > 0 && (
               <div className="mt-8">
-                <h2 className="text-xl font-semibold text-slate-100 mb-1">Related Molecules</h2>
-                <p className="text-sm text-slate-400 mb-4">{allMolecules.length} candidate molecule{allMolecules.length !== 1 ? 's' : ''} found across all results</p>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                  {allMolecules.map(m => (
-                    m.cid ? (
-                      <Link
-                        key={`m-${m.cid}`}
-                        href={`/molecule/${m.cid}`}
-                        className="block bg-slate-800/80 border border-emerald-800/40 hover:border-emerald-500 rounded-xl p-4 transition-colors group"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm font-semibold text-emerald-300 group-hover:text-emerald-200 truncate">{m.name}</span>
-                          <span className="text-[10px] text-slate-500 ml-2 whitespace-nowrap">CID {m.cid}</span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {m.sources.length > 0 && m.sources.map(s => (
-                            <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-400">{s}</span>
-                          ))}
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-emerald-900/30 text-emerald-400 border border-emerald-800/40">View &#8594;</span>
-                        </div>
-                      </Link>
-                    ) : (
-                      <div
-                        key={`m-${m.name}`}
-                        className="bg-slate-800/60 border border-slate-700/50 rounded-xl p-4"
-                      >
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-sm text-slate-400 truncate">{m.name}</span>
-                          <span className="text-[10px] text-slate-600 ml-2 whitespace-nowrap">No CID</span>
-                        </div>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {m.sources.length > 0 && m.sources.map(s => (
-                            <span key={s} className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/80 text-slate-500">{s}</span>
-                          ))}
-                        </div>
-                      </div>
-                    )
-                  ))}
-                </div>
+                <DiseaseRelatedMoleculesTable
+                  molecules={allMolecules}
+                  diseaseName={q || 'search'}
+                />
               </div>
             )}
           </div>
@@ -235,13 +194,16 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
   const detailHref = `/disease/${encodeURIComponent(result.id)}?source=${encodeURIComponent(result.source)}&q=${encodeURIComponent(result.name)}`
 
   return (
-    <Link
-      href={detailHref}
-      className="block bg-slate-800/80 border border-slate-700 rounded-xl p-5 hover:border-indigo-600 transition-colors"
-    >
+    <article className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 hover:border-indigo-600 transition-colors">
       <div className="flex items-start justify-between gap-3 mb-2">
-        <h2 className="text-lg font-semibold text-slate-100">{result.name}</h2>
-        <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300 whitespace-nowrap">{result.source}</span>
+        <h2 className="text-lg font-semibold text-slate-100">
+          <Link href={detailHref} className="hover:text-indigo-200">
+            {result.name}
+          </Link>
+        </h2>
+        <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300 whitespace-nowrap">
+          {result.source}
+        </span>
       </div>
 
       {result.description && (
@@ -250,8 +212,13 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
 
       {result.therapeuticAreas && result.therapeuticAreas.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">
-          {result.therapeuticAreas.map(ta => (
-            <span key={ta} className="text-xs px-2 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-800/50">{ta}</span>
+          {result.therapeuticAreas.map((ta) => (
+            <span
+              key={ta}
+              className="text-xs px-2 py-0.5 rounded-full bg-indigo-900/40 text-indigo-300 border border-indigo-800/50"
+            >
+              {ta}
+            </span>
           ))}
         </div>
       )}
@@ -259,27 +226,55 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
       {result.molecules && result.molecules.length > 0 && (
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Associated Molecules</p>
-          <div className="flex flex-wrap gap-2">
-            {result.molecules.map(m => (
-              m.cid ? (
-                <span
-                  key={m.cid}
-                  className="text-sm px-3 py-1.5 rounded-lg bg-emerald-900/30 text-emerald-300 border border-emerald-800/50"
-                  onClick={e => e.stopPropagation()}
-                >
-                  <Link href={`/molecule/${m.cid}`} onClick={e => e.stopPropagation()}>
-                    {m.name}
-                  </Link>
-                </span>
-              ) : (
-                <span key={m.name} className="text-sm px-3 py-1.5 rounded-lg bg-slate-700/50 text-slate-400">
-                  {m.name}
-                </span>
-              )
+          <ul className="space-y-1.5">
+            {result.molecules.slice(0, 6).map((m) => (
+              <li
+                key={m.cid ?? m.name}
+                className="rounded-lg bg-slate-900/50 border border-slate-700/60 px-2.5 py-1.5"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  {m.cid ? (
+                    <Link
+                      href={`/molecule/${m.cid}`}
+                      className="text-sm text-emerald-300 hover:text-emerald-200 truncate"
+                    >
+                      {m.name}
+                    </Link>
+                  ) : (
+                    <span className="text-sm text-slate-400 truncate">{m.name}</span>
+                  )}
+                  <span className="text-[9px] text-slate-600 shrink-0">
+                    {m.relationKind === 'known_drug'
+                      ? 'drug'
+                      : m.relationKind === 'gene_associated'
+                        ? 'gene'
+                        : 'linked'}
+                  </span>
+                </div>
+                {m.reason && (
+                  <p className="text-[10px] text-slate-500 leading-snug mt-0.5 line-clamp-2">
+                    {m.reason}
+                  </p>
+                )}
+              </li>
             ))}
-          </div>
+            {result.molecules.length > 6 && (
+              <li className="text-[10px] text-slate-600 px-1">
+                +{result.molecules.length - 6} more on detail page
+              </li>
+            )}
+          </ul>
         </div>
       )}
-    </Link>
+
+      <div className="mt-3">
+        <Link
+          href={detailHref}
+          className="text-[11px] text-indigo-400 hover:text-indigo-300"
+        >
+          Open disease detail →
+        </Link>
+      </div>
+    </article>
   )
 }

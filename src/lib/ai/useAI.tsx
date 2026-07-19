@@ -64,6 +64,10 @@ interface AIContextValue extends AIConfig {
   askAI: (
     messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
   ) => AsyncGenerator<string, void, unknown>
+  /** Abort the in-flight chat stream (single-flight). */
+  cancelAskAI: () => void
+  /** True while a chat stream is active. */
+  isChatStreaming: boolean
 }
 
 const AIContext = createContext<AIContextValue | null>(null)
@@ -513,6 +517,19 @@ export function AIProvider({ children }: { children: ReactNode }) {
     [reconnect],
   )
 
+  const [isChatStreaming, setIsChatStreaming] = useState(false)
+  const flightIdRef = useRef(0)
+  /** Dedupes identical concurrent asks within a short window (Strict Mode / multi-mount). */
+  const lastStartRef = useRef<{ key: string; at: number; flightId: number } | null>(null)
+
+  const cancelAskAI = useCallback(() => {
+    flightIdRef.current += 1
+    lastStartRef.current = null
+    abortRef.current?.abort()
+    abortRef.current = null
+    setIsChatStreaming(false)
+  }, [])
+
   const askAI = useCallback(
     async function* (
       messages: { role: 'system' | 'user' | 'assistant'; content: string }[],
@@ -522,12 +539,36 @@ export function AIProvider({ children }: { children: ReactNode }) {
         yield '[Error: No model selected. Connect to Ollama Cloud and select a model.]'
         return
       }
-      console.log(
-        `[ai-chat] Sending chat | model: ${modelToUse} | messages: ${messages.length} | transport: server (cloud)`,
-      )
+
+      const key = `${modelToUse}|${messages.map((m) => `${m.role}:${m.content.slice(0, 80)}`).join('|')}`
+      const now = Date.now()
+      const prev = lastStartRef.current
+      // Same prompt while already streaming (or within 400ms of start) → skip only if
+      // a flight is active. Empty-generator silent return confused remounts that
+      // expected tokens; only coalesce when we know a stream owns the key.
+      if (
+        prev &&
+        prev.key === key &&
+        now - prev.at < 400 &&
+        flightIdRef.current === prev.flightId &&
+        abortRef.current != null
+      ) {
+        console.log('[ai-chat] Coalesced duplicate chat within 400ms (in-flight)')
+        return
+      }
+
+      // Single-flight: abort any previous stream before starting
+      abortRef.current?.abort()
+      const flightId = ++flightIdRef.current
+      lastStartRef.current = { key, at: now, flightId }
 
       const controller = new AbortController()
       abortRef.current = controller
+      setIsChatStreaming(true)
+
+      console.log(
+        `[ai-chat] Sending chat | model: ${modelToUse} | messages: ${messages.length} | transport: server (cloud) | flight: ${flightId}`,
+      )
 
       try {
         const res = await fetch('/api/ai/chat', {
@@ -542,6 +583,8 @@ export function AIProvider({ children }: { children: ReactNode }) {
           signal: controller.signal,
         })
 
+        if (flightId !== flightIdRef.current) return
+
         if (!res.ok || !res.body) {
           const text = await res.text().catch(() => 'Chat request failed')
           console.error('[ai] Chat HTTP error:', res.status, text)
@@ -554,6 +597,14 @@ export function AIProvider({ children }: { children: ReactNode }) {
         let buffer = ''
 
         while (true) {
+          if (flightId !== flightIdRef.current) {
+            try {
+              await reader.cancel()
+            } catch {
+              /* ignore */
+            }
+            return
+          }
           const { done, value } = await reader.read()
           if (done) break
           buffer += decoder.decode(value, { stream: true })
@@ -564,7 +615,10 @@ export function AIProvider({ children }: { children: ReactNode }) {
             if (!line.trim()) continue
             try {
               const parsed = JSON.parse(line)
-              if (parsed.token) yield parsed.token
+              if (parsed.token) {
+                if (flightId !== flightIdRef.current) return
+                yield parsed.token
+              }
               if (parsed.error) {
                 yield `[Error: ${parsed.error}]`
                 return
@@ -576,8 +630,13 @@ export function AIProvider({ children }: { children: ReactNode }) {
           }
         }
       } catch (err) {
-        if (controller.signal.aborted) return
+        if (controller.signal.aborted || flightId !== flightIdRef.current) return
         yield `[Error: ${err instanceof Error ? err.message : String(err)}]`
+      } finally {
+        if (flightId === flightIdRef.current) {
+          setIsChatStreaming(false)
+          if (abortRef.current === controller) abortRef.current = null
+        }
       }
     },
     [config.model, config.availableModels],
@@ -599,6 +658,8 @@ export function AIProvider({ children }: { children: ReactNode }) {
     pullModel: pullModelFn,
     pullProgress,
     askAI,
+    cancelAskAI,
+    isChatStreaming,
   }
 
   return <AIContext.Provider value={value}>{children}</AIContext.Provider>

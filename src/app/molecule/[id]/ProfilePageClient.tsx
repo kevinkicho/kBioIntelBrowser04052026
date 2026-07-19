@@ -556,20 +556,53 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     router.replace(qs ? `?${qs}` : '?', { scroll: false })
   }, [forceRefresh, isEmbed, loadCategory, router, searchParams])
 
-  // Scroll to category section (scroll runs after React mounts focused category)
-  const scrollToCategory = useCallback((catId: CategoryId | 'all') => {
-    if (catId === 'all') {
-      setActiveCategory('all')
-      return
-    }
-    setActiveCategory(catId)
-    if (categoryStatusRef.current[catId] === 'idle') {
-      void loadCategory(catId)
-    }
-  }, [loadCategory])
+  /**
+   * Scroll so the category section title sits just below sticky chrome
+   * (app header + profile tab bar). Using raw scrollIntoView(block:start)
+   * lands content under the sticky bar → “wrong place”.
+   */
+  const scrollToCategoryElement = useCallback((catId: CategoryId) => {
+    const el =
+      document.getElementById(`category-section-${catId}`) ||
+      document.getElementById(catId)
+    if (!el) return false
+    const chrome = document.querySelector<HTMLElement>('[data-profile-sticky-chrome]')
+    const offset = (chrome?.getBoundingClientRect().height ?? 96) + 12
+    const top = el.getBoundingClientRect().top + window.scrollY - offset
+    window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+    // Brief highlight so the matched title is obvious
+    el.classList.add('ring-1', 'ring-indigo-500/40', 'rounded-lg')
+    window.setTimeout(() => {
+      el.classList.remove('ring-1', 'ring-indigo-500/40', 'rounded-lg')
+    }, 1600)
+    return true
+  }, [])
+
+  // Tab click → panels view + correct category section (by matching CategoryDef.id / label)
+  const scrollToCategory = useCallback(
+    (catId: CategoryId | 'all') => {
+      setView('panels')
+      if (catId === 'all') {
+        setActiveCategory('all')
+        // Top of panel list (below sticky chrome)
+        const root = document.getElementById('profile-category-list')
+        if (root) {
+          const chrome = document.querySelector<HTMLElement>('[data-profile-sticky-chrome]')
+          const offset = (chrome?.getBoundingClientRect().height ?? 96) + 12
+          const top = root.getBoundingClientRect().top + window.scrollY - offset
+          window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
+        }
+        return
+      }
+      setActiveCategory(catId)
+      if (categoryStatusRef.current[catId] === 'idle') {
+        void loadCategory(catId)
+      }
+    },
+    [loadCategory],
+  )
 
   // After active *tab* changes only — do not re-scroll when a category soft-refreshes
-  // (categoryStatus used to be a dep and jumped the viewport on every card refresh).
   useEffect(() => {
     if (activeCategory === 'all' || isEmbed) return
     let attempts = 0
@@ -577,22 +610,30 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     let timer: number | undefined
     const tryScroll = () => {
       if (cancelled) return
-      const el = document.getElementById(activeCategory)
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-        return
-      }
-      if (attempts++ < 30) timer = window.setTimeout(tryScroll, 50)
+      if (scrollToCategoryElement(activeCategory)) return
+      if (attempts++ < 40) timer = window.setTimeout(tryScroll, 50)
     }
-    timer = window.setTimeout(tryScroll, 30)
+    // Wait a frame so focused section mounts / expands
+    timer = window.setTimeout(tryScroll, 40)
     return () => {
       cancelled = true
       if (timer != null) window.clearTimeout(timer)
     }
-  }, [activeCategory, isEmbed])
+  }, [activeCategory, isEmbed, scrollToCategoryElement])
+
+  // Re-scroll once the focused category finishes loading (content height settles)
+  useEffect(() => {
+    if (activeCategory === 'all' || isEmbed) return
+    if (categoryStatus[activeCategory] !== 'loaded') return
+    const t = window.setTimeout(() => {
+      scrollToCategoryElement(activeCategory)
+    }, 80)
+    return () => window.clearTimeout(t)
+  }, [activeCategory, categoryStatus, isEmbed, scrollToCategoryElement])
 
   /** Scroll to a panel anchor (hash deep-link from board signal badges). */
   const scrollToPanel = useCallback((panelId: string) => {
+    setView('panels')
     const cat = CATEGORIES.find((c) => c.panels.some((p) => p.id === panelId))
     if (cat && cat.id !== 'gene') {
       setActiveCategory(cat.id as CategoryId)
@@ -604,7 +645,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     const tryScroll = () => {
       const el = document.getElementById(panelId)
       if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        const chrome = document.querySelector<HTMLElement>('[data-profile-sticky-chrome]')
+        const offset = (chrome?.getBoundingClientRect().height ?? 96) + 12
+        const top = el.getBoundingClientRect().top + window.scrollY - offset
+        window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' })
         el.classList.add('ring-2', 'ring-amber-400/60', 'ring-offset-2', 'ring-offset-[#0f1117]')
         window.setTimeout(() => {
           el.classList.remove('ring-2', 'ring-amber-400/60', 'ring-offset-2', 'ring-offset-[#0f1117]')
@@ -897,7 +941,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'dailymed': (panelId, lastFetched) => <LazyPanels.LazyDailyMedPanel labels={d('drugLabels')} panelId={panelId} lastFetched={lastFetched} />,
       'atc': (panelId, lastFetched) => <LazyPanels.LazyAtcPanel classifications={d('atcClassifications')} panelId={panelId} lastFetched={lastFetched} />,
       'clinical-trials': (panelId, lastFetched) => <LazyPanels.LazyClinicalTrialsPanel trials={d('clinicalTrials')} panelId={panelId} lastFetched={lastFetched} diseaseName={searchParams.get('disease') ?? undefined} />,
-      'adverse-events': (panelId, lastFetched) => <LazyPanels.LazyAdverseEventsPanel adverseEvents={d('adverseEvents')} panelId={panelId} lastFetched={lastFetched} />,
+      'adverse-events': (panelId, lastFetched) => <LazyPanels.LazyAdverseEventsPanel adverseEvents={d('adverseEvents')} panelId={panelId} lastFetched={lastFetched} moleculeName={moleculeName} />,
       'recalls': (panelId, lastFetched) => <LazyPanels.LazyRecallsPanel recalls={d('drugRecalls')} panelId={panelId} lastFetched={lastFetched} />,
       'chembl-indications': (panelId, lastFetched) => <LazyPanels.LazyChemblIndicationsPanel indications={d('chemblIndications')} panelId={panelId} lastFetched={lastFetched} diseaseName={searchParams.get('disease') ?? undefined} />,
       'clinvar': (panelId, lastFetched) => <LazyPanels.LazyClinVarPanel variants={d('clinVarVariants')} panelId={panelId} lastFetched={lastFetched} />,
@@ -1345,7 +1389,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       )}
 
       {!isEmbed && (
-        <div className="sticky top-[var(--app-header-height)] z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4">
+        <div
+          className="sticky top-[var(--app-header-height)] z-30 bg-[#0f1117]/95 backdrop-blur-sm border-b border-slate-800/60 -mx-4 sm:-mx-6 px-4 sm:px-6 -mt-4 pt-3 mb-4"
+          data-profile-sticky-chrome
+        >
           <div className="flex items-center gap-1.5 mb-1.5 text-[10px] font-mono text-slate-500">
             <Link href="/" className="text-slate-500 hover:text-slate-300 shrink-0">Home</Link>
             <span className="text-slate-700">/</span>
@@ -1500,7 +1547,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
                 )}
               </div>
             )}
-            <div className="space-y-6">
+            <div className="space-y-6" id="profile-category-list">
               {(isDecisionMode
                 ? [
                     ...MOLECULE_CATEGORIES.filter((c) => DECISION_CATEGORY_IDS.includes(c.id)),
@@ -1509,6 +1556,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
                 : MOLECULE_CATEGORIES
               ).map((cat) => {
                 const focused = activeCategory === cat.id
+                // When a specific tab is selected, only mount that category so the
+                // matching title is the one in view (avoids scroll landing on neighbors).
+                if (activeCategory !== 'all' && !focused) return null
+
                 const count = dataCounts[cat.id] ?? {
                   withData: 0,
                   total: cat.panels.length,
@@ -1563,12 +1614,21 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
                 }
 
                 return (
-                  <div key={cat.id} id={cat.id} data-testid={`category-section-${cat.id}`}>
+                  <div
+                    key={cat.id}
+                    id={`category-section-${cat.id}`}
+                    data-category-id={cat.id}
+                    data-category-label={cat.label}
+                    data-testid={`category-section-${cat.id}`}
+                    className="scroll-mt-[calc(var(--app-header-height)+5.5rem)]"
+                  >
                     <CategorySection
                       icon={cat.icon}
                       label={cat.label}
                       withData={withData}
                       total={total}
+                      categoryId={cat.id}
+                      forceExpanded={focused}
                     >
                       {renderCategoryContent(
                         cat.id,

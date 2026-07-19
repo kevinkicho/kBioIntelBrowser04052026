@@ -78,19 +78,45 @@ describe('deduplicateMolecules', () => {
       {
         id: '1', name: 'Disease A', source: 'Open Targets',
         molecules: [
-          { name: 'Aspirin', cid: 2244 },
+          {
+            name: 'Aspirin',
+            cid: 2244,
+            reason: 'Open Targets known drug or clinical candidate for this disease (drugAndClinicalCandidates), resolved to PubChem by name.',
+            relationKind: 'known_drug' as const,
+          },
         ]
       },
       {
         id: '2', name: 'Disease B', source: 'DisGeNET',
         molecules: [
-          { name: 'Aspirin', cid: 2244 },
+          {
+            name: 'Aspirin',
+            cid: 2244,
+            reason: 'Disease-associated gene PTGS1 (DisGeNET) → UniProt protein name → PubChem name match. Not necessarily an approved drug.',
+            relationKind: 'gene_associated' as const,
+          },
         ]
       },
     ]
     const result = deduplicateMolecules(results)
     expect(result).toHaveLength(1)
     expect(result[0].sources).toEqual(['Open Targets', 'DisGeNET'])
+    expect(result[0].relationKind).toBe('known_drug')
+    expect(result[0].reason).toMatch(/Open Targets known drug/i)
+    expect(result[0].reasons.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('fills fallback reason from source when missing', () => {
+    const result = deduplicateMolecules([
+      {
+        id: '1',
+        name: 'Disease A',
+        source: 'Open Targets',
+        molecules: [{ name: 'Metformin', cid: 4091 }],
+      },
+    ])
+    expect(result[0].reason).toMatch(/known drug|Open Targets/i)
+    expect(result[0].relationKind).toBe('disease_linked')
   })
 
   it('deduplicates by name when CID is null', () => {

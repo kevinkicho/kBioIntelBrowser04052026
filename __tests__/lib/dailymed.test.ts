@@ -23,7 +23,9 @@ describe('getDrugLabelsByName', () => {
     expect(labels[0].dosageForm).toBe('TABLET')
     expect(labels[0].route).toBe('ORAL')
     expect(labels[0].labelerName).toBe('Teva Pharmaceuticals')
-    expect(labels[0].dailyMedUrl).toBe('https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=abc-123')
+    expect(labels[0].dailyMedUrl).toContain('drugInfo.cfm?setid=')
+    expect(labels[0].dailyMedUrl).toContain('abc-123')
+    expect(labels[0].url).toBe(labels[0].dailyMedUrl)
   })
 
   test('returns empty array when no data', async () => {

@@ -66,7 +66,7 @@ export const AtcPanel = memo(function AtcPanel({
       {!isEmpty && (
         <>
           <p className="text-xs text-slate-400 mb-2">
-            WHO Anatomical Therapeutic Chemical codes. Open a row to view the class in the
+            WHO Anatomical Therapeutic Chemical codes. Click a row to open the class in the
             official ATC/DDD Index.
           </p>
           <FilterablePaginatedList
@@ -90,13 +90,12 @@ export const AtcPanel = memo(function AtcPanel({
                 <div>
                   {showHeader && (
                     <div
-                      className="grid grid-cols-[6.5rem_minmax(0,1fr)_9.5rem_3.5rem] gap-x-3 px-2 py-1.5 mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
+                      className="grid grid-cols-[6.5rem_minmax(0,1fr)_minmax(7rem,9.5rem)] gap-x-3 px-2 py-1.5 mb-0.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
                       role="row"
                     >
                       <span>Code</span>
                       <span>Class name</span>
                       <span>Level</span>
-                      <span className="text-right">Open</span>
                     </div>
                   )}
                   <a
@@ -107,7 +106,7 @@ export const AtcPanel = memo(function AtcPanel({
                     onClick={() =>
                       onDeepLinkClick('atc', href, { panelId: 'atc', label: cls.code })
                     }
-                    className="grid grid-cols-[6.5rem_minmax(0,1fr)_9.5rem_3.5rem] items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group gap-x-3"
+                    className="grid grid-cols-[6.5rem_minmax(0,1fr)_minmax(7rem,9.5rem)] items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group gap-x-3"
                   >
                     <span className="text-xs font-mono font-medium text-teal-300 group-hover:text-teal-200 truncate">
                       {cls.code || '—'}
@@ -117,9 +116,6 @@ export const AtcPanel = memo(function AtcPanel({
                     </span>
                     <span className="text-[11px] text-slate-500 truncate" title={level}>
                       {level}
-                    </span>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right whitespace-nowrap">
-                      View ↗
                     </span>
                   </a>
                 </div>
