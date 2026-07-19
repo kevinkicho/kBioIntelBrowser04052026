@@ -21,10 +21,10 @@ import { CandidateCard } from '@/app/discover/components/CandidateCard'
 import type { MoleculeCandidate, ScoreRubric } from '@/lib/domain'
 import type { SaveProjectContext } from '@/components/projects/SaveToProjectButton'
 import { matchDomainCandidate } from '@/lib/discovery/matchDomainCandidate'
-import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
-import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
-import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 
 const DISCLAIMER_KEY = 'biointel-ai-analysis-disclaimer-v1'
 
@@ -60,6 +60,7 @@ export function AiAnalysisView({
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AiRankResult | null>(null)
   const [lastPrompt, setLastPrompt] = useState<{ system: string; user: string } | null>(null)
+  const [regenOpen, setRegenOpen] = useState(false)
   const [disclaimerAck, setDisclaimerAck] = useState(() => {
     try {
       return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(DISCLAIMER_KEY) === '1'
@@ -100,66 +101,64 @@ export function AiAnalysisView({
     onShowingAiList?.(showingAiList)
   }, [showingAiList, onShowingAiList])
 
-  const runAnalysis = useCallback(async () => {
-    if (!aiAvailable) {
-      setError('Connect Ollama Cloud and select a model in AI settings first.')
-      return
-    }
-    if (ofRecordCandidates.length === 0) return
-    setRunning(true)
-    setError(null)
-    try {
-      const { system, user } = buildAiRankPrompt({
-        diseaseName,
-        candidates: inputs,
-        userGoal: userGoal.trim() || undefined,
-        mode: 'reorder',
-      })
-      setLastPrompt({ system, user })
-      let full = ''
-      for await (const token of ai.askAI([
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ])) {
-        full += token
+  const runAnalysis = useCallback(
+    async (override?: { system: string; user: string }) => {
+      if (!aiAvailable) {
+        setError('Connect Ollama Cloud and select a model in AI settings first.')
+        return
       }
-      const validated = parseAndValidateAiRank(full, inputs, { model: ai.model })
-      setResult(validated)
-      onResult?.(validated)
-      emitProductEvent('ai_rank_completed', {
-        disease: diseaseName,
-        count: validated.ordering.length,
-        refused: validated.refused,
-        model: ai.model,
-      })
-      void saveAiGeneratedData({
-        kind: 'discover_rank',
-        mode: 'ai_analysis_reorder',
-        content: JSON.stringify(validated),
-        context: { name: diseaseName },
-        model: ai.model ?? undefined,
-        ollamaUrl: ai.ollamaUrl,
-        promptSystem: system,
-        promptUser: user,
-        task: validated,
-        error: validated.refused ? validated.refuseReason : undefined,
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-      setResult(null)
-      onResult?.(null)
-    } finally {
-      setRunning(false)
-    }
-  }, [
-    ai,
-    aiAvailable,
-    diseaseName,
-    inputs,
-    ofRecordCandidates.length,
-    onResult,
-    userGoal,
-  ])
+      if (ofRecordCandidates.length === 0) return
+      setRunning(true)
+      setError(null)
+      try {
+        const built = buildAiRankPrompt({
+          diseaseName,
+          candidates: inputs,
+          userGoal: userGoal.trim() || undefined,
+          mode: 'reorder',
+        })
+        const system = override?.system ?? built.system
+        const user = override?.user ?? built.user
+        setLastPrompt({ system, user })
+        let full = ''
+        for await (const token of ai.askAI([
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ])) {
+          full += token
+        }
+        const validated = parseAndValidateAiRank(full, inputs, { model: ai.model })
+        setResult(validated)
+        onResult?.(validated)
+        setRegenOpen(false)
+        emitProductEvent('ai_rank_completed', {
+          disease: diseaseName,
+          count: validated.ordering.length,
+          refused: validated.refused,
+          model: ai.model,
+        })
+        void persistAiGeneration({
+          kind: 'discover_rank',
+          mode: 'ai_analysis_reorder',
+          content: JSON.stringify(validated),
+          context: { name: diseaseName },
+          model: ai.model ?? undefined,
+          ollamaUrl: ai.ollamaUrl,
+          promptSystem: system,
+          promptUser: user,
+          task: validated,
+          error: validated.refused ? validated.refuseReason : undefined,
+        })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+        setResult(null)
+        onResult?.(null)
+      } finally {
+        setRunning(false)
+      }
+    },
+    [ai, aiAvailable, diseaseName, inputs, ofRecordCandidates.length, onResult, userGoal],
+  )
 
   function restoreFromHistory(entry: AiGeneratedRecord) {
     try {
@@ -295,8 +294,19 @@ export function AiAnalysisView({
                 className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-40"
                 data-testid="ai-analysis-run"
               >
-                {running ? 'Analyzing…' : result ? 'Re-run analysis' : 'Run AI analysis'}
+                {running ? 'Analyzing…' : result ? 'Quick re-run' : 'Run AI analysis'}
               </button>
+              {result && (
+                <button
+                  type="button"
+                  onClick={() => setRegenOpen(true)}
+                  disabled={running || !aiAvailable}
+                  className="rounded-lg border border-violet-700/60 px-3 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-950/50 disabled:opacity-40"
+                  data-testid="ai-analysis-regenerate"
+                >
+                  Regenerate…
+                </button>
+              )}
             </div>
             {!aiAvailable && (
               <p className="text-[10px] text-amber-400/90">
@@ -325,13 +335,22 @@ export function AiAnalysisView({
               className="mt-2"
               testId="discover-ai-prompt"
             />
-            <AiGenerationHistory
+            <AiRegenerateModal
+              open={regenOpen}
+              onClose={() => setRegenOpen(false)}
               kind="discover_rank"
               mode="ai_analysis_reorder"
+              title="Regenerate Discover AI analysis"
+              systemPrompt={lastPrompt?.system ?? livePrompt?.system ?? ''}
+              userPrompt={lastPrompt?.user ?? livePrompt?.user ?? ''}
               contextKey={diseaseName}
-              className="mt-2"
-              onRestore={restoreFromHistory}
-              testId="discover-ai-history"
+              busy={running}
+              allowOverrideSystem
+              onLoadEntry={restoreFromHistory}
+              onRegenerate={async ({ system, user }) => {
+                await runAnalysis({ system, user })
+              }}
+              testId="discover-ai-regen-modal"
             />
           </div>
         )}

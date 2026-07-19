@@ -11,10 +11,10 @@ import {
 } from '@/lib/ai/contracts'
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
-import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
-import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
-import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 
 const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_executive_brief', label: 'Executive brief' },
@@ -59,6 +59,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   const [insight, setInsight] = useState<StructuredInsight | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [customQuestion, setCustomQuestion] = useState('')
+  const [regenOpen, setRegenOpen] = useState(false)
 
   const claimCount = pack?.claims?.length ?? 0
   const citableCount = useMemo(() => {
@@ -82,13 +83,12 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
     return packModePromptPreview(mode, pack, customQuestion)
   }, [pack, mode, customQuestion])
 
-  const run = async () => {
+  const run = async (override?: { system: string; user: string }) => {
     if (!pack || gated) return
-    if (isCustom && !customQuestion.trim()) {
+    if (isCustom && !customQuestion.trim() && !override?.user?.trim()) {
       setError('Enter a question or prompt first.')
       return
     }
-    // Real Cloud call — needs API key + model; chip status may lag but key/model is enough
     if (!ai.hasUserApiKey || !ai.model) {
       setError(
         'Add your Ollama Cloud API key and connect (top-bar AI button), then pick a model. Pack AI is not dummy data — it calls the live model.',
@@ -97,7 +97,9 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
     }
     setBusy(true)
     setError(null)
-    setInsight(null)
+    if (!override) setInsight(null)
+    const sys = override?.system ?? promptPreview?.system
+    const usr = override?.user ?? promptPreview?.user
     try {
       const res = await fetch('/api/ai/pack', {
         method: 'POST',
@@ -114,6 +116,9 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
           ...(isCustom ? { customQuestion: customQuestion.trim() } : {}),
+          ...(override
+            ? { overrideSystem: override.system, overrideUser: override.user }
+            : {}),
           ...(ai.ollamaApiKey ? { ollamaApiKey: ai.ollamaApiKey } : {}),
         }),
       })
@@ -132,7 +137,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       })
       if (data.refused || !data.insight) {
         setError(data.refuseReason ?? data.error ?? 'Refused or empty response')
-        void saveAiGeneratedData({
+        void persistAiGeneration({
           kind: 'pack',
           mode,
           content: data.refuseReason ?? data.error ?? 'refused',
@@ -140,14 +145,15 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
           error: data.refuseReason ?? data.error,
-          promptSystem: promptPreview?.system,
-          promptUser: promptPreview?.user,
+          promptSystem: sys,
+          promptUser: usr,
         })
         return
       }
       setInsight(data.insight)
       onInsight?.(mode, data.insight)
-      void saveAiGeneratedData({
+      setRegenOpen(false)
+      void persistAiGeneration({
         kind: 'pack',
         mode,
         content: JSON.stringify(data.insight),
@@ -159,8 +165,8 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         model: ai.model,
         ollamaUrl: ai.ollamaUrl,
         task: data.insight,
-        promptSystem: promptPreview?.system,
-        promptUser: promptPreview?.user,
+        promptSystem: sys,
+        promptUser: usr,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pack AI failed')
@@ -271,24 +277,6 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           testId="pack-ai-prompt"
         />
       )}
-      <AiGenerationHistory
-        kind="pack"
-        mode={mode}
-        contextKey={pack?.id}
-        className="mb-2"
-        testId="pack-ai-history"
-        onRestore={(entry: AiGeneratedRecord) => {
-          try {
-            const insight = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
-            if (insight?.summary || insight?.claimIds) {
-              setInsight(insight)
-              setError(null)
-            }
-          } catch {
-            setError('Could not restore that generation')
-          }
-        }}
-      />
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90">
@@ -296,21 +284,66 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           Download after Core panels load, or load more molecule evidence.
         </p>
       ) : (
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={busy || !pack || (isCustom && !customQuestion.trim())}
-          className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
-          data-testid="pack-ai-run"
-        >
-          {busy
-            ? isCustom
-              ? 'Thinking…'
-              : 'Running…'
-            : isCustom
-              ? 'Send prompt'
-              : 'Run analysis'}
-        </button>
+        <div className="mb-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void run()}
+            disabled={busy || !pack || (isCustom && !customQuestion.trim())}
+            className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
+            data-testid="pack-ai-run"
+          >
+            {busy
+              ? isCustom
+                ? 'Thinking…'
+                : 'Running…'
+              : insight
+                ? 'Quick re-run'
+                : isCustom
+                  ? 'Send prompt'
+                  : 'Run analysis'}
+          </button>
+          {(insight || promptPreview) && (
+            <button
+              type="button"
+              onClick={() => setRegenOpen(true)}
+              disabled={busy || !pack}
+              className="rounded-lg border border-indigo-700/50 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-950/40 disabled:opacity-50"
+              data-testid="pack-ai-regenerate"
+            >
+              Regenerate…
+            </button>
+          )}
+        </div>
+      )}
+
+      {promptPreview && pack && (
+        <AiRegenerateModal
+          open={regenOpen}
+          onClose={() => setRegenOpen(false)}
+          kind="pack"
+          mode={mode}
+          title="Regenerate Pack AI"
+          systemPrompt={promptPreview.system}
+          userPrompt={promptPreview.user}
+          contextKey={pack.id}
+          busy={busy}
+          allowOverrideSystem
+          onLoadEntry={(entry: AiGeneratedRecord) => {
+            try {
+              const next = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
+              if (next?.summary || next?.claimIds) {
+                setInsight(next)
+                setError(null)
+              }
+            } catch {
+              setError('Could not load that generation')
+            }
+          }}
+          onRegenerate={async ({ system, user }) => {
+            await run({ system, user })
+          }}
+          testId="pack-ai-regen-modal"
+        />
       )}
 
       {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}

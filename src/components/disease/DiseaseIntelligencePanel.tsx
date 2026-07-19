@@ -3,8 +3,8 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
-import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
-import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
+import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import {
   type DiseaseDetailContext,
   type DiseaseIntelligenceMode,
@@ -45,6 +45,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
     custom: emptyMode(),
   }))
   const [showPrompt, setShowPrompt] = useState(false)
+  const [regenOpen, setRegenOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [followUp, setFollowUp] = useState('')
   const mountedRef = useRef(true)
@@ -148,7 +149,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
       if (gen !== streamGenRef.current) return
 
       if (full.trim()) {
-        void saveAiGeneratedData({
+        void persistAiGeneration({
           kind: 'disease',
           mode: `disease_${mode}`,
           content: full,
@@ -328,17 +329,29 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                     Stop
                   </button>
                 ) : (
-                  (activeTab !== 'summary' || active.wasTriggered || !active.content) && (
-                    <button
-                      type="button"
-                      onClick={handleGenerate}
-                      disabled={activeTab === 'custom' && !customDraft.trim()}
-                      className="rounded-lg bg-indigo-600/90 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 px-3 py-1.5 text-[11px] font-medium text-white transition-colors"
-                      data-testid="disease-intel-generate"
-                    >
-                      {active.wasTriggered ? 'Regenerate' : 'Generate'}
-                    </button>
-                  )
+                  <div className="flex flex-wrap gap-1.5">
+                    {(activeTab !== 'summary' || active.wasTriggered || !active.content) && (
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        disabled={activeTab === 'custom' && !customDraft.trim()}
+                        className="rounded-lg bg-indigo-600/90 hover:bg-indigo-500 disabled:bg-slate-700 disabled:text-slate-500 px-3 py-1.5 text-[11px] font-medium text-white transition-colors"
+                        data-testid="disease-intel-generate"
+                      >
+                        {active.wasTriggered ? 'Quick re-run' : 'Generate'}
+                      </button>
+                    )}
+                    {active.wasTriggered && (
+                      <button
+                        type="button"
+                        onClick={() => setRegenOpen(true)}
+                        className="rounded-lg border border-indigo-700/50 px-3 py-1.5 text-[11px] text-indigo-200 hover:bg-indigo-950/40"
+                        data-testid="disease-intel-regenerate"
+                      >
+                        Regenerate…
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
             </div>
@@ -376,31 +389,108 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
               />
             )}
 
-            <AiGenerationHistory
-              kind="disease"
-              mode={`disease_${activeTab}`}
-              contextKey={context.diseaseName}
-              className="mt-2"
-              testId="disease-intel-history"
-              onRestore={(entry) => {
-                setModes((prev) => ({
-                  ...prev,
-                  [activeTab]: {
-                    ...prev[activeTab],
-                    content: entry.content,
-                    wasTriggered: true,
-                    isStreaming: false,
-                    prompt:
-                      entry.promptSystem || entry.promptUser
-                        ? {
-                            system: entry.promptSystem || '',
-                            user: entry.promptUser || '',
-                          }
-                        : prev[activeTab].prompt,
-                  },
-                }))
-              }}
-            />
+            {(() => {
+              const live =
+                active.prompt ??
+                buildDiseaseIntelligencePrompt(
+                  activeTab,
+                  context,
+                  activeTab === 'custom' ? customDraft : undefined,
+                )
+              return (
+                <AiRegenerateModal
+                  open={regenOpen}
+                  onClose={() => setRegenOpen(false)}
+                  kind="disease"
+                  mode={`disease_${activeTab}`}
+                  title="Regenerate disease intelligence"
+                  systemPrompt={live.system}
+                  userPrompt={live.user}
+                  contextKey={context.diseaseName}
+                  busy={active.isStreaming}
+                  allowOverrideSystem
+                  onLoadEntry={(entry) => {
+                    setModes((prev) => ({
+                      ...prev,
+                      [activeTab]: {
+                        ...prev[activeTab],
+                        content: entry.content,
+                        wasTriggered: true,
+                        isStreaming: false,
+                        prompt:
+                          entry.promptSystem || entry.promptUser
+                            ? {
+                                system: entry.promptSystem || '',
+                                user: entry.promptUser || '',
+                              }
+                            : prev[activeTab].prompt,
+                      },
+                    }))
+                    setRegenOpen(false)
+                  }}
+                  onRegenerate={async ({ system, user }) => {
+                    // Stream with overridden prompts via temporary custom path
+                    ai.cancelAskAI()
+                    const gen = ++streamGenRef.current
+                    streamingModeRef.current = activeTab
+                    setModes((prev) => ({
+                      ...prev,
+                      [activeTab]: {
+                        ...prev[activeTab],
+                        isStreaming: true,
+                        wasTriggered: true,
+                        content: '',
+                        prompt: { system, user },
+                      },
+                    }))
+                    let full = ''
+                    try {
+                      for await (const token of ai.askAI([
+                        { role: 'system', content: system },
+                        { role: 'user', content: user },
+                      ])) {
+                        if (!mountedRef.current || gen !== streamGenRef.current) break
+                        full += token
+                        setModes((prev) => ({
+                          ...prev,
+                          [activeTab]: { ...prev[activeTab], content: full },
+                        }))
+                      }
+                    } catch {
+                      full += '\n\n*[Error: Analysis interrupted]*'
+                    }
+                    if (gen !== streamGenRef.current) return
+                    if (full.trim()) {
+                      void persistAiGeneration({
+                        kind: 'disease',
+                        mode: `disease_${activeTab}`,
+                        content: full,
+                        context: {
+                          name: context.diseaseName,
+                          diseaseId: context.diseaseId,
+                        },
+                        model: ai.model,
+                        ollamaUrl: ai.ollamaUrl,
+                        promptSystem: system,
+                        promptUser: user,
+                      })
+                    }
+                    if (mountedRef.current) {
+                      setModes((prev) => ({
+                        ...prev,
+                        [activeTab]: {
+                          ...prev[activeTab],
+                          isStreaming: false,
+                          content: full,
+                        },
+                      }))
+                    }
+                    setRegenOpen(false)
+                  }}
+                  testId="disease-intel-regen-modal"
+                />
+              )
+            })()}
 
             <div
               className="disease-intel-body mt-2 min-h-[4rem]"

@@ -11,10 +11,10 @@ import {
 } from '@/lib/ai/rhContracts'
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
-import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
-import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
-import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 
 const MODES: { id: RhAiMode; label: string }[] = [
   { id: 'rh_thesis_draft', label: 'Thesis draft' },
@@ -52,6 +52,7 @@ export function RhAiPanel({
   const [insight, setInsight] = useState<RhStructuredInsight | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [customQuestion, setCustomQuestion] = useState('')
+  const [regenOpen, setRegenOpen] = useState(false)
 
   const claimCount = claims.length
   const minClaims = minClaimsForRhMode(mode)
@@ -76,9 +77,9 @@ export function RhAiPanel({
     [mode, hyp, claims, candidates, disease, targetIds, customQuestion],
   )
 
-  const run = async () => {
+  const run = async (override?: { system: string; user: string }) => {
     if (gated) return
-    if (isCustom && !customQuestion.trim()) {
+    if (isCustom && !customQuestion.trim() && !override?.user?.trim()) {
       setError('Enter a question first.')
       return
     }
@@ -90,7 +91,9 @@ export function RhAiPanel({
     }
     setBusy(true)
     setError(null)
-    setInsight(null)
+    if (!override) setInsight(null)
+    const sys = override?.system ?? promptPreview.system
+    const usr = override?.user ?? promptPreview.user
     try {
       const res = await fetch('/api/ai/rh', {
         method: 'POST',
@@ -113,6 +116,9 @@ export function RhAiPanel({
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
           ...(isCustom ? { customQuestion: customQuestion.trim() } : {}),
+          ...(override
+            ? { overrideSystem: override.system, overrideUser: override.user }
+            : {}),
           ...(ai.ollamaApiKey ? { ollamaApiKey: ai.ollamaApiKey } : {}),
         }),
       })
@@ -132,7 +138,7 @@ export function RhAiPanel({
       })
       if (data.refused || !data.insight) {
         setError(data.refuseReason ?? data.error ?? 'Refused or empty response')
-        void saveAiGeneratedData({
+        void persistAiGeneration({
           kind: 'rh',
           mode,
           content: data.refuseReason ?? data.error ?? 'refused',
@@ -140,14 +146,15 @@ export function RhAiPanel({
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
           error: data.refuseReason ?? data.error,
-          promptSystem: promptPreview?.system,
-          promptUser: promptPreview?.user,
+          promptSystem: sys,
+          promptUser: usr,
         })
         return
       }
       setInsight(data.insight)
       onInsight?.(mode, data.insight)
-      void saveAiGeneratedData({
+      setRegenOpen(false)
+      void persistAiGeneration({
         kind: 'rh',
         mode,
         content: JSON.stringify(data.insight),
@@ -155,8 +162,8 @@ export function RhAiPanel({
         model: ai.model,
         ollamaUrl: ai.ollamaUrl,
         task: data.insight,
-        promptSystem: promptPreview?.system,
-        promptUser: promptPreview?.user,
+        promptSystem: sys,
+        promptUser: usr,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'RH AI failed')
@@ -221,24 +228,6 @@ export function RhAiPanel({
         className="mb-2"
         testId="rh-ai-prompt"
       />
-      <AiGenerationHistory
-        kind="rh"
-        mode={mode}
-        contextKey={hyp.id}
-        className="mb-2"
-        testId="rh-ai-history"
-        onRestore={(entry: AiGeneratedRecord) => {
-          try {
-            const restored = (entry.task ?? JSON.parse(entry.content)) as RhStructuredInsight
-            if (restored?.summary || restored?.claimIds) {
-              setInsight(restored)
-              setError(null)
-            }
-          } catch {
-            setError('Could not restore that generation')
-          }
-        }}
-      />
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90" data-testid="rh-ai-gated">
@@ -246,16 +235,55 @@ export function RhAiPanel({
           Seed from a pack and rebuild evidence.
         </p>
       ) : (
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={busy || (isCustom && !customQuestion.trim())}
-          className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
-          data-testid="rh-ai-run"
-        >
-          {busy ? 'Running…' : isCustom ? 'Send prompt' : 'Run claim-bound AI'}
-        </button>
+        <div className="mb-2 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void run()}
+            disabled={busy || (isCustom && !customQuestion.trim())}
+            className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
+            data-testid="rh-ai-run"
+          >
+            {busy ? 'Running…' : insight ? 'Quick re-run' : isCustom ? 'Send prompt' : 'Run claim-bound AI'}
+          </button>
+          <button
+            type="button"
+            onClick={() => setRegenOpen(true)}
+            disabled={busy}
+            className="rounded-lg border border-indigo-700/50 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-950/40 disabled:opacity-50"
+            data-testid="rh-ai-regenerate"
+          >
+            Regenerate…
+          </button>
+        </div>
       )}
+
+      <AiRegenerateModal
+        open={regenOpen}
+        onClose={() => setRegenOpen(false)}
+        kind="rh"
+        mode={mode}
+        title="Regenerate Research Hypothesis AI"
+        systemPrompt={promptPreview.system}
+        userPrompt={promptPreview.user}
+        contextKey={hyp.id}
+        busy={busy}
+        allowOverrideSystem
+        onLoadEntry={(entry: AiGeneratedRecord) => {
+          try {
+            const restored = (entry.task ?? JSON.parse(entry.content)) as RhStructuredInsight
+            if (restored?.summary || restored?.claimIds) {
+              setInsight(restored)
+              setError(null)
+            }
+          } catch {
+            setError('Could not load that generation')
+          }
+        }}
+        onRegenerate={async ({ system, user }) => {
+          await run({ system, user })
+        }}
+        testId="rh-ai-regen-modal"
+      />
 
       {error && (
         <p className="mt-2 text-[11px] text-red-400" role="alert">

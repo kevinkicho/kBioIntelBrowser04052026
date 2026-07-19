@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
-import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
+import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
 import {
   buildAgentToolSystemAddendum,
@@ -327,7 +327,7 @@ export function useAICopilot(
 
     const storedContent = finalContent || fullContent
     if (storedContent.trim() || taskPayload) {
-      void saveAiGeneratedData({
+      void persistAiGeneration({
         kind: 'copilot',
         mode,
         content: validationError
@@ -578,7 +578,7 @@ export function useAICopilot(
         .filter((m) => m.role === 'user')
         .map((m) => m.content)
         .join('\n---\n')
-      void saveAiGeneratedData({
+      void persistAiGeneration({
         kind: 'copilot',
         mode: 'free_qa',
         content:

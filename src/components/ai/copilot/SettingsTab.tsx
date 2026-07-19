@@ -132,12 +132,20 @@ export function SettingsTab({
           Traffic goes browser → this app’s server → ollama.com (not local port 11434).
           Insights must cite loaded panels; sparse data triggers a refuse-and-gap response.
         </p>
-        <Link
-          href="/how-it-works"
-          className="mt-2 inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
-        >
-          View prompts & algorithms →
-        </Link>
+        <div className="mt-2 flex flex-wrap gap-3">
+          <Link
+            href="/how-it-works"
+            className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
+          >
+            View prompts & algorithms →
+          </Link>
+          <Link
+            href="/ai-history"
+            className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
+          >
+            My AI history →
+          </Link>
+        </div>
       </div>
 
       {lastPrompt && (

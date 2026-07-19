@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
     ollamaApiKey?: string
     apiKey?: string
     customQuestion?: string
+    /** Optional full prompt override from regenerate modal (learning UX) */
+    overrideSystem?: string
+    overrideUser?: string
   }
   const apiKey = parseRequestOllamaApiKey(body)
 
@@ -54,12 +57,17 @@ export async function POST(request: NextRequest) {
   }
 
   const ctx = buildPackAiContext(body.pack as PackAiRequest['pack'])
+  const system =
+    typeof body.overrideSystem === 'string' && body.overrideSystem.trim()
+      ? body.overrideSystem
+      : packModeSystemPrompt(mode)
+  const user =
+    typeof body.overrideUser === 'string' && body.overrideUser.trim()
+      ? body.overrideUser
+      : packModeUserPrompt(ctx, mode, body.customQuestion)
   const messages = [
-    { role: 'system' as const, content: packModeSystemPrompt(mode) },
-    {
-      role: 'user' as const,
-      content: packModeUserPrompt(ctx, mode, body.customQuestion),
-    },
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
   ]
 
   let raw = ''

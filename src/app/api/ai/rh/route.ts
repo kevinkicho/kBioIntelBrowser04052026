@@ -34,6 +34,8 @@ export async function POST(request: NextRequest) {
     ollamaApiKey?: string
     apiKey?: string
     customQuestion?: string
+    overrideSystem?: string
+    overrideUser?: string
   }
   const apiKey = parseRequestOllamaApiKey(body)
 
@@ -66,12 +68,17 @@ export async function POST(request: NextRequest) {
     status: body.hypothesis.status,
   })
 
+  const system =
+    typeof body.overrideSystem === 'string' && body.overrideSystem.trim()
+      ? body.overrideSystem
+      : rhModeSystemPrompt(mode)
+  const user =
+    typeof body.overrideUser === 'string' && body.overrideUser.trim()
+      ? body.overrideUser
+      : rhModeUserPrompt(ctx, mode, body.customQuestion)
   const messages = [
-    { role: 'system' as const, content: rhModeSystemPrompt(mode) },
-    {
-      role: 'user' as const,
-      content: rhModeUserPrompt(ctx, mode, body.customQuestion),
-    },
+    { role: 'system' as const, content: system },
+    { role: 'user' as const, content: user },
   ]
 
   let raw = ''

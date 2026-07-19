@@ -15,10 +15,10 @@ import {
 } from '@/lib/ai/aiRank'
 import type { BoardStatus, MoleculeCandidate, Project } from '@/lib/domain'
 import { emitProductEvent } from '@/lib/productEvents'
-import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
-import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
-import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 
 /** Suggest board status from AI rank position (never auto-applied). */
 export function suggestBoardStatusFromAiRank(
@@ -48,6 +48,7 @@ export function BoardAiRecommend({
   const [error, setError] = useState<string | null>(null)
   const [goal, setGoal] = useState('')
   const [lastPrompt, setLastPrompt] = useState<{ system: string; user: string } | null>(null)
+  const [regenOpen, setRegenOpen] = useState(false)
 
   const aiAvailable = ai.enabled && ai.status === 'available' && Boolean(ai.model)
   const candidates = project.candidates
@@ -64,55 +65,61 @@ export function BoardAiRecommend({
     })
   }, [candidates, goal, project.disease?.name, project.name])
 
-  const run = useCallback(async () => {
-    if (!aiAvailable || candidates.length === 0) return
-    setRunning(true)
-    setError(null)
-    try {
-      const inputs = buildAiRankInputsFromBoard(candidates)
-      const disease = project.disease?.name || project.name || 'board'
-      const { system, user } = buildAiRankPrompt({
-        diseaseName: String(disease),
-        candidates: inputs,
-        userGoal: goal.trim() || 'Prioritize for next lab week review',
-        mode: 'board_recommend',
-      })
-      setLastPrompt({ system, user })
-      let full = ''
-      for await (const token of ai.askAI([
-        { role: 'system', content: system },
-        { role: 'user', content: user },
-      ])) {
-        full += token
-      }
-      const validated = parseAndValidateAiRank(full, inputs, { model: ai.model })
-      setResult(validated)
-      emitProductEvent('ai_recommend_completed', {
-        projectId: project.id,
-        count: validated.ordering.length,
-        refused: validated.refused,
-      })
-      void saveAiGeneratedData({
-        kind: 'board_recommend',
-        mode: 'board_recommend',
-        content: JSON.stringify(validated),
-        context: {
+  const run = useCallback(
+    async (override?: { system: string; user: string }) => {
+      if (!aiAvailable || candidates.length === 0) return
+      setRunning(true)
+      setError(null)
+      try {
+        const inputs = buildAiRankInputsFromBoard(candidates)
+        const disease = project.disease?.name || project.name || 'board'
+        const built = buildAiRankPrompt({
+          diseaseName: String(disease),
+          candidates: inputs,
+          userGoal: goal.trim() || 'Prioritize for next lab week review',
+          mode: 'board_recommend',
+        })
+        const system = override?.system ?? built.system
+        const user = override?.user ?? built.user
+        setLastPrompt({ system, user })
+        let full = ''
+        for await (const token of ai.askAI([
+          { role: 'system', content: system },
+          { role: 'user', content: user },
+        ])) {
+          full += token
+        }
+        const validated = parseAndValidateAiRank(full, inputs, { model: ai.model })
+        setResult(validated)
+        setRegenOpen(false)
+        emitProductEvent('ai_recommend_completed', {
           projectId: project.id,
-          name: project.name,
-          diseaseId: project.disease?.id,
-        },
-        model: ai.model ?? undefined,
-        ollamaUrl: ai.ollamaUrl,
-        promptSystem: system,
-        promptUser: user,
-        task: validated,
-      })
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setRunning(false)
-    }
-  }, [ai, aiAvailable, candidates, goal, project])
+          count: validated.ordering.length,
+          refused: validated.refused,
+        })
+        void persistAiGeneration({
+          kind: 'board_recommend',
+          mode: 'board_recommend',
+          content: JSON.stringify(validated),
+          context: {
+            projectId: project.id,
+            name: project.name,
+            diseaseId: project.disease?.id,
+          },
+          model: ai.model ?? undefined,
+          ollamaUrl: ai.ollamaUrl,
+          promptSystem: system,
+          promptUser: user,
+          task: validated,
+        })
+      } catch (e) {
+        setError(e instanceof Error ? e.message : String(e))
+      } finally {
+        setRunning(false)
+      }
+    },
+    [ai, aiAvailable, candidates, goal, project],
+  )
 
   function restoreFromHistory(entry: AiGeneratedRecord) {
     try {
@@ -150,15 +157,28 @@ export function BoardAiRecommend({
             you confirm promote / hold / watching.
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => void run()}
-          disabled={running || !aiAvailable}
-          className="rounded-lg bg-violet-700/90 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-600 disabled:opacity-40"
-          data-testid="board-ai-recommend-run"
-        >
-          {running ? 'Analyzing…' : 'Recommend review order'}
-        </button>
+        <div className="flex flex-wrap gap-1.5">
+          <button
+            type="button"
+            onClick={() => void run()}
+            disabled={running || !aiAvailable}
+            className="rounded-lg bg-violet-700/90 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-600 disabled:opacity-40"
+            data-testid="board-ai-recommend-run"
+          >
+            {running ? 'Analyzing…' : result ? 'Quick re-run' : 'Recommend review order'}
+          </button>
+          {result && (
+            <button
+              type="button"
+              onClick={() => setRegenOpen(true)}
+              disabled={running || !aiAvailable}
+              className="rounded-lg border border-violet-700/50 px-3 py-1.5 text-[11px] text-violet-200 hover:bg-violet-950/50 disabled:opacity-40"
+              data-testid="board-ai-regenerate"
+            >
+              Regenerate…
+            </button>
+          )}
+        </div>
       </div>
       <input
         type="text"
@@ -223,12 +243,22 @@ export function BoardAiRecommend({
         className="mt-2"
         testId="board-ai-prompt"
       />
-      <AiGenerationHistory
+      <AiRegenerateModal
+        open={regenOpen}
+        onClose={() => setRegenOpen(false)}
         kind="board_recommend"
+        mode="board_recommend"
+        title="Regenerate board AI recommend"
+        systemPrompt={lastPrompt?.system ?? livePrompt?.system ?? ''}
+        userPrompt={lastPrompt?.user ?? livePrompt?.user ?? ''}
         contextKey={project.id}
-        className="mt-2"
-        onRestore={restoreFromHistory}
-        testId="board-ai-history"
+        busy={running}
+        allowOverrideSystem
+        onLoadEntry={restoreFromHistory}
+        onRegenerate={async ({ system, user }) => {
+          await run({ system, user })
+        }}
+        testId="board-ai-regen-modal"
       />
     </div>
   )

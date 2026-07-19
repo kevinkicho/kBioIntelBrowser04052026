@@ -1,28 +1,28 @@
 'use client'
 
 /**
- * Paginated review of prior AI generations (Firestore when signed in).
- * User can restore a past output instead of only regenerating.
+ * Compact paginated history (local IDB and/or cloud).
+ * Prefer AiRegenerateModal for full regenerate + load UX.
  */
 
 import { useCallback, useEffect, useState } from 'react'
-import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 import {
-  listAiGeneratedPage,
+  listAiHistoryPage,
   type AiDataKind,
   type AiGeneratedRecord,
-} from '@/lib/firebase/aiDataSync'
+} from '@/lib/ai/aiHistoryStore'
 import { AiPromptReveal } from './AiPromptReveal'
 
 export interface AiGenerationHistoryProps {
   kind?: AiDataKind
   mode?: string
-  /** Optional filter: context name / packId / projectId substring */
   contextKey?: string
   pageSize?: number
   onRestore?: (entry: AiGeneratedRecord) => void
   className?: string
   testId?: string
+  /** Start expanded (e.g. on /ai-history page) */
+  defaultOpen?: boolean
 }
 
 export function AiGenerationHistory({
@@ -33,70 +33,47 @@ export function AiGenerationHistory({
   onRestore,
   className = '',
   testId = 'ai-generation-history',
+  defaultOpen = false,
 }: AiGenerationHistoryProps) {
-  const auth = useFirebaseAuth()
-  const uid = auth.user?.uid
   const [items, setItems] = useState<AiGeneratedRecord[]>([])
   const [cursor, setCursor] = useState<{ createdAt: string; id: string } | null>(null)
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [open, setOpen] = useState(false)
+  const [open, setOpen] = useState(defaultOpen)
+  const [source, setSource] = useState<'cloud' | 'local'>('local')
 
   const load = useCallback(
     async (append: boolean, pageCursor: { createdAt: string; id: string } | null) => {
-      if (!uid) return
       setLoading(true)
       setError(null)
       try {
-        const page = await listAiGeneratedPage(uid, {
+        const page = await listAiHistoryPage({
           kind,
           mode,
           pageSize,
           cursor: append ? pageCursor : null,
+          contextKey,
         })
-        let nextItems = page.items
-        if (contextKey) {
-          const k = contextKey.toLowerCase()
-          nextItems = nextItems.filter((r) => {
-            const c = r.context
-            if (!c) return true
-            return (
-              (c.name && c.name.toLowerCase().includes(k)) ||
-              (c.packId && c.packId.includes(contextKey)) ||
-              (c.projectId && c.projectId.includes(contextKey)) ||
-              (c.hypId && c.hypId.includes(contextKey)) ||
-              String(c.cid ?? '') === contextKey
-            )
-          })
-        }
-        setItems((prev) => (append ? [...prev, ...nextItems] : nextItems))
+        setItems((prev) => (append ? [...prev, ...page.items] : page.items))
         setCursor(page.nextCursor)
         setHasMore(page.hasMore)
+        setSource(page.source)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)
       }
     },
-    [uid, kind, mode, pageSize, contextKey],
+    [kind, mode, pageSize, contextKey],
   )
 
   useEffect(() => {
-    if (!open || !uid) return
+    if (!open) return
     setCursor(null)
     void load(false, null)
-  }, [open, uid, kind, mode, contextKey, load])
-
-  if (!uid) {
-    return (
-      <p className={`text-[10px] text-slate-600 ${className}`} data-testid={`${testId}-signed-out`}>
-        Sign in to save and paginate AI generations in the cloud (local session still works
-        without cloud).
-      </p>
-    )
-  }
+  }, [open, kind, mode, contextKey, load])
 
   return (
     <div
@@ -109,7 +86,9 @@ export function AiGenerationHistory({
         className="flex w-full items-center justify-between px-2.5 py-1.5 text-[10px] text-slate-400 hover:text-indigo-300"
         data-testid={`${testId}-toggle`}
       >
-        <span>Prior generations (cloud)</span>
+        <span>
+          Prior generations ({source === 'cloud' ? 'cloud' : 'this browser'})
+        </span>
         <span className="text-slate-600">{open ? 'Hide' : 'Browse'}</span>
       </button>
       {open && (
@@ -138,9 +117,6 @@ export function AiGenerationHistory({
                         {' '}
                         · {entry.createdAt ? new Date(entry.createdAt).toLocaleString() : '—'}
                       </span>
-                      {entry.model && (
-                        <span className="text-slate-600"> · {entry.model}</span>
-                      )}
                     </div>
                     <div className="flex gap-1 shrink-0">
                       <button
@@ -157,7 +133,7 @@ export function AiGenerationHistory({
                           onClick={() => onRestore(entry)}
                           data-testid={`${testId}-restore`}
                         >
-                          Restore
+                          Load
                         </button>
                       )}
                     </div>

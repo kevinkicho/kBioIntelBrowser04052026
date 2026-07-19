@@ -66,3 +66,13 @@ No Discover of-record ranking tools.
 | Persist (signed-in only) | `lib/firebase/aiDataSync.ts` — includes `promptSystem` / `promptUser`, `listAiGeneratedPage` |
 
 Kinds: `copilot` · `pack` · `disease` · `rh` · `discover_rank` · `board_recommend`
+
+### Regenerate modal (at surface)
+
+`components/ai/AiRegenerateModal.tsx` — review/override prompt, paginated prior gens, **Load message**, **Regenerate with this prompt**.
+
+### Unified store
+
+- `lib/ai/aiHistoryStore.ts` — `persistAiGeneration` (IDB always + Firestore when signed in)
+- `lib/ai/aiHistoryIdb.ts` — local IndexedDB
+- Global browse: `/ai-history`
