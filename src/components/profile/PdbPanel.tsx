@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo, useState } from 'react'
+import { memo, useEffect, useMemo, useState } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { StructureViewer } from '@/components/charts/StructureViewer'
@@ -17,9 +17,15 @@ import {
   pdbMethodShortLabel,
   pdbStructureDeepLink,
   pubmedUrl,
-  rcsbDownloadCifUrl,
 } from '@/lib/pdbLinks'
+import {
+  buildCharacterizationChips,
+  characterizationChipTitle,
+  type CharacterizationChip,
+  type CharacterizationProbeOverrides,
+} from '@/lib/pdbCharacterization'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { clientFetch } from '@/lib/clientFetch'
 
 const methodColors: Record<string, string> = {
   'X-ray': 'bg-sky-900/40 text-sky-300 border-sky-700/30',
@@ -36,6 +42,124 @@ function methodChipClass(method: string): string {
     methodColors[method] ||
     methodColors[short] ||
     'bg-slate-700/40 text-slate-300 border-slate-600/30'
+  )
+}
+
+function charChipClass(chip: CharacterizationChip): string {
+  if (chip.availability === 'available') {
+    return 'border-cyan-800/50 bg-cyan-950/40 text-cyan-300 hover:text-cyan-200 opacity-100'
+  }
+  if (chip.availability === 'explore') {
+    return 'border-indigo-900/40 bg-indigo-950/30 text-indigo-300/90 hover:text-indigo-200 opacity-80'
+  }
+  // Empty placeholder — dim, still clickable for literature shopping
+  return 'border-slate-700/60 bg-slate-900/40 text-slate-500 hover:text-slate-400 opacity-30'
+}
+
+/** Biophysical / structural technique chips (CIF/SS live; CD/MS probed free APIs). */
+function CharacterizationChipRow({
+  structure,
+}: {
+  structure: PdbStructure
+}) {
+  const [probe, setProbe] = useState<CharacterizationProbeOverrides | null>(null)
+  const [probing, setProbing] = useState(true)
+
+  useEffect(() => {
+    let cancelled = false
+    setProbing(true)
+    setProbe(null)
+    const pdbId = structure.pdbId || ''
+    const q = structure.title || pdbId
+    if (!pdbId && !q) {
+      setProbing(false)
+      return
+    }
+    const params = new URLSearchParams()
+    if (pdbId) params.set('pdbId', pdbId)
+    if (q) params.set('q', q.slice(0, 80))
+    void (async () => {
+      try {
+        const res = await clientFetch(
+          `/api/characterization/probe?${params.toString()}`,
+          undefined,
+          { retries: 0, timeoutMs: 12_000 },
+        )
+        if (!res.ok || cancelled) return
+        const data = (await res.json()) as {
+          ms?: { hit?: boolean; href?: string; accession?: string }
+          cd?: { hit?: boolean; href?: string }
+        }
+        if (cancelled) return
+        setProbe({
+          ms: data.ms
+            ? {
+                hit: Boolean(data.ms.hit),
+                href: data.ms.href,
+                accession: data.ms.accession,
+              }
+            : undefined,
+          cd: data.cd
+            ? { hit: Boolean(data.cd.hit), href: data.cd.href }
+            : undefined,
+        })
+      } catch {
+        /* keep static chips */
+      } finally {
+        if (!cancelled) setProbing(false)
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [structure.pdbId, structure.title])
+
+  const chips = useMemo(
+    () =>
+      buildCharacterizationChips({
+        pdbId: structure.pdbId,
+        title: structure.title,
+        probe,
+      }),
+    [structure.pdbId, structure.title, probe],
+  )
+
+  return (
+    <div
+      className="flex flex-wrap items-center gap-1 mt-1.5"
+      data-testid={`pdb-char-chips-${structure.pdbId}`}
+      data-probing={probing ? 'true' : 'false'}
+    >
+      <span className="text-[8px] uppercase tracking-wider text-slate-600 mr-0.5 shrink-0">
+        Char:
+      </span>
+      {chips.map((chip) => (
+        <a
+          key={chip.id}
+          href={chip.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          title={characterizationChipTitle(chip)}
+          data-testid={`pdb-char-${chip.id}-${structure.pdbId}`}
+          data-availability={chip.availability}
+          onClick={(e) => {
+            e.stopPropagation()
+            onDeepLinkClick('pdb', chip.href, {
+              panelId: 'pdb',
+              label: `char:${chip.id}:${structure.pdbId}`,
+            })
+          }}
+          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-opacity ${charChipClass(chip)}`}
+        >
+          {chip.abbrev}
+        </a>
+      ))}
+      {probing && (
+        <span className="text-[8px] text-slate-600 animate-pulse" title="Probing PRIDE / PCDDB…">
+          …
+        </span>
+      )}
+    </div>
   )
 }
 
@@ -83,10 +207,13 @@ export const PdbPanel = memo(function PdbPanel({
       {!isEmpty && (
         <>
           <p className="mb-2 text-[10px] text-slate-600 leading-relaxed">
-            RCSB PDB entries (free public API). Method chips (e.g. X-ray) open experimental /
-            crystallography details on PDBe — coordinates and diffraction metadata live at RCSB/PDBe;
-            we do not host structure-factor files. Use <strong className="text-slate-500">View 3D</strong>{' '}
-            for an in-page molecular view.
+            RCSB PDB entries (free public API). Method chips open experimental details on PDBe.
+            Use <strong className="text-slate-500">View 3D</strong> for an in-page molecular view.
+            Characterization chips: <span className="text-cyan-500/80">bright</span> = free data for
+            this entry (CIF, SS); <span className="text-indigo-400/70">medium</span> = free
+            repository search (CD via PCDDB, MS via PRIDE);{' '}
+            <span className="text-slate-500 opacity-50">dim</span> = not in PDB — PubMed explore for
+            SPR / ITC / DSC / UV (no free structured DB).
           </p>
           <FilterablePaginatedList
             items={list}
@@ -119,7 +246,6 @@ export const PdbPanel = memo(function PdbPanel({
               const isViewerOpen = activeViewer === structure.pdbId
               const doi = doiUrl(structure.citationDoi)
               const pmid = pubmedUrl(structure.citationPmid)
-              const cif = rcsbDownloadCifUrl(structure.pdbId)
               const xray = isXrayMethod(structure.method)
 
               return (
@@ -236,25 +362,9 @@ export const PdbPanel = memo(function PdbPanel({
                             PubMed
                           </a>
                         )}
-                        {cif && (
-                          <a
-                            href={cif}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-500 hover:text-slate-300"
-                            title="Download mmCIF coordinates (RCSB)"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeepLinkClick('pdb', cif, {
-                                panelId: 'pdb',
-                                label: `cif:${structure.pdbId}`,
-                              })
-                            }}
-                          >
-                            CIF
-                          </a>
-                        )}
                       </div>
+                      {/* CIF lives in Char: row with SS/CD/MS/SPR/ITC/DSC/UV */}
+                      <CharacterizationChipRow structure={structure} />
                     </div>
                     <a
                       href={methodHref}

@@ -2,6 +2,11 @@ import { render, screen } from '@testing-library/react'
 import { PdbPanel } from '@/components/profile/PdbPanel'
 import type { PdbStructure } from '@/lib/types'
 
+jest.mock('@/lib/clientFetch', () => ({
+  clientFetch: jest.fn().mockResolvedValue({ ok: false }),
+}))
+
+
 const mockStructures: PdbStructure[] = [
   {
     pdbId: '1M17',
@@ -51,6 +56,20 @@ describe('PdbPanel', () => {
     expect(screen.getByText(/38\.3 kDa/)).toBeInTheDocument()
     expect(screen.getByText('DOI')).toBeInTheDocument()
     expect(screen.getByText('PubMed')).toBeInTheDocument()
-    expect(screen.getByText('CIF')).toBeInTheDocument()
+  })
+
+  test('shows characterization chips (CIF available; SPR empty placeholder)', () => {
+    render(<PdbPanel structures={mockStructures} />)
+    const cif = screen.getByTestId('pdb-char-cif-1M17')
+    expect(cif).toHaveAttribute('data-availability', 'available')
+    expect(cif).toHaveAttribute('href', expect.stringContaining('.cif'))
+    const spr = screen.getByTestId('pdb-char-spr-1M17')
+    expect(spr).toHaveAttribute('data-availability', 'empty')
+    expect(spr).toHaveAttribute('href', expect.stringContaining('pubmed'))
+    expect(screen.getByTestId('pdb-char-cd-1M17')).toHaveAttribute(
+      'data-availability',
+      'explore',
+    )
   })
 })
+
