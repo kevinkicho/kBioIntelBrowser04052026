@@ -529,7 +529,23 @@ export default function ProjectBoardPage() {
         {project.candidates.length > 0 && (
           <>
             <BoardClaimStrip project={project} />
-            <BoardAiRecommend project={project} />
+            <BoardAiRecommend
+              project={project}
+              onApplyStatus={(candidateId, status) => {
+                const res = setBoardStatusAndSave(project.id, candidateId, status)
+                if (!res.ok) {
+                  showBanner('err', res.message)
+                  return
+                }
+                emitProductEvent('board_status_changed', {
+                  projectId: project.id,
+                  status,
+                  source: 'ai_suggest_apply',
+                })
+                refresh()
+                showBanner('ok', `Set ${status} (you confirmed AI suggestion)`)
+              }}
+            />
           </>
         )}
 

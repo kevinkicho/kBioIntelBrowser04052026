@@ -56,3 +56,13 @@ Phase A: retrieval snapshot, panel summary, load/retry category, session molecul
 Phase B: `open_panel`, `fix_gap`, `get_pack_claims`, `seed_research_hypothesis`, `compare_board`.
 
 No Discover of-record ranking tools.
+
+## Prompt transparency + cloud history
+
+| Piece | Path |
+|-------|------|
+| Reveal system/user prompts | `components/ai/AiPromptReveal.tsx` |
+| Paginated restore of prior gens | `components/ai/AiGenerationHistory.tsx` |
+| Persist (signed-in only) | `lib/firebase/aiDataSync.ts` — includes `promptSystem` / `promptUser`, `listAiGeneratedPage` |
+
+Kinds: `copilot` · `pack` · `disease` · `rh` · `discover_rank` · `board_recommend`

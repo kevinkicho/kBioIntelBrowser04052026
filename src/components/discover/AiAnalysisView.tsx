@@ -21,6 +21,10 @@ import { CandidateCard } from '@/app/discover/components/CandidateCard'
 import type { MoleculeCandidate, ScoreRubric } from '@/lib/domain'
 import type { SaveProjectContext } from '@/components/projects/SaveToProjectButton'
 import { matchDomainCandidate } from '@/lib/discovery/matchDomainCandidate'
+import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 
 const DISCLAIMER_KEY = 'biointel-ai-analysis-disclaimer-v1'
 
@@ -55,6 +59,7 @@ export function AiAnalysisView({
   const [running, setRunning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [result, setResult] = useState<AiRankResult | null>(null)
+  const [lastPrompt, setLastPrompt] = useState<{ system: string; user: string } | null>(null)
   const [disclaimerAck, setDisclaimerAck] = useState(() => {
     try {
       return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(DISCLAIMER_KEY) === '1'
@@ -68,6 +73,16 @@ export function AiAnalysisView({
     () => buildAiRankInputsFromLegacy(ofRecordCandidates),
     [ofRecordCandidates],
   )
+
+  const livePrompt = useMemo(() => {
+    if (ofRecordCandidates.length === 0) return null
+    return buildAiRankPrompt({
+      diseaseName,
+      candidates: inputs,
+      userGoal: userGoal.trim() || undefined,
+      mode: 'reorder',
+    })
+  }, [diseaseName, inputs, ofRecordCandidates.length, userGoal])
 
   const ofRecordByKey = useMemo(() => {
     const m = new Map<string, number>()
@@ -100,6 +115,7 @@ export function AiAnalysisView({
         userGoal: userGoal.trim() || undefined,
         mode: 'reorder',
       })
+      setLastPrompt({ system, user })
       let full = ''
       for await (const token of ai.askAI([
         { role: 'system', content: system },
@@ -115,6 +131,18 @@ export function AiAnalysisView({
         count: validated.ordering.length,
         refused: validated.refused,
         model: ai.model,
+      })
+      void saveAiGeneratedData({
+        kind: 'discover_rank',
+        mode: 'ai_analysis_reorder',
+        content: JSON.stringify(validated),
+        context: { name: diseaseName },
+        model: ai.model ?? undefined,
+        ollamaUrl: ai.ollamaUrl,
+        promptSystem: system,
+        promptUser: user,
+        task: validated,
+        error: validated.refused ? validated.refuseReason : undefined,
       })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -132,6 +160,27 @@ export function AiAnalysisView({
     onResult,
     userGoal,
   ])
+
+  function restoreFromHistory(entry: AiGeneratedRecord) {
+    try {
+      const parsed = entry.task
+        ? (entry.task as AiRankResult)
+        : (JSON.parse(entry.content) as AiRankResult)
+      if (parsed?.ordering) {
+        setResult(parsed)
+        onResult?.(parsed)
+        if (entry.promptSystem || entry.promptUser) {
+          setLastPrompt({
+            system: entry.promptSystem || '',
+            user: entry.promptUser || '',
+          })
+        }
+        setEnabled(true)
+      }
+    } catch {
+      setError('Could not restore that generation')
+    }
+  }
 
   function handleToggle(next: boolean) {
     if (next && !disclaimerAck) return
@@ -268,6 +317,22 @@ export function AiAnalysisView({
                 ))}
               </ul>
             )}
+            <AiPromptReveal
+              system={lastPrompt?.system ?? livePrompt?.system}
+              user={lastPrompt?.user ?? livePrompt?.user}
+              mode="ai_analysis_reorder"
+              version="aiRank@v1"
+              className="mt-2"
+              testId="discover-ai-prompt"
+            />
+            <AiGenerationHistory
+              kind="discover_rank"
+              mode="ai_analysis_reorder"
+              contextKey={diseaseName}
+              className="mt-2"
+              onRestore={restoreFromHistory}
+              testId="discover-ai-history"
+            />
           </div>
         )}
       </div>

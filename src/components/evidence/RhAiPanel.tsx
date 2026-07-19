@@ -12,6 +12,9 @@ import {
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
 import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 
 const MODES: { id: RhAiMode; label: string }[] = [
   { id: 'rh_thesis_draft', label: 'Thesis draft' },
@@ -48,7 +51,6 @@ export function RhAiPanel({
   const [busy, setBusy] = useState(false)
   const [insight, setInsight] = useState<RhStructuredInsight | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showPrompt, setShowPrompt] = useState(false)
   const [customQuestion, setCustomQuestion] = useState('')
 
   const claimCount = claims.length
@@ -138,6 +140,8 @@ export function RhAiPanel({
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
           error: data.refuseReason ?? data.error,
+          promptSystem: promptPreview?.system,
+          promptUser: promptPreview?.user,
         })
         return
       }
@@ -151,6 +155,8 @@ export function RhAiPanel({
         model: ai.model,
         ollamaUrl: ai.ollamaUrl,
         task: data.insight,
+        promptSystem: promptPreview?.system,
+        promptUser: promptPreview?.user,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'RH AI failed')
@@ -178,7 +184,6 @@ export function RhAiPanel({
               setMode(m.id)
               setInsight(null)
               setError(null)
-              if (m.id === 'rh_custom') setShowPrompt(true)
             }}
             title={rhModeTaskLabel(m.id)}
             className={`rounded border px-2 py-1 text-[10px] ${
@@ -208,25 +213,32 @@ export function RhAiPanel({
         />
       )}
 
-      <div className="mb-2">
-        <button
-          type="button"
-          onClick={() => setShowPrompt((v) => !v)}
-          className="text-[10px] text-indigo-400/90 hover:text-indigo-300 hover:underline"
-        >
-          {showPrompt ? 'Hide prompt' : 'View prompt'}
-        </button>
-        {showPrompt && (
-          <div className="mt-2 max-h-48 space-y-2 overflow-y-auto rounded border border-slate-800 p-2 text-[10px] text-slate-400">
-            <pre className="whitespace-pre-wrap font-sans">{promptPreview.system}</pre>
-            <pre className="whitespace-pre-wrap font-sans">
-              {promptPreview.user.length > 3000
-                ? `${promptPreview.user.slice(0, 3000)}\n…`
-                : promptPreview.user}
-            </pre>
-          </div>
-        )}
-      </div>
+      <AiPromptReveal
+        system={promptPreview.system}
+        user={promptPreview.user}
+        mode={mode}
+        version="rhAi@v1"
+        className="mb-2"
+        testId="rh-ai-prompt"
+      />
+      <AiGenerationHistory
+        kind="rh"
+        mode={mode}
+        contextKey={hyp.id}
+        className="mb-2"
+        testId="rh-ai-history"
+        onRestore={(entry: AiGeneratedRecord) => {
+          try {
+            const restored = (entry.task ?? JSON.parse(entry.content)) as RhStructuredInsight
+            if (restored?.summary || restored?.claimIds) {
+              setInsight(restored)
+              setError(null)
+            }
+          } catch {
+            setError('Could not restore that generation')
+          }
+        }}
+      />
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90" data-testid="rh-ai-gated">

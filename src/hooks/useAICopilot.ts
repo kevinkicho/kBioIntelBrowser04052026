@@ -17,12 +17,11 @@ import { extractStreamError } from '@/lib/ai/runtime/streamChat'
 import {
   buildMoleculeContext,
   contextToPromptBlock,
-  extractRichData,
   buildDiseaseContext,
   diseaseContextToPromptBlock,
   buildGeneContext,
   geneContextToPromptBlock,
-} from '@/lib/ai/contextBuilder'
+} from '@/lib/ai/copilot/context'
 import {
   buildFollowUpPrompt,
   buildFreeQAPrompt,
@@ -30,7 +29,11 @@ import {
   buildGeneQAPrompt,
   type PromptMode,
   type SessionMoleculeSummary,
-} from '@/lib/ai/promptTemplates'
+} from '@/lib/ai/copilot/prompts'
+import {
+  recentSessionSummaries,
+  sessionMoleculeToSummary,
+} from '@/hooks/copilot/buildSessionMoleculeSummary'
 import {
   isCopilotTaskMode,
   resolveInsightPrompt,
@@ -225,20 +228,12 @@ export function useAICopilot(
         addMessage('system', 'Pick a previously-viewed molecule to diff against.', mode)
         return
       }
-      const sm = sessionHistory.getMolecule(targetName)
-      if (!sm) {
+      const summary = sessionMoleculeToSummary(targetName)
+      if (!summary) {
         addMessage('system', `No session data for "${targetName}".`, mode)
         return
       }
-      const rd = extractRichData(sm.drugData)
-      diffTarget = {
-        name: sm.name,
-        searchedAt: sm.searchedAt,
-        topTargets: rd.topTargetActivities.slice(0, 5).map(t => t.targetName),
-        topAEs: rd.topAdverseEvents.slice(0, 5).map(ae => ae.reactionName),
-        mechanisms: rd.mechanismDetails.slice(0, 3).map(m => `${m.mechanismOfAction} -> ${m.targetName}`),
-        indications: rd.indicationDetails.slice(0, 5).map(i => i.condition),
-      }
+      diffTarget = summary
     }
 
     if (mode === 'hypothesis_seed' && !opts.researchQuestion?.trim()) {
@@ -255,22 +250,7 @@ export function useAICopilot(
 
     const otherSessionMolecules =
       mode === 'cross_molecule_compare'
-        ? sessionHistory
-            .getRecentMolecules(5)
-            .filter((m) => m.name !== identity.name)
-            .map((m): SessionMoleculeSummary => {
-              const rd = extractRichData(m.drugData)
-              return {
-                name: m.name,
-                searchedAt: m.searchedAt,
-                topTargets: rd.topTargetActivities.slice(0, 5).map((t) => t.targetName),
-                topAEs: rd.topAdverseEvents.slice(0, 5).map((ae) => ae.reactionName),
-                mechanisms: rd.mechanismDetails
-                  .slice(0, 3)
-                  .map((mech) => `${mech.mechanismOfAction} -> ${mech.targetName}`),
-                indications: rd.indicationDetails.slice(0, 5).map((i) => i.condition),
-              }
-            })
+        ? recentSessionSummaries(identity.name, 5)
         : undefined
 
     const prompts = resolveInsightPrompt({
@@ -363,6 +343,8 @@ export function useAICopilot(
         ollamaUrl: ai.ollamaUrl,
         task: taskPayload,
         error: msgError || undefined,
+        promptSystem: prompts.system,
+        promptUser: prompts.user + (diseasePromptSuffix || ''),
       })
     }
 
@@ -592,6 +574,11 @@ export function useAICopilot(
     )
 
     if (qaContent.trim() || toolTraces.length) {
+      const sysMsg = chatMessages.find((m) => m.role === 'system')?.content
+      const userMsg = chatMessages
+        .filter((m) => m.role === 'user')
+        .map((m) => m.content)
+        .join('\n---\n')
       void saveAiGeneratedData({
         kind: 'copilot',
         mode: 'free_qa',
@@ -607,6 +594,8 @@ export function useAICopilot(
         model: ai.model,
         ollamaUrl: ai.ollamaUrl,
         error: msgError || undefined,
+        promptSystem: sysMsg,
+        promptUser: userMsg,
       })
     }
 

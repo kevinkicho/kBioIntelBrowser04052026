@@ -3,7 +3,7 @@
 import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
-import { buildCandidateComparePrompt } from '@/lib/ai/promptTemplates'
+import { buildCandidateComparePrompt } from '@/lib/ai/copilot/prompts'
 
 export interface CompareCandidateData {
   clinicalTrials: unknown[]

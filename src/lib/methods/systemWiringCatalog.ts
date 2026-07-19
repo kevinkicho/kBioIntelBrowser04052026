@@ -14,7 +14,7 @@ import {
 import {
   AI_MIN_COMPLETENESS_RATIO,
   AI_MIN_PANELS_WITH_DATA,
-} from '@/lib/ai/promptTemplates'
+} from '@/lib/ai/copilot/prompts'
 import { packModeSystemPrompt, packModeTaskLabel, type PackAiMode } from '@/lib/ai/contracts'
 
 /** Shared copilot system rules (abbreviated for display; full text in source). */

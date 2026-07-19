@@ -1,4 +1,4 @@
-import { buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
+import { buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/copilot/context'
 
 describe('Disease context detection regression tests', () => {
   test('isDiseaseContext is true when diseaseResults is present and CID is 0', () => {

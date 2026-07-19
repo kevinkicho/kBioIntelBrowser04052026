@@ -12,6 +12,9 @@ import {
 import { emitProductEvent } from '@/lib/productEvents'
 import { useAI } from '@/lib/ai/useAI'
 import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 
 const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_executive_brief', label: 'Executive brief' },
@@ -55,7 +58,6 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   const [busy, setBusy] = useState(false)
   const [insight, setInsight] = useState<StructuredInsight | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [showPrompt, setShowPrompt] = useState(false)
   const [customQuestion, setCustomQuestion] = useState('')
 
   const claimCount = pack?.claims?.length ?? 0
@@ -138,6 +140,8 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
           error: data.refuseReason ?? data.error,
+          promptSystem: promptPreview?.system,
+          promptUser: promptPreview?.user,
         })
         return
       }
@@ -155,6 +159,8 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         model: ai.model,
         ollamaUrl: ai.ollamaUrl,
         task: data.insight,
+        promptSystem: promptPreview?.system,
+        promptUser: promptPreview?.user,
       })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pack AI failed')
@@ -222,7 +228,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               setMode(m.id)
               setInsight(null)
               setError(null)
-              if (m.id === 'pack_custom_prompt') setShowPrompt(true)
+
             }}
             title={packModeTaskLabel(m.id)}
             className={`rounded border px-2 py-1 text-[10px] ${
@@ -255,41 +261,34 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         </div>
       )}
 
-      <div className="mb-2">
-        <button
-          type="button"
-          onClick={() => setShowPrompt((v) => !v)}
-          className="text-[10px] text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
-          data-testid="pack-ai-toggle-prompt"
-        >
-          {showPrompt ? 'Hide prompt' : 'View prompt sent to the model'}
-        </button>
-        {showPrompt && promptPreview && (
-          <div
-            className="mt-2 space-y-2 rounded-lg border border-slate-800 bg-slate-950/60 p-2 max-h-56 overflow-y-auto"
-            data-testid="pack-ai-prompt-preview"
-          >
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-                System
-              </p>
-              <pre className="whitespace-pre-wrap break-words font-sans text-[10px] text-slate-400 leading-relaxed">
-                {promptPreview.system}
-              </pre>
-            </div>
-            <div>
-              <p className="text-[9px] font-semibold uppercase tracking-wide text-slate-500 mb-1">
-                User message
-              </p>
-              <pre className="whitespace-pre-wrap break-words font-sans text-[10px] text-slate-400 leading-relaxed">
-                {promptPreview.user.length > 4000
-                  ? `${promptPreview.user.slice(0, 4000)}\n… (truncated for display)`
-                  : promptPreview.user}
-              </pre>
-            </div>
-          </div>
-        )}
-      </div>
+      {promptPreview && (
+        <AiPromptReveal
+          system={promptPreview.system}
+          user={promptPreview.user}
+          mode={mode}
+          version="packAi@v1"
+          className="mb-2"
+          testId="pack-ai-prompt"
+        />
+      )}
+      <AiGenerationHistory
+        kind="pack"
+        mode={mode}
+        contextKey={pack?.id}
+        className="mb-2"
+        testId="pack-ai-history"
+        onRestore={(entry: AiGeneratedRecord) => {
+          try {
+            const insight = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
+            if (insight?.summary || insight?.claimIds) {
+              setInsight(insight)
+              setError(null)
+            }
+          } catch {
+            setError('Could not restore that generation')
+          }
+        }}
+      />
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90">

@@ -1,5 +1,5 @@
-import { buildCrossMoleculeComparePrompt, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
-import { buildMoleculeContext, extractRichData } from '@/lib/ai/contextBuilder'
+import { buildCrossMoleculeComparePrompt, type SessionMoleculeSummary } from '@/lib/ai/copilot/prompts'
+import { buildMoleculeContext, extractRichData } from '@/lib/ai/copilot/context'
 import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
 
 const identity = { name: 'Aspirin', cid: 2244, molecularWeight: 180.16, inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N', iupacName: '2-acetoxybenzoic acid' }

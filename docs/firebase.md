@@ -17,7 +17,7 @@
 |---------|---------------------|------------|
 | **App Hosting** | Deploy Next.js SSR | `firebase.json` → `apphosting`, `apphosting.yaml` env |
 | **Auth** | Optional Google sign-in | `FirebaseProvider`, `UserMenu` |
-| **Firestore** | Projects, settings, pack **metadata** | `projectSync`, `settingsSync`, `packMetaSync` |
+| **Firestore** | Projects, settings, pack **metadata**, optional **AI outputs** | `projectSync`, `settingsSync`, `packMetaSync`, `aiDataSync` (`users/{uid}/ai/{id}`) |
 | **Realtime Database** | Presence only (`presence/{uid}`) | `userProfile` online/offline |
 | **Storage** | Optional JSON export archives | `storageSync` → `users/{uid}/exports/…` |
 | **Functions** | Thin utilities (`health` probe) | https://us-central1-kbiointelbrowser04052026.cloudfunctions.net/health |

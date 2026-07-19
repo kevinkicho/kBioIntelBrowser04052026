@@ -4,7 +4,7 @@ import {
   buildDiseaseSearchRepurposingPrompt,
   buildDiseaseSearchMechanismPrompt,
   buildDiseaseSearchHypothesisPrompt,
-} from '@/lib/ai/promptTemplates'
+} from '@/lib/ai/copilot/prompts'
 
 const SAMPLE_CONTEXT = `=== DISEASE SEARCH: "diabetes" ===
 Results: 3 diseases from Open Targets, DisGeNET

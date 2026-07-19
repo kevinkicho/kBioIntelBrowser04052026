@@ -3,7 +3,7 @@
  * Keeps useAICopilot free of nested switch trees.
  */
 
-import type { MoleculeContext, GeneContext } from '@/lib/ai/contextBuilder'
+import type { MoleculeContext, GeneContext } from '@/lib/ai/copilot/context'
 import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
 import {
   buildAutoInsightPrompt,

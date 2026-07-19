@@ -1,4 +1,4 @@
-import type { MoleculeContext } from '@/lib/ai/contextBuilder'
+import type { MoleculeContext } from '@/lib/ai/copilot/context'
 
 export const AI_MIN_COMPLETENESS_RATIO = 0.12
 export const AI_MIN_PANELS_WITH_DATA = 4

@@ -1,5 +1,5 @@
-import type { GeneContext } from '@/lib/ai/contextBuilder'
-import { geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
+import type { GeneContext } from '@/lib/ai/copilot/context'
+import { geneContextToPromptBlock } from '@/lib/ai/copilot/context'
 import { SYSTEM_PROMPT } from './shared'
 
 export function buildGeneTherapeuticPrompt(ctx: GeneContext): { system: string; user: string } {

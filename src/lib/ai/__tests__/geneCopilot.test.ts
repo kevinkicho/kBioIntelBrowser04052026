@@ -2,14 +2,14 @@ import {
   buildGeneContext,
   geneContextToPromptBlock,
   type GeneContext,
-} from '@/lib/ai/contextBuilder'
+} from '@/lib/ai/copilot/context'
 import {
   buildGeneTherapeuticPrompt,
   buildGeneRepurposingPrompt,
   buildGeneMechanismPrompt,
   buildGeneTargetAssessmentPrompt,
   buildGeneQAPrompt,
-} from '@/lib/ai/promptTemplates'
+} from '@/lib/ai/copilot/prompts'
 
 function makeSnapshot(overrides: Partial<{ totalApisSucceeded: number; totalApisCalled: number; gaps: { panelKey: string; reason: string }[] }> = {}) {
   return {

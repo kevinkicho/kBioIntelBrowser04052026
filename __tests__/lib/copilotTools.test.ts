@@ -3,7 +3,7 @@ import {
   executeCopilotTool,
   parseToolCall,
   formatToolObservation,
-} from '@/lib/ai/copilotTools'
+} from '@/lib/ai/copilot/tools'
 import { buildRetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'

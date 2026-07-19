@@ -3,7 +3,7 @@
  */
 
 import type { CategoryId } from '@/lib/categoryConfig'
-import type { PromptMode } from '@/lib/ai/promptTemplates'
+import type { PromptMode } from '@/lib/ai/copilot/prompts'
 import type { Filter } from '@/lib/hypothesis/types'
 import type { SuggestedEntity } from '@/lib/ai/aiTasks/suggestNext'
 

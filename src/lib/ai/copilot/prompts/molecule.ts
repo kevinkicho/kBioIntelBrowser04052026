@@ -1,5 +1,5 @@
-import type { MoleculeContext } from '@/lib/ai/contextBuilder'
-import { contextToPromptBlock } from '@/lib/ai/contextBuilder'
+import type { MoleculeContext } from '@/lib/ai/copilot/context'
+import { contextToPromptBlock } from '@/lib/ai/copilot/context'
 import { formatRetrievalSummary, type RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
 import type { SessionMoleculeSummary } from './types'
 import {

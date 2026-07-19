@@ -2,6 +2,8 @@
 
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
 
 export function SettingsTab({
   ai,
@@ -139,39 +141,21 @@ export function SettingsTab({
       </div>
 
       {lastPrompt && (
-        <div
-          className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30"
-          data-testid="copilot-last-prompt"
-        >
-          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-1">
-            Last prompt
-            <span className="ml-2 font-mono font-normal text-slate-600">
-              {lastPrompt.version} · {lastPrompt.mode}
-            </span>
-          </p>
-          <p className="text-[9px] text-slate-600 mb-2">
-            What was sent to the model (truncated). Does not affect Discover ranks.
-          </p>
-          <details className="text-[10px] text-slate-500">
-            <summary className="cursor-pointer text-indigo-400/90 hover:text-indigo-300">
-              System ({lastPrompt.system.length} chars)
-            </summary>
-            <pre className="mt-1 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-2 text-[9px] text-slate-500">
-              {lastPrompt.system.slice(0, 4000)}
-              {lastPrompt.system.length > 4000 ? '\n…' : ''}
-            </pre>
-          </details>
-          <details className="mt-1.5 text-[10px] text-slate-500">
-            <summary className="cursor-pointer text-indigo-400/90 hover:text-indigo-300">
-              User ({lastPrompt.user.length} chars)
-            </summary>
-            <pre className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-2 text-[9px] text-slate-500">
-              {lastPrompt.user.slice(0, 6000)}
-              {lastPrompt.user.length > 6000 ? '\n…' : ''}
-            </pre>
-          </details>
-        </div>
+        <AiPromptReveal
+          system={lastPrompt.system}
+          user={lastPrompt.user}
+          mode={lastPrompt.mode}
+          version={lastPrompt.version}
+          className="mt-1"
+          testId="copilot-last-prompt"
+          label="Last prompt sent to the model (learn the protocol)"
+        />
       )}
+      <AiGenerationHistory
+        kind="copilot"
+        className="mt-2"
+        testId="copilot-ai-history"
+      />
     </div>
   )
 }

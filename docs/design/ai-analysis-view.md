@@ -41,3 +41,9 @@ Allowlisted in `src/lib/ai/copilot/tools/catalog.ts` — deterministic executors
 | `compare_board` | Board statuses/scores for a project |
 
 Board tools need `projectId` (or profile `?project=` as default). Never invent claim bodies.
+
+## Prompt transparency + history
+
+- **Show prompt** on Discover analysis, board recommend, Pack/RH AI, Copilot settings (`AiPromptReveal`)
+- **Cloud history** (signed-in): `users/{uid}/ai/*` via `listAiGeneratedPage` + `AiGenerationHistory` with restore
+- Signed-out users keep session-only outputs (product law: local default)

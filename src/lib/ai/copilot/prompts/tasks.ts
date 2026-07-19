@@ -1,4 +1,4 @@
-import type { MoleculeContext } from '@/lib/ai/contextBuilder'
+import type { MoleculeContext } from '@/lib/ai/copilot/context'
 import type { SessionMoleculeSummary } from './types'
 import { SYSTEM_PROMPT } from './shared'
 

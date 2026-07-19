@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
+import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
 import {
   type DiseaseDetailContext,
   type DiseaseIntelligenceMode,
@@ -157,6 +158,8 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
           },
           model: ai.model,
           ollamaUrl: ai.ollamaUrl,
+          promptSystem: prompts.system,
+          promptUser: prompts.user,
         })
       }
 
@@ -372,6 +375,32 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                 }
               />
             )}
+
+            <AiGenerationHistory
+              kind="disease"
+              mode={`disease_${activeTab}`}
+              contextKey={context.diseaseName}
+              className="mt-2"
+              testId="disease-intel-history"
+              onRestore={(entry) => {
+                setModes((prev) => ({
+                  ...prev,
+                  [activeTab]: {
+                    ...prev[activeTab],
+                    content: entry.content,
+                    wasTriggered: true,
+                    isStreaming: false,
+                    prompt:
+                      entry.promptSystem || entry.promptUser
+                        ? {
+                            system: entry.promptSystem || '',
+                            user: entry.promptUser || '',
+                          }
+                        : prev[activeTab].prompt,
+                  },
+                }))
+              }}
+            />
 
             <div
               className="disease-intel-body mt-2 min-h-[4rem]"
