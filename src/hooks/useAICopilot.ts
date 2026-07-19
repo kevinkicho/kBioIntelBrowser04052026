@@ -4,6 +4,15 @@ import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { saveAiGeneratedData } from '@/lib/firebase/aiDataSync'
 import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
+import {
+  buildAgentToolSystemAddendum,
+  COPILOT_MAX_TOOL_STEPS,
+  executeCopilotTool,
+  formatToolObservation,
+  parseToolCall,
+  type CopilotToolContext,
+  type ToolResult,
+} from '@/lib/ai/copilotTools'
 import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
 import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, buildPriorArtQueryPrompt, buildDifferentialSafetyPrompt, buildSuggestNextPrompt, buildHypothesisSeedPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
 import { sessionHistory } from '@/lib/sessionHistory'
@@ -25,6 +34,13 @@ export interface CopilotTaskResult {
     | { kind: 'hypothesis_seed'; filters: Filter[]; url: string }
 }
 
+export interface CopilotToolTrace {
+  name: string
+  ok: boolean
+  summary: string
+  categoryId?: string
+}
+
 export interface CopilotMessage {
   id: string
   role: 'user' | 'assistant' | 'system'
@@ -36,6 +52,13 @@ export interface CopilotMessage {
   validationError?: string
   /** Structured payload for task modes when validation succeeds. */
   task?: CopilotTaskResult['data']
+  /** Tool steps taken during agentic Ask (evidence-bound). */
+  tools?: CopilotToolTrace[]
+}
+
+export interface CopilotActions {
+  refreshCategory?: (categoryId: CategoryId) => void
+  loadCategory?: (categoryId: CategoryId) => void
 }
 
 export interface CopilotState {
@@ -58,6 +81,7 @@ export function useAICopilot(
   fetchedAt: Partial<Record<CategoryId, Date>>,
   identity: { name: string; cid: number; molecularWeight?: number; inchiKey?: string; iupacName?: string; geneSymbol?: string },
   diseaseName?: string,
+  actions?: CopilotActions,
 ) {
   const ai = useAI()
   const [messages, setMessages] = useState<CopilotMessage[]>([])
@@ -73,6 +97,12 @@ export function useAICopilot(
   const isStreamingRef = useRef(false)
   const messagesRef = useRef<CopilotMessage[]>([])
   messagesRef.current = messages
+  const actionsRef = useRef(actions)
+  actionsRef.current = actions
+  const categoryDataRef = useRef(categoryData)
+  categoryDataRef.current = categoryData
+  const categoryStatusRef = useRef(categoryStatus)
+  categoryStatusRef.current = categoryStatus
 
   const generateInsightRef = useRef<((mode: PromptMode, opts?: GenerateInsightOptions) => Promise<void>) | null>(null)
 
@@ -439,6 +469,22 @@ export function useAICopilot(
     setIsStreaming(false)
   }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, identity.cid, identity.geneSymbol, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
 
+  const buildToolContext = useCallback((): CopilotToolContext => {
+    const act = actionsRef.current
+    return {
+      snapshot,
+      categoryData: categoryDataRef.current,
+      categoryStatus: categoryStatusRef.current,
+      identity: {
+        name: identity.name,
+        cid: identity.cid,
+        geneSymbol: identity.geneSymbol,
+      },
+      refreshCategory: act?.refreshCategory,
+      loadCategory: act?.loadCategory,
+    }
+  }, [snapshot, identity.name, identity.cid, identity.geneSymbol])
+
   const askQuestion = useCallback(async (question: string) => {
     if (!aiAvailable) {
       addMessage('user', question, 'free_qa')
@@ -459,82 +505,174 @@ export function useAICopilot(
 
     addMessage('user', question, 'free_qa')
 
-    const hasQaHistory = messagesRef.current.some(m => (m.mode === 'free_qa' || m.mode === 'followup') && m.role === 'assistant' && m.content)
+    const toolAddendum = buildAgentToolSystemAddendum()
+    const hasQaHistory = messagesRef.current.some(
+      (m) =>
+        (m.mode === 'free_qa' || m.mode === 'followup') &&
+        m.role === 'assistant' &&
+        m.content,
+    )
     let chatMessages: { role: 'system' | 'user' | 'assistant'; content: string }[]
 
     if (isDiseaseContext && diseaseCtx) {
       const diseaseBlock = diseaseContextToPromptBlock(diseaseCtx)
       const { system, user } = buildDiseaseQAPrompt(diseaseBlock, question)
+      const systemWithTools = system + '\n\n' + toolAddendum
       setLastPrompt({
         mode: 'free_qa',
-        system,
+        system: systemWithTools,
         user,
         at: Date.now(),
-        version: 'promptCatalog@v1',
+        version: 'promptCatalog@v1+agentTools',
       })
       chatMessages = [
-        { role: 'system', content: system },
+        { role: 'system', content: systemWithTools },
         { role: 'user', content: user },
       ]
     } else if (isGeneContext && geneCtx) {
       const { system, user } = buildGeneQAPrompt(geneCtx, question)
+      const systemWithTools = system + '\n\n' + toolAddendum
       setLastPrompt({
         mode: 'free_qa',
-        system,
+        system: systemWithTools,
         user,
         at: Date.now(),
-        version: 'promptCatalog@v1',
+        version: 'promptCatalog@v1+agentTools',
       })
       chatMessages = [
-        { role: 'system', content: system },
+        { role: 'system', content: systemWithTools },
         { role: 'user', content: user },
       ]
     } else if (hasQaHistory) {
       const recentHistory = messagesRef.current
-        .filter(m => m.mode === 'free_qa' || m.mode === 'followup')
-        .slice(-6).map(m => ({
+        .filter((m) => m.mode === 'free_qa' || m.mode === 'followup')
+        .slice(-6)
+        .map((m) => ({
           role: m.role as 'system' | 'user' | 'assistant',
           content: m.content,
         }))
       chatMessages = buildFollowUpPrompt(recentHistory, context, question)
+      const sysIdx = chatMessages.findIndex((m) => m.role === 'system')
+      if (sysIdx >= 0) {
+        chatMessages[sysIdx] = {
+          ...chatMessages[sysIdx],
+          content: chatMessages[sysIdx].content + '\n\n' + toolAddendum,
+        }
+      }
       if (diseasePromptSuffix) {
         const lastUserIdx = chatMessages.length - 1
-        chatMessages[lastUserIdx] = { ...chatMessages[lastUserIdx], content: chatMessages[lastUserIdx].content + diseasePromptSuffix }
+        chatMessages[lastUserIdx] = {
+          ...chatMessages[lastUserIdx],
+          content: chatMessages[lastUserIdx].content + diseasePromptSuffix,
+        }
       }
       const sys = chatMessages.find((m) => m.role === 'system')?.content ?? ''
-      const usr = chatMessages.filter((m) => m.role === 'user').map((m) => m.content).join('\n---\n')
+      const usr = chatMessages
+        .filter((m) => m.role === 'user')
+        .map((m) => m.content)
+        .join('\n---\n')
       setLastPrompt({
         mode: 'followup',
         system: sys,
         user: usr,
         at: Date.now(),
-        version: 'promptCatalog@v1',
+        version: 'promptCatalog@v1+agentTools',
       })
     } else {
       const { system, user } = buildFreeQAPrompt(context, question)
+      const systemWithTools = system + '\n\n' + toolAddendum
       setLastPrompt({
         mode: 'free_qa',
-        system,
+        system: systemWithTools,
         user: user + diseasePromptSuffix,
         at: Date.now(),
-        version: 'promptCatalog@v1',
+        version: 'promptCatalog@v1+agentTools',
       })
       chatMessages = [
-        { role: 'system', content: system },
+        { role: 'system', content: systemWithTools },
         { role: 'user', content: user + diseasePromptSuffix },
       ]
     }
 
-    const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
-    setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode: 'followup', timestamp: Date.now() }])
+    const msgId = 'msg-' + Date.now() + '-' + messageIdRef.current++
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: msgId,
+        role: 'assistant',
+        content: '',
+        mode: 'followup',
+        timestamp: Date.now(),
+        tools: [],
+      },
+    ])
 
+    const toolTraces: CopilotToolTrace[] = []
     let fullContent = ''
     let streamError: string | null = null
+
     try {
-      for await (const token of ai.askAI(chatMessages)) {
+      for (let step = 0; step < COPILOT_MAX_TOOL_STEPS + 1; step++) {
         if (controller.signal.aborted) break
-        fullContent += token
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+        fullContent = ''
+        for await (const token of ai.askAI(chatMessages)) {
+          if (controller.signal.aborted) break
+          fullContent += token
+          setMessages((prev) =>
+            prev.map((m) =>
+              m.id === msgId
+                ? {
+                    ...m,
+                    content: fullContent,
+                    tools: toolTraces.length ? [...toolTraces] : m.tools,
+                  }
+                : m,
+            ),
+          )
+        }
+
+        const toolCall = parseToolCall(fullContent)
+        if (!toolCall || step >= COPILOT_MAX_TOOL_STEPS) break
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? { ...m, content: `Using tool \`${toolCall.name}\`…` }
+              : m,
+          ),
+        )
+
+        const result: ToolResult = executeCopilotTool(toolCall, buildToolContext())
+        toolTraces.push({
+          name: result.name,
+          ok: result.ok,
+          summary: result.summary.slice(0, 200),
+          categoryId: result.categoryId,
+        })
+
+        chatMessages = [
+          ...chatMessages,
+          { role: 'assistant', content: fullContent },
+          {
+            role: 'user',
+            content:
+              formatToolObservation(result) +
+              '\n\nContinue: answer the user with evidence citations. You may call one more tool if needed, else give the final answer (no tool fence).',
+          },
+        ]
+
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId
+              ? {
+                  ...m,
+                  tools: [...toolTraces],
+                  content:
+                    'Tool ' + result.name + ': ' + (result.ok ? 'ok' : 'failed') + '…',
+                }
+              : m,
+          ),
+        )
       }
     } catch (err) {
       streamError = err instanceof Error ? err.message : String(err)
@@ -542,16 +680,28 @@ export function useAICopilot(
 
     const { content: finalContent, error: inlineError } = extractStreamError(fullContent)
     const msgError = streamError || inlineError
-    if (msgError || finalContent !== fullContent) {
-      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: finalContent || fullContent, ...(msgError ? { error: msgError } : {}) } : m))
-    }
+    setMessages((prev) =>
+      prev.map((m) =>
+        m.id === msgId
+          ? {
+              ...m,
+              content: finalContent || fullContent,
+              tools: toolTraces.length ? toolTraces : m.tools,
+              ...(msgError ? { error: msgError } : {}),
+            }
+          : m,
+      ),
+    )
 
     const qaContent = finalContent || fullContent
-    if (qaContent.trim()) {
+    if (qaContent.trim() || toolTraces.length) {
       void saveAiGeneratedData({
         kind: 'copilot',
         mode: 'free_qa',
-        content: qaContent,
+        content:
+          toolTraces.length > 0
+            ? '[tools: ' + toolTraces.map((t) => t.name).join(', ') + ']\n' + qaContent
+            : qaContent,
         context: {
           name: identity.name,
           cid: identity.cid || undefined,
@@ -565,7 +715,21 @@ export function useAICopilot(
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, addMessage, identity.name, identity.cid, identity.geneSymbol, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
+  }, [
+    ai,
+    aiAvailable,
+    context,
+    addMessage,
+    identity.name,
+    identity.cid,
+    identity.geneSymbol,
+    isDiseaseContext,
+    diseaseCtx,
+    isGeneContext,
+    geneCtx,
+    diseasePromptSuffix,
+    buildToolContext,
+  ])
 
   const stopStreaming = useCallback(() => {
     abortRef.current?.abort()

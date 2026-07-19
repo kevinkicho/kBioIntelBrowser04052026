@@ -8,10 +8,13 @@ function makeSnapshot(): RetrievalSnapshot {
   return {
     categories: {} as RetrievalSnapshot['categories'],
     overallCompleteness: 0.5,
+    categoryLoadRatio: 0.5,
     totalApisCalled: 50,
     totalApisSucceeded: 25,
     totalApisErrored: 2,
     totalApisEmpty: 23,
+    totalApisTimeout: 0,
+    totalApisPending: 0,
     totalDurationMs: 0,
     slowestApi: null,
     gaps: [],

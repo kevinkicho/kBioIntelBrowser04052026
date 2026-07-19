@@ -1730,6 +1730,15 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             fetchedAt={fetchedAt}
             identity={{ name: moleculeName, cid, molecularWeight, inchiKey, iupacName }}
             diseaseName={fromDiscover ? (searchParams.get('disease') ?? undefined) : undefined}
+            refreshCategory={(catId) => {
+              void loadCategory(catId, { force: true, refresh: true })
+            }}
+            loadCategory={(catId) => {
+              void loadCategory(catId)
+            }}
+            onNavigateToPanel={(panelId) => {
+              scrollToPanel(panelId)
+            }}
           />
         )}
         {isEmbed && (
