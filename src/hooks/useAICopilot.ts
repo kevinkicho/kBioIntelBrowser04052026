@@ -42,7 +42,6 @@ import {
   validateTaskModeOutput,
   type CopilotTaskPayload,
 } from '@/lib/ai/copilot/validateTaskMode'
-import { sessionHistory } from '@/lib/sessionHistory'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 
