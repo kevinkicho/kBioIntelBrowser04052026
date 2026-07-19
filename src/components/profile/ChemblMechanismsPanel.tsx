@@ -13,6 +13,7 @@ import {
 } from '@/lib/chemblLinks'
 import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 const actionTypeColors: Record<string, string> = {
   INHIBITOR: 'text-red-300',
@@ -100,6 +101,12 @@ export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({
                   target="_blank"
                   rel="noopener noreferrer"
                   title="Open in ChEMBL"
+                  onClick={() =>
+                    onDeepLinkClick('chembl', href, {
+                      panelId: 'chembl-mechanisms',
+                      label: mech.mechanismOfAction || mech.targetName || 'mechanism',
+                    })
+                  }
                   className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_5rem_3.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
                   <span className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">

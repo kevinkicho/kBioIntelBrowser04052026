@@ -386,17 +386,36 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                   }}
                 />
               ) : (
-                !active.isStreaming &&
-                activeTab !== 'summary' && (
-                  <p className="text-xs text-slate-500">
-                    {activeTab === 'custom'
-                      ? 'Enter a question and click Generate.'
-                      : 'Click Generate to run this analysis with the current disease evidence block.'}
-                  </p>
+                !active.isStreaming && (
+                  <div
+                    className="rounded-lg border border-dashed border-slate-700/80 bg-slate-950/40 px-4 py-5 text-center"
+                    data-testid="disease-intel-empty"
+                  >
+                    <p className="text-sm text-slate-300 font-medium mb-1">
+                      {activeTab === 'custom'
+                        ? 'Write a research question, then generate'
+                        : `Generate ${meta.shortLabel.toLowerCase()} analysis`}
+                    </p>
+                    <p className="text-xs text-slate-500 mb-3 max-w-md mx-auto leading-relaxed">
+                      Uses your Ollama Cloud key and the genes, trial drugs, and molecules already
+                      loaded for this disease — not a clinical prediction. Nothing runs until you
+                      click Generate.
+                    </p>
+                    {activeTab !== 'custom' && (
+                      <button
+                        type="button"
+                        onClick={handleGenerate}
+                        className="rounded-lg bg-indigo-600 hover:bg-indigo-500 px-4 py-2 text-xs font-medium text-white transition-colors"
+                        data-testid="disease-intel-generate-empty"
+                      >
+                        Generate {meta.shortLabel}
+                      </button>
+                    )}
+                  </div>
                 )
               )}
               {active.wasTriggered && !active.isStreaming && !active.content && (
-                <p className="text-xs text-slate-500">No analysis generated. Try again.</p>
+                <p className="text-xs text-slate-500 mt-2">No analysis generated. Try again.</p>
               )}
             </div>
 

@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
 import { chemblCompoundUrl, chemblTargetUrl, normalizeChemblId } from '@/lib/chemblLinks'
 import type { ChemblActivity, RelatedCompound } from '@/lib/types'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 interface Props {
   activities: ChemblActivity[]
@@ -147,6 +148,12 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                       href={targetHref}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        onDeepLinkClick('chembl', targetHref, {
+                          panelId: 'competitive-landscape',
+                          label: name,
+                        })
+                      }
                       className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 truncate block"
                       title={`Open target ${name} in ChEMBL`}
                     >
@@ -191,6 +198,12 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                       target="_blank"
                       rel="noopener noreferrer"
                       title={`${label} in ChEMBL`}
+                      onClick={() =>
+                        onDeepLinkClick('chembl', href, {
+                          panelId: 'competitive-landscape',
+                          label,
+                        })
+                      }
                       className="grid grid-cols-[minmax(0,1.4fr)_4.5rem_minmax(5.5rem,0.9fr)_3.5rem] gap-x-2 items-center px-2 py-1.5 hover:bg-slate-900/50 transition-colors group"
                     >
                       <div className="min-w-0">

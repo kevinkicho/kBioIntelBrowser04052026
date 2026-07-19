@@ -6,6 +6,7 @@ import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList
 import type { BindingAffinity } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 const AFFINITY_TYPE_COLORS: Record<string, string> = {
   Ki: 'text-violet-300',
@@ -79,6 +80,12 @@ export const BindingDbPanel = memo(function BindingDbPanel({
                     target="_blank"
                     rel="noopener noreferrer"
                     title={`Open DOI for ${aff.targetName || 'affinity'}`}
+                    onClick={() =>
+                      onDeepLinkClick('other', doiHref, {
+                        panelId: 'bindingdb',
+                        label: aff.targetName || 'affinity',
+                      })
+                    }
                     className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors group"
                   >
                     <span className="text-sm font-medium text-slate-100 group-hover:text-sky-200 truncate" title={aff.targetName}>

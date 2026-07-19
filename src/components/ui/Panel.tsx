@@ -10,7 +10,10 @@ import {
   getPanelDisabledReason,
   isPanelSourceDisabled,
 } from '@/lib/api/sourceAvailability'
-import { useProfilePanelContext } from '@/components/profile/ProfilePanelContext'
+import {
+  isCategoryLoading,
+  useProfilePanelContext,
+} from '@/components/profile/ProfilePanelContext'
 import { filterTraceForPanel, loadStatusFromPanelTrace } from '@/lib/panelApiTrace'
 import { PanelApiDetailModal } from './PanelApiDetailModal'
 
@@ -122,18 +125,34 @@ export function Panel({
   // Dim when we render the empty/disabled message (not when list children show data).
   // Important: parents may still pass `children` while `empty` is set — UI shows emptyText
   // branch only, so dim based on emptyText/sourceDisabled, not on children presence.
-  const emptyOnly = Boolean(emptyText) || Boolean(sourceDisabled)
+  // Dim empty/disabled, but keep timeout/error readable so Retry is usable
+  const isFetchFailure =
+    effectiveLoadStatus === 'timeout' || effectiveLoadStatus === 'error'
+  const emptyOnly =
+    (Boolean(emptyText) || Boolean(sourceDisabled)) && !isFetchFailure
+
+  const catRefreshing =
+    catId && profileCtx
+      ? isCategoryLoading(profileCtx.loadingCategories, catId)
+      : false
+  const canRetryCategory =
+    isFetchFailure &&
+    Boolean(catId && profileCtx?.refreshCategory) &&
+    !sourceDisabled
 
   return (
     <div
       className={`bg-slate-800/50 border rounded-xl p-5 ${
         sourceDisabled
           ? 'border-amber-900/40 opacity-90'
-          : 'border-slate-700'
+          : isFetchFailure
+            ? 'border-amber-800/40'
+            : 'border-slate-700'
       } ${emptyOnly ? 'opacity-20' : ''} ${className}`}
       data-testid={panelId ? `panel-${panelId}` : undefined}
       data-source-disabled={sourceDisabled ? 'true' : undefined}
       data-empty={emptyOnly ? 'true' : 'false'}
+      data-load-status={effectiveLoadStatus || undefined}
       title={nextWorkTitle}
     >
       <div className="flex justify-between items-start mb-4 gap-2">
@@ -231,11 +250,42 @@ export function Panel({
           </p>
           {(derivedError || disabledReason) && (
             <p
-              className="text-[10px] text-amber-500/80 mt-1.5 leading-relaxed"
+              className={`text-[10px] mt-1.5 leading-relaxed ${
+                isFetchFailure ? 'text-amber-400/90' : 'text-amber-500/80'
+              }`}
               title={disabledReason || derivedError}
             >
               {disabledReason || derivedError}
             </p>
+          )}
+          {canRetryCategory && catId && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+                profileCtx!.refreshCategory(catId)
+              }}
+              disabled={Boolean(catRefreshing)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-700/50 bg-amber-950/40 px-3 py-1.5 text-[11px] font-medium text-amber-200 hover:bg-amber-900/50 disabled:opacity-40 transition-colors"
+              data-testid={panelId ? `panel-retry-category-${panelId}` : 'panel-retry-category'}
+              title="Re-query all sources in this category (shared fetch)"
+            >
+              <svg
+                className={`h-3.5 w-3.5 ${catRefreshing ? 'animate-spin' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                />
+              </svg>
+              {catRefreshing ? 'Retrying category…' : 'Retry category'}
+            </button>
           )}
         </div>
       ) : (

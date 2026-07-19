@@ -113,6 +113,20 @@ const ALL_CATEGORY_IDS: CategoryId[] = [...MOLECULE_CATEGORY_IDS]
 
 const DISCOVER_PRIORITY_CATEGORIES: CategoryId[] = ['clinical-safety', 'bioactivity-targets', 'molecular-chemical']
 
+/** Tiered category load order (module-level so effects do not re-create deps). */
+const TIER1_CATEGORIES: CategoryId[] = [
+  'pharmaceutical',
+  'clinical-safety',
+  'bioactivity-targets',
+]
+const TIER2_CATEGORIES: CategoryId[] = ['research-literature', 'molecular-chemical']
+const TIER3_CATEGORIES: CategoryId[] = [
+  'protein-structure',
+  'genomics-disease',
+  'interactions-pathways',
+  'nih-high-impact',
+]
+
 function AutoLoadIndicator({ categoryStatus }: { categoryStatus: CategoriesStatus }) {
   const [visible, setVisible] = useState(true)
   const priorityLoaded = DISCOVER_PRIORITY_CATEGORIES.every(id => categoryStatus[id] === 'loaded')
@@ -518,7 +532,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       if (softRefreshingRef.current.has(id)) s.add(id)
     }
     return s
-    // softRefreshTick forces recompute when soft-refresh set mutates
+    // softRefreshTick is intentional: soft-refresh mutates a ref, not categoryStatus
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- softRefreshTick drives spinner after soft refresh
   }, [categoryStatus, softRefreshTick])
 
   const panelContextValue = useMemo(
@@ -554,6 +569,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     next.delete('_t')
     const qs = next.toString()
     router.replace(qs ? `?${qs}` : '?', { scroll: false })
+    // cid is covered by loadCategory / forceRefresh remount key on ProfilePageClient
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refresh kickoff once per forceRefresh flag
   }, [forceRefresh, isEmbed, loadCategory, router, searchParams])
 
   /**
@@ -602,34 +619,40 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     [loadCategory],
   )
 
-  // After active *tab* changes only — do not re-scroll when a category soft-refreshes
+  /**
+   * Scroll target for the focused tab exactly once per (cid, category) focus.
+   * Avoids double smooth-scroll (mount effect + loaded effect) which felt jumpy.
+   */
+  const scrolledForTabRef = useRef<string | null>(null)
+  useEffect(() => {
+    scrolledForTabRef.current = null
+  }, [cid])
+
   useEffect(() => {
     if (activeCategory === 'all' || isEmbed) return
+    const key = `${cid}:${activeCategory}`
+    if (scrolledForTabRef.current === key) return
+
     let attempts = 0
     let cancelled = false
     let timer: number | undefined
     const tryScroll = () => {
       if (cancelled) return
-      if (scrollToCategoryElement(activeCategory)) return
-      if (attempts++ < 40) timer = window.setTimeout(tryScroll, 50)
+      if (scrollToCategoryElement(activeCategory)) {
+        scrolledForTabRef.current = key
+        return
+      }
+      // Wait for section mount; once category is loaded, give more chances for layout
+      const loaded = categoryStatusRef.current[activeCategory] === 'loaded'
+      const maxAttempts = loaded ? 12 : 40
+      if (attempts++ < maxAttempts) timer = window.setTimeout(tryScroll, 50)
     }
-    // Wait a frame so focused section mounts / expands
     timer = window.setTimeout(tryScroll, 40)
     return () => {
       cancelled = true
       if (timer != null) window.clearTimeout(timer)
     }
-  }, [activeCategory, isEmbed, scrollToCategoryElement])
-
-  // Re-scroll once the focused category finishes loading (content height settles)
-  useEffect(() => {
-    if (activeCategory === 'all' || isEmbed) return
-    if (categoryStatus[activeCategory] !== 'loaded') return
-    const t = window.setTimeout(() => {
-      scrollToCategoryElement(activeCategory)
-    }, 80)
-    return () => window.clearTimeout(t)
-  }, [activeCategory, categoryStatus, isEmbed, scrollToCategoryElement])
+  }, [activeCategory, isEmbed, scrollToCategoryElement, cid, categoryStatus])
 
   /** Scroll to a panel anchor (hash deep-link from board signal badges). */
   const scrollToPanel = useCallback((panelId: string) => {
@@ -714,18 +737,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     return () => { cancelled = true }
   }, [snapshotId])
 
-  // Tier-1 first paint (full mode): pharma + clinical + bioactivity
-  const TIER1: CategoryId[] = ['pharmaceutical', 'clinical-safety', 'bioactivity-targets']
-  // Tier-2: literature + molecular (PubChem props)
-  const TIER2: CategoryId[] = ['research-literature', 'molecular-chemical']
-  // Tier-3: speculative / gene-cascade heavy (load on demand or later)
-  const TIER3: CategoryId[] = [
-    'protein-structure',
-    'genomics-disease',
-    'interactions-pathways',
-    'nih-high-impact',
-  ]
-
   // Cold-open perf: paint active tab first, then stagger remaining tiers.
   // Wait for cacheReady so IDB hits win before network.
   useEffect(() => {
@@ -744,7 +755,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     // 2) Rest of first-paint set after a short yield (reduces concurrent free-API storm)
     const rest: CategoryId[] = isDecisionMode
       ? DECISION_CATEGORY_IDS.filter((id) => id !== first)
-      : TIER1.filter((id) => id !== first)
+      : TIER1_CATEGORIES.filter((id) => id !== first)
 
     const t1 = window.setTimeout(() => {
       if (cancelled) return
@@ -754,7 +765,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     // 3) Tier-2 after further delay (full mode only)
     const t2 = window.setTimeout(() => {
       if (cancelled || isDecisionMode) return
-      for (const id of TIER2) void loadCategory(id)
+      for (const id of TIER2_CATEGORIES) void loadCategory(id)
     }, 900)
 
     return () => {
@@ -774,7 +785,7 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     discoverLoadedRef.current = true
     const priorityCategories: CategoryId[] = [
       ...DECISION_CATEGORY_IDS,
-      ...TIER1.filter(id => !DECISION_CATEGORY_IDS.includes(id)),
+      ...TIER1_CATEGORIES.filter((id) => !DECISION_CATEGORY_IDS.includes(id)),
     ]
     let i = 0
     let cancelled = false
@@ -804,7 +815,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
   // Background pre-fetch after first-paint tiers ready
   const pharmaceuticalLoaded = categoryStatus['pharmaceutical'] === 'loaded'
-  const tier1Ready = TIER1.every(id => categoryStatus[id] === 'loaded' || categoryStatus[id] === 'error')
+  const tier1Ready = TIER1_CATEGORIES.every(
+    (id) => categoryStatus[id] === 'loaded' || categoryStatus[id] === 'error',
+  )
   const decisionReady = decisionCategoriesReady(categoryStatus)
 
   useEffect(() => {
@@ -845,12 +858,12 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
     if (!tier1Ready) return
 
-    const prefetchOrder: CategoryId[] = [...TIER2, ...TIER3]
+    const prefetchOrder: CategoryId[] = [...TIER2_CATEGORIES, ...TIER3_CATEGORIES]
     const PREFETCH_CONCURRENCY = 2
 
     let cancelled = false
     async function prefetchWithConcurrency() {
-      const queue = prefetchOrder.filter(id => categoryStatusRef.current[id] === 'idle')
+      const queue = prefetchOrder.filter((id) => categoryStatusRef.current[id] === 'idle')
       const workers = Array.from({ length: PREFETCH_CONCURRENCY }, async () => {
         while (queue.length > 0 && !cancelled) {
           const catId = queue.shift()
@@ -863,7 +876,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     }
 
     const timer = setTimeout(prefetchWithConcurrency, 200)
-    return () => { cancelled = true; clearTimeout(timer) }
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
   }, [tier1Ready, decisionReady, isDecisionMode, loadCategory, cacheReady])
 
   // Merge all loaded data into a single props-like object for summary/export/counts

@@ -35,9 +35,42 @@ export type ProductEventName =
   | 'source_deep_link_opened'
   /**
    * Generic surface telemetry (props: surface, action, …).
-   * Used for CT table, related molecules, 3D structure, disease intel — not dual-emit.
+   * Canonical surfaces — see UI_SURFACE_CATALOG. Metric '—' (exploratory) unless noted.
+   * Not dual-emit.
    */
   | 'ui_surface_action'
+
+/**
+ * Known `ui_surface_action.surface` values and intended product use.
+ * Keep in sync with emit call sites; do not invent dual-emit aliases.
+ *
+ * M7 note: rank latency uses `discover_rank_completed.ms` only —
+ * never fold `harvest_safety_done` into P50/P95.
+ */
+export const UI_SURFACE_CATALOG = {
+  clinical_trials: {
+    actions: ['expand_row', 'filter', 'sort', 'export_csv'] as const,
+    purpose: 'CT dense table engagement',
+  },
+  related_molecules: {
+    actions: ['open_row', 'filter', 'sort'] as const,
+    purpose: 'Disease-related molecules + why-chosen',
+  },
+  structure_3d: {
+    actions: ['molview_ready', 'fallback_2d'] as const,
+    purpose: 'PubChem 3D preflight / MolView',
+  },
+  disease_intelligence: {
+    actions: ['stream_start', 'stream_stop'] as const,
+    purpose: 'Claim-bound disease AI (user-triggered)',
+  },
+  list_csv_export: {
+    actions: ['export'] as const,
+    purpose: 'Filterable list CSV download',
+  },
+} as const
+
+export type UiSurfaceName = keyof typeof UI_SURFACE_CATALOG
 
 /** Success-metric tags from design v1 §1.5 / v2 §6.10. */
 export type ProductMetricId = 'M1' | 'M2' | 'M3' | 'M4' | 'M5' | 'M6' | 'M7' | 'M8' | 'M9' | '—'

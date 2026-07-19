@@ -21,6 +21,12 @@ export type DeepLinkSource =
   | 'hmdb'
   | 'chebi'
   | 'drugcentral'
+  | 'ndc'
+  | 'pdb'
+  | 'dailymed'
+  | 'openalex'
+  | 'nci'
+  | 'bindingdb'
   | 'other'
 
 /**

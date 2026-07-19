@@ -5,6 +5,7 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { NciConcept } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 /** Soft cap for list density — full text available via title tooltip + NCI link. */
 const DEF_CLAMP = 'line-clamp-2'
@@ -78,6 +79,12 @@ export const NciThesaurusPanel = memo(function NciThesaurusPanel({
                       href={concept.url}
                       target="_blank"
                       rel="noopener noreferrer"
+                      onClick={() =>
+                        onDeepLinkClick('nci', concept.url, {
+                          panelId: 'nci-thesaurus',
+                          label: concept.name || concept.code,
+                        })
+                      }
                       className="text-sm font-medium text-slate-100 hover:text-cyan-300"
                       title={concept.url ? `Open ${concept.name} in NCI Thesaurus` : undefined}
                     >

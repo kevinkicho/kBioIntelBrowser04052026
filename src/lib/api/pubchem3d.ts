@@ -57,23 +57,45 @@ export async function hasPubChem3dConformer(cid: number): Promise<boolean> {
   }
 }
 
+/** In-tab memo so ProfileHeader + MoleculeViewer3D share one probe per CID. */
+const clientProbeCache = new Map<number, Promise<boolean>>()
+
 /**
  * Browser-safe preflight via same-origin API (preferred in the client).
+ * Dedupes concurrent/repeated probes for the same CID in this page session.
  * Falls back to direct PubChem probe if the API is unavailable.
  */
 export async function probePubChem3dClient(cid: number): Promise<boolean> {
   if (!Number.isFinite(cid) || cid <= 0) return false
-  try {
-    const res = await fetch(`/api/pubchem/has-3d?cid=${cid}`, {
-      method: 'GET',
-      cache: 'no-store',
-    })
-    if (res.ok) {
-      const data = (await res.json()) as { has3d?: boolean }
-      if (typeof data.has3d === 'boolean') return data.has3d
+  const hit = clientProbeCache.get(cid)
+  if (hit) return hit
+
+  const promise = (async () => {
+    try {
+      const res = await fetch(`/api/pubchem/has-3d?cid=${cid}`, {
+        method: 'GET',
+        cache: 'no-store',
+      })
+      if (res.ok) {
+        const data = (await res.json()) as { has3d?: boolean }
+        if (typeof data.has3d === 'boolean') return data.has3d
+      }
+    } catch {
+      /* fall through */
     }
-  } catch {
-    /* fall through */
+    return hasPubChem3dConformer(cid)
+  })()
+
+  clientProbeCache.set(cid, promise)
+  try {
+    return await promise
+  } catch (err) {
+    clientProbeCache.delete(cid)
+    throw err
   }
-  return hasPubChem3dConformer(cid)
+}
+
+/** Test-only: clear client probe memo. */
+export function clearPubChem3dClientProbeCache(): void {
+  clientProbeCache.clear()
 }

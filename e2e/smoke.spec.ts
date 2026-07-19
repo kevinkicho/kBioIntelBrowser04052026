@@ -92,4 +92,12 @@ test.describe('BioIntel smoke', () => {
       await expect(toggle).toBeDisabled()
     }
   })
+
+  test('aspirin profile does not show identity shell banner under normal PubChem', async ({
+    page,
+  }) => {
+    await page.goto('/molecule/2244')
+    await expect(page.getByText(/CID:2244/)).toBeVisible({ timeout: 60_000 })
+    await expect(page.getByTestId('identity-shell-banner')).toHaveCount(0)
+  })
 })

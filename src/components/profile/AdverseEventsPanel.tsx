@@ -30,7 +30,10 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
   /** Molecule name for openFDA drug+reaction deep links */
   moleculeName?: string
 }) {
-  const list = Array.isArray(adverseEvents) ? adverseEvents : []
+  const list = useMemo(
+    () => (Array.isArray(adverseEvents) ? adverseEvents : []),
+    [adverseEvents],
+  )
   const maxCount = useMemo(() => Math.max(...list.map((e) => e.count), 1), [list])
   const sortOptions = useMemo(
     () => [

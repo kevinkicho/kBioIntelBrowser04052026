@@ -11,6 +11,29 @@ import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
 import { mapLegacyCandidateToMoleculeCandidate } from '@/lib/domain'
 import { probePubChem3dClient } from '@/lib/api/pubchem3d'
 
+/** True when identity fell back to a minimal CID shell (PubChem/MyChem limited). */
+export function isIdentityShellMolecule(molecule: Pick<Molecule, 'name' | 'description' | 'formula' | 'inchiKey' | 'molecularWeight'>): boolean {
+  const desc = (molecule.description || '').toLowerCase()
+  if (
+    desc.includes('minimal identity shell') ||
+    desc.includes('full structure metadata unavailable') ||
+    desc.includes('identity resolved via mychem fallback') ||
+    desc.includes('upstream identity apis unavailable')
+  ) {
+    return true
+  }
+  // Bare CID name + empty chemistry fields
+  if (
+    /^CID\s+\d+$/i.test(molecule.name.trim()) &&
+    !molecule.formula?.trim() &&
+    !molecule.inchiKey?.trim() &&
+    !(molecule.molecularWeight > 0)
+  ) {
+    return true
+  }
+  return false
+}
+
 export function ProfileHeader({ molecule }: { molecule: Molecule }) {
   const [show3D, setShow3D] = useState(false)
   /** null = probing, true/false = known */
@@ -53,8 +76,10 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
   const toggleLabel =
     has3d === null ? '…' : show3D ? '2D' : has3d === false ? '2D only' : '3D'
 
+  const identityShell = isIdentityShellMolecule(molecule)
+
   return (
-    <div className="flex flex-col md:flex-row gap-6 items-start">
+    <div className="flex flex-col md:flex-row gap-6 items-start w-full">
       <div className="flex-shrink-0 relative">
         {show3D && has3d !== false ? (
           <MoleculeViewer3D
@@ -103,6 +128,18 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
         </button>
       </div>
       <div className="flex-1 min-w-0">
+        {identityShell && (
+          <div
+            className="mb-3 rounded-lg border border-amber-800/40 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100/90 leading-relaxed"
+            data-testid="identity-shell-banner"
+            role="status"
+          >
+            <span className="font-semibold text-amber-200">Limited identity metadata. </span>
+            PubChem structure lookup was unavailable from this host, so the profile is using a
+            minimal CID shell. Evidence panels may still load by CID; names, formula, and InChIKey
+            can be incomplete until identity APIs recover.
+          </div>
+        )}
         <div className="flex flex-wrap items-center gap-3 mb-2">
           <h1 className="text-3xl font-bold text-slate-100">{molecule.name}</h1>
           <Badge classification={molecule.classification} />
@@ -113,8 +150,8 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
             compact
           />
         </div>
-        <p className="text-slate-400 font-mono text-sm mb-2">{molecule.formula}</p>
-        <p className="text-slate-400 text-sm mb-3">{molecule.iupacName}</p>
+        <p className="text-slate-400 font-mono text-sm mb-2">{molecule.formula || '—'}</p>
+        <p className="text-slate-400 text-sm mb-3">{molecule.iupacName || ''}</p>
         <div className="flex flex-wrap gap-4 text-sm">
           <span className="text-slate-400">
             MW:{' '}

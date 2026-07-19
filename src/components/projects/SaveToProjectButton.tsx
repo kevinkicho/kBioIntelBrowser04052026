@@ -259,6 +259,7 @@ export function SaveToProjectButton({
                     <button
                       type="button"
                       role="option"
+                      aria-selected={false}
                       className="w-full rounded-md px-2 py-1.5 text-left text-xs text-slate-200 hover:bg-slate-800"
                       onClick={() => saveTo(p.id)}
                     >

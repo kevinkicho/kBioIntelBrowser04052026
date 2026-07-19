@@ -129,6 +129,14 @@ describe('DiseaseIntelligencePanel', () => {
     expect(screen.getByText('Quick Summary')).toBeInTheDocument()
   })
 
+  it('shows empty-state Generate CTA without auto-streaming', () => {
+    makeAiAvailable()
+    render(<DiseaseIntelligencePanel context={baseContext} />)
+    expect(screen.getByTestId('disease-intel-empty')).toBeInTheDocument()
+    expect(screen.getByTestId('disease-intel-generate-empty')).toBeInTheDocument()
+    expect(mockAiState.askAI).not.toHaveBeenCalled()
+  })
+
   it('handles empty data gracefully', () => {
     makeAiUnavailable()
     const { container } = render(<DiseaseIntelligencePanel context={emptyDataContext} />)

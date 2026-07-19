@@ -202,7 +202,10 @@ export const OpenCitationsPanel = memo(function OpenCitationsPanel({
   panelId?: string
   lastFetched?: Date
 }) {
-  const list = Array.isArray(metrics) ? metrics : []
+  const list = useMemo(
+    () => (Array.isArray(metrics) ? metrics : []),
+    [metrics],
+  )
   const isEmpty = list.length === 0
 
   const summary = useMemo(() => {

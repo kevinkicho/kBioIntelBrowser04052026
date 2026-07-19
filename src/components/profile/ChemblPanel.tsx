@@ -14,6 +14,7 @@ import {
 } from '@/lib/chemblLinks'
 import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 const ASSAY_TYPE_LABELS: Record<string, string> = {
   B: 'Binding',
@@ -79,6 +80,12 @@ export const ChemblPanel = memo(function ChemblPanel({
             href={compoundHref}
             target="_blank"
             rel="noopener noreferrer"
+            onClick={() =>
+              onDeepLinkClick('chembl', compoundHref, {
+                panelId: 'chembl',
+                label: 'compound',
+              })
+            }
             className="text-[10px] font-normal text-indigo-400 hover:text-indigo-300 hover:underline"
           >
             Open compound in ChEMBL ↗
@@ -138,6 +145,12 @@ export const ChemblPanel = memo(function ChemblPanel({
                 target="_blank"
                 rel="noopener noreferrer"
                 title={`Open ${activity.targetName || 'activity'} in ChEMBL`}
+                onClick={() =>
+                  onDeepLinkClick('chembl', rowHref, {
+                    panelId: 'chembl',
+                    label: activity.targetName || activity.activityType || 'activity',
+                  })
+                }
                 className="grid grid-cols-[minmax(0,1.4fr)_minmax(4rem,0.7fr)_minmax(5rem,0.9fr)_4rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
               >
                 <div className="min-w-0">
