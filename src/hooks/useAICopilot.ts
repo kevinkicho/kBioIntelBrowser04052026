@@ -11,8 +11,9 @@ import {
   formatToolObservation,
   parseToolCall,
   type CopilotToolContext,
-  type ToolResult,
-} from '@/lib/ai/copilotTools'
+} from '@/lib/ai/copilot/tools'
+import { runAgentToolLoop } from '@/lib/ai/runtime/agentLoop'
+import { extractStreamError } from '@/lib/ai/runtime/streamChat'
 import { buildMoleculeContext, contextToPromptBlock, extractRichData, buildDiseaseContext, diseaseContextToPromptBlock, buildGeneContext, geneContextToPromptBlock } from '@/lib/ai/contextBuilder'
 import { buildAutoInsightPrompt, buildExecutiveBriefPrompt, buildGapAnalysisPrompt, buildSafetyDeepDivePrompt, buildFollowUpPrompt, buildFreeQAPrompt, buildMechanismAnalysisPrompt, buildTherapeuticHypothesisPrompt, buildCompetitivePositionPrompt, buildRepurposingScanPrompt, buildCrossMoleculeComparePrompt, buildDiseaseAutoInsightPrompt, buildDiseaseQAPrompt, buildDiseaseSearchBriefPrompt, buildDiseaseSearchGapPrompt, buildDiseaseSearchRepurposingPrompt, buildDiseaseSearchMechanismPrompt, buildDiseaseSearchHypothesisPrompt, buildGeneTherapeuticPrompt, buildGeneRepurposingPrompt, buildGeneMechanismPrompt, buildGeneTargetAssessmentPrompt, buildGeneQAPrompt, buildPriorArtQueryPrompt, buildDifferentialSafetyPrompt, buildSuggestNextPrompt, buildHypothesisSeedPrompt, type PromptMode, type SessionMoleculeSummary } from '@/lib/ai/promptTemplates'
 import { sessionHistory } from '@/lib/sessionHistory'
@@ -157,14 +158,6 @@ export function useAICopilot(
   }, [isGeneContext, geneCtx, isDiseaseContext, diseaseCtx, context, diseasePromptSuffix])
 
   const aiAvailable = ai.enabled && ai.status === 'available'
-
-  function extractStreamError(content: string): { content: string; error?: string } {
-    const match = content.match(/\[Error: (.+?)\]/)
-    if (!match) return { content }
-    const errorText = match[1]
-    const cleaned = content.replace(/\s*\[Error: .+?\]\s*/g, '').trim()
-    return { content: cleaned || '', error: errorText }
-  }
 
   const addMessage = useCallback((role: CopilotMessage['role'], content: string, mode: PromptMode): CopilotMessage => {
     const msg: CopilotMessage = {
@@ -607,85 +600,80 @@ export function useAICopilot(
       },
     ])
 
-    const toolTraces: CopilotToolTrace[] = []
-    let fullContent = ''
-    let streamError: string | null = null
-
-    try {
-      for (let step = 0; step < COPILOT_MAX_TOOL_STEPS + 1; step++) {
-        if (controller.signal.aborted) break
-        fullContent = ''
-        for await (const token of ai.askAI(chatMessages)) {
-          if (controller.signal.aborted) break
-          fullContent += token
-          setMessages((prev) =>
-            prev.map((m) =>
-              m.id === msgId
-                ? {
-                    ...m,
-                    content: fullContent,
-                    tools: toolTraces.length ? [...toolTraces] : m.tools,
-                  }
-                : m,
-            ),
-          )
-        }
-
-        const toolCall = parseToolCall(fullContent)
-        if (!toolCall || step >= COPILOT_MAX_TOOL_STEPS) break
-
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === msgId
-              ? { ...m, content: `Using tool \`${toolCall.name}\`…` }
-              : m,
-          ),
-        )
-
-        const result: ToolResult = executeCopilotTool(toolCall, buildToolContext())
-        toolTraces.push({
-          name: result.name,
-          ok: result.ok,
-          summary: result.summary.slice(0, 200),
-          categoryId: result.categoryId,
-        })
-
-        chatMessages = [
-          ...chatMessages,
-          { role: 'assistant', content: fullContent },
+    const loopResult = await runAgentToolLoop({
+      messages: chatMessages,
+      maxToolSteps: COPILOT_MAX_TOOL_STEPS,
+      signal: controller.signal,
+      streamOnce: (msgs) => ai.askAI(msgs),
+      parseToolCall: (text) => parseToolCall(text),
+      executeTool: (call) =>
+        executeCopilotTool(
           {
-            role: 'user',
-            content:
-              formatToolObservation(result) +
-              '\n\nContinue: answer the user with evidence citations. You may call one more tool if needed, else give the final answer (no tool fence).',
+            name: call.name as Parameters<typeof executeCopilotTool>[0]['name'],
+            args: call.args,
           },
-        ]
-
+          buildToolContext(),
+        ),
+      formatObservation: (r) =>
+        formatToolObservation({
+          name: r.name as Parameters<typeof formatToolObservation>[0]['name'],
+          ok: r.ok,
+          summary: r.summary,
+          data: r.data,
+          categoryId: r.categoryId as Parameters<typeof formatToolObservation>[0]['categoryId'],
+        }),
+      onPartial: (text, tools) => {
         setMessages((prev) =>
           prev.map((m) =>
             m.id === msgId
               ? {
                   ...m,
-                  tools: [...toolTraces],
-                  content:
-                    'Tool ' + result.name + ': ' + (result.ok ? 'ok' : 'failed') + '…',
+                  content: text,
+                  tools: tools.length
+                    ? tools.map((t) => ({
+                        name: t.name,
+                        ok: t.ok,
+                        summary: t.summary,
+                        categoryId: t.categoryId,
+                      }))
+                    : m.tools,
                 }
               : m,
           ),
         )
-      }
-    } catch (err) {
-      streamError = err instanceof Error ? err.message : String(err)
-    }
+      },
+      onToolStart: (name) => {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === msgId ? { ...m, content: `Using tool \`${name}\`…` } : m,
+          ),
+        )
+      },
+      onToolEnd: (trace) => {
+        setMessages((prev) =>
+          prev.map((m) => {
+            if (m.id !== msgId) return m
+            const tools = [...(m.tools || []), trace]
+            return {
+              ...m,
+              tools,
+              content: `Tool ${trace.name}: ${trace.ok ? 'ok' : 'failed'}…`,
+            }
+          }),
+        )
+      },
+    })
 
-    const { content: finalContent, error: inlineError } = extractStreamError(fullContent)
-    const msgError = streamError || inlineError
+    const toolTraces: CopilotToolTrace[] = loopResult.toolTraces
+    const qaContent = loopResult.finalText
+    const msgError = loopResult.error
+
     setMessages((prev) =>
       prev.map((m) =>
         m.id === msgId
           ? {
               ...m,
-              content: finalContent || fullContent,
+              content: qaContent,
               tools: toolTraces.length ? toolTraces : m.tools,
               ...(msgError ? { error: msgError } : {}),
             }
@@ -693,14 +681,13 @@ export function useAICopilot(
       ),
     )
 
-    const qaContent = finalContent || fullContent
     if (qaContent.trim() || toolTraces.length) {
       void saveAiGeneratedData({
         kind: 'copilot',
         mode: 'free_qa',
         content:
           toolTraces.length > 0
-            ? '[tools: ' + toolTraces.map((t) => t.name).join(', ') + ']\n' + qaContent
+            ? `[tools: ${toolTraces.map((t) => t.name).join(', ')}]\n${qaContent}`
             : qaContent,
         context: {
           name: identity.name,

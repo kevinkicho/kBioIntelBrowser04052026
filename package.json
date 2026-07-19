@@ -19,7 +19,7 @@
     "test:e2e:fixture": "cross-env E2E_FIXTURE=1 playwright test e2e/north-star-loop.spec.ts",
     "test:e2e:fixture:auto": "cross-env E2E_FIXTURE=1 E2E_WEBSERVER=1 playwright test e2e/north-star-loop.spec.ts",
     "test:e2e:live": "playwright test e2e/north-star-loop.spec.ts",
-    "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences|searchHistory|profileRevisitCache|pubchem|localSession|PackBuilder.share|agentActivity|api-tracker.isolation|panelApiTrace|relatedMolecules|candidateWhy|faersLinks|identityShell|packRelatedMoleculesDensity|retrievalMonitor|copilotTools\" --passWithNoTests",
+    "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences|searchHistory|profileRevisitCache|pubchem|localSession|PackBuilder.share|agentActivity|api-tracker.isolation|panelApiTrace|relatedMolecules|candidateWhy|faersLinks|identityShell|packRelatedMoleculesDensity|retrievalMonitor|copilotTools|agentLoop\" --passWithNoTests",
     "smoke:vendors": "node scripts/vendor-url-smoke.js",
     "logs:tail": "node scripts/biointel-cli.js logs tail --n 40",
     "test:live": "node scripts/test-live.js",
