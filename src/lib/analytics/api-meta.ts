@@ -24,6 +24,13 @@ export const API_METADATA: Record<string, ApiMeta> = {
     apiEndpoint:
       'https://www.accessdata.fda.gov/drugsatfda_docs/PurpleBook/',
   },
+  'purple-book-patents': {
+    organization: 'U.S. FDA',
+    description:
+      'Purple Book BPPT patent list (sponsor-submitted patents for certain reference biologics)',
+    apiDocs: 'https://purplebooksearch.fda.gov/patent-list',
+    apiEndpoint: 'https://purplebooksearch.fda.gov/patent-list',
+  },
   'ema-bulk': {
     organization: 'European Medicines Agency',
     description:

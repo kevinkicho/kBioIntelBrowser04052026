@@ -74,8 +74,22 @@
 - EMA Excel: single stable URL; Next `revalidate` 24h + process memory catalog.
 - Parsers: hand-rolled CSV + OOXML (no paid/xlsx SaaS deps).
 
+## Wave 5 (shipped) — BPPT patents + establishment portals
+
+| Source | Role | Code |
+|--------|------|------|
+| **Purple Book patent list (BPPT)** | Sponsor-submitted patents + expiry for certain reference BLAs | `purpleBookPatents.ts`, panel `purple-book-patents`, `GET /api/purple-book-patents?q=` |
+| **Establishment / FEI / DRLS portals** | Manufacturing plant discovery (portal-first) | `establishmentDeepLinks.ts`, panel `establishment-links` |
+| **Patent list provided flag** | From monthly Purple Book CSV | Badge on Purple Book product rows |
+
+### Honest limits (unchanged)
+
+- BPPT is **ministerial** FDA publication — not validity/infringement analysis.  
+- No free BLA→FEI plant graph; DRLS + Data Dashboard + FEI portal only.  
+- Discover biologics-first identity graph remains a design non-goal until revised.
+
 ## Still optional later
 
-- Purple Book patent-list tab / BPPT export if FDA keeps free downloads.  
-- Server-side FEI plant join if a free structured FEI API appears.  
-- Discover biologics-first identity graph (design non-goal until revised).
+- Server-side FEI plant join if a free structured public FEI API appears without auth.  
+- Discover biologics-first identity graph (design non-goal until revised).  
+- Cache USPTO bulk patent assignments (separate free dump; large).

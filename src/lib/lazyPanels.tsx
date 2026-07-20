@@ -144,6 +144,22 @@ export const LazyEmaBulkMedicinesPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyPurpleBookPatentsPanel = dynamic(
+  () =>
+    import('@/components/profile/PurpleBookPatentsPanel').then((m) => ({
+      default: m.PurpleBookPatentsPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
+export const LazyEstablishmentLinksPanel = dynamic(
+  () =>
+    import('@/components/profile/EstablishmentLinksPanel').then((m) => ({
+      default: m.EstablishmentLinksPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }

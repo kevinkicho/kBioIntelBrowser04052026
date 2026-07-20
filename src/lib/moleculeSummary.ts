@@ -134,6 +134,11 @@ export function computeMoleculeSummary(
           panelId: 'purple-book',
         },
         {
+          label: 'BPPT patents',
+          value: safeArray(props.purpleBookPatents).length,
+          panelId: 'purple-book-patents',
+        },
+        {
           label: 'Drug type',
           value: (() => {
             const ema = safeArray(props.emaMedicines)[0] as { drugType?: string } | undefined

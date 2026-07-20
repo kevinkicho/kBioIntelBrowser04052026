@@ -52,7 +52,9 @@ See **`docs/design/biologics-biosimilars-sources.md`**.
 |------|------|-------------|
 | openFDA Drugs@FDA BLA | A | `biologics-licensed` |
 | Purple Book monthly CSV | B | `purple-book`, `/api/purple-book` |
+| Purple Book BPPT patents | B/C | `purple-book-patents`, `/api/purple-book-patents` |
 | EMA medicines Excel | B | `ema-bulk`, `/api/ema-bulk` |
+| Establishment / FEI / DRLS | C | `establishment-links` |
 | Open Targets drugType | A | `ema-medicines` + summary badge |
 
 Not a biologics-first Discover identity model.

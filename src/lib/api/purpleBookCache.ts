@@ -66,8 +66,13 @@ type Catalog = {
 let memoryCatalog: Catalog | null = null
 let memoryLoad: Promise<Catalog | null> | null = null
 
-export function purpleBookCsvUrl(year: number, month: (typeof MONTHS)[number]): string {
-  return `https://www.accessdata.fda.gov/drugsatfda_docs/PurpleBook/${year}/purplebook-search-${month}-data-download.csv`
+export function purpleBookCsvUrl(
+  year: number,
+  month: (typeof MONTHS)[number],
+  casing: 'lower' | 'title' = 'lower',
+): string {
+  const m = casing === 'title' ? month.charAt(0).toUpperCase() + month.slice(1) : month
+  return `https://www.accessdata.fda.gov/drugsatfda_docs/PurpleBook/${year}/purplebook-search-${m}-data-download.csv`
 }
 
 /** Candidate (year, month) pairs newest-first from “now”. */
@@ -178,19 +183,22 @@ export function parsePurpleBookCsv(text: string, sourceMonth: string, sourceUrl:
 
 async function fetchCatalog(): Promise<Catalog | null> {
   for (const { year, month } of purpleBookCandidateMonths()) {
-    const url = purpleBookCsvUrl(year, month)
-    try {
-      const res = await fetch(url, fetchOptions)
-      if (!res.ok) continue
-      const text = await res.text()
-      if (!text || text.length < 200) continue
-      if (!/bla number/i.test(text.slice(0, 4000))) continue
-      const sourceMonth = `${year}-${String(MONTHS.indexOf(month) + 1).padStart(2, '0')}`
-      const catalog = parsePurpleBookCsv(text, sourceMonth, url)
-      if (catalog.products.length === 0) continue
-      return catalog
-    } catch {
-      continue
+    // FDA 2026 URLs mix lowercase and Title-case month folders/names
+    for (const casing of ['lower', 'title'] as const) {
+      const url = purpleBookCsvUrl(year, month, casing)
+      try {
+        const res = await fetch(url, fetchOptions)
+        if (!res.ok) continue
+        const text = await res.text()
+        if (!text || text.length < 200) continue
+        if (!/bla number/i.test(text.slice(0, 4000))) continue
+        const sourceMonth = `${year}-${String(MONTHS.indexOf(month) + 1).padStart(2, '0')}`
+        const catalog = parsePurpleBookCsv(text, sourceMonth, url)
+        if (catalog.products.length === 0) continue
+        return catalog
+      } catch {
+        continue
+      }
     }
   }
   return null

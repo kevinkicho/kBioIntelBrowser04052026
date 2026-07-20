@@ -83,9 +83,11 @@ export function drugsAtFdaUrl(applicationNumber: string): string {
 }
 
 export function fdaEstablishmentSearchUrl(sponsorOrPlantHint: string): string {
+  // Prefer DRLS / FDA.gov search — FEI portal often requires login
   const q = sponsorOrPlantHint.trim()
-  // FDA Data Dashboard / FEI public search (portal)
-  return `https://datadashboard.fda.gov/ora/cd/index.htm${q ? `#search=${encodeURIComponent(q)}` : ''}`
+  return q
+    ? `https://www.fda.gov/search?s=${encodeURIComponent(q)}`
+    : 'https://datadashboard.fda.gov/oii/cd/inspections.htm'
 }
 
 export function purpleBookDownloadUrl(): string {

@@ -92,9 +92,23 @@ export const CATEGORIES: CategoryDef[] = [
         tier: 'supporting',
       },
       {
+        id: 'purple-book-patents',
+        title: 'PurpleBookPatents',
+        propKey: 'purpleBookPatents',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
         id: 'ema-bulk',
         title: 'EmaBulkMedicines',
         propKey: 'emaBulkMedicines',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
+        id: 'establishment-links',
+        title: 'EstablishmentLinks',
+        propKey: 'establishmentLinks',
         isNullable: true,
         tier: 'supporting',
       },

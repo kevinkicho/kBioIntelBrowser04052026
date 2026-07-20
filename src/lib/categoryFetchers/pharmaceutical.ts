@@ -8,8 +8,10 @@ import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
 import { getEmaMedicinesByName } from '@/lib/api/emaMedicines'
 import { getBiologicsLicensedByName } from '@/lib/api/biologicsLicensed'
 import { searchPurpleBookByName } from '@/lib/api/purpleBookCache'
+import { searchPurpleBookPatentsByName } from '@/lib/api/purpleBookPatents'
 import { searchEmaBulkByName } from '@/lib/api/emaMedicinesBulk'
 import { buildInternationalRegulatorLinks } from '@/lib/regulatorDeepLinks'
+import { buildEstablishmentDeepLinks } from '@/lib/establishmentDeepLinks'
 import { getDrugPricesByName } from '@/lib/api/nadac'
 import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
 import { getDrugLabelsByName } from '@/lib/api/dailymed'
@@ -22,7 +24,7 @@ import { getCPICData } from '@/lib/api/cpic'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const searchTerms = [name, ...synonyms.slice(0, 1)]
-  const [companiesNested, ndcProducts, orangeBookEntries, healthCanadaProducts, emaMedicines, biologicsLicensed, purpleBookResult, emaBulkResult, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
+  const [companiesNested, ndcProducts, orangeBookEntries, healthCanadaProducts, emaMedicines, biologicsLicensed, purpleBookResult, purpleBookPatentsResult, emaBulkResult, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
     trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
     trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
     trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
@@ -37,6 +39,11 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
       'purple-book',
       searchPurpleBookByName(queryFor('purple-book') || name),
       { meta: null, products: [] },
+    ),
+    trackedSafe(
+      'purple-book-patents',
+      searchPurpleBookPatentsByName(queryFor('purple-book-patents') || name, 60),
+      { meta: null, patents: [] },
     ),
     trackedSafe(
       'ema-bulk',
@@ -58,6 +65,12 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     seen.add(p.brandName)
     return true
   })
+  // Prefer sponsor/applicant from biologics or Purple Book for establishment portal hints
+  const firmHint =
+    biologicsLicensed[0]?.sponsorName ||
+    purpleBookResult.products[0]?.applicant ||
+    companies[0]?.company ||
+    name
   return {
     companies,
     ndcProducts,
@@ -67,8 +80,12 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     biologicsLicensed,
     purpleBookProducts: purpleBookResult.products,
     purpleBookMeta: purpleBookResult.meta,
+    purpleBookPatents: purpleBookPatentsResult.patents,
+    purpleBookPatentsMeta: purpleBookPatentsResult.meta,
     emaBulkMedicines: emaBulkResult.products,
     emaBulkMeta: emaBulkResult.meta,
+    establishmentLinks: buildEstablishmentDeepLinks(firmHint),
+    establishmentFirmHint: firmHint,
     drugPrices,
     drugInteractions,
     drugLabels,

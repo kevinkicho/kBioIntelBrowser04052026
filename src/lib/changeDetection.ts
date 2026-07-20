@@ -50,6 +50,12 @@ export const TRACKED_KEYS: {
     panelId: 'purple-book',
   },
   {
+    key: 'purpleBookPatents',
+    label: 'Purple Book patents',
+    category: 'Pharmaceutical',
+    panelId: 'purple-book-patents',
+  },
+  {
     key: 'emaBulkMedicines',
     label: 'EMA bulk medicines',
     category: 'Pharmaceutical',

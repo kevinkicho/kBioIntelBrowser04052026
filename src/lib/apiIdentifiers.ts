@@ -115,8 +115,20 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
     supportedTypes: ['name'],
   },
   {
+    panelId: 'purple-book-patents',
+    label: 'Purple Book patents (BPPT)',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
     panelId: 'ema-bulk',
     label: 'EMA medicines Excel dump',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
+    panelId: 'establishment-links',
+    label: 'Manufacturing / establishments',
     defaultType: 'name',
     supportedTypes: ['name'],
   },

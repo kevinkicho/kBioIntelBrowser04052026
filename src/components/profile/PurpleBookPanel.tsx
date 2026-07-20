@@ -142,6 +142,11 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
                       >
                         {p.licenseType || 'license type n/a'}
                       </span>
+                      {/^yes$/i.test(p.patentListProvided || '') && (
+                        <span className="text-[9px] rounded border border-sky-800/40 bg-sky-950/30 text-sky-300 px-1.5 py-0.5">
+                          patent list (BPPT)
+                        </span>
+                      )}
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-3 mt-1.5">
