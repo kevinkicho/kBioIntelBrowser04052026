@@ -180,7 +180,7 @@ export async function searchEmaBulkByName(
   if (!catalog) return { meta: null, products: [] }
 
   const n = q.toLowerCase()
-  let hits = catalog.products.filter((p) => {
+  const hits = catalog.products.filter((p) => {
     if (opts?.biosimilarOnly && !p.biosimilar) return false
     return (
       p.name.toLowerCase().includes(n) ||

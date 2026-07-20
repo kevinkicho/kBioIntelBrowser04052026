@@ -30,7 +30,7 @@ export function readZipTextEntry(zip: Buffer, entryPath: string): string | null 
     const name = zip.subarray(nameStart, nameStart + nameLen).toString('utf8')
     const dataStart = nameStart + nameLen + extraLen
     // ZIP data descriptor / zero sizes: fall back to searching EOCD if needed — skip for EMA xlsx (sizes present)
-    let size = compSize
+    const size = compSize
     if (size === 0 && uncompSize === 0) {
       // try next signature scan — rare; skip entry
       offset = dataStart
