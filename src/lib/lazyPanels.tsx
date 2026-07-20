@@ -128,6 +128,22 @@ export const LazyBiologicsLicensedPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyPurpleBookPanel = dynamic(
+  () =>
+    import('@/components/profile/PurpleBookPanel').then((m) => ({
+      default: m.PurpleBookPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
+export const LazyEmaBulkMedicinesPanel = dynamic(
+  () =>
+    import('@/components/profile/EmaBulkMedicinesPanel').then((m) => ({
+      default: m.EmaBulkMedicinesPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }

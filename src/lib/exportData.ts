@@ -18,6 +18,8 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
       { propKey: 'healthCanadaProducts', title: 'Health Canada DPD' },
       { propKey: 'emaMedicines', title: 'EMA / EU medicines' },
       { propKey: 'biologicsLicensed', title: 'Licensed biologics / biosimilars (BLA)' },
+      { propKey: 'purpleBookProducts', title: 'Purple Book' },
+      { propKey: 'emaBulkMedicines', title: 'EMA medicines dump' },
       { propKey: 'drugPrices', title: 'Drug Pricing' },
       { propKey: 'drugInteractions', title: 'Drug Interactions' },
       { propKey: 'drugLabels', title: 'Drug Labels' },

@@ -130,6 +130,8 @@ const API_CATEGORY_MAP: Record<string, { id: string; label: string; icon: string
   'fda-ndc': { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
   orangebook: { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
   'biologics-licensed': { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
+  'purple-book': { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
+  'ema-bulk': { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
   'ema-medicines': { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
   'health-canada-dpd': { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
   nadac: { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },

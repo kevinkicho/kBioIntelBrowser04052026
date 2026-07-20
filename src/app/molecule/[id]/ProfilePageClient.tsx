@@ -973,6 +973,23 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           lastFetched={lastFetched}
         />
       ),
+      'purple-book': (panelId, lastFetched) => (
+        <LazyPanels.LazyPurpleBookPanel
+          products={d('purpleBookProducts')}
+          sourceMonth={
+            (d('purpleBookMeta') as { sourceMonth?: string } | null | undefined)?.sourceMonth
+          }
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
+      'ema-bulk': (panelId, lastFetched) => (
+        <LazyPanels.LazyEmaBulkMedicinesPanel
+          products={d('emaBulkMedicines')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'international-regulators': (panelId, lastFetched) => (
         <LazyPanels.LazyInternationalRegulatorsPanel
           moleculeName={moleculeName}

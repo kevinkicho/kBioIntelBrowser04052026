@@ -46,7 +46,16 @@
 
 ## Biologics / biosimilars (panel enrichment)
 
-See **`docs/design/biologics-biosimilars-sources.md`**. Live free path: openFDA Drugs@FDA **BLA** → panel `biologics-licensed`. Not a biologics-first Discover identity model.
+See **`docs/design/biologics-biosimilars-sources.md`**.
+
+| Path | Tier | Panel / API |
+|------|------|-------------|
+| openFDA Drugs@FDA BLA | A | `biologics-licensed` |
+| Purple Book monthly CSV | B | `purple-book`, `/api/purple-book` |
+| EMA medicines Excel | B | `ema-bulk`, `/api/ema-bulk` |
+| Open Targets drugType | A | `ema-medicines` + summary badge |
+
+Not a biologics-first Discover identity model.
 
 ## Product rules
 

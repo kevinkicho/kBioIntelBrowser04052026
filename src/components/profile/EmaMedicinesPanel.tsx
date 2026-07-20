@@ -79,6 +79,11 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                       {m.chemblId}
                     </span>
                   )}
+                  {m.drugType && (
+                    <span className="text-[10px] bg-violet-900/40 text-violet-200 border border-violet-700/30 px-2 py-0.5 rounded">
+                      {m.drugType}
+                    </span>
+                  )}
                   {m.yearOfFirstApproval != null && (
                     <span className="text-[10px] bg-emerald-900/40 text-emerald-300 border border-emerald-700/30 px-2 py-0.5 rounded">
                       First approval {m.yearOfFirstApproval}

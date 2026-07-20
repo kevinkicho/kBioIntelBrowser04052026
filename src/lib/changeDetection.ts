@@ -43,6 +43,18 @@ export const TRACKED_KEYS: {
     category: 'Pharmaceutical',
     panelId: 'biologics-licensed',
   },
+  {
+    key: 'purpleBookProducts',
+    label: 'Purple Book products',
+    category: 'Pharmaceutical',
+    panelId: 'purple-book',
+  },
+  {
+    key: 'emaBulkMedicines',
+    label: 'EMA bulk medicines',
+    category: 'Pharmaceutical',
+    panelId: 'ema-bulk',
+  },
   { key: 'clinicalTrials', label: 'clinical trials', category: 'Clinical', panelId: 'clinical-trials' },
   { key: 'adverseEvents', label: 'adverse events', category: 'Safety', panelId: 'adverse-events' },
   { key: 'drugRecalls', label: 'recalls', category: 'Safety', panelId: 'recalls' },

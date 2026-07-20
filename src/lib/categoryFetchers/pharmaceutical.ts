@@ -7,6 +7,8 @@ import { getOrangeBookByName } from '@/lib/api/orangebook'
 import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
 import { getEmaMedicinesByName } from '@/lib/api/emaMedicines'
 import { getBiologicsLicensedByName } from '@/lib/api/biologicsLicensed'
+import { searchPurpleBookByName } from '@/lib/api/purpleBookCache'
+import { searchEmaBulkByName } from '@/lib/api/emaMedicinesBulk'
 import { buildInternationalRegulatorLinks } from '@/lib/regulatorDeepLinks'
 import { getDrugPricesByName } from '@/lib/api/nadac'
 import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
@@ -20,7 +22,7 @@ import { getCPICData } from '@/lib/api/cpic'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const searchTerms = [name, ...synonyms.slice(0, 1)]
-  const [companiesNested, ndcProducts, orangeBookEntries, healthCanadaProducts, emaMedicines, biologicsLicensed, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
+  const [companiesNested, ndcProducts, orangeBookEntries, healthCanadaProducts, emaMedicines, biologicsLicensed, purpleBookResult, emaBulkResult, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
     trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
     trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
     trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
@@ -30,6 +32,16 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
       'biologics-licensed',
       getBiologicsLicensedByName(queryFor('biologics-licensed') || name),
       [],
+    ),
+    trackedSafe(
+      'purple-book',
+      searchPurpleBookByName(queryFor('purple-book') || name),
+      { meta: null, products: [] },
+    ),
+    trackedSafe(
+      'ema-bulk',
+      searchEmaBulkByName(queryFor('ema-bulk') || name, { limit: 30 }),
+      { meta: null, products: [] },
     ),
     trackedSafe('nadac', getDrugPricesByName(name), []),
     trackedSafe('rxnorm', getDrugInteractionsByName(queryFor('drug-interactions')), []),
@@ -53,6 +65,10 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     healthCanadaProducts,
     emaMedicines,
     biologicsLicensed,
+    purpleBookProducts: purpleBookResult.products,
+    purpleBookMeta: purpleBookResult.meta,
+    emaBulkMedicines: emaBulkResult.products,
+    emaBulkMeta: emaBulkResult.meta,
     drugPrices,
     drugInteractions,
     drugLabels,

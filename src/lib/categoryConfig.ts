@@ -85,6 +85,20 @@ export const CATEGORIES: CategoryDef[] = [
         tier: 'supporting',
       },
       {
+        id: 'purple-book',
+        title: 'PurpleBook',
+        propKey: 'purpleBookProducts',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
+        id: 'ema-bulk',
+        title: 'EmaBulkMedicines',
+        propKey: 'emaBulkMedicines',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
         id: 'international-regulators',
         title: 'InternationalRegulators',
         propKey: 'internationalRegulatorLinks',

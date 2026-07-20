@@ -198,6 +198,26 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
                   >
                     FDA establishment search ↗
                   </a>
+                  {p.sponsorName && (
+                    <a
+                      href={`https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(`"${p.sponsorName}"`)}&forms=10-K,10-Q`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-indigo-400 hover:underline"
+                      onClick={() =>
+                        onDeepLinkClick(
+                          'other',
+                          `https://efts.sec.gov/LATEST/search-index?q=${encodeURIComponent(p.sponsorName)}`,
+                          {
+                            panelId: panelId || 'biologics-licensed',
+                            label: 'sec-sponsor',
+                          },
+                        )
+                      }
+                    >
+                      SEC 10-K/10-Q search ↗
+                    </a>
+                  )}
                 </div>
               </div>
             )}

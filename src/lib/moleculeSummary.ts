@@ -128,6 +128,20 @@ export function computeMoleculeSummary(
           value: safeArray(props.biologicsLicensed).length,
           panelId: 'biologics-licensed',
         },
+        {
+          label: 'Purple Book',
+          value: safeArray(props.purpleBookProducts).length,
+          panelId: 'purple-book',
+        },
+        {
+          label: 'Drug type',
+          value: (() => {
+            const ema = safeArray(props.emaMedicines)[0] as { drugType?: string } | undefined
+            const dt = ema?.drugType?.trim()
+            return dt || '—'
+          })(),
+          panelId: 'ema-medicines',
+        },
         { label: 'Drug Labels', value: drugLabels.length, panelId: 'dailymed' },
       ],
     },

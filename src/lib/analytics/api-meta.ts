@@ -16,6 +16,22 @@ export const API_METADATA: Record<string, ApiMeta> = {
     apiDocs: 'https://open.fda.gov/apis/drug/drugsfda/',
     apiEndpoint: 'https://api.fda.gov/drug/drugsfda.json',
   },
+  'purple-book': {
+    organization: 'U.S. FDA',
+    description:
+      'Purple Book monthly CSV downloads — licensed biologics, biosimilar and interchangeable labels',
+    apiDocs: 'https://purplebooksearch.fda.gov/downloads',
+    apiEndpoint:
+      'https://www.accessdata.fda.gov/drugsatfda_docs/PurpleBook/',
+  },
+  'ema-bulk': {
+    organization: 'European Medicines Agency',
+    description:
+      'Official EMA medicines Excel dump (biosimilar / orphan / ATMP flags, MAH, dates)',
+    apiDocs: 'https://www.ema.europa.eu/en/medicines/download-medicine-data',
+    apiEndpoint:
+      'https://www.ema.europa.eu/en/documents/report/medicines-output-medicines-report_en.xlsx',
+  },
   'ema-medicines': {
     organization: 'Open Targets + EMA',
     description: 'EU-facing medicine card from Open Targets GraphQL plus EMA portal/bulk deep links',

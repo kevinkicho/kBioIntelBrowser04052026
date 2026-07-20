@@ -109,6 +109,18 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
     supportedTypes: ['name'],
   },
   {
+    panelId: 'purple-book',
+    label: 'FDA Purple Book (monthly CSV)',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
+    panelId: 'ema-bulk',
+    label: 'EMA medicines Excel dump',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
     panelId: 'international-regulators',
     label: 'International regulators',
     defaultType: 'name',

@@ -59,9 +59,23 @@
 - Prefer: “FDA-licensed BLA record”, “openFDA lists”, “heuristic biosimilar suffix”, “see Purple Book for interchangeability”.  
 - Avoid: “approved to treat”, “interchangeable with X” as app assertions, “this biosimilar is safe”.
 
-## Future free-only enhancements (optional)
+## Wave 4 (shipped) — tier B caches + polish
 
-- Cache Purple Book monthly CSV/XLSX (tier B) under `revalidate` if FDA keeps stable download URLs.  
-- Cache EMA medicines Excel overnight and filter `biosimilar` rows server-side.  
-- Surface `drugType` badge on molecule summary when OT says Antibody/Protein.  
-- SEC EDGAR 10-K / manufacturing footnotes deep links by sponsor CIK (already have SEC name search).
+| Source | Role | Code |
+|--------|------|------|
+| **Purple Book monthly CSV** | Official 351(a) / 351(k) biosimilar / interchangeable | `purpleBookCache.ts`, panel `purple-book`, `GET /api/purple-book?q=` |
+| **EMA medicines Excel** | Official biosimilar / orphan / ATMP flags + MAH | `emaMedicinesBulk.ts` + zero-dep xlsx reader, panel `ema-bulk`, `GET /api/ema-bulk?q=` |
+| **Open Targets drugType** | Antibody / Protein / Small molecule badge | EMA medicines panel + molecule summary “Drug type” |
+| **SEC 10-K/10-Q by sponsor** | Corporate filings deep link | Biologics + Purple Book panels |
+
+### Cache notes
+
+- Purple Book: try current month → older months (14 candidates); Next `revalidate` 7d + process memory catalog.
+- EMA Excel: single stable URL; Next `revalidate` 24h + process memory catalog.
+- Parsers: hand-rolled CSV + OOXML (no paid/xlsx SaaS deps).
+
+## Still optional later
+
+- Purple Book patent-list tab / BPPT export if FDA keeps free downloads.  
+- Server-side FEI plant join if a free structured FEI API appears.  
+- Discover biologics-first identity graph (design non-goal until revised).
