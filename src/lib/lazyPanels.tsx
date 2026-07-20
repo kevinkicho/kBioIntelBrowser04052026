@@ -31,6 +31,14 @@ export const LazyHealthCanadaDpdPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyEmaMedicinesPanel = dynamic(
+  () =>
+    import('@/components/profile/EmaMedicinesPanel').then((m) => ({
+      default: m.EmaMedicinesPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyNadacPanel = dynamic(
   () => import('@/components/profile/NadacPanel').then(m => ({ default: m.NadacPanel })),
   { loading: LoadingComponent }

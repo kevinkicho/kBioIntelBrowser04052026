@@ -1,8 +1,10 @@
 import { searchDiseases, getDiseaseGeneAssociations, deduplicateMolecules } from '@/lib/diseaseSearch'
 import { searchClinicalTrialsByCondition, sortTrials, extractDrugInterventions } from '@/lib/api/clinicaltrials'
+import { getWhoGhoContextForDisease } from '@/lib/api/whoGho'
 import { DiseaseIntelligencePanel } from '@/components/disease/DiseaseIntelligencePanel'
 import { DiseaseDrugsTrialsTable } from '@/components/disease/DiseaseDrugsTrialsTable'
 import { DiseaseRelatedMoleculesTable } from '@/components/disease/DiseaseRelatedMoleculesTable'
+import { WhoGhoContextStrip } from '@/components/disease/WhoGhoContextStrip'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { DataPoint } from '@/components/ui/DataPoint'
 import Link from 'next/link'
@@ -49,6 +51,15 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
 
   const trials = sortTrials(await searchClinicalTrialsByCondition(diseaseName))
   const drugInterventions = extractDrugInterventions(trials)
+  let whoGho: Awaited<ReturnType<typeof getWhoGhoContextForDisease>> = {
+    indicators: [],
+    facts: [],
+  }
+  try {
+    whoGho = await getWhoGhoContextForDisease(diseaseName)
+  } catch {
+    /* free API optional */
+  }
 
   const trialSummary = {
     total: trials.length,
@@ -155,6 +166,12 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
             </div>
           </DataPoint>
         </div>
+
+        <WhoGhoContextStrip
+          diseaseName={diseaseName}
+          indicators={whoGho.indicators}
+          facts={whoGho.facts}
+        />
 
         {genes.length > 0 && (
           <section className="mb-8">

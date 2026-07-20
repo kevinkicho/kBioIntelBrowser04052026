@@ -1,6 +1,6 @@
 # International free public APIs (regulators & research infra)
 
-**Status:** Active — Health Canada DPD integrated; WHO GHO + NIH RePORTER documented/scaffolded  
+**Status:** Active — Wave 1 + Wave 2 partial shipped  
 **Product law:** Free public APIs only; evidence-first; no regulatory decision support language  
 **Audience:** Implementers adding panels without paid DBs
 
@@ -16,21 +16,21 @@
 
 | Source | Role | Tier | Code / docs |
 |--------|------|------|-------------|
-| **Health Canada DPD** | FDA twin — DIN, brand, status, ingredients | A | `src/lib/api/healthCanadaDpd.ts`, panel `health-canada` |
-| **NIH RePORTER** | NSF-like grants (US) | A | Already: `src/lib/api/nihreporter.ts`, panel `nih-reporter` |
-| **WHO GHO OData** | CDC-like disease burden (not drug labels) | A | `src/lib/api/whoGho.ts` (scaffold) |
+| **Health Canada DPD** | FDA twin — DIN, brand, status, ingredients | A | `healthCanadaDpd.ts`, panel `health-canada` |
+| **NIH RePORTER** | NSF-like grants (US) | A | `nihreporter.ts`, panel `nih-reporter` |
+| **WHO GHO OData** | CDC-like disease burden | A | `whoGho.ts`, disease page strip + `/api/who-gho` |
 | **Open Targets GraphQL** | Target–disease–drug | A | Existing `opentargets.ts` |
-| **ClinicalTrials.gov v2** | Trials | A | Existing `clinicaltrials.ts` |
+| **ClinicalTrials.gov v2** | Trials | A | Existing `clinicaltrials.ts` (+ EudraCT parse) |
 | **openFDA / NDC / Orange Book** | US regulator | A | Existing pharmaceutical panels |
 
-## Wave 2 (planned)
+## Wave 2 (in progress / shipped partial)
 
-| Source | Role | Tier | Integration note |
-|--------|------|------|------------------|
-| **EMA** | EU authorizations | A/B | Bulk Excel/JSON + ePI API; deep links |
-| **EU CTR / CTIS** | EU trials | B/C | Deep link by EU CT number |
-| **ECHA CHEM** | EU chemical hazard (EPA-ish) | B/C | Deep link by CAS/EC; no full free REST bulk |
-| **OpenAIRE / CORDIS** | EU funding | A/B | Project/grant context |
+| Source | Role | Tier | Code |
+|--------|------|------|------|
+| **EMA / EU medicines** | EU-facing drug card + EMA search | A | `emaMedicines.ts`, panel `ema-medicines` (OT + EMA deep links; bulk xlsx later) |
+| **EU CTR (EudraCT)** | EU trial register deep links | A | From CTG `secondaryIdInfos` → `euClinicalTrials.ts` + CT panel links |
+| **ECHA CHEM** | EU chemical hazard (EPA-ish) | B/C | Deep link by CAS/EC (not yet) |
+| **OpenAIRE / CORDIS** | EU funding | A/B | Not yet |
 
 ## Wave 3 (portal-first)
 

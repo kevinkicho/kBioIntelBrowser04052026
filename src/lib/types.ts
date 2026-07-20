@@ -288,6 +288,8 @@ export interface ClinicalTrial {
   sponsor: string
   enrollment?: number
   interventionDetails?: { name: string; type: string }[]
+  /** EudraCT numbers from CTG secondary IDs (EU CTR deep links) */
+  eudraCtNumbers?: string[]
 }
 
 export interface AdverseEvent {

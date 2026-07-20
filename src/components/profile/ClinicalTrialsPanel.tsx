@@ -14,6 +14,7 @@ import {
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emitProductEvent } from '@/lib/productEvents'
+import { eudraCtRegisterUrl } from '@/lib/euClinicalTrials'
 
 const STATUS_BADGE: Record<string, string> = {
   COMPLETED: 'bg-emerald-900/40 text-emerald-300 border-emerald-800/40',
@@ -346,22 +347,45 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                       </div>
                     </div>
                   )}
-                  {href && (
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-block text-[10px] text-indigo-400 hover:underline"
-                      onClick={() =>
-                        onDeepLinkClick('clinicaltrials', href, {
-                          panelId: 'clinical-trials',
-                          label: trial.nctId,
-                        })
-                      }
-                    >
-                      Open full record on ClinicalTrials.gov ↗
-                    </a>
-                  )}
+                  <div className="flex flex-wrap gap-x-3 gap-y-1">
+                    {href && (
+                      <a
+                        href={href}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-block text-[10px] text-indigo-400 hover:underline"
+                        onClick={() =>
+                          onDeepLinkClick('clinicaltrials', href, {
+                            panelId: 'clinical-trials',
+                            label: trial.nctId,
+                          })
+                        }
+                      >
+                        ClinicalTrials.gov ↗
+                      </a>
+                    )}
+                    {(trial.eudraCtNumbers ?? []).map((eu) => {
+                      const euHref = eudraCtRegisterUrl(eu)
+                      return (
+                        <a
+                          key={eu}
+                          href={euHref}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-block text-[10px] text-cyan-400 hover:underline"
+                          title="EU Clinical Trials Register (EudraCT)"
+                          onClick={() =>
+                            onDeepLinkClick('other', euHref, {
+                              panelId: 'clinical-trials',
+                              label: eu,
+                            })
+                          }
+                        >
+                          EU CTR {eu} ↗
+                        </a>
+                      )
+                    })}
+                  </div>
                 </div>
               ) : null
 

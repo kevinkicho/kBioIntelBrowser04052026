@@ -1,5 +1,6 @@
 import type { ClinicalTrial } from '../types'
 import { LIMITS } from '../api-limits'
+import { parseSecondaryTrialIds } from '../euClinicalTrials'
 
 const BASE_URL = 'https://clinicaltrials.gov/api/v2/studies'
 const fetchOptions: RequestInit = { next: { revalidate: 3600 } }
@@ -15,6 +16,8 @@ function parseStudies(studies: unknown[]): ClinicalTrial[] {
     const arms = (p.armsInterventionsModule ?? {}) as Record<string, unknown>
     const enrollment = (design.enrollmentInfo ?? {}) as Record<string, unknown>
     const interventions = (arms.interventions ?? []) as { type: string; name: string }[]
+    const secondary = (id.secondaryIdInfos ?? []) as Array<{ id?: string; type?: string }>
+    const { eudraCtNumbers } = parseSecondaryTrialIds(secondary)
 
     return {
       nctId: String(id.nctId ?? ''),
@@ -28,6 +31,7 @@ function parseStudies(studies: unknown[]): ClinicalTrial[] {
       interventions: interventions.map(i => i.name).filter(Boolean),
       enrollment: typeof enrollment.count === 'number' ? enrollment.count : undefined,
       interventionDetails: interventions.map(i => ({ name: i.name, type: i.type })).filter(i => i.name),
+      eudraCtNumbers: eudraCtNumbers.length > 0 ? eudraCtNumbers : undefined,
     }
   })
 }

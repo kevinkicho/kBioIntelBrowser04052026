@@ -70,6 +70,13 @@ export const CATEGORIES: CategoryDef[] = [
         isNullable: true,
         tier: 'supporting',
       },
+      {
+        id: 'ema-medicines',
+        title: 'EmaMedicines',
+        propKey: 'emaMedicines',
+        isNullable: true,
+        tier: 'supporting',
+      },
       { id: 'nadac', title: 'NADAC', propKey: 'drugPrices', isNullable: false, tier: 'supporting' },
       { id: 'drug-interactions', title: 'DrugInteractions', propKey: 'drugInteractions', isNullable: false, tier: 'core' },
       { id: 'dailymed', title: 'DailyMed', propKey: 'drugLabels', isNullable: false, tier: 'core' },
