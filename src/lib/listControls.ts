@@ -26,8 +26,11 @@ export function parseListDate(raw: unknown): number {
   return Number.isFinite(t) ? t : 0
 }
 
-export function compareText(a: string, b: string): number {
-  return a.localeCompare(b, undefined, { sensitivity: 'base', numeric: true })
+/** Coerce free-API values (numbers, null, rare objects) before localeCompare. */
+export function compareText(a: unknown, b: unknown): number {
+  const sa = a == null ? '' : typeof a === 'string' ? a : String(a)
+  const sb = b == null ? '' : typeof b === 'string' ? b : String(b)
+  return sa.localeCompare(sb, undefined, { sensitivity: 'base', numeric: true })
 }
 
 export function compareNumber(a: number, b: number): number {
@@ -44,18 +47,18 @@ export type ListSortOption<T> = {
 
 /** Common A–Z / Z–A sorts from a label getter. */
 export function alphaSortOptions<T>(
-  getLabel: (item: T) => string,
+  getLabel: (item: T) => unknown,
 ): ListSortOption<T>[] {
   return [
     {
       id: 'name-asc',
       label: 'Name A–Z',
-      compare: (a, b) => compareText(getLabel(a) || '', getLabel(b) || ''),
+      compare: (a, b) => compareText(getLabel(a), getLabel(b)),
     },
     {
       id: 'name-desc',
       label: 'Name Z–A',
-      compare: (a, b) => compareText(getLabel(b) || '', getLabel(a) || ''),
+      compare: (a, b) => compareText(getLabel(b), getLabel(a)),
     },
   ]
 }
@@ -113,11 +116,25 @@ export function applyFilterSort<T>(
   let out = items
   if (q) {
     out = items.filter((item) => {
-      const hay = opts.getSearchText(item).toLowerCase()
-      return hay.includes(q)
+      try {
+        const hay = String(opts.getSearchText(item) ?? '').toLowerCase()
+        return hay.includes(q)
+      } catch {
+        return false
+      }
     })
   }
   const sort = opts.sortOptions.find((s) => s.id === opts.sortId) ?? opts.sortOptions[0]
   if (!sort) return out
-  return [...out].sort(sort.compare)
+  try {
+    return [...out].sort((a, b) => {
+      try {
+        return sort.compare(a, b)
+      } catch {
+        return 0
+      }
+    })
+  } catch {
+    return out
+  }
 }

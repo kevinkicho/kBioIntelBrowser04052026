@@ -63,7 +63,9 @@ export async function putAiHistoryLocal(
     // Evict oldest beyond max
     const all = await idbReq(store.getAll()) as AiGeneratedRecord[]
     if (all.length > AI_HISTORY_IDB_MAX) {
-      all.sort((a, b) => (a.createdAt || '').localeCompare(b.createdAt || ''))
+      all.sort((a, b) =>
+        String(a.createdAt || '').localeCompare(String(b.createdAt || '')),
+      )
       const drop = all.slice(0, all.length - AI_HISTORY_IDB_MAX)
       for (const d of drop) {
         await idbReq(store.delete(d.id))
@@ -97,7 +99,9 @@ export async function listAiHistoryLocal(opts: {
     const store = tx.objectStore(AI_HISTORY_IDB_STORE)
     let all = (await idbReq(store.getAll())) as AiGeneratedRecord[]
     db.close()
-    all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    all.sort((a, b) =>
+      String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+    )
     if (opts.kind) all = all.filter((r) => r.kind === opts.kind)
     if (opts.mode) all = all.filter((r) => r.mode === opts.mode)
     if (opts.contextKey) {

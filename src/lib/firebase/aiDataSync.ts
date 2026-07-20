@@ -278,7 +278,9 @@ export async function listAiGeneratedPage(
     )
     const snap = await getDocs(col)
     let all = snap.docs.map((d) => toRecord(d.id, d.data()))
-    all.sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || ''))
+    all.sort((a, b) =>
+      String(b.createdAt || '').localeCompare(String(a.createdAt || '')),
+    )
     if (opts.kind) all = all.filter((r) => r.kind === opts.kind)
     if (opts.mode) all = all.filter((r) => r.mode === opts.mode)
     if (opts.cursor) {

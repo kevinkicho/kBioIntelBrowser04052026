@@ -54,4 +54,22 @@ describe('listControls', () => {
     })
     expect(out.map((x) => x.d)).toEqual(['2024-12-01', '2021-06-01', '2019-01-01'])
   })
+
+  test('alpha sort coerces non-string labels (no localeCompare crash)', () => {
+    const items = [
+      { name: 42 as unknown as string },
+      { name: null as unknown as string },
+      { name: 'beta' },
+    ]
+    const out = applyFilterSort(items, {
+      query: '',
+      getSearchText: (x) => String(x.name ?? ''),
+      sortId: 'name-asc',
+      sortOptions: alphaSortOptions((x) => x.name as unknown),
+    })
+    expect(out).toHaveLength(3)
+    // null → '', then 42, then beta
+    expect(out.map((x) => x.name)).toEqual([null, 42, 'beta'])
+  })
 })
+
