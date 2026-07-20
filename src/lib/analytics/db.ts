@@ -145,6 +145,11 @@ const API_CATEGORY_MAP: Record<string, { id: string; label: string; icon: string
   cpic: { id: 'pharmaceutical', label: 'Pharmaceutical', icon: '💊' },
 
   clinicaltrials: { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },
+  'ror-sponsors': { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },
+  'ror-query': { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },
+  'cms-hospitals': { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },
+  'ror-grants': { id: 'research-literature', label: 'Research & Literature', icon: '📚' },
+  'ror-lit-query': { id: 'research-literature', label: 'Research & Literature', icon: '📚' },
   isrctn: { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },
   adverseevents: { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },
   recalls: { id: 'clinical-safety', label: 'Clinical & Safety', icon: '🏥' },

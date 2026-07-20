@@ -16,6 +16,7 @@ import { getCitationMetrics } from '@/lib/api/opencitations'
 import { searchPubMed } from '@/lib/api/pubmed'
 import { searchCrossRef } from '@/lib/api/crossref'
 import { searchArXiv } from '@/lib/api/arxiv'
+import { resolveRorByNames, searchRorOrganizations } from '@/lib/api/ror'
 
 export async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [literature, nihGrants, openAireProjects, openAirePublications, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
@@ -58,7 +59,22 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
   for (const a of pubmedArticles as Array<{ doi?: string }>) pushDoi(a.doi)
 
   const dois = Array.from(doiSet).slice(0, 12)
-  const citationMetrics = await trackedSafe('opencitations', getCitationMetrics(dois), [])
+  const grantInstitutes = (nihGrants as Array<{ institute?: string }>)
+    .map((g) => g.institute)
+    .filter((s): s is string => Boolean(s && s !== 'Unknown'))
+  const [citationMetrics, rorFromGrants, rorFromName] = await Promise.all([
+    trackedSafe('opencitations', getCitationMetrics(dois), []),
+    trackedSafe('ror-grants', resolveRorByNames(grantInstitutes, 8), []),
+    trackedSafe('ror-lit-query', searchRorOrganizations(queryFor('research-orgs') || name), []),
+  ])
+  const seen = new Set<string>()
+  const researchOrgsLit = []
+  for (const o of [...rorFromGrants, ...rorFromName]) {
+    if (seen.has(o.rorId)) continue
+    seen.add(o.rorId)
+    researchOrgsLit.push(o)
+    if (researchOrgsLit.length >= 16) break
+  }
   return {
     literature,
     nihGrants,
@@ -72,5 +88,6 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
     pubmedArticles,
     crossRefWorks,
     arxivPapers,
+    researchOrgsLit,
   }
 }

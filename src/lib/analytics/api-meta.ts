@@ -31,6 +31,20 @@ export const API_METADATA: Record<string, ApiMeta> = {
     apiDocs: 'https://purplebooksearch.fda.gov/patent-list',
     apiEndpoint: 'https://purplebooksearch.fda.gov/patent-list',
   },
+  ror: {
+    organization: 'Research Organization Registry',
+    description:
+      'Open CC0 identifiers for research universities, institutes, healthcare research orgs, and funders',
+    apiDocs: 'https://ror.readme.io/docs/rest-api',
+    apiEndpoint: 'https://api.ror.org/v2/organizations',
+  },
+  'cms-hospitals': {
+    organization: 'U.S. CMS',
+    description: 'Medicare Hospital General Information (registered US hospitals)',
+    apiDocs: 'https://data.cms.gov/provider-data/dataset/xubh-q36u',
+    apiEndpoint:
+      'https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0',
+  },
   'ema-bulk': {
     organization: 'European Medicines Agency',
     description:

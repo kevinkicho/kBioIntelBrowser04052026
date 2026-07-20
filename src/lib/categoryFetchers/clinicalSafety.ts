@@ -13,6 +13,20 @@ import { getToxCastData } from '@/lib/api/toxcast'
 import { getSIDERData } from '@/lib/api/sider'
 import { searchIRIS } from '@/lib/api/iris'
 import { searchDrugShortages } from '@/lib/api/fda-drug-shortages'
+import { resolveRorByNames, searchRorOrganizations } from '@/lib/api/ror'
+import { resolveCmsHospitalsByNames } from '@/lib/api/cmsHospitals'
+import type { ClinicalTrial } from '@/lib/types'
+
+function collectTrialOrgNames(trials: ClinicalTrial[]): string[] {
+  const names: string[] = []
+  for (const t of trials) {
+    if (t.sponsor) names.push(t.sponsor)
+    for (const f of t.facilities ?? []) {
+      if (f.name) names.push(f.name)
+    }
+  }
+  return names
+}
 
 export async function fetchClinicalSafety(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const clinicalTrialsLimit = getApiParamNumber(apiParams, 'clinical-trials', 'maxResults', 10)
@@ -29,6 +43,33 @@ export async function fetchClinicalSafety(name: string, queryFor: (s: string) =>
     trackedSafe('iris', searchIRIS(queryFor('iris')), []),
     trackedSafe('fda-drug-shortages', searchDrugShortages(name), { shortages: [], total: 0 }),
   ])
+
+  const orgNames = collectTrialOrgNames(clinicalTrials)
+  const facilityNames = clinicalTrials.flatMap((t) =>
+    (t.facilities ?? []).map((f) => f.name).filter(Boolean),
+  )
+  const [researchOrgsFromSponsors, researchOrgsFromName, usHospitals] = await Promise.all([
+    trackedSafe('ror-sponsors', resolveRorByNames(orgNames, 10), []),
+    trackedSafe('ror-query', searchRorOrganizations(queryFor('research-orgs') || name), []),
+    trackedSafe(
+      'cms-hospitals',
+      resolveCmsHospitalsByNames(
+        facilityNames.length > 0 ? facilityNames : orgNames.slice(0, 6),
+        10,
+      ),
+      [],
+    ),
+  ])
+  // Prefer sponsor-matched ROR, then fill from name query
+  const seenRor = new Set<string>()
+  const researchOrgs = []
+  for (const o of [...researchOrgsFromSponsors, ...researchOrgsFromName]) {
+    if (seenRor.has(o.rorId)) continue
+    seenRor.add(o.rorId)
+    researchOrgs.push(o)
+    if (researchOrgs.length >= 20) break
+  }
+
   return {
     clinicalTrials,
     isrctnTrials,
@@ -41,5 +82,7 @@ export async function fetchClinicalSafety(name: string, queryFor: (s: string) =>
     siderSideEffects: siderData.sideEffects,
     irisAssessments,
     drugShortages: drugShortagesData.shortages,
+    researchOrgs,
+    usHospitals,
   }
 }

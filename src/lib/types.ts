@@ -290,6 +290,8 @@ export interface ClinicalTrial {
   interventionDetails?: { name: string; type: string }[]
   /** EudraCT numbers from CTG secondary IDs (EU CTR deep links) */
   eudraCtNumbers?: string[]
+  /** Trial sites (facility names) from CTG locations module */
+  facilities?: { name: string; city: string; country: string }[]
 }
 
 export interface AdverseEvent {

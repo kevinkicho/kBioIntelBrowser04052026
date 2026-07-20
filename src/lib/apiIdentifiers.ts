@@ -133,6 +133,24 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
     supportedTypes: ['name'],
   },
   {
+    panelId: 'research-orgs',
+    label: 'ROR research organizations',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
+    panelId: 'us-hospitals',
+    label: 'CMS US hospitals',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
+    panelId: 'research-orgs-lit',
+    label: 'ROR orgs (grants / literature)',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
     panelId: 'international-regulators',
     label: 'International regulators',
     defaultType: 'name',

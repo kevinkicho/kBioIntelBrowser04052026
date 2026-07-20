@@ -14,10 +14,24 @@ function parseStudies(studies: unknown[]): ClinicalTrial[] {
     const sponsor = (p.sponsorCollaboratorsModule ?? {}) as Record<string, unknown>
     const conditions = (p.conditionsModule ?? {}) as Record<string, unknown>
     const arms = (p.armsInterventionsModule ?? {}) as Record<string, unknown>
+    const contacts = (p.contactsLocationsModule ?? {}) as Record<string, unknown>
     const enrollment = (design.enrollmentInfo ?? {}) as Record<string, unknown>
     const interventions = (arms.interventions ?? []) as { type: string; name: string }[]
     const secondary = (id.secondaryIdInfos ?? []) as Array<{ id?: string; type?: string }>
     const { eudraCtNumbers } = parseSecondaryTrialIds(secondary)
+    const locations = (contacts.locations ?? []) as Array<{
+      facility?: string
+      city?: string
+      country?: string
+    }>
+    const facilities = locations
+      .map((loc) => ({
+        name: String(loc.facility || '').trim(),
+        city: String(loc.city || '').trim(),
+        country: String(loc.country || '').trim(),
+      }))
+      .filter((f) => f.name)
+      .slice(0, 8)
 
     return {
       nctId: String(id.nctId ?? ''),
@@ -32,6 +46,7 @@ function parseStudies(studies: unknown[]): ClinicalTrial[] {
       enrollment: typeof enrollment.count === 'number' ? enrollment.count : undefined,
       interventionDetails: interventions.map(i => ({ name: i.name, type: i.type })).filter(i => i.name),
       eudraCtNumbers: eudraCtNumbers.length > 0 ? eudraCtNumbers : undefined,
+      facilities: facilities.length > 0 ? facilities : undefined,
     }
   })
 }

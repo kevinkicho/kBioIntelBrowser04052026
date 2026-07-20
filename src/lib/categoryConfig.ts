@@ -137,6 +137,20 @@ export const CATEGORIES: CategoryDef[] = [
     icon: '🏥',
     panels: [
       { id: 'clinical-trials', title: 'ClinicalTrials', propKey: 'clinicalTrials', isNullable: false, tier: 'core' },
+      {
+        id: 'research-orgs',
+        title: 'ResearchOrgs',
+        propKey: 'researchOrgs',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
+        id: 'us-hospitals',
+        title: 'UsHospitals',
+        propKey: 'usHospitals',
+        isNullable: true,
+        tier: 'supporting',
+      },
       { id: 'isrctn', title: 'ISRCTN', propKey: 'isrctnTrials', isNullable: true, tier: 'supporting' },
       { id: 'adverse-events', title: 'AdverseEvents', propKey: 'adverseEvents', isNullable: false, tier: 'core' },
       { id: 'recalls', title: 'Recalls', propKey: 'drugRecalls', isNullable: false, tier: 'core' },
@@ -280,6 +294,13 @@ export const CATEGORIES: CategoryDef[] = [
     icon: '📚',
     panels: [
       { id: 'nih-reporter', title: 'NIHReporter', propKey: 'nihGrants', isNullable: false, tier: 'supporting' },
+      {
+        id: 'research-orgs-lit',
+        title: 'ResearchOrgsGrants',
+        propKey: 'researchOrgsLit',
+        isNullable: true,
+        tier: 'supporting',
+      },
       {
         id: 'openaire-projects',
         title: 'OpenAIREProjects',

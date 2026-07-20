@@ -36,6 +36,8 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
     category: 'Clinical & Safety',
     panels: [
       { propKey: 'clinicalTrials', title: 'Clinical Trials' },
+      { propKey: 'researchOrgs', title: 'Research organizations (ROR)' },
+      { propKey: 'usHospitals', title: 'US hospitals (CMS)' },
       { propKey: 'isrctnTrials', title: 'ISRCTN' },
       { propKey: 'adverseEvents', title: 'Adverse Events' },
       { propKey: 'drugRecalls', title: 'Recalls' },
@@ -162,6 +164,7 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
     category: 'Research & Literature',
     panels: [
       { propKey: 'nihGrants', title: 'NIH Grants' },
+      { propKey: 'researchOrgsLit', title: 'Research organizations (grants/ROR)' },
       { propKey: 'openAireProjects', title: 'OpenAIRE Projects' },
       { propKey: 'openAirePublications', title: 'OpenAIRE Publications' },
       { propKey: 'patents', title: 'Patents' },
