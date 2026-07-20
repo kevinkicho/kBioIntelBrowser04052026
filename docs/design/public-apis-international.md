@@ -40,8 +40,13 @@
 | MHRA products / Yellow Card | UK SPC / AE | C | `regulatorDeepLinks.ts`, panel `international-regulators` |
 | TGA ARTG | Australia register | C | same panel |
 | PMDA | Japan English hub + search | C | same panel |
-| EMA bulk downloads | Excel medicine lists + JSON dumps | B | Deep links on EMA panel + regulators panel |
+| EMA bulk downloads | Excel medicine lists + JSON dumps | B | `emaBulk.ts` + EMA / regulators panels |
 | OpenAIRE publications | Free research products search | A | `getOpenAirePublicationsByName`, panel `openaire-publications` |
+| Purple Book / FEI / trade portals | US biologics + plants + HS trade | C | `regulatorDeepLinks.ts` (+ BLA panel) |
+
+## Biologics / biosimilars (panel enrichment)
+
+See **`docs/design/biologics-biosimilars-sources.md`**. Live free path: openFDA Drugs@FDA **BLA** → panel `biologics-licensed`. Not a biologics-first Discover identity model.
 
 ## Product rules
 

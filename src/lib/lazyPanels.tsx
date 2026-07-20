@@ -120,6 +120,14 @@ export const LazyInternationalRegulatorsPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyBiologicsLicensedPanel = dynamic(
+  () =>
+    import('@/components/profile/BiologicsLicensedPanel').then((m) => ({
+      default: m.BiologicsLicensedPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }

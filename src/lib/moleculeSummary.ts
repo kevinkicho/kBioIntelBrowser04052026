@@ -123,6 +123,11 @@ export function computeMoleculeSummary(
           value: safeArray(props.healthCanadaProducts).length,
           panelId: 'health-canada',
         },
+        {
+          label: 'BLA biologics',
+          value: safeArray(props.biologicsLicensed).length,
+          panelId: 'biologics-licensed',
+        },
         { label: 'Drug Labels', value: drugLabels.length, panelId: 'dailymed' },
       ],
     },

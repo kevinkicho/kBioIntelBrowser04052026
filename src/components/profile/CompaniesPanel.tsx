@@ -50,7 +50,14 @@ export const CompaniesPanel = memo(function CompaniesPanel({ companies, panelId,
                 <span className="text-xs bg-slate-700 text-slate-300 px-2 py-0.5 rounded">{product.route}</span>
                 <p className="text-xs text-slate-500 mt-1">{product.genericName}</p>
                 {product.applicationNumber && (
-                  <p className="text-xs text-slate-600 mt-0.5">{product.applicationNumber}</p>
+                  <p className="text-xs text-slate-600 mt-0.5">
+                    {product.applicationNumber}
+                    {/^BLA/i.test(product.applicationNumber) && (
+                      <span className="ml-1.5 text-[9px] rounded border border-violet-800/40 bg-violet-950/30 text-violet-300 px-1 py-0.5">
+                        biologic (BLA)
+                      </span>
+                    )}
+                  </p>
                 )}
               </div>
             </div>

@@ -78,6 +78,13 @@ export const CATEGORIES: CategoryDef[] = [
         tier: 'supporting',
       },
       {
+        id: 'biologics-licensed',
+        title: 'BiologicsLicensed',
+        propKey: 'biologicsLicensed',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
         id: 'international-regulators',
         title: 'InternationalRegulators',
         propKey: 'internationalRegulatorLinks',

@@ -16,6 +16,8 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
       { propKey: 'ndcProducts', title: 'NDC Products' },
       { propKey: 'orangeBookEntries', title: 'Orange Book' },
       { propKey: 'healthCanadaProducts', title: 'Health Canada DPD' },
+      { propKey: 'emaMedicines', title: 'EMA / EU medicines' },
+      { propKey: 'biologicsLicensed', title: 'Licensed biologics / biosimilars (BLA)' },
       { propKey: 'drugPrices', title: 'Drug Pricing' },
       { propKey: 'drugInteractions', title: 'Drug Interactions' },
       { propKey: 'drugLabels', title: 'Drug Labels' },

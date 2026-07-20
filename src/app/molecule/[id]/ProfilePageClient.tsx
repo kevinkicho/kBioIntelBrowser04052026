@@ -966,6 +966,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           lastFetched={lastFetched}
         />
       ),
+      'biologics-licensed': (panelId, lastFetched) => (
+        <LazyPanels.LazyBiologicsLicensedPanel
+          products={d('biologicsLicensed')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'international-regulators': (panelId, lastFetched) => (
         <LazyPanels.LazyInternationalRegulatorsPanel
           moleculeName={moleculeName}

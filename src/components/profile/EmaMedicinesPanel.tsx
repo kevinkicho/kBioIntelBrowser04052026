@@ -3,6 +3,7 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import type { EmaMedicineRecord } from '@/lib/api/emaMedicines'
+import { getEmaBulkDownloadLinks } from '@/lib/api/emaBulk'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
@@ -32,15 +33,29 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
         <div className="space-y-3">
           <p className="text-[10px] text-slate-500 leading-relaxed">
             Structured fields from Open Targets (free GraphQL). Official product documents open on
-            the EMA site — not clinical decision support.{' '}
-            <a
-              href="https://www.ema.europa.eu/en/medicines/download-medicine-data"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-indigo-400 hover:underline"
-            >
-              EMA bulk medicine Excel downloads ↗
-            </a>
+            the EMA site — not clinical decision support. Bulk dumps (tier B):{' '}
+            {getEmaBulkDownloadLinks()
+              .filter((l) => l.id !== 'ema-biosimilars-topic')
+              .slice(0, 3)
+              .map((l, i, arr) => (
+                <span key={l.id}>
+                  <a
+                    href={l.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-indigo-400 hover:underline"
+                    onClick={() =>
+                      onDeepLinkClick('other', l.url, {
+                        panelId: panelId || 'ema-medicines',
+                        label: l.id,
+                      })
+                    }
+                  >
+                    {l.label} ↗
+                  </a>
+                  {i < arr.length - 1 ? ' · ' : ''}
+                </span>
+              ))}
           </p>
           {list.map((m) => (
             <div

@@ -103,6 +103,12 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
   { panelId: 'health-canada', label: 'Health Canada DPD', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'ema-medicines', label: 'EMA / Open Targets drug', defaultType: 'name', supportedTypes: ['name'] },
   {
+    panelId: 'biologics-licensed',
+    label: 'FDA biologics / biosimilars (BLA)',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
     panelId: 'international-regulators',
     label: 'International regulators',
     defaultType: 'name',

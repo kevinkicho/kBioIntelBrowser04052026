@@ -37,6 +37,12 @@ export const TRACKED_KEYS: {
     category: 'Pharmaceutical',
     panelId: 'health-canada',
   },
+  {
+    key: 'biologicsLicensed',
+    label: 'licensed biologics',
+    category: 'Pharmaceutical',
+    panelId: 'biologics-licensed',
+  },
   { key: 'clinicalTrials', label: 'clinical trials', category: 'Clinical', panelId: 'clinical-trials' },
   { key: 'adverseEvents', label: 'adverse events', category: 'Safety', panelId: 'adverse-events' },
   { key: 'drugRecalls', label: 'recalls', category: 'Safety', panelId: 'recalls' },
