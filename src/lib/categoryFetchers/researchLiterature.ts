@@ -4,7 +4,10 @@ import { getApiParamNumber } from '@/lib/resolveApiQuery'
 
 import { getLiteratureByName } from '@/lib/api/europepmc'
 import { getNihGrantsByName } from '@/lib/api/nihreporter'
-import { getEuResearchProjectsByName } from '@/lib/api/openaire'
+import {
+  getEuResearchProjectsByName,
+  getOpenAirePublicationsByName,
+} from '@/lib/api/openaire'
 import { getPatentsByMoleculeName } from '@/lib/api/patents'
 import { getSecFilingsByName } from '@/lib/api/secedgar'
 import { getSemanticPapersByName } from '@/lib/api/semantic-scholar'
@@ -15,10 +18,15 @@ import { searchCrossRef } from '@/lib/api/crossref'
 import { searchArXiv } from '@/lib/api/arxiv'
 
 export async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [literature, nihGrants, openAireProjects, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
+  const [literature, nihGrants, openAireProjects, openAirePublications, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
     trackedSafe('europepmc', getLiteratureByName(queryFor('literature')), []),
     trackedSafe('nihreporter', getNihGrantsByName(queryFor('nih-reporter')), []),
     trackedSafe('openaire', getEuResearchProjectsByName(queryFor('openaire-projects') || name), []),
+    trackedSafe(
+      'openaire-pubs',
+      getOpenAirePublicationsByName(queryFor('openaire-publications') || name),
+      [],
+    ),
     trackedSafe('patents', getPatentsByMoleculeName(queryFor('patents')), []),
     trackedSafe('secedgar', getSecFilingsByName(queryFor('sec')), []),
     trackedSafe('semantic-scholar', getSemanticPapersByName(queryFor('semantic-scholar')), []),
@@ -55,6 +63,7 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
     literature,
     nihGrants,
     openAireProjects,
+    openAirePublications,
     patents,
     secFilings,
     semanticPapers,

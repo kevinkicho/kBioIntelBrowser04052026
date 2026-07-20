@@ -169,7 +169,9 @@ export function computeMoleculeSummary(
         { label: 'NIH Grants', value: nihGrants.length, panelId: 'nih-reporter' },
         {
           label: 'OpenAIRE',
-          value: safeArray(props.openAireProjects).length,
+          value:
+            safeArray(props.openAireProjects).length +
+            safeArray(props.openAirePublications).length,
           panelId: 'openaire-projects',
         },
         { label: 'Patents', value: patents.length, panelId: 'patents' },

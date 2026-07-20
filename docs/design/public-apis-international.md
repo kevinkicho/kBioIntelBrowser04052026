@@ -1,6 +1,7 @@
 # International free public APIs (regulators & research infra)
 
-**Status:** Active — Wave 1 + Wave 2 partial shipped  
+**Status:** Active — Waves 1–3 shipped (portal-first Wave 3)  
+
 **Product law:** Free public APIs only; evidence-first; no regulatory decision support language  
 **Audience:** Implementers adding panels without paid DBs
 
@@ -23,7 +24,7 @@
 | **ClinicalTrials.gov v2** | Trials | A | Existing `clinicaltrials.ts` (+ EudraCT parse) |
 | **openFDA / NDC / Orange Book** | US regulator | A | Existing pharmaceutical panels |
 
-## Wave 2 (in progress / shipped partial)
+## Wave 2 (shipped)
 
 | Source | Role | Tier | Code |
 |--------|------|------|------|
@@ -32,13 +33,15 @@
 | **ECHA CHEM** | EU chemical hazard (EPA-ish) | A/C | CAS deep links on CompTox panel (`echaLinks.ts`) |
 | **OpenAIRE / CORDIS** | EU (+ multi-funder) projects | A | `openaire.ts`, panel `openaire-projects` |
 
-## Wave 3 (portal-first)
+## Wave 3 (portal-first) — shipped
 
-| Source | Role | Tier |
-|--------|------|------|
-| MHRA products / Yellow Card | UK SPC / AE | C |
-| TGA ARTG | Australia register | C |
-| PMDA / JADER | Japan | C / B bulk |
+| Source | Role | Tier | Code |
+|--------|------|------|------|
+| MHRA products / Yellow Card | UK SPC / AE | C | `regulatorDeepLinks.ts`, panel `international-regulators` |
+| TGA ARTG | Australia register | C | same panel |
+| PMDA | Japan English hub + search | C | same panel |
+| EMA bulk downloads | Excel medicine lists + JSON dumps | B | Deep links on EMA panel + regulators panel |
+| OpenAIRE publications | Free research products search | A | `getOpenAirePublicationsByName`, panel `openaire-publications` |
 
 ## Product rules
 

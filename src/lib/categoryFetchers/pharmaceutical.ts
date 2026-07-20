@@ -6,6 +6,7 @@ import { getNdcProductsByName } from '@/lib/api/fda-ndc'
 import { getOrangeBookByName } from '@/lib/api/orangebook'
 import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
 import { getEmaMedicinesByName } from '@/lib/api/emaMedicines'
+import { buildInternationalRegulatorLinks } from '@/lib/regulatorDeepLinks'
 import { getDrugPricesByName } from '@/lib/api/nadac'
 import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
 import { getDrugLabelsByName } from '@/lib/api/dailymed'
@@ -53,5 +54,7 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     gsrsSubstances,
     pharmgkbDrugs: pharmgkbData.drugs,
     cpicGuidelines,
+    // Portal-first regulator deep links (sync, free, no scrape)
+    internationalRegulatorLinks: buildInternationalRegulatorLinks(name),
   }
 }

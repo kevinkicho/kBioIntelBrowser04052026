@@ -49,6 +49,12 @@ export const TRACKED_KEYS: {
     category: 'Research',
     panelId: 'openaire-projects',
   },
+  {
+    key: 'openAirePublications',
+    label: 'OpenAIRE publications',
+    category: 'Research',
+    panelId: 'openaire-publications',
+  },
   { key: 'chemblActivities', label: 'bioactivities', category: 'Bioactivity', panelId: 'chembl' },
   { key: 'pdbStructures', label: '3D structures', category: 'Structural', panelId: 'pdb' },
 ]

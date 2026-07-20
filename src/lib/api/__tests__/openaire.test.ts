@@ -2,7 +2,7 @@
  * @jest-environment node
  */
 
-import { getOpenAireProjectsByName } from '../openaire'
+import { getOpenAireProjectsByName, getOpenAirePublicationsByName } from '../openaire'
 
 describe('openaire', () => {
   it('returns empty for short query', async () => {
@@ -52,4 +52,44 @@ describe('openaire', () => {
     expect(rows[0].cordisUrl).toMatch(/cordis\.europa\.eu/)
     expect(rows[0].url).toMatch(/openaire/)
   })
+
+  it('maps OpenAIRE publications', async () => {
+    // @ts-expect-error mock
+    global.fetch = jest.fn(async () => ({
+      ok: true,
+      json: async () => ({
+        response: {
+          results: {
+            result: {
+              header: { 'dri:objIdentifier': { $: 'pub-1' } },
+              metadata: {
+                'oaf:entity': {
+                  'oaf:result': {
+                    title: [
+                      {
+                        '@classid': 'main title',
+                        $: 'Tafamidis in ATTR cardiomyopathy',
+                      },
+                    ],
+                    pid: {
+                      '@classid': 'doi',
+                      $: '10.1161/example.123',
+                    },
+                    dateofacceptance: { $: '2020-11-01' },
+                    publisher: { $: 'AHA' },
+                  },
+                },
+              },
+            },
+          },
+        },
+      }),
+    }))
+    const pubs = await getOpenAirePublicationsByName('tafamidis')
+    expect(pubs).toHaveLength(1)
+    expect(pubs[0].title).toMatch(/Tafamidis/i)
+    expect(pubs[0].doi).toBe('10.1161/example.123')
+    expect(pubs[0].url).toMatch(/doi\.org/)
+  })
 })
+

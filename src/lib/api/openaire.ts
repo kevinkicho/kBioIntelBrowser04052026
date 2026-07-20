@@ -23,8 +23,19 @@ export interface OpenAireProject {
   cordisUrl: string | null
 }
 
-const BASE = 'https://api.openaire.eu/search/projects'
+const PROJECTS_BASE = 'https://api.openaire.eu/search/projects'
+const PUBLICATIONS_BASE = 'https://api.openaire.eu/search/publications'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
+
+export interface OpenAirePublication {
+  id: string
+  title: string
+  doi: string | null
+  year: string
+  publisher: string
+  /** Best public landing page (DOI or OpenAIRE explore) */
+  url: string
+}
 
 /** OpenAIRE wraps many scalars as { "$": "value" } */
 function unwrap(v: unknown): string {
@@ -129,7 +140,7 @@ export async function getOpenAireProjectsByName(
   if (opts?.hasECFunding) params.set('hasECFunding', 'true')
 
   try {
-    const res = await fetch(`${BASE}?${params.toString()}`, fetchOptions)
+    const res = await fetch(`${PROJECTS_BASE}?${params.toString()}`, fetchOptions)
     if (!res.ok) return []
     const data = (await res.json()) as {
       response?: { results?: unknown }
@@ -149,4 +160,96 @@ export async function getEuResearchProjectsByName(query: string): Promise<OpenAi
   const ec = await getOpenAireProjectsByName(query, { size: 12, hasECFunding: true })
   if (ec.length > 0) return ec
   return getOpenAireProjectsByName(query, { size: 12 })
+}
+
+function mapPublication(raw: unknown): OpenAirePublication | null {
+  try {
+    const meta = (raw as { metadata?: { 'oaf:entity'?: { 'oaf:result'?: Record<string, unknown> } } })
+      ?.metadata?.['oaf:entity']?.['oaf:result']
+    if (!meta) return null
+    const header = (raw as { header?: { 'dri:objIdentifier'?: unknown } })?.header
+    const id = unwrap(header?.['dri:objIdentifier'])
+
+    // title can be array of { $, @classid }
+    let title = ''
+    const titles = meta.title
+    if (Array.isArray(titles)) {
+      const main =
+        titles.find((t) => String((t as { '@classid'?: string })['@classid'] || '').includes('main')) ||
+        titles[0]
+      title = unwrap(main)
+    } else {
+      title = unwrap(titles)
+    }
+
+    let doi: string | null = null
+    const pid = meta.pid
+    if (Array.isArray(pid)) {
+      for (const p of pid) {
+        const classid = String((p as { '@classid'?: string })['@classid'] || '').toLowerCase()
+        if (classid === 'doi') {
+          doi = unwrap(p)
+          break
+        }
+      }
+    } else if (pid && typeof pid === 'object') {
+      const classid = String((pid as { '@classid'?: string })['@classid'] || '').toLowerCase()
+      if (classid === 'doi') doi = unwrap(pid)
+    }
+    if (doi) {
+      doi = doi.replace(/^https?:\/\/(dx\.)?doi\.org\//i, '').replace(/^doi:/i, '')
+    }
+
+    const year = unwrap(meta.dateofacceptance) || ''
+    // date often YYYY-MM-DD
+    const yearOnly = year.match(/\d{4}/)?.[0] || year.slice(0, 4)
+    const publisher = unwrap(meta.publisher)
+
+    if (!title && !doi) return null
+    const url = doi
+      ? `https://doi.org/${doi}`
+      : id
+        ? `https://explore.openaire.eu/search/publication?articleId=${encodeURIComponent(id)}`
+        : `https://explore.openaire.eu/search/find?keyword=${encodeURIComponent(title)}`
+
+    return {
+      id: id || doi || title.slice(0, 40),
+      title: title || doi || 'Untitled',
+      doi,
+      year: yearOnly,
+      publisher,
+      url,
+    }
+  } catch {
+    return null
+  }
+}
+
+/**
+ * Search OpenAIRE research products (publications) by keywords.
+ */
+export async function getOpenAirePublicationsByName(
+  query: string,
+  size = 12,
+): Promise<OpenAirePublication[]> {
+  const q = query.trim()
+  if (!q || q.length < 2) return []
+  const params = new URLSearchParams({
+    keywords: q,
+    format: 'json',
+    size: String(Math.min(25, Math.max(1, size))),
+    page: '1',
+  })
+  try {
+    const res = await fetch(`${PUBLICATIONS_BASE}?${params.toString()}`, fetchOptions)
+    if (!res.ok) return []
+    const data = (await res.json()) as { response?: { results?: unknown } }
+    const rows = asResultArray(data.response?.results)
+    return rows
+      .map(mapPublication)
+      .filter((p): p is OpenAirePublication => p != null)
+      .slice(0, size)
+  } catch {
+    return []
+  }
 }

@@ -32,7 +32,15 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
         <div className="space-y-3">
           <p className="text-[10px] text-slate-500 leading-relaxed">
             Structured fields from Open Targets (free GraphQL). Official product documents open on
-            the EMA site — not clinical decision support.
+            the EMA site — not clinical decision support.{' '}
+            <a
+              href="https://www.ema.europa.eu/en/medicines/download-medicine-data"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:underline"
+            >
+              EMA bulk medicine Excel downloads ↗
+            </a>
           </p>
           {list.map((m) => (
             <div

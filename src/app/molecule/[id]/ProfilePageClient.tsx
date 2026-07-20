@@ -966,6 +966,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           lastFetched={lastFetched}
         />
       ),
+      'international-regulators': (panelId, lastFetched) => (
+        <LazyPanels.LazyInternationalRegulatorsPanel
+          moleculeName={moleculeName}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'nadac': (panelId, lastFetched) => <LazyPanels.LazyNadacPanel prices={d('drugPrices')} panelId={panelId} lastFetched={lastFetched} />,
       'drug-interactions': (panelId, lastFetched) => <LazyPanels.LazyDrugInteractionsPanel interactions={d('drugInteractions')} panelId={panelId} lastFetched={lastFetched} />,
       'dailymed': (panelId, lastFetched) => <LazyPanels.LazyDailyMedPanel labels={d('drugLabels')} panelId={panelId} lastFetched={lastFetched} />,
@@ -1014,6 +1021,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'openaire-projects': (panelId, lastFetched) => (
         <LazyPanels.LazyOpenAireProjectsPanel
           projects={d('openAireProjects')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
+      'openaire-publications': (panelId, lastFetched) => (
+        <LazyPanels.LazyOpenAirePublicationsPanel
+          publications={d('openAirePublications')}
           panelId={panelId}
           lastFetched={lastFetched}
         />

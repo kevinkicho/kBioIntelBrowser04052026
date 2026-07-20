@@ -104,6 +104,22 @@ export const LazyOpenAireProjectsPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyOpenAirePublicationsPanel = dynamic(
+  () =>
+    import('@/components/profile/OpenAirePublicationsPanel').then((m) => ({
+      default: m.OpenAirePublicationsPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
+export const LazyInternationalRegulatorsPanel = dynamic(
+  () =>
+    import('@/components/profile/InternationalRegulatorsPanel').then((m) => ({
+      default: m.InternationalRegulatorsPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }
