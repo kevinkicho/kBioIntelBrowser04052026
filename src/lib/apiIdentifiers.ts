@@ -93,6 +93,7 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
   { panelId: 'properties', label: 'PubChem Properties', defaultType: 'cid', supportedTypes: ['cid'] },
   { panelId: 'hazards', label: 'PubChem Hazards', defaultType: 'cid', supportedTypes: ['cid'] },
   { panelId: 'companies', label: 'FDA NDC', defaultType: 'name', supportedTypes: ['name'] },
+  { panelId: 'health-canada', label: 'Health Canada DPD', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'drug-interactions', label: 'RxNorm', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'drugcentral', label: 'DrugCentral', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'pharmgkb', label: 'PharmGKB', defaultType: 'name', supportedTypes: ['name', 'gene_symbol'] },

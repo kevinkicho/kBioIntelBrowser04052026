@@ -23,6 +23,14 @@ export const LazyOrangeBookPanel = dynamic(
   { loading: LoadingComponent }
 )
 
+export const LazyHealthCanadaDpdPanel = dynamic(
+  () =>
+    import('@/components/profile/HealthCanadaDpdPanel').then((m) => ({
+      default: m.HealthCanadaDpdPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyNadacPanel = dynamic(
   () => import('@/components/profile/NadacPanel').then(m => ({ default: m.NadacPanel })),
   { loading: LoadingComponent }

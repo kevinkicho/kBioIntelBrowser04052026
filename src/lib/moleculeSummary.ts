@@ -118,6 +118,11 @@ export function computeMoleculeSummary(
       secondaryMetrics: [
         { label: 'NDC Codes', value: ndcProducts.length, panelId: 'ndc' },
         { label: 'Orange Book', value: orangeBookEntries.length, panelId: 'orange-book' },
+        {
+          label: 'Health Canada',
+          value: safeArray(props.healthCanadaProducts).length,
+          panelId: 'health-canada',
+        },
         { label: 'Drug Labels', value: drugLabels.length, panelId: 'dailymed' },
       ],
     },

@@ -21,6 +21,7 @@ Coding agents and human implementers: read this before changing product behavior
 - `docs/design/profile-revisit-cache.md` — search-history reopen: session cache (shipped) + IDB durability (Phase B)
 - `docs/design/agentic-workflow-cli.md` — full CLI cookbook, playbooks, API surfaces
 - `docs/design/ai-analysis-view.md` — dual-view: of-record rank vs optional AI analysis
+- `docs/design/public-apis-international.md` — free foreign-regulator / research APIs (Health Canada, WHO GHO, …)
 
 ## Canonical code areas
 

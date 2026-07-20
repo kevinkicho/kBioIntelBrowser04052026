@@ -4,6 +4,7 @@ import type { ApiParamValue } from '@/lib/apiIdentifiers'
 import { getDrugsByIngredient } from '@/lib/api/openfda'
 import { getNdcProductsByName } from '@/lib/api/fda-ndc'
 import { getOrangeBookByName } from '@/lib/api/orangebook'
+import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
 import { getDrugPricesByName } from '@/lib/api/nadac'
 import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
 import { getDrugLabelsByName } from '@/lib/api/dailymed'
@@ -16,10 +17,11 @@ import { getCPICData } from '@/lib/api/cpic'
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const searchTerms = [name, ...synonyms.slice(0, 1)]
-  const [companiesNested, ndcProducts, orangeBookEntries, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
+  const [companiesNested, ndcProducts, orangeBookEntries, healthCanadaProducts, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
     trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
     trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
     trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
+    trackedSafe('health-canada-dpd', getHealthCanadaProductsByName(queryFor('health-canada') || name), []),
     trackedSafe('nadac', getDrugPricesByName(name), []),
     trackedSafe('rxnorm', getDrugInteractionsByName(queryFor('drug-interactions')), []),
     trackedSafe('dailymed', getDrugLabelsByName(name), []),
@@ -39,6 +41,7 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     companies,
     ndcProducts,
     orangeBookEntries,
+    healthCanadaProducts,
     drugPrices,
     drugInteractions,
     drugLabels,

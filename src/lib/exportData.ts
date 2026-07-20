@@ -15,6 +15,7 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
       { propKey: 'companies', title: 'Companies' },
       { propKey: 'ndcProducts', title: 'NDC Products' },
       { propKey: 'orangeBookEntries', title: 'Orange Book' },
+      { propKey: 'healthCanadaProducts', title: 'Health Canada DPD' },
       { propKey: 'drugPrices', title: 'Drug Pricing' },
       { propKey: 'drugInteractions', title: 'Drug Interactions' },
       { propKey: 'drugLabels', title: 'Drug Labels' },

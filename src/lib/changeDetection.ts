@@ -31,6 +31,12 @@ export const TRACKED_KEYS: {
 }[] = [
   { key: 'companies', label: 'approved products', category: 'Pharmaceutical', panelId: 'companies' },
   { key: 'ndcProducts', label: 'NDC codes', category: 'Pharmaceutical', panelId: 'ndc' },
+  {
+    key: 'healthCanadaProducts',
+    label: 'Health Canada DPD',
+    category: 'Pharmaceutical',
+    panelId: 'health-canada',
+  },
   { key: 'clinicalTrials', label: 'clinical trials', category: 'Clinical', panelId: 'clinical-trials' },
   { key: 'adverseEvents', label: 'adverse events', category: 'Safety', panelId: 'adverse-events' },
   { key: 'drugRecalls', label: 'recalls', category: 'Safety', panelId: 'recalls' },

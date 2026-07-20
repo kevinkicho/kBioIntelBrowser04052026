@@ -63,6 +63,13 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'companies', title: 'Companies', propKey: 'companies', isNullable: false, tier: 'supporting' },
       { id: 'ndc', title: 'NDC', propKey: 'ndcProducts', isNullable: false, tier: 'supporting' },
       { id: 'orange-book', title: 'OrangeBook', propKey: 'orangeBookEntries', isNullable: false, tier: 'supporting' },
+      {
+        id: 'health-canada',
+        title: 'HealthCanadaDPD',
+        propKey: 'healthCanadaProducts',
+        isNullable: true,
+        tier: 'supporting',
+      },
       { id: 'nadac', title: 'NADAC', propKey: 'drugPrices', isNullable: false, tier: 'supporting' },
       { id: 'drug-interactions', title: 'DrugInteractions', propKey: 'drugInteractions', isNullable: false, tier: 'core' },
       { id: 'dailymed', title: 'DailyMed', propKey: 'drugLabels', isNullable: false, tier: 'core' },

@@ -952,6 +952,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'companies': (panelId: string, lastFetched?: Date) => <LazyPanels.LazyCompaniesPanel companies={d('companies')} panelId={panelId} lastFetched={lastFetched} />,
       'ndc': (panelId, lastFetched) => <LazyPanels.LazyNdcPanel products={d('ndcProducts')} panelId={panelId} lastFetched={lastFetched} />,
       'orange-book': (panelId, lastFetched) => <LazyPanels.LazyOrangeBookPanel entries={d('orangeBookEntries')} panelId={panelId} lastFetched={lastFetched} />,
+      'health-canada': (panelId, lastFetched) => (
+        <LazyPanels.LazyHealthCanadaDpdPanel
+          products={d('healthCanadaProducts')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'nadac': (panelId, lastFetched) => <LazyPanels.LazyNadacPanel prices={d('drugPrices')} panelId={panelId} lastFetched={lastFetched} />,
       'drug-interactions': (panelId, lastFetched) => <LazyPanels.LazyDrugInteractionsPanel interactions={d('drugInteractions')} panelId={panelId} lastFetched={lastFetched} />,
       'dailymed': (panelId, lastFetched) => <LazyPanels.LazyDailyMedPanel labels={d('drugLabels')} panelId={panelId} lastFetched={lastFetched} />,
