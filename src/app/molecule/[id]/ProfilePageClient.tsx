@@ -1011,6 +1011,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'wikipathways': (panelId, lastFetched) => <LazyPanels.LazyWikiPathwaysPanel pathways={d('wikiPathways')} panelId={panelId} lastFetched={lastFetched} />,
       'pathway-commons': (panelId, lastFetched) => <LazyPanels.LazyPathwayCommonsPanel results={d('pathwayCommonsResults')} panelId={panelId} lastFetched={lastFetched} />,
       'nih-reporter': (panelId, lastFetched) => <LazyPanels.LazyNihReporterPanel grants={d('nihGrants')} panelId={panelId} lastFetched={lastFetched} />,
+      'openaire-projects': (panelId, lastFetched) => (
+        <LazyPanels.LazyOpenAireProjectsPanel
+          projects={d('openAireProjects')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'patents': (panelId, lastFetched) => <LazyPanels.LazyPatentsPanel patents={d('patents')} panelId={panelId} lastFetched={lastFetched} />,
       'sec': (panelId, lastFetched) => <LazyPanels.LazySecEdgarPanel filings={d('secFilings')} panelId={panelId} lastFetched={lastFetched} />,
       'literature': (panelId, lastFetched) => <LazyPanels.LazyLiteraturePanel results={d('literature')} panelId={panelId} lastFetched={lastFetched} />,

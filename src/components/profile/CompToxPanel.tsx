@@ -3,6 +3,8 @@
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import type { CompToxData } from '@/lib/types'
+import { buildEchaDeepLinks } from '@/lib/echaLinks'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 export const CompToxPanel = memo(function CompToxPanel({
   data,
@@ -24,6 +26,10 @@ export const CompToxPanel = memo(function CompToxPanel({
     >
       {!isEmpty && data && (() => {
         const cas = data.casNumber || data.casrn
+        const echa = buildEchaDeepLinks({
+          cas,
+          name: data.chemicalName,
+        })
         const hasToxcastCounts =
           data.toxcastAvailable === true ||
           (data.toxcastAvailable !== false && data.toxcastTotal > 0)
@@ -52,11 +58,46 @@ export const CompToxPanel = memo(function CompToxPanel({
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
                   CAS Number
                 </span>
-                <div className="mt-1">
+                <div className="mt-1 flex flex-wrap items-center gap-2">
                   <span className="text-xs bg-amber-900/40 text-amber-300 border border-amber-700/30 px-2 py-0.5 rounded font-mono">
                     {cas}
                   </span>
+                  {echa.casSearchUrl && (
+                    <a
+                      href={echa.casSearchUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-cyan-400 hover:underline"
+                      data-testid="echa-cas-link"
+                      onClick={() =>
+                        onDeepLinkClick('other', echa.casSearchUrl!, {
+                          panelId: panelId || 'comptox',
+                          label: cas,
+                        })
+                      }
+                    >
+                      ECHA (CAS) ↗
+                    </a>
+                  )}
+                  <a
+                    href={echa.chemSearchUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-indigo-400 hover:underline"
+                    data-testid="echa-chem-link"
+                    onClick={() =>
+                      onDeepLinkClick('other', echa.chemSearchUrl, {
+                        panelId: panelId || 'comptox',
+                        label: cas || data.chemicalName,
+                      })
+                    }
+                  >
+                    ECHA CHEM ↗
+                  </a>
                 </div>
+                <p className="text-[10px] text-slate-600 mt-1">
+                  EU chemical portal deep links (REACH / C&amp;L) — free public UI, not a bulk API.
+                </p>
               </div>
             )}
 

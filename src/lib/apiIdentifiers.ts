@@ -84,6 +84,7 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
   { panelId: 'crossref', label: 'CrossRef', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'arxiv', label: 'arXiv', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'nih-reporter', label: 'NIH RePORTER', defaultType: 'name', supportedTypes: ['name'] },
+  { panelId: 'openaire-projects', label: 'OpenAIRE projects', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'sec', label: 'SEC EDGAR', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'patents', label: 'PatentsView', defaultType: 'name', supportedTypes: ['name'] },
   { panelId: 'mychem', label: 'MyChem', defaultType: 'inchikey', supportedTypes: ['name', 'inchikey'] },

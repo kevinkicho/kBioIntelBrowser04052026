@@ -238,6 +238,13 @@ export const CATEGORIES: CategoryDef[] = [
     icon: '📚',
     panels: [
       { id: 'nih-reporter', title: 'NIHReporter', propKey: 'nihGrants', isNullable: false, tier: 'supporting' },
+      {
+        id: 'openaire-projects',
+        title: 'OpenAIREProjects',
+        propKey: 'openAireProjects',
+        isNullable: true,
+        tier: 'supporting',
+      },
       { id: 'patents', title: 'Patents', propKey: 'patents', isNullable: false, tier: 'supporting' },
       { id: 'sec', title: 'SEC', propKey: 'secFilings', isNullable: false, tier: 'supporting' },
       { id: 'literature', title: 'Literature', propKey: 'literature', isNullable: false, tier: 'core' },

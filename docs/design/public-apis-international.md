@@ -27,10 +27,10 @@
 
 | Source | Role | Tier | Code |
 |--------|------|------|------|
-| **EMA / EU medicines** | EU-facing drug card + EMA search | A | `emaMedicines.ts`, panel `ema-medicines` (OT + EMA deep links; bulk xlsx later) |
-| **EU CTR (EudraCT)** | EU trial register deep links | A | From CTG `secondaryIdInfos` → `euClinicalTrials.ts` + CT panel links |
-| **ECHA CHEM** | EU chemical hazard (EPA-ish) | B/C | Deep link by CAS/EC (not yet) |
-| **OpenAIRE / CORDIS** | EU funding | A/B | Not yet |
+| **EMA / EU medicines** | EU-facing drug card + EMA search | A | `emaMedicines.ts`, panel `ema-medicines` (OT + EMA deep links) |
+| **EU CTR (EudraCT)** | EU trial register deep links | A | CTG secondary IDs → `euClinicalTrials.ts` + CT panel |
+| **ECHA CHEM** | EU chemical hazard (EPA-ish) | A/C | CAS deep links on CompTox panel (`echaLinks.ts`) |
+| **OpenAIRE / CORDIS** | EU (+ multi-funder) projects | A | `openaire.ts`, panel `openaire-projects` |
 
 ## Wave 3 (portal-first)
 

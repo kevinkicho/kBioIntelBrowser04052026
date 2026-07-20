@@ -43,6 +43,12 @@ export const TRACKED_KEYS: {
   { key: 'patents', label: 'patents', category: 'Research', panelId: 'patents' },
   { key: 'literature', label: 'publications', category: 'Research', panelId: 'literature' },
   { key: 'nihGrants', label: 'NIH grants', category: 'Research', panelId: 'nih-reporter' },
+  {
+    key: 'openAireProjects',
+    label: 'OpenAIRE projects',
+    category: 'Research',
+    panelId: 'openaire-projects',
+  },
   { key: 'chemblActivities', label: 'bioactivities', category: 'Bioactivity', panelId: 'chembl' },
   { key: 'pdbStructures', label: '3D structures', category: 'Structural', panelId: 'pdb' },
 ]

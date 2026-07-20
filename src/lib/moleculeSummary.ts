@@ -167,6 +167,11 @@ export function computeMoleculeSummary(
       primaryPanelId: 'literature',
       secondaryMetrics: [
         { label: 'NIH Grants', value: nihGrants.length, panelId: 'nih-reporter' },
+        {
+          label: 'OpenAIRE',
+          value: safeArray(props.openAireProjects).length,
+          panelId: 'openaire-projects',
+        },
         { label: 'Patents', value: patents.length, panelId: 'patents' },
         { label: 'Total Citations', value: totalCitations, panelId: 'open-citations' },
       ],

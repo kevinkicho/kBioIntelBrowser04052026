@@ -96,6 +96,14 @@ export const LazyNihReporterPanel = dynamic(
   { loading: LoadingComponent }
 )
 
+export const LazyOpenAireProjectsPanel = dynamic(
+  () =>
+    import('@/components/profile/OpenAireProjectsPanel').then((m) => ({
+      default: m.OpenAireProjectsPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }
