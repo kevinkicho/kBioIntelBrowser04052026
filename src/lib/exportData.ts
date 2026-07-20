@@ -156,6 +156,7 @@ const categoryMappings: { category: string; panels: PanelMapping[] }[] = [
     category: 'Research & Literature',
     panels: [
       { propKey: 'nihGrants', title: 'NIH Grants' },
+      { propKey: 'openAireProjects', title: 'OpenAIRE Projects' },
       { propKey: 'patents', title: 'Patents' },
       { propKey: 'secFilings', title: 'SEC Filings' },
       { propKey: 'literature', title: 'Literature' },
