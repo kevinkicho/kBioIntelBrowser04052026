@@ -7,7 +7,6 @@ import {
   AXIS_HELP,
   axisStatusHelp,
   formatAxisTooltip,
-  formatCompositeTooltip,
 } from '@/lib/domain/scoreAxisHelp'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 
