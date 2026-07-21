@@ -1,11 +1,16 @@
 /**
  * Molecule panel deep-link builders for count-signal badges (PR14 DoD).
- * Format: /molecule/{cid}?project=…&disease=…#{panelId}
+ * Format: /molecule/{cid}?tab={category}&project=…&disease=…&panel={panelId}#{panelId}
+ * `tab` opens the correct category so the panel is mounted before scroll.
  */
+
+import { categoryIdForPanel } from './explainSignal'
 
 export interface DeepLinkOptions {
   projectId?: string | null
   disease?: string | null
+  /** Override category tab (otherwise inferred from panelId). */
+  categoryId?: string | null
 }
 
 /** DOM id used as the hash target on the molecule profile. */
@@ -15,7 +20,7 @@ export function panelAnchorId(panelId: string): string {
 
 /**
  * Build a path that opens a molecule profile scrolled to a panel.
- * Query params are optional; hash is always the panel id.
+ * Includes category `tab` so profile loads the right fan-out before hash scroll.
  */
 export function buildMoleculePanelDeepLink(
   cid: number,
@@ -30,6 +35,13 @@ export function buildMoleculePanelDeepLink(
   }
 
   const params = new URLSearchParams()
+  const tab =
+    opts?.categoryId ||
+    categoryIdForPanel(panelId) ||
+    null
+  if (tab) params.set('tab', tab)
+  // Explicit panel for clients that read query before hash settles
+  params.set('panel', panelId)
   if (opts?.projectId) params.set('project', opts.projectId)
   if (opts?.disease) params.set('disease', opts.disease)
   const qs = params.toString()

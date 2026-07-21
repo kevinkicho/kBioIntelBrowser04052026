@@ -35,3 +35,9 @@ export {
   type CandidateSignalStatus,
   type CandidateSignalRow,
 } from './projectSignals'
+
+export {
+  explainSignal,
+  categoryIdForPanel,
+  type SignalExplainParts,
+} from './explainSignal'

@@ -160,7 +160,14 @@ export function BoardTable({
                 <td className="px-3 py-3 min-w-[8rem]">
                   {/* Prefer sticky chips even while a background re-check runs */}
                   {sigRow && sigRow.signals.length > 0 ? (
-                    <SignalBadges signals={sigRow.signals} compact />
+                    <SignalBadges
+                      signals={sigRow.signals}
+                      compact
+                      moleculeName={c.identity.name}
+                      cid={sigRow.cid ?? cid}
+                      snapshotAge={sigRow.snapshotAge}
+                      projectId={project.id}
+                    />
                   ) : signalsLoading && !sigRow ? (
                     <span className="text-[10px] text-slate-600 animate-pulse">…</span>
                   ) : sigRow?.status === 'baseline' ? (

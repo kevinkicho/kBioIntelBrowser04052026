@@ -686,27 +686,31 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     requestAnimationFrame(tryScroll)
   }, [loadCategory])
 
-  // Deep-link: /molecule/{cid}#panel-id (and ?project=) from board signal badges
+  // Deep-link: /molecule/{cid}?tab=category&panel=id#panel-id from board signal badges
   useEffect(() => {
     if (typeof window === 'undefined' || isEmbed) return
-    const panelId = panelIdFromHash(window.location.hash)
+    const fromHash = panelIdFromHash(window.location.hash)
+    const fromQuery = searchParams.get('panel')?.trim() || null
+    const panelId = fromHash || fromQuery
     if (!panelId) return
     scrollToPanel(panelId)
-  }, [scrollToPanel, isEmbed])
+  }, [scrollToPanel, isEmbed, searchParams])
 
-  // Re-attempt scroll when categories finish loading (hash still present)
+  // Re-attempt scroll when the target category finishes loading (hash / ?panel= still present)
   useEffect(() => {
     if (typeof window === 'undefined' || isEmbed) return
-    const panelId = panelIdFromHash(window.location.hash)
+    const fromHash = panelIdFromHash(window.location.hash)
+    const fromQuery = searchParams.get('panel')?.trim() || null
+    const panelId = fromHash || fromQuery
     if (!panelId) return
     const cat = CATEGORIES.find((c) => c.panels.some((p) => p.id === panelId))
     if (!cat || cat.id === 'gene') return
     if (categoryStatus[cat.id as CategoryId] === 'loaded') {
       requestAnimationFrame(() => {
-        document.getElementById(panelId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        scrollToPanel(panelId)
       })
     }
-  }, [categoryStatus, isEmbed])
+  }, [categoryStatus, isEmbed, searchParams, scrollToPanel])
 
   // Auto-load the active category when it changes (incl. decision-mode deep links
   // like ?tab=interactions-pathways — outside Core six first-paint set)
