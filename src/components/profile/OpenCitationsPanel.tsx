@@ -157,7 +157,7 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
             rel="noopener noreferrer"
             className="text-cyan-400 hover:text-cyan-300"
           >
-            DOI ↗
+            DOI
           </a>
           <a
             href={ocMetaUrl}
@@ -165,7 +165,7 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
             rel="noopener noreferrer"
             className="text-slate-500 hover:text-slate-300"
           >
-            OpenCitations ↗
+            OpenCitations
           </a>
           {openAlexUrl && (
             <a
@@ -174,7 +174,7 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
               rel="noopener noreferrer"
               className="text-emerald-500/80 hover:text-emerald-300"
             >
-              OpenAlex ↗
+              OpenAlex
             </a>
           )}
           {pubmedUrl && (
@@ -184,7 +184,7 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
               rel="noopener noreferrer"
               className="text-violet-400/80 hover:text-violet-300"
             >
-              PubMed ↗
+              PubMed
             </a>
           )}
           <StyledTooltip content={metric.doi}>

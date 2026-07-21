@@ -108,7 +108,7 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
           rel="noopener noreferrer"
           className="text-[10px] font-normal text-indigo-400 hover:text-indigo-300 hover:underline"
         >
-          ChEMBL compound (indications) ↗
+          ChEMBL compound (indications)
         </a>
       )}
     </span>

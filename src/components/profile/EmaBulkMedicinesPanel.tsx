@@ -62,7 +62,7 @@ export const EmaBulkMedicinesPanel = memo(function EmaBulkMedicinesPanel({
               )
             }
           >
-            EMA download page ↗
+            EMA download page
           </a>
         </p>
         {list.length > 0 && (
@@ -144,7 +144,7 @@ export const EmaBulkMedicinesPanel = memo(function EmaBulkMedicinesPanel({
                     })
                   }
                 >
-                  EMA search ↗
+                  EMA search
                 </a>
               </div>
             )}

@@ -58,7 +58,7 @@ export function faersDashboardUrl(): string {
 
 /**
  * Evidence API URL (JSON) for the same reaction ± drug the panel used.
- * Prefer as secondary “API query ↗”, not the primary row click target.
+ * Prefer as secondary “API query”, not the primary row click target.
  */
 export function faersEvidenceApiUrl(input: {
   reactionName?: string | null

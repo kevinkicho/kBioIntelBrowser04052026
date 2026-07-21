@@ -212,7 +212,7 @@ export function VendorsPanel({ cid }: { cid: number }) {
                   title={`Search ${s.name} for this molecule`}
                   className="text-xs px-3 py-1.5 rounded-lg bg-cyan-900/25 text-cyan-300 border border-cyan-700/40 hover:bg-cyan-900/40 hover:border-cyan-600/50 transition-colors"
                 >
-                  {s.name} ↗
+                  {s.name}
                 </a>
               ) : (
                 <span
@@ -244,7 +244,7 @@ export function VendorsPanel({ cid }: { cid: number }) {
                   data-testid={`vendor-db-chip-${d.name}`}
                   className="text-[10px] px-2 py-1 rounded bg-indigo-900/25 text-indigo-300 border border-indigo-700/40 hover:bg-indigo-900/45 hover:border-indigo-600/50 transition-colors"
                 >
-                  {d.name} ↗
+                  {d.name}
                 </a>
               ) : (
                 <span

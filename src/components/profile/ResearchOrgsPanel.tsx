@@ -48,7 +48,7 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
             rel="noopener noreferrer"
             className="text-indigo-400 hover:underline"
           >
-            ROR search ↗
+            ROR search
           </a>
           {list[0]?.name ? (
             <>
@@ -57,14 +57,14 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
                 href={`/orgs?q=${encodeURIComponent(list[0].name)}`}
                 className="text-violet-400 hover:underline"
               >
-                Lab dossier + AI ↗
+                Lab dossier + AI
               </a>
             </>
           ) : (
             <>
               {' · '}
               <a href="/orgs" className="text-violet-400 hover:underline">
-                Research-lab module ↗
+                Research-lab module
               </a>
             </>
           )}
@@ -123,7 +123,7 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
                       })
                     }
                   >
-                    ROR record ↗
+                    ROR record
                   </a>
                   {o.website && (
                     <a
@@ -138,7 +138,7 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
                         })
                       }
                     >
-                      Website ↗
+                      Website
                     </a>
                   )}
                 </div>

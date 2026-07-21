@@ -124,11 +124,7 @@ function SignalChip({
           data-panel-id={s.panelId}
         >
           <span aria-hidden>{s.type === 'new' ? '🆕' : s.type === 'removed' ? '📉' : '🔄'}</span>
-          {label}
-          <span className="ml-0.5 text-[9px] opacity-60" aria-hidden>
-            ↗
-          </span>
-        </Link>
+          {label}</Link>
       ) : (
         <span
           className={`inline-flex items-center gap-0.5 rounded-full border px-2 py-0.5 text-[10px] font-medium cursor-default ${tone} opacity-80`}

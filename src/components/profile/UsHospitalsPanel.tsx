@@ -46,7 +46,7 @@ export const UsHospitalsPanel = memo(function UsHospitalsPanel({
             rel="noopener noreferrer"
             className="text-indigo-400 hover:underline"
           >
-            Dataset ↗
+            Dataset
           </a>
         </p>
         {list.length > 0 && (
@@ -112,7 +112,7 @@ export const UsHospitalsPanel = memo(function UsHospitalsPanel({
                     })
                   }
                 >
-                  Medicare Care Compare ↗
+                  Medicare Care Compare
                 </a>
               </div>
             )}

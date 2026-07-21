@@ -131,7 +131,7 @@ export const GeneOntologyPanel = memo(function GeneOntologyPanel({
                     rel="noopener noreferrer"
                     className="shrink-0 text-[10px] text-blue-400 hover:text-blue-300"
                   >
-                    AmiGO ↗
+                    AmiGO
                   </a>
                 </div>
               </div>

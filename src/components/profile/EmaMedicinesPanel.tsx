@@ -52,7 +52,7 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                       })
                     }
                   >
-                    {l.label} ↗
+                    {l.label}
                   </a>
                   {i < arr.length - 1 ? ' · ' : ''}
                 </span>
@@ -117,7 +117,7 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                     })
                   }
                 >
-                  Search EMA website ↗
+                  Search EMA website
                 </a>
                 {m.openTargetsUrl && (
                   <a
@@ -132,7 +132,7 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                       })
                     }
                   >
-                    Open Targets drug ↗
+                    Open Targets drug
                   </a>
                 )}
                 {m.eparProductInfoUrl && (
@@ -149,7 +149,7 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                         })
                       }
                     >
-                      EPAR product info PDF (guess) ↗
+                      EPAR product info PDF (guess)
                     </a>
                   </StyledTooltip>
                 )}

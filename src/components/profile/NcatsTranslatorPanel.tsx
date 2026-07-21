@@ -156,7 +156,7 @@ export const NcatsTranslatorPanel = memo(function NcatsTranslatorPanel({
                       rel="noopener noreferrer"
                       className="text-slate-500 hover:text-slate-300"
                     >
-                      NCATS Translator ↗
+                      NCATS Translator
                     </a>
                   </div>
                 </div>

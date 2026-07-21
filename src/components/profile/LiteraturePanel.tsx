@@ -34,7 +34,7 @@ function LiteratureItem({ paper }: { paper: LiteratureResult }) {
             rel="noopener noreferrer"
             className="text-blue-400 hover:text-blue-300"
           >
-            DOI ↗
+            DOI
           </a>
         )}
         {paper.pmid && (
@@ -44,7 +44,7 @@ function LiteratureItem({ paper }: { paper: LiteratureResult }) {
             rel="noopener noreferrer"
             className="text-emerald-400 hover:text-emerald-300"
           >
-            PubMed ↗
+            PubMed
           </a>
         )}
       </div>

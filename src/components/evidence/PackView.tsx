@@ -63,11 +63,7 @@ function DeepChip({
           className={`${className} ${chipLink}`}
           data-testid={testId}
         >
-          {children}
-          <span className="ml-0.5 opacity-70" aria-hidden>
-            ↗
-          </span>
-        </a>
+          {children}</a>
       </StyledTooltip>
     )
   }
@@ -173,7 +169,7 @@ export function PackView({ pack, compact = false, className = '' }: Props) {
                             className="text-indigo-400/90 hover:text-indigo-300 hover:underline"
                             data-testid="pack-claim-source-url"
                           >
-                            {provLink.label} ↗
+                            {provLink.label}
                           </a>
                         </StyledTooltip>
                       ) : (

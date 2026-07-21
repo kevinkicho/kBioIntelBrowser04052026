@@ -148,7 +148,7 @@ export const NhgriAnvilPanel = memo(function NhgriAnvilPanel({
                       rel="noopener noreferrer"
                       className="shrink-0 text-[10px] text-indigo-400 hover:text-indigo-300"
                     >
-                      AnVIL ↗
+                      AnVIL
                     </a>
                   </div>
                 </div>

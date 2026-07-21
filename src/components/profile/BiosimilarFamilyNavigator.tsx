@@ -65,7 +65,7 @@ function MemberList({
                   })
                 }
               >
-                Drugs@FDA ↗
+                Drugs@FDA
               </a>
             )}
           </li>

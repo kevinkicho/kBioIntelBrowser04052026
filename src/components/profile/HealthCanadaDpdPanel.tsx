@@ -131,7 +131,7 @@ export const HealthCanadaDpdPanel = memo(function HealthCanadaDpdPanel({
                       })
                     }
                   >
-                    Open Health Canada DPD ↗
+                    Open Health Canada DPD
                   </a>
                 )}
               </div>

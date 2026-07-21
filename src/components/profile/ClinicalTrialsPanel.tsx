@@ -362,7 +362,7 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                           })
                         }
                       >
-                        ClinicalTrials.gov ↗
+                        ClinicalTrials.gov
                       </a>
                     )}
                     {(trial.eudraCtNumbers ?? []).map((eu) => {
@@ -381,7 +381,7 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                               })
                             }
                           >
-                            EU CTR {eu} ↗
+                            EU CTR {eu}
                           </a>
                         </StyledTooltip>
                       )

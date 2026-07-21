@@ -115,7 +115,7 @@ function SourcePill({
           rel="noopener noreferrer"
           className={`text-[9px] px-1.5 py-0.5 rounded border hover:brightness-125 transition-colors ${colorClass}`}
         >
-          {source} ↗
+          {source}
         </a>
       </StyledTooltip>
     )

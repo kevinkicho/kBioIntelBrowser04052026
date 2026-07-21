@@ -105,7 +105,7 @@ export const NihReporterPanel = memo(function NihReporterPanel({
                     rel="noopener noreferrer"
                     className="text-[10px] text-purple-400 hover:text-purple-300"
                   >
-                    RePORTER ↗
+                    RePORTER
                   </a>
                 </div>
               </div>

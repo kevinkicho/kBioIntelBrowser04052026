@@ -93,7 +93,7 @@ export const HPOPanel = memo(function HPOPanel({
                     rel="noopener noreferrer"
                     className="shrink-0 text-[10px] text-emerald-400 hover:text-emerald-300"
                   >
-                    HPO ↗
+                    HPO
                   </a>
                 </div>
               </div>

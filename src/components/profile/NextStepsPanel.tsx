@@ -307,7 +307,7 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
                 rel="noopener noreferrer"
                 className="rounded-lg border border-slate-600 bg-slate-800/50 px-3 py-1.5 text-[11px] text-slate-300 hover:border-cyan-700/40 hover:text-cyan-200"
               >
-                PubChem Chemical Vendors section ↗
+                PubChem Chemical Vendors section
               </a>
             )}
           </div>
@@ -333,7 +333,7 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
                   data-testid={`order-catalog-${s.name.replace(/\s+/g, '-').toLowerCase()}`}
                 >
                   <span className="text-xs font-medium text-cyan-200 group-hover:text-cyan-100">
-                    {s.name} ↗
+                    {s.name}
                   </span>
                   <span className="text-[9px] text-slate-500">{s.hint}</span>
                 </a>

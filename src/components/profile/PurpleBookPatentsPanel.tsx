@@ -54,7 +54,7 @@ export const PurpleBookPatentsPanel = memo(function PurpleBookPatentsPanel({
               })
             }
           >
-            Official patent list ↗
+            Official patent list
           </a>
         </p>
         {list.length > 0 && (
@@ -117,7 +117,7 @@ export const PurpleBookPatentsPanel = memo(function PurpleBookPatentsPanel({
                       })
                     }
                   >
-                    Google Patents ↗
+                    Google Patents
                   </a>
                   <a
                     href={p.purpleBookProductUrl}
@@ -131,7 +131,7 @@ export const PurpleBookPatentsPanel = memo(function PurpleBookPatentsPanel({
                       })
                     }
                   >
-                    Purple Book product ↗
+                    Purple Book product
                   </a>
                 </div>
               </div>

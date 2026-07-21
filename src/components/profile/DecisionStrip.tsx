@@ -272,7 +272,7 @@ export function DecisionStrip({
                             className="text-indigo-400/80 hover:text-indigo-300 hover:underline"
                             data-testid="decision-strip-claim-source"
                           >
-                            {c.provenance.source} ↗
+                            {c.provenance.source}
                           </a>
                         ) : (
                           c.provenance.source

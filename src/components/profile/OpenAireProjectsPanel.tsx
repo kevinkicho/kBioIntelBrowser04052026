@@ -102,7 +102,7 @@ export const OpenAireProjectsPanel = memo(function OpenAireProjectsPanel({
                       })
                     }
                   >
-                    OpenAIRE ↗
+                    OpenAIRE
                   </a>
                   {p.cordisUrl && (
                     <a
@@ -117,7 +117,7 @@ export const OpenAireProjectsPanel = memo(function OpenAireProjectsPanel({
                         })
                       }
                     >
-                      CORDIS ↗
+                      CORDIS
                     </a>
                   )}
                 </div>

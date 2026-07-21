@@ -42,7 +42,7 @@ function PubMedItem({ article }: { article: PubMedArticle }) {
             rel="noopener noreferrer"
             className="text-blue-400 hover:text-blue-300"
           >
-            PubMed ↗
+            PubMed
           </a>
         )}
         {article.doi && (
@@ -52,7 +52,7 @@ function PubMedItem({ article }: { article: PubMedArticle }) {
             rel="noopener noreferrer"
             className="text-cyan-400 hover:text-cyan-300"
           >
-            DOI ↗
+            DOI
           </a>
         )}
         {article.pmcid && (
@@ -62,7 +62,7 @@ function PubMedItem({ article }: { article: PubMedArticle }) {
             rel="noopener noreferrer"
             className="text-emerald-400 hover:text-emerald-300"
           >
-            PMC ↗
+            PMC
           </a>
         )}
       </div>

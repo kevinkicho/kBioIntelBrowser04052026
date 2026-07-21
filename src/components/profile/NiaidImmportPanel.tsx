@@ -137,7 +137,7 @@ export const NiaidImmportPanel = memo(function NiaidImmportPanel({
                         rel="noopener noreferrer"
                         className="text-emerald-400 hover:text-emerald-300"
                       >
-                        ImmPort ↗
+                        ImmPort
                       </a>
                       <a
                         href={`https://www.immport.org/shared/search?term=${encodeURIComponent(s.studyId)}`}
@@ -145,7 +145,7 @@ export const NiaidImmportPanel = memo(function NiaidImmportPanel({
                         rel="noopener noreferrer"
                         className="text-slate-500 hover:text-slate-300"
                       >
-                        Search ↗
+                        Search
                       </a>
                     </div>
                   </div>

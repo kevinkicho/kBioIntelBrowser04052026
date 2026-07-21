@@ -150,7 +150,7 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
                       className="text-[10px] text-blue-400 hover:text-blue-300"
                       aria-label="View on CTD"
                     >
-                      ↗
+                     
                     </a>
                   </StyledTooltip>
                 </div>

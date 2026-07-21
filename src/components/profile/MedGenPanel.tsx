@@ -60,7 +60,7 @@ function ConceptItem({ concept }: { concept: MedGenConcept }) {
             rel="noopener noreferrer"
             className="shrink-0 text-[10px] text-cyan-400 hover:text-cyan-300"
           >
-            MedGen ↗
+            MedGen
           </a>
         )}
       </div>

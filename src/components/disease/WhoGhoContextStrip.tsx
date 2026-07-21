@@ -38,7 +38,7 @@ export function WhoGhoContextStrip({
           rel="noopener noreferrer"
           className="text-[10px] text-sky-400 hover:underline shrink-0"
         >
-          GHO portal ↗
+          GHO portal
         </a>
       </div>
 

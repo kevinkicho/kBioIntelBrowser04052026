@@ -144,7 +144,7 @@ function JurisdictionChip({
       {j.count > 0 ? (
         <span className="font-mono tabular-nums text-indigo-300 shrink-0">{j.count}</span>
       ) : null}
-      {/* No trailing ↗ — saves space; hover tooltip explains navigation */}
+      {/* No trailing — saves space; hover tooltip explains navigation */}
     </>
   )
 

@@ -98,7 +98,7 @@ export const MeshPanel = memo(function MeshPanel({
                     rel="noopener noreferrer"
                     className="shrink-0 text-[10px] text-cyan-400 hover:text-cyan-300"
                   >
-                    MeSH ↗
+                    MeSH
                   </a>
                 )}
               </div>

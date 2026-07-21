@@ -81,7 +81,7 @@ export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, la
                         className="text-[10px] text-blue-400 hover:text-blue-300"
                         aria-label="View on Orphanet"
                       >
-                        ↗
+                       
                       </a>
                     </StyledTooltip>
                   </div>

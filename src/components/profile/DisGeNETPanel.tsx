@@ -138,7 +138,7 @@ export const DisGeNETPanel = memo(function DisGeNETPanel({
                       rel="noopener noreferrer"
                       className="text-[10px] text-blue-400 hover:text-blue-300"
                     >
-                      DisGeNET ↗
+                      DisGeNET
                     </a>
                     <Link
                       href={discoverHref}

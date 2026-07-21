@@ -76,7 +76,7 @@ export const CompToxPanel = memo(function CompToxPanel({
                         })
                       }
                     >
-                      ECHA (CAS) ↗
+                      ECHA (CAS)
                     </a>
                   )}
                   <a
@@ -92,7 +92,7 @@ export const CompToxPanel = memo(function CompToxPanel({
                       })
                     }
                   >
-                    ECHA CHEM ↗
+                    ECHA CHEM
                   </a>
                 </div>
                 <p className="text-[10px] text-slate-600 mt-1">

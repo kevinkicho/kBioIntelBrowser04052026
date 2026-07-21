@@ -47,7 +47,7 @@ describe('AdverseEventsPanel', () => {
     expect(screen.getByText(/no adverse events found/i)).toBeInTheDocument()
   })
 
-  test('list rows deep-link to FAERS dashboard; API↗ is secondary evidence link', () => {
+  test('list rows deep-link to FAERS dashboard; API is secondary evidence link', () => {
     render(
       <AdverseEventsPanel adverseEvents={mockEvents} moleculeName="Aspirin" />,
     )

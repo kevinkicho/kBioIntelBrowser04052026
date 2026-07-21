@@ -350,7 +350,7 @@ function GeneDiseasesPanel({
                         })
                       }
                     >
-                      ↗
+                     
                     </a>
                   </div>
                 </div>
@@ -433,8 +433,7 @@ function GeneDiseasesPanel({
                     >
                       {g.pubmedId || '—'}
                     </span>
-                    <span className="text-xs text-cyan-400 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -500,8 +499,7 @@ function GeneDiseasesPanel({
                     <span className="text-[11px] font-mono tabular-nums text-right text-slate-500">
                       {c.score != null ? c.score : '—'}
                     </span>
-                    <span className="text-xs text-cyan-400 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -747,8 +745,7 @@ function GeneVariantsPanel({
                         {review}
                       </span>
                     </StyledTooltip>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -860,8 +857,7 @@ function GeneVariantsPanel({
                     >
                       {freq}
                     </span>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -911,8 +907,7 @@ function GeneVariantsPanel({
                 >
                   {clingenDosage.triplosensitivity || '—'}
                 </span>
-                <span className="text-xs text-cyan-400 text-right">↗</span>
-              </a>
+</a>
             ) : (
               <div className="grid grid-cols-subgrid col-span-4 items-center px-2 py-2">
                 <span className="text-sm font-medium text-slate-100">
@@ -1146,8 +1141,7 @@ function GeneExpressionPanel({
                     >
                       {tpm}
                     </span>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -1250,8 +1244,7 @@ function GeneExpressionPanel({
                     >
                       {score}
                     </span>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -1352,8 +1345,7 @@ function GeneExpressionPanel({
                     >
                       {species}
                     </span>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -1393,7 +1385,7 @@ function TargetedDrugsPanel({
         Drugs targeting this gene ({drugs.length})
       </h3>
       <p className="text-[10px] text-slate-600 mb-3">
-        DGIdb interactions. Use the API button for source, timestamp, and endpoint. Open ↗ goes to
+        DGIdb interactions. Use the API button for source, timestamp, and endpoint. Open goes to
         DGIdb drug search.
       </p>
       <div
@@ -1455,7 +1447,7 @@ function TargetedDrugsPanel({
                     className="text-xs text-blue-400 hover:text-blue-300 text-right"
                     aria-label="View in DGIdb"
                   >
-                    ↗
+                   
                   </a>
                 </StyledTooltip>
               </div>
@@ -1731,8 +1723,7 @@ function GenePathwaysPanel({
                         {summary}
                       </span>
                     </StyledTooltip>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -1817,8 +1808,7 @@ function GenePathwaysPanel({
                         {desc}
                       </span>
                     </StyledTooltip>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -1896,8 +1886,7 @@ function GenePathwaysPanel({
                         {def}
                       </span>
                     </StyledTooltip>
-                    <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -1979,8 +1968,7 @@ function GenePathwaysPanel({
                     >
                       {score}
                     </span>
-                    <span className="text-xs text-cyan-400 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -2072,8 +2060,7 @@ function GenePathwaysPanel({
                     >
                       {org}
                     </span>
-                    <span className="text-xs text-cyan-400 text-right">↗</span>
-                  </a>
+</a>
                 </div>
               )
             }}
@@ -2132,8 +2119,7 @@ function GenePathwaysPanel({
                   >
                     {id}
                   </span>
-                  <span className="text-xs text-cyan-400 text-right">↗</span>
-                </a>
+</a>
               )
             })}
           </div>
@@ -2434,7 +2420,7 @@ function GeneDetailPageClientInner({
                 rel="noopener noreferrer"
                 className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-indigo-500 transition-colors"
               >
-                NCBI Gene ↗
+                NCBI Gene
               </a>
             </div>
           </div>

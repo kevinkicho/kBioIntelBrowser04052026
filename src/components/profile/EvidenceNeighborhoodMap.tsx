@@ -309,9 +309,7 @@ function NodeChip({ node, panelId }: { node: NeighborhoodNode; panelId: string }
       <span className="truncate max-w-[11rem]">{node.label}</span>
       {node.count != null ? (
         <span className="font-mono tabular-nums opacity-80">({node.count})</span>
-      ) : null}
-      {clickable ? <span className="opacity-50">↗</span> : null}
-    </>
+      ) : null}</>
   )
 
   const baseClass = `inline-flex max-w-full items-center gap-1 rounded border px-1.5 py-0.5 text-[10px] leading-snug ${tone} ${dim}`

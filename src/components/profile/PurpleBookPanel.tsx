@@ -67,7 +67,7 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
               })
             }
           >
-            Downloads ↗
+            Downloads
           </a>
         </p>
         {list.length > 0 && (
@@ -162,7 +162,7 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
                         })
                       }
                     >
-                      Drugs@FDA ↗
+                      Drugs@FDA
                     </a>
                     <a
                       href={p.purpleBookUrl}
@@ -176,7 +176,7 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
                         })
                       }
                     >
-                      Purple Book portal ↗
+                      Purple Book portal
                     </a>
                     {p.applicant && (
                       <a
@@ -195,7 +195,7 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
                           )
                         }
                       >
-                        SEC search (applicant) ↗
+                        SEC search (applicant)
                       </a>
                     )}
                   </div>

@@ -88,7 +88,7 @@ export const ChemblPanel = memo(function ChemblPanel({
             }
             className="text-[10px] font-normal text-indigo-400 hover:text-indigo-300 hover:underline"
           >
-            Open compound in ChEMBL ↗
+            Open compound in ChEMBL
           </a>
         ) : null
       }

@@ -78,7 +78,7 @@ export const InternationalRegulatorsPanel = memo(function InternationalRegulator
                     })
                   }
                 >
-                  Open ↗
+                  Open
                 </a>
               </li>
             ))}

@@ -115,7 +115,7 @@ export const MonarchPanel = memo(function MonarchPanel({
                         rel="noopener noreferrer"
                         className="text-cyan-400 hover:text-cyan-300"
                       >
-                        Monarch ↗
+                        Monarch
                       </a>
                     )}
                     {disease.pubmedId && (

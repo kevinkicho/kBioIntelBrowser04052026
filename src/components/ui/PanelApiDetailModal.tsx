@@ -88,7 +88,7 @@ export function PanelApiDetailModal({
                   rel="noopener noreferrer"
                   className="text-[10px] text-indigo-400 hover:text-indigo-300"
                 >
-                  Docs ↗
+                  Docs
                 </a>
               )}
               {isBrowseableUrl(sourceInfo.endpoint) && (
@@ -98,7 +98,7 @@ export function PanelApiDetailModal({
                   rel="noopener noreferrer"
                   className="text-[10px] text-emerald-400/90 hover:text-emerald-300"
                 >
-                  Endpoint ↗
+                  Endpoint
                 </a>
               )}
               {!isBrowseableUrl(sourceInfo.endpoint) && sourceInfo.endpoint && (
@@ -221,7 +221,7 @@ export function PanelApiDetailModal({
                             rel="noopener noreferrer"
                             className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300"
                           >
-                            Docs ↗
+                            Docs
                           </a>
                         ) : null}
                         {s.endpoint && isBrowseableUrl(s.endpoint) ? (
@@ -231,7 +231,7 @@ export function PanelApiDetailModal({
                             rel="noopener noreferrer"
                             className="inline-block text-[10px] text-emerald-400/80 hover:text-emerald-300"
                           >
-                            Endpoint ↗
+                            Endpoint
                           </a>
                         ) : null}
                       </div>

@@ -198,7 +198,7 @@ export const NdcPanel = memo(function NdcPanel({
                           })
                         }}
                       >
-                        DailyMed labels for this NDC ↗
+                        DailyMed labels for this NDC
                       </a>
                     </div>
                   )}

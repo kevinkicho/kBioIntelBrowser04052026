@@ -133,7 +133,7 @@ export const OLSPanel = memo(function OLSPanel({
                   rel="noopener noreferrer"
                   className="shrink-0 text-[10px] text-blue-400 hover:text-blue-300"
                 >
-                  OLS ↗
+                  OLS
                 </a>
               </div>
             </div>

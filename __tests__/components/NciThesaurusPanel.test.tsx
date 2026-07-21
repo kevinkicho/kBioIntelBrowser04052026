@@ -54,7 +54,7 @@ describe('NciThesaurusPanel', () => {
     expect(defs[0].getAttribute('title')).toMatch(/anti-inflammatory/i)
   })
 
-  test('concept name deep-links to NCI Thesaurus (no NCI ↗ column)', () => {
+  test('concept name deep-links to NCI Thesaurus (no NCI arrow column)', () => {
     render(<NciThesaurusPanel concepts={mockConcepts} />)
     expect(screen.queryByText(/NCI ↗/)).not.toBeInTheDocument()
     const link = screen.getByRole('link', { name: 'Aspirin' })

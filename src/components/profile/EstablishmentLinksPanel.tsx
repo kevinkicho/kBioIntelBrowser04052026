@@ -74,7 +74,7 @@ export const EstablishmentLinksPanel = memo(function EstablishmentLinksPanel({
                     })
                   }
                 >
-                  Open ↗
+                  Open
                 </a>
               </li>
             ))}

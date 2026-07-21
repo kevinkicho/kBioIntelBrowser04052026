@@ -47,7 +47,7 @@ export const UsCollegesPanel = memo(function UsCollegesPanel({
             rel="noopener noreferrer"
             className="text-indigo-400 hover:underline"
           >
-            Scorecard ↗
+            Scorecard
           </a>
         </p>
         {list.length > 0 && (
@@ -102,7 +102,7 @@ export const UsCollegesPanel = memo(function UsCollegesPanel({
                       })
                     }
                   >
-                    College Scorecard ↗
+                    College Scorecard
                   </a>
                   {c.schoolUrl && (
                     <a
@@ -117,7 +117,7 @@ export const UsCollegesPanel = memo(function UsCollegesPanel({
                         })
                       }
                     >
-                      Website ↗
+                      Website
                     </a>
                   )}
                 </div>

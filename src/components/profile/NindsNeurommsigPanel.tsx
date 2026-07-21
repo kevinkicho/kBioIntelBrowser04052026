@@ -185,7 +185,7 @@ export const NindsNeurommsigPanel = memo(function NindsNeurommsigPanel({
                         rel="noopener noreferrer"
                         className="text-violet-400 hover:text-violet-300"
                       >
-                        NeuroMMSig ↗
+                        NeuroMMSig
                       </a>
                       {discoverHref && (
                         <Link

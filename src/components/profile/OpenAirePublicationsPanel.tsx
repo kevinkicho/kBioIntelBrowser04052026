@@ -79,7 +79,7 @@ export const OpenAirePublicationsPanel = memo(function OpenAirePublicationsPanel
                     })
                   }
                 >
-                  Open record ↗
+                  Open record
                 </a>
               </div>
             )}

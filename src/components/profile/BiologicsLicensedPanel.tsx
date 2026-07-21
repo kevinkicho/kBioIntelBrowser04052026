@@ -81,7 +81,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
               })
             }
           >
-            Purple Book downloads ↗
+            Purple Book downloads
           </a>
           {emaBiosimilar && (
             <>
@@ -98,7 +98,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
                   })
                 }
               >
-                EMA biosimilars hub ↗
+                EMA biosimilars hub
               </a>
             </>
           )}
@@ -168,7 +168,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
                       })
                     }
                   >
-                    Drugs@FDA ↗
+                    Drugs@FDA
                   </a>
                   <a
                     href={p.purpleBookSearchUrl}
@@ -182,7 +182,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
                       })
                     }
                   >
-                    Purple Book ↗
+                    Purple Book
                   </a>
                   <a
                     href={p.establishmentSearchUrl}
@@ -196,7 +196,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
                       })
                     }
                   >
-                    FDA establishment search ↗
+                    FDA establishment search
                   </a>
                   {p.sponsorName && (
                     <a
@@ -215,7 +215,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
                         )
                       }
                     >
-                      SEC 10-K/10-Q search ↗
+                      SEC 10-K/10-Q search
                     </a>
                   )}
                 </div>

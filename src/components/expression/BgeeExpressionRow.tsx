@@ -113,7 +113,7 @@ export function BgeeExpressionRow({ expr, fetchedAt, compact = false }: BgeeExpr
                 rel="noopener noreferrer"
                 className="text-[10px] text-indigo-400/90 hover:text-indigo-300 hover:underline"
               >
-                Bgee gene ↗
+                Bgee gene
               </a>
               {olsUrl && anatId.startsWith('UBERON') && (
                 <a
@@ -122,7 +122,7 @@ export function BgeeExpressionRow({ expr, fetchedAt, compact = false }: BgeeExpr
                   rel="noopener noreferrer"
                   className="text-[10px] text-slate-500 hover:text-slate-300 hover:underline"
                 >
-                  {anatId} ↗
+                  {anatId}
                 </a>
               )}
             </div>

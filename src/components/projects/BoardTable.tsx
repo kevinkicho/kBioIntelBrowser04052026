@@ -213,7 +213,7 @@ export function BoardTable({
                                 className={`${chipClass} hover:border-indigo-600/50 hover:text-indigo-300 transition-colors`}
                                 data-testid="origin-chip-link"
                               >
-                                {link.label} ↗
+                                {link.label}
                               </a>
                             </StyledTooltip>
                           )
