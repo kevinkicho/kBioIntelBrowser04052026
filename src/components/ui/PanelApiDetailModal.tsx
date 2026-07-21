@@ -1,6 +1,7 @@
 'use client'
 
 import type { CategoryApiTrace } from '@/lib/panelApiTrace'
+import type { PanelSourceInfo } from '@/lib/panelSources'
 
 interface PanelApiDetailModalProps {
   open: boolean
@@ -8,6 +9,22 @@ interface PanelApiDetailModalProps {
   panelTitle: string
   panelId?: string
   trace: CategoryApiTrace | null
+  /** Catalog provenance (stable docs/endpoints) — preferred over raw join:// tokens */
+  sourceInfo?: PanelSourceInfo | null
+}
+
+/** True when the string is a public http(s) registry/docs link (not join:// or app path). */
+function isBrowseableUrl(u: string | undefined | null): boolean {
+  if (!u) return false
+  return /^https?:\/\//i.test(u) && !u.startsWith('join://')
+}
+
+function formatNonHttpEndpoint(endpoint: string): string {
+  if (endpoint.startsWith('join://')) {
+    return `Local join (${endpoint.replace(/^join:\/\//, '')})`
+  }
+  if (endpoint.startsWith('/')) return `App route ${endpoint}`
+  return endpoint
 }
 
 export function PanelApiDetailModal({
@@ -16,6 +33,7 @@ export function PanelApiDetailModal({
   panelTitle,
   panelId,
   trace,
+  sourceInfo = null,
 }: PanelApiDetailModalProps) {
   if (!open) return null
 
@@ -47,10 +65,55 @@ export function PanelApiDetailModal({
           </button>
         </div>
 
+        {/* Stable catalog provenance — avoids weird join:// or bare relative paths as "links" */}
+        {sourceInfo && (
+          <section
+            className="mb-3 rounded-lg border border-indigo-900/40 bg-indigo-950/20 p-3 space-y-1.5 text-xs"
+            data-testid="panel-api-catalog-source"
+          >
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300/80">
+              Catalog provenance
+            </div>
+            <Row label="Source" value={sourceInfo.source} />
+            <Row label="API" value={sourceInfo.api} mono />
+            {sourceInfo.description && (
+              <p className="text-[10px] text-slate-400 leading-relaxed">{sourceInfo.description}</p>
+            )}
+            <div className="flex flex-wrap gap-3 pt-1">
+              {isBrowseableUrl(sourceInfo.docs) && (
+                <a
+                  href={sourceInfo.docs}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-indigo-400 hover:text-indigo-300"
+                >
+                  Docs ↗
+                </a>
+              )}
+              {isBrowseableUrl(sourceInfo.endpoint) && (
+                <a
+                  href={sourceInfo.endpoint}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-emerald-400/90 hover:text-emerald-300"
+                >
+                  Endpoint ↗
+                </a>
+              )}
+              {!isBrowseableUrl(sourceInfo.endpoint) && sourceInfo.endpoint && (
+                <span className="text-[10px] text-slate-500" title="Not a public HTTP link">
+                  Join path: {sourceInfo.endpoint}
+                </span>
+              )}
+            </div>
+          </section>
+        )}
+
         {!trace ? (
           <p className="text-xs text-slate-500">
-            No fetch trace yet. Load or refresh this panel&apos;s category to capture request
-            metrics.
+            {sourceInfo
+              ? 'No live fetch trace for this session yet — catalog links above are the official sources. Load or refresh the category to capture timing metrics.'
+              : "No fetch trace yet. Load or refresh this panel's category to capture request metrics."}
           </p>
         ) : (
           <div className="space-y-3 text-xs">
@@ -127,9 +190,9 @@ export function PanelApiDetailModal({
                       {s.organization && (
                         <div className="mt-1 text-[10px] text-slate-500">Org: {s.organization}</div>
                       )}
-                      {s.endpoint && (
+                      {s.endpoint ? (
                         <div className="mt-1">
-                          {s.endpoint.startsWith('http') ? (
+                          {isBrowseableUrl(s.endpoint) ? (
                             <a
                               href={s.endpoint}
                               target="_blank"
@@ -139,14 +202,17 @@ export function PanelApiDetailModal({
                               {s.endpoint}
                             </a>
                           ) : (
-                            <span className="break-all font-mono text-[10px] text-cyan-400/70">
-                              {s.endpoint}
+                            <span
+                              className="break-all font-mono text-[10px] text-slate-500"
+                              title="Internal path or non-HTTP token — not a public registry link"
+                            >
+                              {formatNonHttpEndpoint(s.endpoint)}
                             </span>
                           )}
                         </div>
-                      )}
+                      ) : null}
                       <div className="mt-0.5 flex flex-wrap gap-2">
-                        {s.docs && (
+                        {s.docs && isBrowseableUrl(s.docs) ? (
                           <a
                             href={s.docs}
                             target="_blank"
@@ -155,8 +221,8 @@ export function PanelApiDetailModal({
                           >
                             Docs ↗
                           </a>
-                        )}
-                        {s.endpoint?.startsWith('http') && (
+                        ) : null}
+                        {s.endpoint && isBrowseableUrl(s.endpoint) ? (
                           <a
                             href={s.endpoint}
                             target="_blank"
@@ -165,7 +231,7 @@ export function PanelApiDetailModal({
                           >
                             Endpoint ↗
                           </a>
-                        )}
+                        ) : null}
                       </div>
                       {s.error && (
                         <div className="mt-1 break-all font-mono text-[10px] text-red-400/80">

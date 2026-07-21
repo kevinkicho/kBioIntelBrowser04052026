@@ -148,10 +148,13 @@ function Chip({
   onOpenPanel?: (categoryId: string, panelId: string) => void
 }) {
   const tone = TONE[chip.tone || 'slate']
-  const clickable = Boolean(onOpenPanel && chip.categoryId && chip.panelId)
+  const empty = typeof chip.value === 'number' && chip.value === 0
+  // In-panel scroll is not a deep link — only style as clickable when parent provided handler
+  // and value is non-zero (zero chips stay inert)
+  const clickable = Boolean(onOpenPanel && chip.categoryId && chip.panelId && !empty)
   const className = `inline-flex items-center gap-1.5 rounded border px-2 py-1 text-[10px] ${tone} ${
-    clickable ? 'cursor-pointer hover:opacity-90' : ''
-  }`
+    empty ? 'opacity-30' : ''
+  } ${clickable ? 'cursor-pointer hover:opacity-90' : 'cursor-default'}`
 
   const body = (
     <>
@@ -166,6 +169,7 @@ function Chip({
         type="button"
         className={className}
         data-testid={`landscape-chip-${chip.id}`}
+        title={`Open ${chip.label} panel`}
         onClick={() => onOpenPanel!(chip.categoryId!, chip.panelId!)}
       >
         {body}
@@ -173,7 +177,12 @@ function Chip({
     )
   }
   return (
-    <span className={className} data-testid={`landscape-chip-${chip.id}`}>
+    <span
+      className={className}
+      data-testid={`landscape-chip-${chip.id}`}
+      data-empty={empty ? 'true' : 'false'}
+      title={empty ? `${chip.label}: no data` : chip.label}
+    >
       {body}
     </span>
   )

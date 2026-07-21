@@ -350,6 +350,13 @@ export function Panel({
                   >
                     {sourceInfo.endpoint}
                   </a>
+                ) : sourceInfo.endpoint?.startsWith('join://') ? (
+                  <span
+                    className="font-mono text-slate-500 break-all text-left"
+                    title="Local multi-source join — not a single HTTP endpoint"
+                  >
+                    multi-source join (see Docs)
+                  </span>
                 ) : (
                   <button
                     type="button"
@@ -371,6 +378,7 @@ export function Panel({
         panelTitle={title}
         panelId={panelId}
         trace={panelTrace}
+        sourceInfo={sourceInfo}
       />
     </div>
   )

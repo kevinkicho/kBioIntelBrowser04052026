@@ -98,12 +98,27 @@ export function buildEvidenceNeighborhood(input: {
 
   for (const [name, count] of Array.from(sponsors.entries()).slice(0, 12)) {
     const id = nid('sponsor', name)
-    addNode({ id, label: name, kind: 'sponsor', count, detail: `${count} trial(s)` })
+    addNode({
+      id,
+      label: name,
+      kind: 'sponsor',
+      count,
+      detail: `${count} ClinicalTrials.gov listing(s) with this sponsor name`,
+      // Official registry search (deep link) — not a homepage shell
+      href: `https://clinicaltrials.gov/search?term=${encodeURIComponent(name)}&aggFilters=status:rec%20not%20yet%20rec%20act%20com`,
+    })
     edges.push({ from: molId, to: id, label: 'trial sponsor' })
   }
   for (const [name, count] of Array.from(facilities.entries()).slice(0, 12)) {
     const id = nid('facility', name)
-    addNode({ id, label: name, kind: 'facility', count, detail: `${count} listing(s)` })
+    addNode({
+      id,
+      label: name,
+      kind: 'facility',
+      count,
+      detail: `${count} trial site listing(s) on ClinicalTrials.gov`,
+      href: `https://clinicaltrials.gov/search?locn=${encodeURIComponent(name)}`,
+    })
     edges.push({ from: molId, to: id, label: 'trial site' })
   }
 
@@ -161,7 +176,14 @@ export function buildEvidenceNeighborhood(input: {
   }
   for (const [name, count] of Array.from(grantInst.entries()).slice(0, 10)) {
     const id = nid('grant', name)
-    addNode({ id, label: name, kind: 'grant-org', count, detail: `${count} grant(s)` })
+    addNode({
+      id,
+      label: name,
+      kind: 'grant-org',
+      count,
+      detail: `${count} NIH RePORTER project(s) listing this institute`,
+      href: `https://reporter.nih.gov/search/results?query=${encodeURIComponent(name)}`,
+    })
     edges.push({ from: molId, to: id, label: 'NIH grant org' })
   }
 
@@ -176,7 +198,8 @@ export function buildEvidenceNeighborhood(input: {
       label: 'Literature corpus',
       kind: 'literature',
       count: litCount,
-      detail: `${litCount} free-API rows (PMC / PubMed / OpenAlex)`,
+      detail: `${litCount} free-API rows (Europe PMC / PubMed / OpenAlex) for this molecule name`,
+      href: `https://europepmc.org/search?query=${encodeURIComponent(moleculeName)}`,
     })
     edges.push({ from: molId, to: id, label: 'publications' })
   }

@@ -126,6 +126,44 @@ const ENTRIES: Record<string, PanelSourceEntry> = {
   'arxiv': { source: 'Cornell University', api: 'arXiv', description: 'arXiv preprint server for physics, math, and biology', docs: 'https://info.arxiv.org/help/api/', endpoint: 'http://export.arxiv.org/api/query', _metaKey: 'arxiv' },
   'literature': { source: 'EMBL-EBI', api: 'Europe PMC', description: 'Europe PMC life sciences literature database', docs: 'https://www.ebi.ac.uk/europepmc/webservices/rest/search/', endpoint: 'https://www.ebi.ac.uk/europepmc/webservices/rest/search', _metaKey: 'europepmc' },
   'ninds-neurommsig': { source: 'NINDS (NIH)', api: 'NINDS NeuroMMSig', description: 'NINDS molecular mechanistic signature database', docs: 'https://neurmmsig.scai.fraunhofer.de/', endpoint: 'https://stemcells.nindsgenetics.org/api/search', _metaKey: 'ninds-neurommsig' },
+  /** Multi-source join panels (local deterministic; no single upstream) */
+  'evidence-neighborhood': {
+    source: 'Multi-source join',
+    api: 'CT.gov · ROR · CMS · Scorecard · RePORTER · Europe PMC',
+    description:
+      'Deterministic local join of free public profile data: ClinicalTrials.gov sponsors/sites, ROR orgs, CMS Care Compare hospitals, US College Scorecard, NIH RePORTER institutes, and literature row counts (Europe PMC / PubMed / OpenAlex). Not competitive rankings or clinical referral.',
+    docs: 'https://clinicaltrials.gov/data-api/about-api',
+    endpoint: 'join://profile/clinical-safety+research-literature',
+  },
+  'research-orgs': {
+    source: 'ROR',
+    api: 'Research Organization Registry',
+    description: 'CC0 research organization IDs matched from trial sponsors/sites and related names',
+    docs: 'https://ror.readme.io/docs/rest-api',
+    endpoint: 'https://api.ror.org/v2/organizations',
+    _metaKey: 'ror',
+  },
+  'us-hospitals': {
+    source: 'CMS',
+    api: 'Hospital General Information',
+    description: 'US Medicare hospital directory (Care Compare) for affiliation context',
+    docs: 'https://data.cms.gov/provider-data/dataset/xubh-q36u',
+    endpoint: 'https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0',
+  },
+  'us-colleges': {
+    source: 'U.S. Dept of Education',
+    api: 'College Scorecard',
+    description: 'US college/university directory for research affiliation context (not admissions advice)',
+    docs: 'https://collegescorecard.ed.gov/data/api-documentation/',
+    endpoint: 'https://api.data.gov/ed/collegescorecard/v1/schools',
+  },
+  'biosimilar-family': {
+    source: 'U.S. FDA',
+    api: 'Purple Book / openFDA BLA',
+    description: 'Licensed biologics and biosimilar family roles from free FDA sources',
+    docs: 'https://purplebooksearch.fda.gov/',
+    endpoint: 'https://api.fda.gov/drug/drugsfda.json',
+  },
 }
 
 const PANEL_SOURCE_MAP: Record<string, PanelSourceInfo> = {}
