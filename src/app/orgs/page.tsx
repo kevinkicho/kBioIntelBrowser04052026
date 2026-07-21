@@ -13,6 +13,8 @@ import {
 } from '@/lib/orgAffiliationJoin'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { ResearchLabDossierView } from '@/components/orgs/ResearchLabDossierView'
+import { OrgSearchSuggest } from '@/components/orgs/OrgSearchSuggest'
+import type { OrgSuggestion } from '@/lib/orgs/orgSuggest'
 
 const KIND_LABEL: Record<AffiliationEdge['kind'], string> = {
   'sponsor-ror': 'Sponsor → ROR',
@@ -46,8 +48,8 @@ function OrgsPageInner() {
   const [error, setError] = useState<string | null>(null)
   const [sponsorText, setSponsorText] = useState('')
 
-  const runDirectorySearch = useCallback(async () => {
-    const query = q.trim()
+  const runDirectorySearch = useCallback(async (queryOverride?: string) => {
+    const query = (queryOverride ?? q).trim()
     if (query.length < 2) {
       setError('Enter at least 2 characters')
       return
@@ -112,8 +114,8 @@ function OrgsPageInner() {
     }
   }, [q, country, euPack])
 
-  const runDossierPipeline = useCallback(async () => {
-    const query = q.trim()
+  const runDossierPipeline = useCallback(async (queryOverride?: string) => {
+    const query = (queryOverride ?? q).trim()
     if (query.length < 2) {
       setError('Enter at least 2 characters')
       return
@@ -145,9 +147,15 @@ function OrgsPageInner() {
     }
   }, [q, country, euPack])
 
-  const runAll = useCallback(async () => {
-    await Promise.all([runDossierPipeline(), runDirectorySearch()])
-  }, [runDossierPipeline, runDirectorySearch])
+  const runAll = useCallback(
+    async (queryOverride?: string) => {
+      await Promise.all([
+        runDossierPipeline(queryOverride),
+        runDirectorySearch(queryOverride),
+      ])
+    },
+    [runDossierPipeline, runDirectorySearch],
+  )
 
   // Auto-run when linked with ?q=
   useEffect(() => {
@@ -207,13 +215,19 @@ function OrgsPageInner() {
         }}
       >
         <div className="flex flex-col sm:flex-row gap-2">
-          <input
-            type="search"
+          <OrgSearchSuggest
             value={q}
-            onChange={(e) => setQ(e.target.value)}
-            placeholder="e.g. Harvard, Karolinska, Pasteur, Mayo…"
-            className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
-            data-testid="orgs-search-input"
+            onChange={setQ}
+            country={country}
+            disabled={loading || dossierLoading}
+            onSelectSuggestion={(s: OrgSuggestion) => {
+              setQ(s.name)
+              if (!country && s.source === 'college' && s.countryCode === 'US') {
+                setCountry('US')
+              }
+              // Pass name explicitly — React state may not have flushed yet
+              void runAll(s.name)
+            }}
           />
           <select
             value={country}
@@ -243,6 +257,10 @@ function OrgsPageInner() {
             {loading || dossierLoading ? 'Running pipeline…' : 'Build dossier + search'}
           </button>
         </div>
+        <p className="text-[10px] text-slate-600">
+          Type 2+ characters for live suggestions (ROR · US College Scorecard · OpenAlex). Arrow
+          keys + Enter to pick; free public registries only — no mock data.
+        </p>
         <label className="flex items-center gap-2 text-[11px] text-slate-400">
           <input
             type="checkbox"
