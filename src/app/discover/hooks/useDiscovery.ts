@@ -492,8 +492,10 @@ export function useDiscovery() {
         if (progressRef.current) clearTimeout(progressRef.current)
         // Superseded search (new request or unmount) — leave state to the newer call
         if (err instanceof DOMException && err.name === 'AbortError') {
+          // A newer search owns abortRef — leave UI to that request (do not force idle).
           if (abortRef.current !== controller) return
-          // Active request aborted without a replacement (e.g. Strict Mode unmount)
+          // Active request aborted with no replacement: stay on loading briefly only if
+          // still the active controller; prefer idle so URL deep-link effect can re-fire.
           setState((prev) =>
             prev.status === 'loading'
               ? {

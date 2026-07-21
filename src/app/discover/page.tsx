@@ -116,7 +116,8 @@ export default function DiscoverPage() {
   const refreshToken = searchParams.get('_t')
 
   // Deep link + search-history reopen: any change to q / diseaseId / targets must re-rank.
-  // Previously a bootstrapped ref only ran once, so history clicks only updated the URL field.
+  // Clear appliedUrlKey on cleanup so React Strict Mode remounts re-run rank after abort
+  // (otherwise URL stays filled while status is stuck idle with empty content).
   useEffect(() => {
     if (!initialQuery && !initialDiseaseId && initialTargets.length === 0) return
 
@@ -130,11 +131,13 @@ export default function DiscoverPage() {
     if (appliedUrlKey.current === key) return
     appliedUrlKey.current = key
 
+    let cancelled = false
     void search(initialQuery || initialDiseaseId || '', {
       diseaseId: initialDiseaseId,
       targets: initialTargets,
       forceRefresh,
     }).then(() => {
+      if (cancelled) return
       if (forceRefresh) {
         const next = new URLSearchParams(searchParams.toString())
         next.delete('refresh')
@@ -143,6 +146,14 @@ export default function DiscoverPage() {
         router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
       }
     })
+
+    return () => {
+      cancelled = true
+      // Allow remount / re-entry to rank this URL again after abort
+      if (appliedUrlKey.current === key) {
+        appliedUrlKey.current = null
+      }
+    }
   }, [
     initialQuery,
     initialDiseaseId,

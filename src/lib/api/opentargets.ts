@@ -264,6 +264,73 @@ export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
 }
 
 /**
+ * Resolve a hard disease registry id (EFO_*, MONDO_*, …) via Open Targets.
+ * Used when name search hits don't include the pinned id (id namespace drift).
+ */
+export async function getDiseaseById(
+  diseaseId: string,
+): Promise<{ id: string; name: string; description?: string; therapeuticAreas: string[] } | null> {
+  const id = diseaseId?.trim()
+  if (!id) return null
+  try {
+    const query = `
+      query DiseaseById($efoId: String!) {
+        disease(efoId: $efoId) {
+          id
+          name
+          description
+          therapeuticAreas {
+            name
+          }
+        }
+      }
+    `
+    const res = await fetch(API_URL, {
+      method: 'POST',
+      ...fetchOptions,
+      headers: {
+        ...((fetchOptions.headers as Record<string, string>) || {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: { efoId: id },
+      }),
+    })
+    if (!res.ok) {
+      console.error('[opentargets] getDiseaseById HTTP', res.status)
+      return null
+    }
+    const data = await res.json()
+    if (data.errors) {
+      console.error('[opentargets] getDiseaseById GraphQL errors:', data.errors)
+      return null
+    }
+    const d = data.data?.disease as
+      | {
+          id?: string
+          name?: string
+          description?: string
+          therapeuticAreas?: { name?: string }[]
+        }
+      | null
+      | undefined
+    if (!d?.id || !d?.name) return null
+    return {
+      id: d.id,
+      name: d.name,
+      description: d.description,
+      therapeuticAreas: (d.therapeuticAreas ?? [])
+        .map((t) => t.name)
+        .filter((n): n is string => Boolean(n)),
+    }
+  } catch (err) {
+    console.error('[opentargets] getDiseaseById', err)
+    return null
+  }
+}
+
+/**
  * Disease → associated gene targets (Open Targets Platform GraphQL).
  * Platform 26.x: `associatedTargets` (not legacy `linkedTargets`).
  * Symbol field is `approvedSymbol` (not target.name).

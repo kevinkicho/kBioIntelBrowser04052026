@@ -4,6 +4,7 @@
  */
 
 import { searchDiseases, resolveMoleculesFromNames, type DiseaseResult } from '../diseaseSearch'
+import { getDiseaseById } from '../api/opentargets'
 import type { SourceFetchStatus } from '../dataStatus'
 import { mapRankResultToDiscoveryResult } from '../domain/mappers'
 import {
@@ -89,11 +90,20 @@ export function diseaseResultToEntity(d: DiseaseResult): DiseaseEntity {
   }
 }
 
+/** Normalize registry disease ids for pin matching (MONDO:x ↔ MONDO_x, strip OBO URLs). */
+export function normalizeDiseaseRegistryId(id: string): string {
+  return id
+    .trim()
+    .toLowerCase()
+    .replace(/^https?:\/\/purl\.obolibrary\.org\/obo\//i, '')
+    .replace(/^http:\/\/www\.ebi\.ac\.uk\/efo\//i, '')
+    .replace(/:/g, '_')
+}
+
 function findPinnedDisease(hits: DiseaseResult[], diseaseId: string): DiseaseResult | undefined {
-  const pin = diseaseId.trim()
+  const pin = normalizeDiseaseRegistryId(diseaseId)
   if (!pin) return undefined
-  const lower = pin.toLowerCase()
-  return hits.find((d) => d.id && d.id.toLowerCase() === lower)
+  return hits.find((d) => d.id && normalizeDiseaseRegistryId(d.id) === pin)
 }
 
 /**
@@ -244,8 +254,7 @@ export async function rankCandidatesForDisease(
   sourceStatuses.push(diseaseLookup.status)
   timing.disease = Date.now() - diseaseStart
 
-  if (diseaseLookup.value.length === 0) {
-    if (pinnedId) throw new UnknownDiseaseIdError(pinnedId)
+  if (diseaseLookup.value.length === 0 && !pinnedId) {
     warnings.push('No disease matches for query.')
     return emptyRankResult(query, {
       warnings,
@@ -258,7 +267,36 @@ export async function rankCandidatesForDisease(
 
   let primaryDisease: DiseaseResult
   if (pinnedId) {
-    const pinned = findPinnedDisease(diseaseLookup.value, pinnedId)
+    let pinned = findPinnedDisease(diseaseLookup.value, pinnedId)
+    // Name search may return a different ontology id for the same disease
+    // (e.g. typeahead MONDO_* vs Open Targets EFO_*). Resolve the pin by id.
+    if (!pinned) {
+      const byId = await getDiseaseById(pinnedId)
+      if (byId) {
+        pinned = {
+          id: byId.id,
+          name: byId.name,
+          description: byId.description,
+          therapeuticAreas: byId.therapeuticAreas,
+          source: 'Open Targets',
+        }
+        warnings.push(
+          `diseaseId pin ${pinnedId} resolved via Open Targets registry (not present in name-search hits).`,
+        )
+      }
+    }
+    // Last resort: if name search found a single high-confidence match for q, use it
+    // only when the pin id is a known synonym style of the hit (already normalized miss).
+    if (!pinned && diseaseLookup.value.length === 1) {
+      const only = diseaseLookup.value[0]!
+      const qNorm = query.trim().toLowerCase()
+      if (only.name.toLowerCase() === qNorm || only.name.toLowerCase().includes(qNorm)) {
+        pinned = only
+        warnings.push(
+          `diseaseId pin ${pinnedId} not found; using sole name match "${only.name}" (${only.id}).`,
+        )
+      }
+    }
     if (!pinned) throw new UnknownDiseaseIdError(pinnedId)
     primaryDisease = pinned
   } else if (diseaseLookup.value.length > 1) {
