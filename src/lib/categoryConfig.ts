@@ -85,6 +85,13 @@ export const CATEGORIES: CategoryDef[] = [
         tier: 'supporting',
       },
       {
+        id: 'biosimilar-family',
+        title: 'BiosimilarFamily',
+        propKey: 'biosimilarFamily',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
         id: 'purple-book',
         title: 'PurpleBook',
         propKey: 'purpleBookProducts',
@@ -148,6 +155,13 @@ export const CATEGORIES: CategoryDef[] = [
         id: 'us-hospitals',
         title: 'UsHospitals',
         propKey: 'usHospitals',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
+        id: 'evidence-neighborhood',
+        title: 'EvidenceNeighborhood',
+        propKey: 'evidenceNeighborhood',
         isNullable: true,
         tier: 'supporting',
       },

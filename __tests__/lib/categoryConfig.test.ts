@@ -13,12 +13,18 @@ describe('categoryConfig', () => {
       expect(CATEGORIES).toHaveLength(10)
     })
 
-    it('contains 119 total panels across all categories', () => {
+    it('contains 136 total panels across all categories', () => {
       const totalPanels = CATEGORIES.reduce(
         (sum, cat) => sum + cat.panels.length,
         0
       )
-      expect(totalPanels).toBe(119)
+      expect(totalPanels).toBe(136)
+    })
+
+    it('includes biosimilar family and evidence neighborhood panels', () => {
+      const ids = CATEGORIES.flatMap((cat) => cat.panels.map((p) => p.id))
+      expect(ids).toContain('biosimilar-family')
+      expect(ids).toContain('evidence-neighborhood')
     })
 
     it('has no duplicate panel IDs', () => {
@@ -69,7 +75,7 @@ describe('categoryConfig', () => {
       }
       const counts = getCategoryDataCounts(props)
       expect(counts['pharmaceutical'].withData).toBe(1)
-      expect(counts['pharmaceutical'].total).toBe(11)
+      expect(counts['pharmaceutical'].total).toBe(20)
     })
 
     it('counts nullable props with data correctly', () => {

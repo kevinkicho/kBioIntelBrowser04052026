@@ -32,7 +32,10 @@ export {
   OPEN_TARGETS_SOURCE,
   extractClaimsFromRelatedMolecules,
   RELATED_MOLECULE_SOURCE,
+  extractClaimsFromLandscape,
+  LANDSCAPE_SOURCE,
 } from './extractors'
+export type { LandscapeEvidenceInput } from './extractors'
 
 export {
   DEFAULT_CLAIM_TOTAL_CAP,

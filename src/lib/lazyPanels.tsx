@@ -184,6 +184,22 @@ export const LazyUsCollegesPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyBiosimilarFamilyNavigator = dynamic(
+  () =>
+    import('@/components/profile/BiosimilarFamilyNavigator').then((m) => ({
+      default: m.BiosimilarFamilyNavigator,
+    })),
+  { loading: LoadingComponent },
+)
+
+export const LazyEvidenceNeighborhoodMap = dynamic(
+  () =>
+    import('@/components/profile/EvidenceNeighborhoodMap').then((m) => ({
+      default: m.EvidenceNeighborhoodMap,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }

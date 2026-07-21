@@ -17,8 +17,10 @@ import {
   extractClaimsFromChemblActivities,
   extractClaimsFromChemblMechanisms,
   extractClaimsFromClinicalTrials,
+  extractClaimsFromLandscape,
   extractClaimsFromOpenTargets,
   extractClaimsFromRelatedMolecules,
+  type LandscapeEvidenceInput,
 } from './extractors'
 import type { DedupedDiseaseMolecule, DiseaseMolecule } from '@/lib/diseaseSearch'
 
@@ -35,6 +37,8 @@ export interface CorePanelEvidenceInput {
   /** Disease-related molecules with selection reasons (board density). */
   relatedMolecules?: readonly (DiseaseMolecule | DedupedDiseaseMolecule)[] | null
   diseaseName?: string
+  /** Optional landscape join inputs (orgs, hospitals, grants, biologics family). */
+  landscape?: LandscapeEvidenceInput | null
 }
 
 export interface ExtractAllOptions extends ClaimExtractorContext {
@@ -48,6 +52,11 @@ export interface ExtractAllOptions extends ClaimExtractorContext {
    * Default order: mechanism → binds-target → indicated-for → trial → safety → other.
    */
   preferFacetOrder?: boolean
+  /**
+   * When true, extract landscape claims first and keep a larger share of them
+   * (board / profile landscape pack path). Still total-capped.
+   */
+  landscapeMode?: boolean
 }
 
 const FACET_PRIORITY: Record<string, number> = {
@@ -92,9 +101,25 @@ export function extractClaimsFromCorePanels(
   panels: CorePanelEvidenceInput,
   options: ExtractAllOptions,
 ): EvidenceClaim[] {
-  const { totalCap = DEFAULT_CLAIM_TOTAL_CAP, preferFacetOrder = true, ...ctx } = options
+  const {
+    totalCap = DEFAULT_CLAIM_TOTAL_CAP,
+    preferFacetOrder = true,
+    landscapeMode = false,
+    ...ctx
+  } = options
 
-  const raw: EvidenceClaim[] = [
+  const landscapeClaims = panels.landscape
+    ? extractClaimsFromLandscape(
+        {
+          ...panels.landscape,
+          moleculeName: panels.landscape.moleculeName || ctx.moleculeName,
+          clinicalTrials: panels.landscape.clinicalTrials ?? panels.clinicalTrials,
+        },
+        ctx,
+      )
+    : []
+
+  const coreRaw: EvidenceClaim[] = [
     ...extractClaimsFromChemblMechanisms(panels.chemblMechanisms, ctx),
     ...extractClaimsFromChemblActivities(panels.chemblActivities, ctx),
     ...extractClaimsFromOpenTargets(panels.diseaseAssociations, ctx),
@@ -106,13 +131,30 @@ export function extractClaimsFromCorePanels(
     }),
   ]
 
-  let claims = dedupeClaimsById(raw)
-  if (preferFacetOrder) {
-    claims = sortByFacetPriority(claims)
-  }
-
-  if (totalCap != null && totalCap >= 0 && claims.length > totalCap) {
-    claims = claims.slice(0, totalCap)
+  let claims: EvidenceClaim[]
+  if (landscapeMode) {
+    // Prefer landscape claims, then fill remaining capacity with core extractors
+    const landscape = dedupeClaimsById(landscapeClaims)
+    const core = dedupeClaimsById(coreRaw)
+    const seen = new Set(landscape.map((c) => c.id))
+    const fill = core.filter((c) => !seen.has(c.id))
+    if (totalCap != null && totalCap >= 0) {
+      const landscapeCap = Math.min(landscape.length, Math.max(40, Math.floor(totalCap * 0.55)))
+      const head = landscape.slice(0, landscapeCap)
+      const rest = fill.slice(0, Math.max(0, totalCap - head.length))
+      claims = [...head, ...rest]
+    } else {
+      claims = [...landscape, ...fill]
+    }
+  } else {
+    const raw: EvidenceClaim[] = [...coreRaw, ...landscapeClaims]
+    claims = dedupeClaimsById(raw)
+    if (preferFacetOrder) {
+      claims = sortByFacetPriority(claims)
+    }
+    if (totalCap != null && totalCap >= 0 && claims.length > totalCap) {
+      claims = claims.slice(0, totalCap)
+    }
   }
 
   return claims

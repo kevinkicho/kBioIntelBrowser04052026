@@ -14,6 +14,7 @@ import type { ScoreRubric } from '@/lib/domain/score'
 import { createDefaultScoreRubric } from '@/lib/domain/score'
 import type { DiscoveryPreferencesSnapshot } from '@/lib/discovery/preferences'
 import { sha256Hex } from '@/lib/domain/sha256'
+import type { ClinicalTrial } from '@/lib/types'
 import {
   DEFAULT_CLAIM_TOTAL_CAP,
   claimSourceNames,
@@ -75,6 +76,8 @@ export interface BuildEvidencePackInput {
    * Pass null to disable (not recommended for export).
    */
   maxClaims?: number | null
+  /** Prefer landscape claims when extracting from panels. */
+  landscapeMode?: boolean
 }
 
 function nowIso(): string {
@@ -151,6 +154,8 @@ export function buildEvidencePack(input: BuildEvidencePackInput): EvidencePack {
       epistemicStatus: input.extractOptions?.epistemicStatus,
       totalCap: maxClaims,
       preferFacetOrder: input.extractOptions?.preferFacetOrder ?? true,
+      landscapeMode:
+        input.landscapeMode === true || input.extractOptions?.landscapeMode === true,
     }
     claims = extractClaimsFromCorePanels(input.panels, extractOpts)
   } else {
@@ -328,12 +333,30 @@ export function corePanelsFromProfileData(
   data: Record<string, unknown> | null | undefined,
 ): CorePanelEvidenceInput {
   if (!data) return {}
+  const clinicalTrials = asArray<ClinicalTrial>(data.clinicalTrials)
   return {
     chemblActivities: asArray(data.chemblActivities),
     chemblMechanisms: asArray(data.chemblMechanisms),
     adverseEvents: asArray(data.adverseEvents),
-    clinicalTrials: asArray(data.clinicalTrials),
+    clinicalTrials,
     diseaseAssociations: asArray(data.diseaseAssociations),
+    landscape: {
+      moleculeName: typeof data.moleculeName === 'string' ? data.moleculeName : undefined,
+      clinicalTrials,
+      researchOrgs: asArray(data.researchOrgs),
+      researchOrgsLit: asArray(data.researchOrgsLit),
+      euResearchOrgs: asArray(data.euResearchOrgs),
+      usHospitals: asArray(data.usHospitals),
+      usColleges: asArray(data.usColleges),
+      nihGrants: asArray(data.nihGrants),
+      literature: asArray(data.literature),
+      pubmedArticles: asArray(data.pubmedArticles),
+      openAlexWorks: asArray(data.openAlexWorks),
+      biologicsLicensed: asArray(data.biologicsLicensed),
+      purpleBookProducts: asArray(data.purpleBookProducts),
+      purpleBookPatents: asArray(data.purpleBookPatents),
+      emaBulkMedicines: asArray(data.emaBulkMedicines),
+    },
   }
 }
 

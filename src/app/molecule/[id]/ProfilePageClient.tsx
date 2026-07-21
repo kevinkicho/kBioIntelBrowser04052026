@@ -973,6 +973,17 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           lastFetched={lastFetched}
         />
       ),
+      'biosimilar-family': (panelId, lastFetched) => (
+        <LazyPanels.LazyBiosimilarFamilyNavigator
+          moleculeName={moleculeName}
+          purpleBookProducts={d('purpleBookProducts')}
+          biologicsLicensed={d('biologicsLicensed')}
+          purpleBookPatents={d('purpleBookPatents')}
+          emaBulkMedicines={d('emaBulkMedicines')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'purple-book': (panelId, lastFetched) => (
         <LazyPanels.LazyPurpleBookPanel
           products={d('purpleBookProducts')}
@@ -1030,6 +1041,23 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'us-hospitals': (panelId, lastFetched) => (
         <LazyPanels.LazyUsHospitalsPanel
           hospitals={d('usHospitals')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
+      'evidence-neighborhood': (panelId, lastFetched) => (
+        <LazyPanels.LazyEvidenceNeighborhoodMap
+          moleculeName={moleculeName}
+          clinicalTrials={d('clinicalTrials')}
+          researchOrgs={d('researchOrgs')}
+          researchOrgsLit={d('researchOrgsLit')}
+          euResearchOrgs={d('euResearchOrgs')}
+          usHospitals={d('usHospitals')}
+          usColleges={d('usColleges')}
+          nihGrants={d('nihGrants')}
+          literature={d('literature')}
+          pubmedArticles={d('pubmedArticles')}
+          openAlexWorks={d('openAlexWorks')}
           panelId={panelId}
           lastFetched={lastFetched}
         />

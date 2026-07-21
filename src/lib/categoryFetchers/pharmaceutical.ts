@@ -12,6 +12,7 @@ import { searchPurpleBookPatentsByName } from '@/lib/api/purpleBookPatents'
 import { searchEmaBulkByName } from '@/lib/api/emaMedicinesBulk'
 import { buildInternationalRegulatorLinks } from '@/lib/regulatorDeepLinks'
 import { buildEstablishmentDeepLinks } from '@/lib/establishmentDeepLinks'
+import { buildBiosimilarFamily } from '@/lib/biosimilarFamily'
 import { getDrugPricesByName } from '@/lib/api/nadac'
 import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
 import { getDrugLabelsByName } from '@/lib/api/dailymed'
@@ -96,5 +97,12 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     cpicGuidelines,
     // Portal-first regulator deep links (sync, free, no scrape)
     internationalRegulatorLinks: buildInternationalRegulatorLinks(name),
+    biosimilarFamily: buildBiosimilarFamily({
+      moleculeName: name,
+      purpleBookProducts: purpleBookResult.products,
+      biologicsLicensed,
+      purpleBookPatents: purpleBookPatentsResult.patents,
+      emaBulkMedicines: emaBulkResult.products,
+    }),
   }
 }

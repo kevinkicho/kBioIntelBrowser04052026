@@ -32,6 +32,25 @@ jest.mock('@/components/evidence/PackAiPanel', () => ({
   PackAiPanel: () => null,
 }))
 
+describe('PackBuilder landscape mode', () => {
+  it('exposes landscape mode toggle when extracting from panels', () => {
+    render(
+      <PackBuilder
+        panels={FIXTURE_CORE_PANELS}
+        defaultTitle="Test pack"
+        moleculeName="Aspirin"
+      />,
+    )
+    const toggle = screen.getByTestId('pack-landscape-mode')
+    expect(toggle).toBeInTheDocument()
+    const checkbox = toggle.querySelector('input[type="checkbox"]') as HTMLInputElement
+    expect(checkbox).toBeTruthy()
+    expect(checkbox.checked).toBe(false)
+    fireEvent.click(checkbox)
+    expect(checkbox.checked).toBe(true)
+  })
+})
+
 describe('PackView', () => {
   it('renders pack title and claim count', () => {
     const pack = buildEvidencePack({

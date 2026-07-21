@@ -82,6 +82,7 @@ export function PackBuilder({
   const [lastPack, setLastPack] = useState<EvidencePack | null>(null)
   const [banner, setBanner] = useState<{ type: 'ok' | 'err'; text: string } | null>(null)
   const [showPreview, setShowPreview] = useState(true)
+  const [landscapeMode, setLandscapeMode] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const openedEmitted = useRef(false)
@@ -130,12 +131,13 @@ export function PackBuilder({
       })
     }
     return buildEvidencePack({
-      title,
+      title: landscapeMode ? `${title.replace(/\s*landscape pack$/i, '')} landscape pack` : title,
       panels,
       extractOptions: {
         retrievedAt,
         subjectCandidateId,
         moleculeName,
+        landscapeMode,
       },
       candidates,
       disease,
@@ -144,6 +146,7 @@ export function PackBuilder({
       rubric: defaultPackRubric(preferencesSnapshot),
       projectId: projectId ?? undefined,
       maxClaims: MAX_PACK_CLAIMS,
+      landscapeMode,
     })
   }, [
     title,
@@ -156,6 +159,7 @@ export function PackBuilder({
     targets,
     preferencesSnapshot,
     projectId,
+    landscapeMode,
   ])
 
   useEffect(() => {
@@ -335,6 +339,29 @@ export function PackBuilder({
           placeholder="Pack title"
         />
       </label>
+
+      {!preClaims && (
+        <label
+          className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"
+          data-testid="pack-landscape-mode"
+        >
+          <input
+            type="checkbox"
+            checked={landscapeMode}
+            onChange={(e) => setLandscapeMode(e.target.checked)}
+            className="mt-0.5 rounded border-slate-600 bg-slate-900 text-sky-600 focus:ring-sky-700"
+          />
+          <span>
+            <span className="block text-[11px] font-medium text-sky-200">
+              Landscape pack mode
+            </span>
+            <span className="block text-[10px] text-slate-500 leading-relaxed">
+              Prefer org · trial site · grant · biosimilar-family claims (~55% of the claim cap),
+              then fill with Core panels. Free public joins only — not competitive or clinical advice.
+            </span>
+          </span>
+        </label>
+      )}
 
       {previewPack && (
         <div className="mb-3">

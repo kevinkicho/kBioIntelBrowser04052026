@@ -19,6 +19,7 @@ import { searchArXiv } from '@/lib/api/arxiv'
 import { resolveRorByNames, searchRorOrganizations } from '@/lib/api/ror'
 import { resolveUsCollegesByNames, searchUsCollegesByName } from '@/lib/api/collegeScorecard'
 import { searchEuResearchOrgsPack } from '@/lib/api/euResearchOrgs'
+import { buildEvidenceNeighborhood } from '@/lib/evidenceNeighborhood'
 
 export async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [literature, nihGrants, openAireProjects, openAirePublications, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
@@ -106,5 +107,16 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
     researchOrgsLit,
     euResearchOrgs,
     usColleges,
+    /** Partial neighborhood from lit/grants (merged client-side with clinical when both loaded) */
+    evidenceNeighborhoodLit: buildEvidenceNeighborhood({
+      moleculeName: name,
+      researchOrgsLit,
+      euResearchOrgs,
+      usColleges,
+      nihGrants,
+      literature,
+      pubmedArticles,
+      openAlexWorks,
+    }),
   }
 }

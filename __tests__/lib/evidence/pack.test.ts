@@ -221,6 +221,47 @@ describe('corePanelsFromProfileData', () => {
     expect(panels.adverseEvents).toHaveLength(2)
     expect(panels.clinicalTrials).toBeNull()
   })
+
+  it('maps landscape join keys and supports landscapeMode packs', () => {
+    const panels = corePanelsFromProfileData({
+      moleculeName: 'Aspirin',
+      clinicalTrials: FIXTURE_CORE_PANELS.clinicalTrials,
+      researchOrgs: [
+        {
+          rorId: '00pack',
+          idUrl: 'https://ror.org/00pack',
+          name: 'Pack ROR',
+          aliases: [],
+          types: ['Education'],
+          city: 'Boston',
+          countryCode: 'US',
+          countryName: 'United States',
+          region: 'MA',
+          website: null,
+          wikipedia: null,
+          established: null,
+          status: 'active',
+        },
+      ],
+      nihGrants: [{ institute: 'NCI', title: 'Oncology' }],
+      chemblMechanisms: FIXTURE_CORE_PANELS.chemblMechanisms,
+    })
+    expect(panels.landscape?.researchOrgs).toHaveLength(1)
+    expect(panels.landscape?.nihGrants).toHaveLength(1)
+
+    const pack = buildEvidencePack({
+      title: 'Landscape demo',
+      panels,
+      extractOptions: { ...FIXTURE_CTX, landscapeMode: true },
+      landscapeMode: true,
+      id: 'pack_landscape',
+      createdAt: FIXTURE_RETRIEVED_AT,
+    })
+    expect(pack.claims.some((c) => /landscape|neighborhood|sponsor|ROR|NIH/i.test(c.statement))).toBe(
+      true,
+    )
+    expect(pack.claims.every((c) => c.provenance.retrievedAt)).toBeTruthy()
+  })
 })
 
 describe('pack index — localStorage metadata only', () => {

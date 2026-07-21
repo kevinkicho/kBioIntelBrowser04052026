@@ -15,6 +15,7 @@ import { searchIRIS } from '@/lib/api/iris'
 import { searchDrugShortages } from '@/lib/api/fda-drug-shortages'
 import { resolveRorByNames, searchRorOrganizations } from '@/lib/api/ror'
 import { resolveCmsHospitalsByNames } from '@/lib/api/cmsHospitals'
+import { buildEvidenceNeighborhood } from '@/lib/evidenceNeighborhood'
 import type { ClinicalTrial } from '@/lib/types'
 
 function collectTrialOrgNames(trials: ClinicalTrial[]): string[] {
@@ -84,5 +85,11 @@ export async function fetchClinicalSafety(name: string, queryFor: (s: string) =>
     drugShortages: drugShortagesData.shortages,
     researchOrgs,
     usHospitals,
+    evidenceNeighborhood: buildEvidenceNeighborhood({
+      moleculeName: name,
+      clinicalTrials,
+      researchOrgs,
+      usHospitals,
+    }),
   }
 }

@@ -8,6 +8,7 @@ import {
   extractClaimsFromAdverseEvents,
   extractClaimsFromClinicalTrials,
   extractClaimsFromOpenTargets,
+  extractClaimsFromLandscape,
   extractClaimsFromCorePanels,
   dedupeClaimsById,
   countClaimsByType,
@@ -20,6 +21,7 @@ import {
   CLINICAL_TRIALS_SOURCE,
   OPEN_TARGETS_SOURCE,
   CHEMBL_MECHANISM_SOURCE,
+  LANDSCAPE_SOURCE,
 } from '@/lib/evidence'
 import {
   FIXTURE_CTX,
@@ -267,4 +269,56 @@ describe('extractClaimsFromCorePanels (aggregate)', () => {
     })
     expect(claims[0].epistemicStatus).toBe('timeout')
   })
+
+  it('includes landscape claims and prefers them in landscapeMode', () => {
+    const landscapePanels = {
+      ...FIXTURE_CORE_PANELS,
+      landscape: {
+        moleculeName: 'Aspirin',
+        clinicalTrials: FIXTURE_CLINICAL_TRIALS,
+        researchOrgs: [
+          {
+            rorId: '00test',
+            idUrl: 'https://ror.org/00test',
+            name: 'Test ROR Org',
+            aliases: [],
+            types: ['Education'],
+            city: 'Boston',
+            countryCode: 'US',
+            countryName: 'United States',
+            region: 'MA',
+            website: null,
+            wikipedia: null,
+            established: null,
+            status: 'active',
+          },
+        ],
+        nihGrants: [{ institute: 'NHLBI', title: 'Cardio' }],
+      },
+    }
+
+    const landscapeOnly = extractClaimsFromLandscape(landscapePanels.landscape, FIXTURE_CTX)
+    expect(landscapeOnly.length).toBeGreaterThan(0)
+    expect(landscapeOnly.every((c) => c.claimType === 'other')).toBe(true)
+    expect(landscapeOnly[0].provenance.source).toBe(LANDSCAPE_SOURCE)
+    expect(landscapeOnly[0].statement).toMatch(/evidence neighborhood/i)
+
+    const normal = extractClaimsFromCorePanels(landscapePanels, FIXTURE_CTX)
+    expect(normal.some((c) => c.provenance.source === LANDSCAPE_SOURCE)).toBe(true)
+    // Core facets still present when not in landscapeMode
+    expect(normal.some((c) => c.claimType === 'mechanism')).toBe(true)
+
+    const landscapeMode = extractClaimsFromCorePanels(landscapePanels, {
+      ...FIXTURE_CTX,
+      landscapeMode: true,
+      totalCap: 50,
+    })
+    expect(landscapeMode[0].provenance.source).toBe(LANDSCAPE_SOURCE)
+    const landscapeCount = landscapeMode.filter(
+      (c) => c.provenance.source === LANDSCAPE_SOURCE,
+    ).length
+    expect(landscapeCount).toBeGreaterThan(0)
+    expect(landscapeMode.length).toBeLessThanOrEqual(50)
+  })
+
 })

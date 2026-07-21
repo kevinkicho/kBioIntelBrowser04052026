@@ -92,21 +92,29 @@ export function ExportButton({
     setOpen(false)
   }
 
-  function handleEvidencePack(format: 'json' | 'md') {
+  function handleEvidencePack(format: 'json' | 'md', landscapeMode = false) {
     const preferencesSnapshot = snapshotDiscoveryPreferences(loadDiscoveryPreferences())
+    const panels = corePanelsFromProfileData({
+      ...data,
+      moleculeName,
+    })
     const pack = buildEvidencePack({
-      title: `${moleculeName} evidence pack`,
-      panels: corePanelsFromProfileData(data),
+      title: landscapeMode
+        ? `${moleculeName} landscape pack`
+        : `${moleculeName} evidence pack`,
+      panels,
       extractOptions: {
         retrievedAt: new Date().toISOString(),
         subjectCandidateId: candidate.candidateId,
         moleculeName,
+        landscapeMode,
       },
       candidates: [candidate],
       preferencesSnapshot,
       rubric: defaultPackRubric(preferencesSnapshot),
       projectId: projectId ?? undefined,
       maxClaims: MAX_PACK_CLAIMS,
+      landscapeMode,
     })
     const body = format === 'json' ? packToJson(pack) : packToMarkdown(pack)
     const mime = format === 'json' ? 'application/json' : 'text/markdown'
@@ -146,6 +154,18 @@ export function ExportButton({
             className="w-full text-left px-4 py-2 text-sm text-emerald-300 hover:bg-slate-700"
           >
             📦 Download evidence pack (MD)
+          </button>
+          <button
+            onClick={() => handleEvidencePack('json', true)}
+            className="w-full text-left px-4 py-2 text-sm text-sky-300 hover:bg-slate-700"
+          >
+            🗺 Landscape pack (JSON) — orgs · trials · grants
+          </button>
+          <button
+            onClick={() => handleEvidencePack('md', true)}
+            className="w-full text-left px-4 py-2 text-sm text-sky-300 hover:bg-slate-700"
+          >
+            🗺 Landscape pack (MD)
           </button>
           <button
             type="button"

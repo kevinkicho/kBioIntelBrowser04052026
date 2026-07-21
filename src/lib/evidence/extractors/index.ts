@@ -22,3 +22,8 @@ export {
   extractClaimsFromRelatedMolecules,
   RELATED_MOLECULE_SOURCE,
 } from './relatedMolecules'
+export {
+  extractClaimsFromLandscape,
+  LANDSCAPE_SOURCE,
+  type LandscapeEvidenceInput,
+} from './landscape'
