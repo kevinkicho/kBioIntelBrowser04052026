@@ -286,6 +286,132 @@ function MiniBar({ pct, color }: { pct: number; color: string }) {
   )
 }
 
+/**
+ * Shared column template so Search / Other / every category listitem aligns.
+ * API | Health | Reqs | OK | Errors | Empty | Avg | p50 | p95 | Last OK | Last Error
+ */
+const API_ROW_GRID =
+  'grid grid-cols-[minmax(9rem,1.35fr)_4.75rem_3.25rem_2.75rem_3rem_3rem_3.5rem_3.25rem_3.25rem_4.5rem_minmax(6rem,1.1fr)] gap-x-2 items-center min-w-[52rem]'
+
+function ApiSummaryHeader() {
+  return (
+    <div
+      className={`${API_ROW_GRID} border-b border-slate-800/60 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-slate-500`}
+      role="row"
+    >
+      <span>API</span>
+      <span className="text-center">Health</span>
+      <span className="text-right">Reqs</span>
+      <span className="text-right">OK</span>
+      <span className="text-right">Errors</span>
+      <span className="text-right">Empty</span>
+      <span className="text-right">Avg</span>
+      <span className="text-right">p50</span>
+      <span className="text-right">p95</span>
+      <span className="text-right">Last OK</span>
+      <span className="text-right">Last error</span>
+    </div>
+  )
+}
+
+/** Flat layout inserts category column — use a slightly different grid. */
+const API_ROW_GRID_FLAT =
+  'grid grid-cols-[minmax(9rem,1.2fr)_minmax(6rem,0.9fr)_4.75rem_3.25rem_2.75rem_3rem_3rem_3.5rem_3.25rem_3.25rem_4.5rem_minmax(6rem,1fr)] gap-x-2 items-center min-w-[58rem]'
+
+function ApiSummaryHeaderFlat() {
+  return (
+    <div
+      className={`${API_ROW_GRID_FLAT} border-b border-slate-700 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-slate-500`}
+      role="row"
+    >
+      <span>API</span>
+      <span>Category</span>
+      <span className="text-center">Health</span>
+      <span className="text-right">Reqs</span>
+      <span className="text-right">OK</span>
+      <span className="text-right">Errors</span>
+      <span className="text-right">Empty</span>
+      <span className="text-right">Avg</span>
+      <span className="text-right">p50</span>
+      <span className="text-right">p95</span>
+      <span className="text-right">Last OK</span>
+      <span className="text-right">Last error</span>
+    </div>
+  )
+}
+
+function ApiSummaryRow({
+  api,
+  onOpen,
+  flat,
+}: {
+  api: ApiSummary
+  onOpen: (source: string) => void
+  flat?: boolean
+}) {
+  const grid = flat ? API_ROW_GRID_FLAT : API_ROW_GRID
+  return (
+    <button
+      type="button"
+      role="row"
+      onClick={() => onOpen(api.source)}
+      className={`${grid} w-full border-b border-slate-800/40 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-800/30 group`}
+      data-testid={`analytics-api-row-${api.source}`}
+    >
+      <span className="min-w-0 truncate font-medium text-slate-200 group-hover:text-indigo-300">
+        {apiName(api.source)}
+      </span>
+      {flat ? (
+        <span className="min-w-0 truncate text-xs text-slate-400">
+          {api.categoryIcon} {api.categoryLabel}
+        </span>
+      ) : null}
+      <span className="text-center tabular-nums text-slate-300">
+        {healthDot(api.success_rate)} {api.success_rate}%
+      </span>
+      <span className="text-right tabular-nums text-slate-400">{api.total_requests}</span>
+      <span className="text-right tabular-nums text-emerald-400">{api.success_count}</span>
+      <span className="text-right tabular-nums text-red-400">{api.error_count}</span>
+      <span className="text-right tabular-nums text-yellow-400/70">{api.empty_count}</span>
+      <span className="text-right tabular-nums text-slate-300">{fmtMs(api.avg_duration_ms)}</span>
+      <span className="text-right tabular-nums text-slate-400">{fmtMs(api.p50_ms)}</span>
+      <span className="text-right tabular-nums text-slate-400">{fmtMs(api.p95_ms)}</span>
+      <span className="text-right text-[11px] tabular-nums text-slate-500">
+        {timeAgo(api.last_success_at)}
+      </span>
+      <span className="min-w-0 truncate text-right text-[11px] text-slate-500" title={api.last_error ?? undefined}>
+        {api.last_error
+          ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 48)}`
+          : '—'}
+      </span>
+    </button>
+  )
+}
+
+function ApiSummaryList({
+  apis,
+  onOpen,
+  flat,
+}: {
+  apis: ApiSummary[]
+  onOpen: (source: string) => void
+  flat?: boolean
+}) {
+  if (apis.length === 0) {
+    return <p className="px-3 py-4 text-center text-sm text-slate-500">No APIs in this group.</p>
+  }
+  return (
+    <div className="overflow-x-auto" role="table" aria-label="API summary">
+      {flat ? <ApiSummaryHeaderFlat /> : <ApiSummaryHeader />}
+      <div role="rowgroup">
+        {apis.map((api) => (
+          <ApiSummaryRow key={api.source} api={api} onOpen={onOpen} flat={flat} />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function AnalyticsPage() {
   const [view, setView] = useState<ViewMode>('summary')
   const [layout, setLayout] = useState<LayoutMode>('grouped')
@@ -374,8 +500,8 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-6">
-      <div className="max-w-7xl mx-auto">
+    <div className="page-canvas text-slate-100">
+      <div className="w-full min-w-0">
         <div className="flex items-center justify-between mb-8">
           <div>
             <h1 className="text-3xl font-bold text-white">Analytics</h1>
@@ -459,59 +585,22 @@ export default function AnalyticsPage() {
                 className="w-full bg-slate-800 border border-slate-700 rounded-lg px-4 py-2.5 text-sm text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
               />
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-slate-500 border-b border-slate-700">
-                    <th className="text-left py-2 px-3 font-medium">API</th>
-                    <th className="text-left py-2 px-3 font-medium">Category</th>
-                    <th className="text-center py-2 px-3 font-medium">Health</th>
-                    <th className="text-right py-2 px-3 font-medium">Reqs</th>
-                    <th className="text-right py-2 px-3 font-medium">OK</th>
-                    <th className="text-right py-2 px-3 font-medium">Errors</th>
-                    <th className="text-right py-2 px-3 font-medium">Empty</th>
-                    <th className="text-right py-2 px-3 font-medium">Avg</th>
-                    <th className="text-right py-2 px-3 font-medium">p50</th>
-                    <th className="text-right py-2 px-3 font-medium">p95</th>
-                    <th className="text-right py-2 px-3 font-medium">Last OK</th>
-                    <th className="text-right py-2 px-3 font-medium">Last Error</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {flatApis
-                    .filter(api => !filter || apiName(api.source).toLowerCase().includes(filter.toLowerCase()) || api.categoryLabel.toLowerCase().includes(filter.toLowerCase()))
-                    .map(api => (
-                    <tr
-                      key={api.source}
-                      onClick={() => openDetail(api.source)}
-                      className="border-b border-slate-800/30 hover:bg-slate-800/20 cursor-pointer group"
-                    >
-                      <td className="py-2 px-3 font-medium text-slate-200 group-hover:text-indigo-300 transition-colors">
-                        {apiName(api.source)}
-                      </td>
-                      <td className="py-2 px-3 text-xs text-slate-400">{api.categoryIcon} {api.categoryLabel}</td>
-                      <td className="py-2 px-3 text-center">{healthDot(api.success_rate)} {api.success_rate}%</td>
-                      <td className="py-2 px-3 text-right text-slate-400">{api.total_requests}</td>
-                      <td className="py-2 px-3 text-right text-emerald-400">{api.success_count}</td>
-                      <td className="py-2 px-3 text-right text-red-400">{api.error_count}</td>
-                      <td className="py-2 px-3 text-right text-yellow-400/70">{api.empty_count}</td>
-                      <td className="py-2 px-3 text-right text-slate-300">{fmtMs(api.avg_duration_ms)}</td>
-                      <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p50_ms)}</td>
-                      <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p95_ms)}</td>
-                      <td className="py-2 px-3 text-right text-slate-400 text-xs">{timeAgo(api.last_success_at)}</td>
-                      <td className="py-2 px-3 text-right text-slate-400 text-xs">
-                        {api.last_error ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 40)}` : '\u2014'}
-                      </td>
-                    </tr>
-                  ))}
-                  {flatApis.filter(api => !filter || apiName(api.source).toLowerCase().includes(filter.toLowerCase()) || api.categoryLabel.toLowerCase().includes(filter.toLowerCase())).length === 0 && (
-                    <tr>
-                      <td colSpan={12} className="py-8 text-center text-slate-500">No APIs match your filter.</td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+            {(() => {
+              const filtered = flatApis.filter(
+                (api) =>
+                  !filter ||
+                  apiName(api.source).toLowerCase().includes(filter.toLowerCase()) ||
+                  api.categoryLabel.toLowerCase().includes(filter.toLowerCase()),
+              )
+              if (filtered.length === 0) {
+                return (
+                  <p className="py-8 text-center text-slate-500">No APIs match your filter.</p>
+                )
+              }
+              return (
+                <ApiSummaryList apis={filtered} onOpen={openDetail} flat />
+              )
+            })()}
           </div>
         ) : view === 'summary' ? (
           <div>
@@ -554,50 +643,12 @@ export default function AnalyticsPage() {
                   </div>
                 </button>
                 {expanded.has(cat.id) && (
-                  <div className="mt-1 ml-6 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="text-slate-500 border-b border-slate-800/50">
-                          <th className="text-left py-2 px-3 font-medium">API</th>
-                          <th className="text-center py-2 px-3 font-medium">Health</th>
-                          <th className="text-right py-2 px-3 font-medium">Reqs</th>
-                          <th className="text-right py-2 px-3 font-medium">OK</th>
-                          <th className="text-right py-2 px-3 font-medium">Errors</th>
-                          <th className="text-right py-2 px-3 font-medium">Empty</th>
-                          <th className="text-right py-2 px-3 font-medium">Avg</th>
-                          <th className="text-right py-2 px-3 font-medium">p50</th>
-                          <th className="text-right py-2 px-3 font-medium">p95</th>
-                          <th className="text-right py-2 px-3 font-medium">Last OK</th>
-                          <th className="text-right py-2 px-3 font-medium">Last Error</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {cat.apis.map(api => (
-                          <tr
-                            key={api.source}
-                            onClick={() => openDetail(api.source)}
-                            className="border-b border-slate-800/30 hover:bg-slate-800/20 cursor-pointer group"
-                          >
-                            <td className="py-2 px-3 font-medium text-slate-200 group-hover:text-indigo-300 transition-colors">
-                              {apiName(api.source)}
-                              <span className="ml-1.5 text-indigo-400/0 group-hover:text-indigo-400/60 text-xs transition-colors">click for details</span>
-                            </td>
-                            <td className="py-2 px-3 text-center">{healthDot(api.success_rate)} {api.success_rate}%</td>
-                            <td className="py-2 px-3 text-right text-slate-400">{api.total_requests}</td>
-                            <td className="py-2 px-3 text-right text-emerald-400">{api.success_count}</td>
-                            <td className="py-2 px-3 text-right text-red-400">{api.error_count}</td>
-                            <td className="py-2 px-3 text-right text-yellow-400/70">{api.empty_count}</td>
-                            <td className="py-2 px-3 text-right text-slate-300">{fmtMs(api.avg_duration_ms)}</td>
-                            <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p50_ms)}</td>
-                            <td className="py-2 px-3 text-right text-slate-400">{fmtMs(api.p95_ms)}</td>
-                            <td className="py-2 px-3 text-right text-slate-400 text-xs">{timeAgo(api.last_success_at)}</td>
-                            <td className="py-2 px-3 text-right text-slate-400 text-xs">
-                              {api.last_error ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 40)}` : '\u2014'}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div
+                    className="mt-1 rounded-b-xl border border-t-0 border-slate-800/50 bg-slate-950/40"
+                    data-testid={`analytics-cat-list-${cat.id}`}
+                  >
+                    {/* Same fixed grid for Search, Other, and every category → columns align */}
+                    <ApiSummaryList apis={cat.apis} onOpen={openDetail} />
                   </div>
                 )}
               </div>

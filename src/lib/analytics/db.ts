@@ -259,6 +259,13 @@ const API_CATEGORY_MAP: Record<string, { id: string; label: string; icon: string
   similar: { id: 'search', label: 'Search', icon: '🔍' },
 }
 
+/** Fallback labels when source is unmapped → catId `other`. */
+const CATEGORY_META: Record<string, { label: string; icon: string }> = {
+  other: { label: 'Other', icon: '📄' },
+  search: { label: 'Search', icon: '🔍' },
+  gene: { label: 'Gene', icon: '🧬' },
+}
+
 const CATEGORY_ORDER = [
   'pharmaceutical',
   'clinical-safety',
@@ -271,6 +278,7 @@ const CATEGORY_ORDER = [
   'research-literature',
   'gene',
   'search',
+  'other',
 ]
 
 let _rows: MetricRow[] = []
@@ -413,7 +421,11 @@ export function getCategorizedSummary(since?: string): CategoryGroup[] {
   for (const catId of orderedIds) {
     const catMap = byCategory.get(catId)
     if (!catMap) continue
-    const sampleMapping = API_CATEGORY_MAP[catMap.keys().next().value!] ?? API_CATEGORY_MAP[`category:${catId}`] ?? { label: catId, icon: '📄' }
+    const sampleMapping =
+      CATEGORY_META[catId] ??
+      API_CATEGORY_MAP[catMap.keys().next().value!] ??
+      API_CATEGORY_MAP[`category:${catId}`] ??
+      { label: catId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), icon: '📄' }
 
     const apis: ApiSummary[] = []
     let catTotalReqs = 0, catSuccess = 0, catErrors = 0, catEmpty = 0, catDurationSum = 0
@@ -423,7 +435,11 @@ export function getCategorizedSummary(since?: string): CategoryGroup[] {
       const source = apiSources[i]
       const rows = catMap.get(source)!
       const s = summarizeGroup(rows)
-      const mapping = API_CATEGORY_MAP[source] ?? { id: catId, label: sampleMapping.label, icon: sampleMapping.icon }
+      const mapping = API_CATEGORY_MAP[source] ?? {
+        id: catId,
+        label: sampleMapping.label,
+        icon: sampleMapping.icon,
+      }
       apis.push({
         ...s,
         category: mapping.id,
