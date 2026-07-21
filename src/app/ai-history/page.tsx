@@ -16,6 +16,8 @@ import {
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiUserComment } from '@/components/ai/AiUserComment'
+import { AiGenerationView } from '@/components/ai/AiGenerationView'
+import { formatAiGenerationPreview } from '@/lib/ai/formatAiGeneration'
 import { clearAiHistoryLocal } from '@/lib/ai/aiHistoryIdb'
 
 const KINDS: Array<AiDataKind | 'all'> = [
@@ -146,13 +148,17 @@ export default function AiHistoryPage() {
                   </button>
                 </div>
                 <p className="mt-2 text-[11px] text-slate-400 line-clamp-3">
-                  {(entry.content || entry.error || '').slice(0, 280)}
+                  {formatAiGenerationPreview(entry, 280)}
                 </p>
                 {expanded && (
                   <div className="mt-3 space-y-2 border-t border-slate-800 pt-2">
-                    <pre className="max-h-60 overflow-y-auto whitespace-pre-wrap text-[10px] text-slate-400">
-                      {entry.content || entry.error || ''}
-                    </pre>
+                    <div className="max-h-72 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950/40 p-2">
+                      <AiGenerationView
+                        entry={entry}
+                        density="full"
+                        testId={`ai-history-body-${entry.id}`}
+                      />
+                    </div>
                     <AiPromptReveal
                       system={entry.promptSystem}
                       user={entry.promptUser}

@@ -13,6 +13,8 @@ import {
 } from '@/lib/ai/aiHistoryStore'
 import { AiPromptReveal } from './AiPromptReveal'
 import { AiUserComment } from './AiUserComment'
+import { AiGenerationView } from './AiGenerationView'
+import { formatAiGenerationPreview } from '@/lib/ai/formatAiGeneration'
 
 export interface AiGenerationHistoryProps {
   kind?: AiDataKind
@@ -103,7 +105,7 @@ export function AiGenerationHistory({
           )}
           <ul className="space-y-1.5 max-h-64 overflow-y-auto">
             {items.map((entry) => {
-              const preview = (entry.content || entry.error || '').slice(0, 120)
+              const preview = formatAiGenerationPreview(entry, 140)
               const expanded = expandedId === entry.id
               return (
                 <li
@@ -140,13 +142,17 @@ export function AiGenerationHistory({
                     </div>
                   </div>
                   {!expanded && (
-                    <p className="mt-1 text-slate-500 line-clamp-2">{preview || '(empty)'}</p>
+                    <p className="mt-1 text-slate-400 line-clamp-2">{preview || '(empty)'}</p>
                   )}
                   {expanded && (
                     <div className="mt-2 space-y-2">
-                      <pre className="max-h-40 overflow-y-auto whitespace-pre-wrap text-[9px] text-slate-400">
-                        {entry.content || entry.error || ''}
-                      </pre>
+                      <div className="max-h-48 overflow-y-auto rounded border border-slate-800/50 bg-slate-950/40 p-1.5">
+                        <AiGenerationView
+                          entry={entry}
+                          density="full"
+                          testId={`${testId}-body-${entry.id}`}
+                        />
+                      </div>
                       {(entry.promptSystem || entry.promptUser) && (
                         <AiPromptReveal
                           system={entry.promptSystem}

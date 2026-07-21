@@ -16,6 +16,8 @@ import {
   type AiGeneratedRecord,
 } from '@/lib/ai/aiHistoryStore'
 import { AiUserComment } from './AiUserComment'
+import { AiGenerationView } from './AiGenerationView'
+import { formatAiGenerationPreview } from '@/lib/ai/formatAiGeneration'
 
 export interface AiRegenerateModalProps {
   open: boolean
@@ -229,7 +231,7 @@ export function AiRegenerateModal({
             <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
               {items.map((entry) => {
                 const expanded = expandedId === entry.id
-                const preview = (entry.content || entry.error || '').slice(0, 100)
+                const preview = formatAiGenerationPreview(entry, 120)
                 return (
                   <li
                     key={entry.id}
@@ -271,13 +273,17 @@ export function AiRegenerateModal({
                       </div>
                     </div>
                     {!expanded && (
-                      <p className="mt-1 text-slate-500 line-clamp-2">{preview || '(empty)'}</p>
+                      <p className="mt-1 text-slate-400 line-clamp-2">{preview || '(empty)'}</p>
                     )}
                     {expanded && (
                       <div className="mt-2 space-y-1">
-                        <pre className="max-h-28 overflow-y-auto whitespace-pre-wrap text-[9px] text-slate-400">
-                          {entry.content || entry.error || ''}
-                        </pre>
+                        <div className="max-h-40 overflow-y-auto rounded border border-slate-800/50 bg-slate-950/50 p-1.5">
+                          <AiGenerationView
+                            entry={entry}
+                            density="full"
+                            testId={`${testId}-body-${entry.id}`}
+                          />
+                        </div>
                         {(entry.promptUser || entry.promptSystem) && (
                           <button
                             type="button"

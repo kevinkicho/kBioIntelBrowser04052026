@@ -16,6 +16,7 @@ import {
 } from '@/lib/ai/aiHistoryStore'
 import { AiPromptReveal } from './AiPromptReveal'
 import { AiUserComment } from './AiUserComment'
+import { AiGenerationView } from './AiGenerationView'
 
 export interface AiRunNavigatorProps {
   kind: AiDataKind
@@ -184,10 +185,6 @@ export function AiRunNavigator({
                   {current.model ? ` · ${current.model}` : ''}
                   {current.error ? ' · error' : ''}
                 </p>
-                <p className="mt-1 max-h-16 overflow-hidden text-[11px] leading-snug text-slate-400 line-clamp-3">
-                  {(current.content || current.error || '').slice(0, 240)}
-                  {(current.content || '').length > 240 ? '…' : ''}
-                </p>
                 {current.userComment?.trim() && (
                   <p className="mt-1 text-[10px] text-amber-200/80 line-clamp-2">
                     Note: {current.userComment.trim()}
@@ -214,6 +211,13 @@ export function AiRunNavigator({
                   {showPrompt ? 'Hide prompt' : 'Show prompt'}
                 </button>
               </div>
+            </div>
+            <div className="mt-2 max-h-48 overflow-y-auto rounded border border-slate-800/60 bg-slate-950/40 p-2">
+              <AiGenerationView
+                entry={current}
+                density="full"
+                testId={`${testId}-body`}
+              />
             </div>
             {showPrompt && (
               <AiPromptReveal
