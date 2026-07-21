@@ -52,6 +52,13 @@ export const API_METADATA: Record<string, ApiMeta> = {
     apiDocs: 'https://collegescorecard.ed.gov/data/api-documentation/',
     apiEndpoint: 'https://api.data.gov/ed/collegescorecard/v1/schools',
   },
+  'urban-ipeds': {
+    organization: 'Urban Institute',
+    description: 'IPEDS directory via Education Data Portal (UNITID lookup, no key)',
+    apiDocs: 'https://educationdata.urban.org/documentation/colleges.html',
+    apiEndpoint:
+      'https://educationdata.urban.org/api/v1/college-university/ipeds/directory',
+  },
   'ror-eu-pack': {
     organization: 'Research Organization Registry',
     description: 'EU multi-country ROR packs (education, healthcare, facility types)',
@@ -164,7 +171,13 @@ export const API_METADATA: Record<string, ApiMeta> = {
   patents: { organization: 'USPTO / PatentsView', description: 'PatentsView patent data for biomedical research', apiDocs: 'https://www.patentsview.org/api/api-inventor/', apiEndpoint: 'https://search.patentsview.org/api/v1/patent' },
   secedgar: { organization: 'U.S. SEC', description: 'SEC EDGAR corporate filing data for pharmaceutical companies', apiDocs: 'https://www.sec.gov/edgar/sec-api-documentation', apiEndpoint: 'https://data.sec.gov/api/xbrl' },
   'semantic-scholar': { organization: 'AI2', description: 'Semantic Scholar academic paper search and citation data', apiDocs: 'https://api.semanticscholar.org/api/v2/', apiEndpoint: 'https://api.semanticscholar.org/graph/v1' },
-  openalex: { organization: 'OurResearch', description: 'OpenAlex open scholarly metadata catalog', apiDocs: 'https://docs.openalex.org/', apiEndpoint: 'https://api.openalex.org' },
+  openalex: {
+    organization: 'OurResearch',
+    description:
+      'OpenAlex open scholarly catalog; works + US education institution name search (no key fallback for colleges)',
+    apiDocs: 'https://docs.openalex.org/',
+    apiEndpoint: 'https://api.openalex.org',
+  },
   pubmed: { organization: 'NLM (NIH)', description: 'PubMed biomedical literature citation database', apiDocs: 'https://www.ncbi.nlm.nih.gov/books/NBK25501/', apiEndpoint: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed' },
   opencitations: { organization: 'OpenCitations', description: 'OpenCitations open scholarly citation data', apiDocs: 'https://opencitations.net/api', apiEndpoint: 'https://opencitations.net/index/api/v2' },
   crossref: { organization: 'CrossRef', description: 'CrossRef DOI metadata and citation data', apiDocs: 'https://api.crossref.org/', apiEndpoint: 'https://api.crossref.org/works' },

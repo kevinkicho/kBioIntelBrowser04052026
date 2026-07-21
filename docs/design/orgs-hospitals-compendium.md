@@ -11,6 +11,8 @@
 | **ROR** | Global (US + EU + …) | A | Research universities, institutes, many academic hospitals, funders |
 | **CMS Hospital General Information** | US Medicare | A/B | Registered hospitals (name, address, type, rating) |
 | **College Scorecard** | US colleges | A | Free `api.data.gov` DEMO_KEY (or `DATA_GOV_API_KEY`) |
+| **OpenAlex institutions** | US education | A | **Zero-key** name search fallback when Scorecard empty |
+| **Urban IPEDS directory** | US | A | Zero-key **UNITID** enrich (address/phone); not full-text name |
 | **EU ROR packs** | Core EU countries | A | Multi-country education/healthcare/facility filters |
 | **National EU hospital open data** | Per country | C | Still no single free pan-EU hospital API |
 
@@ -20,7 +22,9 @@
 |-------|------|
 | ROR client | `src/lib/api/ror.ts` |
 | CMS hospitals | `src/lib/api/cmsHospitals.ts` |
-| College Scorecard | `src/lib/api/collegeScorecard.ts` |
+| College Scorecard | `src/lib/api/collegeScorecard.ts` (fallback: OpenAlex + IPEDS) |
+| OpenAlex institutions | `src/lib/api/openAlexInstitutions.ts` |
+| Urban IPEDS | `src/lib/api/urbanIpeds.ts` |
 | EU packs | `src/lib/api/euResearchOrgs.ts` |
 | Panels | `ResearchOrgsPanel`, `UsHospitalsPanel`, `UsCollegesPanel` |
 | Browse UI | `/orgs` |

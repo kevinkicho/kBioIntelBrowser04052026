@@ -38,8 +38,9 @@ export const UsCollegesPanel = memo(function UsCollegesPanel({
     >
       <div className="space-y-3">
         <p className="text-[10px] text-slate-500 leading-relaxed">
-          US Department of Education College Scorecard (Title IV institutions). Directory context
-          for research affiliations — not admissions or ranking advice.{' '}
+          US colleges: College Scorecard (primary), OpenAlex US education if Scorecard empty, Urban
+          IPEDS enrichment for address/phone when UNITID known. Free public data — not admissions
+          advice.{' '}
           <a
             href="https://collegescorecard.ed.gov/"
             target="_blank"
@@ -70,10 +71,16 @@ export const UsCollegesPanel = memo(function UsCollegesPanel({
                   <div className="min-w-0">
                     <p className="font-semibold text-slate-100 text-sm">{c.name}</p>
                     <p className="text-[11px] text-slate-400 mt-0.5">
-                      {[c.city, c.state, c.zip].filter(Boolean).join(', ')}
+                      {[c.address, c.city, c.state, c.zip].filter(Boolean).join(', ')}
                     </p>
                     <p className="text-[11px] text-slate-500 mt-0.5">
-                      {[c.ownership, c.predominantDegree, c.studentSize != null ? `${c.studentSize} students` : '']
+                      {[
+                        c.ownership,
+                        c.predominantDegree,
+                        c.studentSize != null ? `${c.studentSize} students` : '',
+                        c.phone,
+                        c.source,
+                      ]
                         .filter(Boolean)
                         .join(' · ')}
                     </p>

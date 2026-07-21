@@ -1,10 +1,14 @@
 /**
  * US College Scorecard (Dept of Education) — free public API via api.data.gov.
  * Default DEMO_KEY for development; set DATA_GOV_API_KEY for higher limits (still free).
+ * Fallback chain (no paid keys): Scorecard → OpenAlex US education → optional Urban IPEDS enrich.
  * Not admissions advice — institutional directory for research affiliation context.
  * @see https://collegescorecard.ed.gov/data/api-documentation/
  * @see docs/design/orgs-hospitals-compendium.md
  */
+
+import { searchOpenAlexUsEducation } from './openAlexInstitutions'
+import { getUrbanIpedsByUnitid } from './urbanIpeds'
 
 const BASE = 'https://api.data.gov/ed/collegescorecard/v1/schools'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -23,6 +27,11 @@ export interface UsCollege {
   carnegieBasic: string
   locale: string
   scorecardUrl: string
+  /** Scorecard | openalex | ipeds */
+  source?: string
+  phone?: string
+  address?: string
+  rorId?: string | null
   matchSource?: string
 }
 
@@ -89,21 +98,14 @@ function mapSchool(raw: Record<string, unknown>, matchSource?: string): UsColleg
     carnegieBasic: String(raw['school.carnegie_basic'] ?? '').trim(),
     locale: String(raw['school.locale'] ?? '').trim(),
     scorecardUrl: `https://collegescorecard.ed.gov/school/?${id}`,
+    source: 'scorecard',
     matchSource,
   }
 }
 
-/**
- * Search US colleges/universities by name (College Scorecard).
- */
-export async function searchUsCollegesByName(
-  query: string,
-  limit = 15,
-): Promise<UsCollege[]> {
-  const q = query.trim()
-  if (!q || q.length < 2) return []
+async function searchScorecardOnly(query: string, limit: number): Promise<UsCollege[]> {
   const params = new URLSearchParams({
-    'school.name': q,
+    'school.name': query,
     per_page: String(Math.min(50, Math.max(1, limit))),
     page: '0',
     fields: FIELDS,
@@ -120,6 +122,88 @@ export async function searchUsCollegesByName(
   } catch {
     return []
   }
+}
+
+async function searchOpenAlexAsColleges(query: string, limit: number): Promise<UsCollege[]> {
+  const rows = await searchOpenAlexUsEducation(query, limit)
+  return rows.map((r) => ({
+    id: r.openAlexId || r.name,
+    name: r.name,
+    city: r.city,
+    state: r.region,
+    zip: '',
+    schoolUrl: r.homepage,
+    ownership: '',
+    predominantDegree: r.type || 'education',
+    studentSize: null,
+    carnegieBasic: '',
+    locale: '',
+    scorecardUrl: r.openAlexUrl,
+    source: 'openalex',
+    rorId: r.rorId,
+    matchSource: 'openalex-fallback',
+  }))
+}
+
+/**
+ * Enrich Scorecard rows with Urban IPEDS directory fields (address, phone, website).
+ * Best-effort; failures leave Scorecard fields intact.
+ */
+export async function enrichCollegesWithIpeds(colleges: UsCollege[]): Promise<UsCollege[]> {
+  const out: UsCollege[] = []
+  for (const c of colleges.slice(0, 8)) {
+    const unitid = /^\d+$/.test(c.id) ? c.id : ''
+    if (!unitid) {
+      out.push(c)
+      continue
+    }
+    try {
+      const ipeds = await getUrbanIpedsByUnitid(unitid)
+      if (!ipeds) {
+        out.push(c)
+        continue
+      }
+      out.push({
+        ...c,
+        address: ipeds.address || c.address,
+        phone: ipeds.phone || c.phone,
+        schoolUrl: c.schoolUrl || ipeds.website,
+        city: c.city || ipeds.city,
+        state: c.state || ipeds.state,
+        zip: c.zip || ipeds.zip,
+        ownership: c.ownership || ipeds.control,
+        source: c.source === 'scorecard' ? 'scorecard+ipeds' : c.source,
+      })
+    } catch {
+      out.push(c)
+    }
+  }
+  // append any beyond enrich cap
+  for (const c of colleges.slice(8)) out.push(c)
+  return out
+}
+
+/**
+ * Search US colleges/universities by name.
+ * Primary: College Scorecard. Fallback (no key): OpenAlex US education institutions.
+ * Optional IPEDS enrich when Scorecard unitids are present.
+ */
+export async function searchUsCollegesByName(
+  query: string,
+  limit = 15,
+  opts?: { enrichIpeds?: boolean },
+): Promise<UsCollege[]> {
+  const q = query.trim()
+  if (!q || q.length < 2) return []
+
+  let rows = await searchScorecardOnly(q, limit)
+  if (rows.length === 0) {
+    rows = await searchOpenAlexAsColleges(q, limit)
+  }
+  if (opts?.enrichIpeds !== false && rows.some((r) => r.source?.startsWith('scorecard'))) {
+    rows = await enrichCollegesWithIpeds(rows)
+  }
+  return rows.slice(0, limit)
 }
 
 /**

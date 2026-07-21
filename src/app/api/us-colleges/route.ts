@@ -24,7 +24,7 @@ export async function GET(request: NextRequest) {
       query: q,
       count: colleges.length,
       colleges,
-      note: 'College Scorecard public data — not admissions advice. Free api.data.gov key optional (DEMO_KEY default).',
+      note: 'Scorecard primary; OpenAlex US education fallback (no key); Urban IPEDS enriches UNITID rows. Not admissions advice.',
     })
   } catch (e) {
     return NextResponse.json(
