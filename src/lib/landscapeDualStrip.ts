@@ -31,8 +31,21 @@ export interface JurisdictionPresence {
   region: string
   label: string
   count: number
+  /** Short secondary line (e.g. brand samples) */
   detail?: string
+  /**
+   * Official http(s) deep link only — never homepage shells or empty strings.
+   * If absent, chip is not clickable.
+   */
   href?: string
+  /** Why this chip is present (for styled tooltip) */
+  whyShowing?: string
+  /** What user learns by navigating (for styled tooltip) */
+  learnMore?: string
+  /** Free-source method / caveats */
+  method?: string
+  /** Register / portal name for transparency */
+  sourceName?: string
 }
 
 export interface LandscapeDualStripView {
@@ -128,57 +141,101 @@ export function buildLandscapeDualStrip(input: {
   const links = input.internationalRegulatorLinks ?? []
 
   const jurisdictions: JurisdictionPresence[] = []
+  const httpHref = (u: string | null | undefined): string | undefined => {
+    const s = (u || '').trim()
+    return /^https?:\/\//i.test(s) ? s : undefined
+  }
+
   if (bla > 0 || pb > 0 || orange > 0) {
+    const parts = [
+      bla ? `${bla} BLA / Drugs@FDA licensed biologic rows` : '',
+      pb ? `${pb} Purple Book product rows` : '',
+      orange ? `${orange} Orange Book entries` : '',
+    ].filter(Boolean)
+    // Prefer official search/portal deep links (stable public URLs)
+    const usHref =
+      httpHref(links.find((l) => l.id === 'fda' || /fda/i.test(l.label))?.url) ||
+      (pb > 0
+        ? 'https://purplebooksearch.fda.gov/'
+        : bla > 0
+          ? 'https://www.accessdata.fda.gov/scripts/cder/daf/'
+          : 'https://www.accessdata.fda.gov/scripts/cder/ob/')
     jurisdictions.push({
       id: 'us',
       region: 'US',
       label: 'US (BLA / Purple / Orange)',
       count: bla + pb + orange,
-      detail: [
-        bla ? `${bla} BLA` : '',
-        pb ? `${pb} Purple Book` : '',
-        orange ? `${orange} Orange Book` : '',
-      ]
-        .filter(Boolean)
-        .join(' · '),
-      href: links.find((l) => l.id === 'fda' || /fda/i.test(l.label))?.url,
+      detail: parts.join(' · '),
+      href: usHref,
+      sourceName: 'U.S. FDA free public registers',
+      whyShowing: `Free US register rows loaded for ${moleculeName}: ${parts.join('; ')}. Chip appears only when at least one of BLA, Purple Book, or Orange Book lists is non-empty from free public APIs/caches.`,
+      learnMore:
+        'Open the linked FDA portal to inspect licensed biologics/biosimilar roles (Purple Book), application/product pages (Drugs@FDA / BLA), or therapeutic equivalence listings (Orange Book). BioIntel only counts free public rows — not approval recommendations.',
+      method:
+        'Deterministic count join from profile panels (openFDA Drugs@FDA BLA, Purple Book cache, Orange Book). Not LLM ranking or competitive intelligence scores.',
     })
   }
   if (hc.length > 0) {
+    const samples = hc
+      .slice(0, 2)
+      .map((p) => p.brandName || p.din)
+      .filter(Boolean)
+      .join(', ')
+    const hcHref =
+      httpHref(hc[0]?.url) ||
+      httpHref(links.find((l) => l.id === 'health_canada' || /canada/i.test(l.label))?.url) ||
+      'https://health-products.canada.ca/dpd-bdpp/index-eng.jsp'
     jurisdictions.push({
       id: 'ca',
       region: 'CA',
       label: 'Health Canada DPD',
       count: hc.length,
-      detail: hc
-        .slice(0, 2)
-        .map((p) => p.brandName || p.din)
-        .filter(Boolean)
-        .join(', '),
-      href: hc[0]?.url,
+      detail: samples || undefined,
+      href: hcHref,
+      sourceName: 'Health Canada Drug Product Database',
+      whyShowing: `${hc.length} Health Canada DPD product row(s) matched for ${moleculeName} via free public DPD API. Sample: ${samples || 'see portal'}.`,
+      learnMore:
+        'Navigate to DPD (or the product deep link when available) for DIN, brand, status, and ingredient framing in Canada. Not a prescribing or import decision tool.',
+      method:
+        'Count of free-public DPD hits attached to this molecule profile. Deep link prefers product URL when present; otherwise DPD search portal.',
     })
   }
   if (emaBulk > 0 || emaMed > 0) {
+    const emaHref =
+      httpHref(links.find((l) => l.id === 'ema')?.url) ||
+      `https://www.ema.europa.eu/en/search?search_api_fulltext=${encodeURIComponent(moleculeName)}`
     jurisdictions.push({
       id: 'eu',
       region: 'EU',
       label: 'EMA medicines',
       count: emaBulk + emaMed,
       detail: emaBulk ? `${emaBulk} bulk dump` : `${emaMed} search rows`,
-      href: links.find((l) => l.id === 'ema')?.url,
+      href: emaHref,
+      sourceName: 'European Medicines Agency',
+      whyShowing: `EU-facing free data present: ${emaBulk ? `${emaBulk} EMA bulk medicine row(s)` : ''}${emaBulk && emaMed ? ' + ' : ''}${emaMed ? `${emaMed} EMA search hit(s)` : ''} for ${moleculeName}.`,
+      learnMore:
+        'Open EMA public search / medicine pages for EU product names, EPAR entry points, and authorization framing. Bulk rows are dump-derived; always verify on the live EMA record.',
+      method:
+        'Deterministic counts from EMA bulk Excel/JSON caches and/or free EMA-facing search joins. Portal deep link is official EMA search — not a scraped shadow page.',
     })
   }
-  // Portal-only jurisdictions (UK/AU/JP) when deep links present
+  // Portal-only jurisdictions (UK/AU/JP) — only when an http deep link exists
   for (const id of ['mhra', 'tga', 'pmda'] as const) {
     const link = links.find((l) => l.id === id || String(l.id).startsWith(id))
-    if (link) {
+    const href = httpHref(link?.url)
+    if (link && href) {
       jurisdictions.push({
         id,
         region: link.region || id.toUpperCase(),
         label: link.label,
         count: 0,
-        detail: 'Portal search (no structured count)',
-        href: link.url,
+        detail: link.kind === 'search' ? 'Name search portal' : 'Official portal',
+        href,
+        sourceName: link.label,
+        whyShowing: `International regulator deep link prepared for ${moleculeName} (${link.region}). No structured row count in BioIntel — portal-first free path only.`,
+        learnMore: `${link.description || 'Open the official regulator portal'} to search product information, labels, or public registers for this name. Expect search results, not a BioIntel-hosted database.`,
+        method:
+          'Portal-first deep link from free public regulator sites (no scrape). Chip is shown only when a stable http(s) URL is available.',
       })
     }
   }

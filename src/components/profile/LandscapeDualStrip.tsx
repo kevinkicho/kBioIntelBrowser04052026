@@ -1,11 +1,13 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useId, useMemo, useState, type ReactNode } from 'react'
 import {
   buildLandscapeDualStripFromProfileData,
+  type JurisdictionPresence,
   type LandscapeStripChip,
 } from '@/lib/landscapeDualStrip'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 
 const TONE: Record<NonNullable<LandscapeStripChip['tone']>, string> = {
   emerald: 'border-emerald-800/40 bg-emerald-950/30 text-emerald-200',
@@ -14,6 +16,13 @@ const TONE: Record<NonNullable<LandscapeStripChip['tone']>, string> = {
   sky: 'border-sky-800/40 bg-sky-950/30 text-sky-200',
   slate: 'border-slate-700 bg-slate-900/50 text-slate-300',
   rose: 'border-rose-800/40 bg-rose-950/30 text-rose-200',
+}
+
+function stableHttpHref(url: string | null | undefined): string | null {
+  const u = (url || '').trim()
+  if (!/^https?:\/\//i.test(u)) return null
+  if (isBrokenSourceShellUrl(u)) return null
+  return u
 }
 
 export const LandscapeDualStrip = memo(function LandscapeDualStrip({
@@ -88,39 +97,7 @@ export const LandscapeDualStrip = memo(function LandscapeDualStrip({
           <ul className="flex flex-wrap gap-1.5">
             {strip.jurisdictions.map((j) => (
               <li key={j.id}>
-                {j.href ? (
-                  <a
-                    href={j.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1 rounded border border-slate-700 bg-slate-950/50 px-2 py-1 text-[10px] text-slate-300 hover:border-indigo-700/50 hover:text-indigo-200"
-                    title={j.detail}
-                    onClick={() =>
-                      onDeepLinkClick('other', j.href!, {
-                        panelId: 'landscape-dual-strip',
-                        label: j.id,
-                      })
-                    }
-                  >
-                    <span className="font-semibold text-slate-100">{j.region}</span>
-                    <span className="text-slate-500">{j.label}</span>
-                    {j.count > 0 ? (
-                      <span className="font-mono text-indigo-300">{j.count}</span>
-                    ) : (
-                      <span className="text-slate-600">↗</span>
-                    )}
-                  </a>
-                ) : (
-                  <span
-                    className="inline-flex items-center gap-1 rounded border border-slate-800 px-2 py-1 text-[10px] text-slate-400"
-                    title={j.detail}
-                  >
-                    <span className="font-semibold text-slate-200">{j.region}</span>
-                    {j.count > 0 ? (
-                      <span className="font-mono text-slate-300">{j.count}</span>
-                    ) : null}
-                  </span>
-                )}
+                <JurisdictionChip j={j} moleculeName={strip.moleculeName} />
               </li>
             ))}
           </ul>
@@ -139,6 +116,157 @@ export const LandscapeDualStrip = memo(function LandscapeDualStrip({
     </section>
   )
 })
+
+function JurisdictionChip({
+  j,
+  moleculeName,
+}: {
+  j: JurisdictionPresence
+  moleculeName: string
+}) {
+  const uid = useId()
+  const tipId = `${uid}-tip`
+  const [open, setOpen] = useState(false)
+  const href = stableHttpHref(j.href)
+  const emptyCount = !j.count || j.count === 0
+
+  const className = `inline-flex max-w-full items-center gap-1 rounded border px-2 py-1 text-[10px] ${
+    href
+      ? 'border-slate-700 bg-slate-950/50 text-slate-300 hover:border-indigo-700/50 hover:text-indigo-200'
+      : 'border-slate-800 bg-slate-950/30 text-slate-400 cursor-default'
+  } ${emptyCount && !href ? 'opacity-30' : emptyCount ? 'opacity-80' : ''}`
+
+  const body = (
+    <>
+      <span className="font-semibold text-slate-100 shrink-0">{j.region}</span>
+      <span className="text-slate-500 truncate">{j.label}</span>
+      {j.count > 0 ? (
+        <span className="font-mono tabular-nums text-indigo-300 shrink-0">{j.count}</span>
+      ) : null}
+      {/* No trailing ↗ — saves space; hover tooltip explains navigation */}
+    </>
+  )
+
+  return (
+    <span
+      className="relative inline-flex max-w-full"
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocus={() => setOpen(true)}
+      onBlur={() => setOpen(false)}
+    >
+      {href ? (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={className}
+          aria-describedby={open ? tipId : undefined}
+          data-testid="jurisdiction-chip"
+          data-clickable="true"
+          data-region={j.region}
+          onClick={() =>
+            onDeepLinkClick('other', href, {
+              panelId: 'landscape-dual-strip',
+              label: j.id,
+            })
+          }
+        >
+          {body}
+        </a>
+      ) : (
+        <span
+          className={className}
+          aria-describedby={open ? tipId : undefined}
+          data-testid="jurisdiction-chip"
+          data-clickable="false"
+          data-region={j.region}
+        >
+          {body}
+        </span>
+      )}
+
+      {open && (
+        <JurisdictionTooltip
+          tipId={tipId}
+          j={j}
+          moleculeName={moleculeName}
+          href={href}
+        />
+      )}
+    </span>
+  )
+}
+
+function JurisdictionTooltip({
+  tipId,
+  j,
+  moleculeName,
+  href,
+}: {
+  tipId: string
+  j: JurisdictionPresence
+  moleculeName: string
+  href: string | null
+}) {
+  return (
+    <span
+      id={tipId}
+      role="tooltip"
+      data-testid="jurisdiction-chip-tooltip"
+      className="pointer-events-none absolute left-0 bottom-full z-[60] mb-1.5 w-72 max-w-[min(18rem,92vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
+    >
+      <span className="block text-[10px] font-semibold text-sky-200">
+        {j.region} · {j.label}
+      </span>
+      <span className="mt-0.5 block text-[9px] font-medium uppercase tracking-wide text-slate-500">
+        Jurisdiction presence · free public registers
+      </span>
+      {j.count > 0 && (
+        <span className="mt-1 block font-mono text-[10px] text-indigo-300">
+          {j.count} free-API row{j.count === 1 ? '' : 's'}
+          {j.detail ? ` · ${j.detail}` : ''}
+        </span>
+      )}
+
+      <TipBlock title="Why this chip is here">
+        {j.whyShowing ||
+          `Free public data for ${moleculeName} includes a ${j.region} register or portal signal (${j.label}).`}
+      </TipBlock>
+      <TipBlock title="What you can learn if you navigate">
+        {j.learnMore ||
+          'Open the official regulator/register page for product names, status, and public documentation. BioIntel does not give clinical or regulatory decisions.'}
+      </TipBlock>
+      <TipBlock title="How BioIntel decided">
+        {j.method ||
+          'Deterministic join of free-public profile panels and portal deep links. Not LLM ranking or competitive scoring.'}
+      </TipBlock>
+      {j.sourceName && (
+        <TipBlock title="Source">{j.sourceName}</TipBlock>
+      )}
+      <TipBlock title="Link">
+        {href
+          ? 'Official http(s) deep link — opens in a new tab.'
+          : 'No stable deep link for this row — chip is not clickable.'}
+      </TipBlock>
+      {href && (
+        <span className="mt-1 block break-all font-mono text-[8px] text-slate-600">{href}</span>
+      )}
+      <span className="mt-1.5 block text-[9px] leading-snug text-slate-600">
+        Not admissions, clinical referral, or regulatory decision support.
+      </span>
+    </span>
+  )
+}
+
+function TipBlock({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <span className="mt-1.5 block">
+      <span className="block text-[9px] font-semibold text-indigo-300/90">{title}</span>
+      <span className="mt-0.5 block text-[10px] leading-snug text-slate-300">{children}</span>
+    </span>
+  )
+}
 
 function Chip({
   chip,
