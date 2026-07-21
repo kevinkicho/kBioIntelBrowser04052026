@@ -205,11 +205,19 @@ function formatStructuredInsight(
   }
 }
 
+export type AiGenerationFormatInput = {
+  content?: string
+  error?: string
+  task?: unknown
+  kind?: string
+  mode?: string
+}
+
 /**
  * Format a stored AI generation for UI (preview + structured blocks).
  */
 export function formatAiGeneration(
-  entry: Pick<AiGeneratedRecord, 'content' | 'error' | 'task' | 'kind' | 'mode'>,
+  entry: AiGenerationFormatInput | Pick<AiGeneratedRecord, 'content' | 'error' | 'task' | 'kind' | 'mode'>,
 ): FormattedAiGeneration {
   if (entry.error && !entry.content?.trim() && !entry.task) {
     return {
@@ -264,7 +272,7 @@ export function formatAiGeneration(
 
 /** Short list preview only. */
 export function formatAiGenerationPreview(
-  entry: Pick<AiGeneratedRecord, 'content' | 'error' | 'task' | 'kind' | 'mode'>,
+  entry: AiGenerationFormatInput,
   maxLen = 160,
 ): string {
   const f = formatAiGeneration(entry)

@@ -50,6 +50,7 @@ describe('formatAiGeneration', () => {
     const f = formatAiGeneration({
       kind: 'rh',
       mode: 'rh_thesis_draft',
+      content: '',
       task: {
         summary: 'Thesis draft from claims',
         claimIds: ['c1'],
