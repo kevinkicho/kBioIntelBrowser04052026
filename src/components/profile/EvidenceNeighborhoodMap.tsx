@@ -8,6 +8,7 @@
 
 import { memo, useId, useMemo, useState, type ReactNode } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 import {
   buildEvidenceNeighborhood,
   type NeighborhoodNode,
@@ -381,7 +382,8 @@ function ChipTooltip({
         <span
           id={panelId}
           role="tooltip"
-          className="pointer-events-none absolute bottom-full left-0 z-50 mb-1.5 w-56 rounded-lg border border-slate-600 bg-slate-900 p-2 shadow-xl"
+          style={{ zIndex: STYLED_TOOLTIP_Z }}
+          className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-56 rounded-lg border border-slate-600 bg-slate-900 p-2 shadow-xl"
         >
           <span className="block text-[9px] font-semibold uppercase tracking-wide text-indigo-300/90">
             {title}

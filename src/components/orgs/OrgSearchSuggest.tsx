@@ -230,7 +230,7 @@ export function OrgSearchSuggest({
           top: menuRect.top,
           left: menuRect.left,
           width: menuRect.width,
-          zIndex: 9999,
+          zIndex: 10000,
         }}
         className="max-h-80 overflow-y-auto rounded-lg border border-slate-600 bg-slate-900 shadow-2xl shadow-black/60"
         data-testid={`${testId}-dropdown`}

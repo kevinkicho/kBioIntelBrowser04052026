@@ -10,6 +10,7 @@ import Link from 'next/link'
 import type { SignalItem } from '@/lib/signals'
 import { explainSignal } from '@/lib/signals/explainSignal'
 import { buildMoleculePanelDeepLink } from '@/lib/signals/deepLink'
+import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 
 interface SignalBadgesProps {
   signals: SignalItem[]
@@ -144,7 +145,8 @@ function SignalChip({
           id={tipId}
           role="tooltip"
           data-testid="signal-chip-tooltip"
-          className="pointer-events-none absolute left-0 bottom-full z-[60] mb-1.5 w-72 max-w-[min(18rem,90vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
+          style={{ zIndex: STYLED_TOOLTIP_Z }}
+          className="pointer-events-none absolute left-0 bottom-full mb-1.5 w-72 max-w-[min(18rem,90vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
         >
           <span className="block text-[10px] font-semibold text-amber-200/95">
             {explain.headline}

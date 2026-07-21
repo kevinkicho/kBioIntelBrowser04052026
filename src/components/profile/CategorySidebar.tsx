@@ -29,7 +29,7 @@ function StatusIndicator({
   return (
     <span className="relative group">
       <span className={`w-1.5 h-1.5 rounded-full ${color}`} />
-      <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] text-slate-200 bg-slate-800 border border-slate-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-50 shadow-lg">
+      <span className="absolute right-full mr-2 top-1/2 -translate-y-1/2 px-2 py-1 text-[10px] text-slate-200 bg-slate-800 border border-slate-700 rounded whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-[50000] shadow-lg">
         {tooltip}
       </span>
     </span>

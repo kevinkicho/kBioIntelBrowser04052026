@@ -9,7 +9,7 @@ import {
   formatAxisTooltip,
 } from '@/lib/domain/scoreAxisHelp'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
-import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { StyledTooltip, STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 
 export interface ScoreAxisBarsProps {
   scores: ScoreVector
@@ -186,7 +186,8 @@ export function ScoreAxisBars({
             </span>
             {showFlyout && (
               <div
-                className="absolute left-0 top-full z-40 mt-1 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-[10px] text-slate-300 leading-snug pointer-events-none"
+                style={{ zIndex: STYLED_TOOLTIP_Z }}
+                className="absolute left-0 top-full mt-1 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-[10px] text-slate-300 leading-snug pointer-events-none"
                 data-testid={`score-axis-flyout-${key}`}
                 role="tooltip"
               >

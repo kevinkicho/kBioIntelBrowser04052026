@@ -34,7 +34,7 @@ function StatusDot({
     >
       <span className={`w-1.5 h-1.5 rounded-full ${color}`} />
       {show && (
-        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] text-slate-200 bg-slate-800 border border-slate-700 rounded whitespace-nowrap z-50 shadow-lg">
+        <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-2 py-1 text-[10px] text-slate-200 bg-slate-800 border border-slate-700 rounded whitespace-nowrap z-[50000] shadow-lg">
           {tooltip}
         </span>
       )}

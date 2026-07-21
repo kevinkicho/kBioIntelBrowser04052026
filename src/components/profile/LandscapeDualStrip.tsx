@@ -8,7 +8,7 @@ import {
 } from '@/lib/landscapeDualStrip'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
-import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { StyledTooltip, STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 
 const TONE: Record<NonNullable<LandscapeStripChip['tone']>, string> = {
   emerald: 'border-emerald-800/40 bg-emerald-950/30 text-emerald-200',
@@ -215,7 +215,8 @@ function JurisdictionTooltip({
       id={tipId}
       role="tooltip"
       data-testid="jurisdiction-chip-tooltip"
-      className="pointer-events-none absolute left-0 bottom-full z-[60] mb-1.5 w-72 max-w-[min(18rem,92vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
+      style={{ zIndex: STYLED_TOOLTIP_Z }}
+      className="pointer-events-none absolute left-0 bottom-full mb-1.5 w-72 max-w-[min(18rem,92vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
     >
       <span className="block text-[10px] font-semibold text-sky-200">
         {j.region} · {j.label}

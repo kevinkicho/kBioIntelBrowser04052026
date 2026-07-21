@@ -93,7 +93,8 @@ export function ScoreExplainer({
       </button>
       {open && (
         <div
-          className="absolute z-50 left-0 top-5 w-80 max-w-[min(20rem,calc(100vw-2rem))] bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl text-xs text-slate-300 leading-relaxed"
+          style={{ zIndex: 50000 }}
+          className="absolute left-0 top-5 w-80 max-w-[min(20rem,calc(100vw-2rem))] bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl text-xs text-slate-300 leading-relaxed"
           data-testid="score-explainer-panel"
           role="dialog"
           aria-label="Score breakdown"

@@ -8,6 +8,7 @@
 
 import { useId, useState, type ReactNode } from 'react'
 import type { AiWhyParts } from '@/lib/ai/aiWhyTooltip'
+import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 
 export interface AiWhyTooltipProps {
   why: AiWhyParts
@@ -55,7 +56,8 @@ export function AiWhyTooltip({
           id={panelId}
           role="tooltip"
           data-testid={`${testId}-panel`}
-          className={`pointer-events-none absolute z-[60] mt-1 w-64 max-w-[min(18rem,80vw)] rounded-lg border border-violet-800/50 bg-slate-950 px-2.5 py-2 text-left shadow-xl shadow-black/40 ${
+          style={{ zIndex: STYLED_TOOLTIP_Z }}
+          className={`pointer-events-none absolute mt-1 w-64 max-w-[min(18rem,80vw)] rounded-lg border border-violet-800/50 bg-slate-950 px-2.5 py-2 text-left shadow-xl shadow-black/40 ${
             align === 'right' ? 'right-0 top-full' : 'left-0 top-full'
           }`}
         >
