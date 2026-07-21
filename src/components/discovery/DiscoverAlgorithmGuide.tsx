@@ -10,6 +10,7 @@ import {
 } from '@/lib/discovery/algorithmGuide'
 import { PrefTooltip } from '@/components/discovery/PrefTooltip'
 import { emitProductEvent } from '@/lib/productEvents'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface DiscoverAlgorithmGuideProps {
   /** Compact strip under hero (default) vs full card */
@@ -152,9 +153,11 @@ function PipelineSteps() {
                 <PrefTooltip eventKey={`pipeline_${stage.id}`} text={stage.detail} />
               </div>
               <p className="mt-0.5 text-[11px] text-slate-500 leading-snug">{stage.short}</p>
-              <p className="mt-1 text-[9px] text-slate-600 truncate" title={stage.sources.join(' · ')}>
-                Sources: {stage.sources.join(' · ')}
-              </p>
+              <StyledTooltip content={stage.sources.join(' · ')}>
+                <p className="mt-1 text-[9px] text-slate-600 truncate">
+                  Sources: {stage.sources.join(' · ')}
+                </p>
+              </StyledTooltip>
             </div>
           </li>
         ))}
@@ -175,7 +178,6 @@ function AxisStrip() {
             key={ax.key}
             className="group relative inline-flex items-center gap-1 rounded-full border border-slate-700/70 bg-slate-900/80 px-2.5 py-1 text-[10px] text-slate-300 cursor-help"
             tabIndex={0}
-            title={`${ax.summary} ${ax.expect}`}
           >
             {ax.label}
             <PrefTooltip

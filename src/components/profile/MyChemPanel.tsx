@@ -117,7 +117,7 @@ export const MyChemPanel = memo(function MyChemPanel({
                   href={primaryHref}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={`Open ${titleName}`}
+                  aria-label={`Open ${titleName}`}
                   className="grid grid-cols-[minmax(0,1.3fr)_4.5rem_4rem_3.5rem] gap-x-2 items-start px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group"
                 >
                   <div className="min-w-0">

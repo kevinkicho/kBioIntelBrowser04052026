@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { ChangeItem } from '@/lib/changeDetection'
 import { getSnapshotAge } from '@/lib/changeDetection'
 import { buildMoleculePanelDeepLink } from '@/lib/signals'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   changes: ChangeItem[]
@@ -63,14 +64,11 @@ export function ChangeAlerts({ changes, cid, projectId }: Props) {
 
           if (href) {
             return (
-              <a
-                key={i}
-                href={href}
-                className={chipClass}
-                title={`Jump to ${c.label} panel`}
-              >
-                {content}
-              </a>
+              <StyledTooltip key={i} content={`Jump to ${c.label} panel`}>
+                <a href={href} className={chipClass}>
+                  {content}
+                </a>
+              </StyledTooltip>
             )
           }
 

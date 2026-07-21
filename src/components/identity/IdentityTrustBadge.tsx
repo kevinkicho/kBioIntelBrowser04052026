@@ -10,6 +10,7 @@ import {
   type IdentityTrust,
   type IdentityTrustLevel,
 } from '@/lib/domain'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 /**
  * @deprecated Level styles kept for any leftover consumers; UI no longer shows level chips.
@@ -167,30 +168,28 @@ export function IdentityTrustBadge({
       {chips.map((c) => {
         const cls =
           'inline-flex items-center rounded border border-slate-700/70 bg-slate-800/70 px-1.5 py-0.5 font-mono text-[10px] text-slate-300 hover:border-slate-500 hover:text-slate-100'
+        const tip = c.title || c.label
         if (c.href) {
           return (
-            <a
-              key={`${c.kind}-${c.label}`}
-              href={c.href}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={cls}
-              title={c.title || c.label}
-              data-testid={`identity-id-${c.kind}`}
-            >
-              {c.label}
-            </a>
+            <StyledTooltip key={`${c.kind}-${c.label}`} content={tip}>
+              <a
+                href={c.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={cls}
+                data-testid={`identity-id-${c.kind}`}
+              >
+                {c.label}
+              </a>
+            </StyledTooltip>
           )
         }
         return (
-          <span
-            key={`${c.kind}-${c.label}`}
-            className={cls}
-            title={c.title || c.label}
-            data-testid={`identity-id-${c.kind}`}
-          >
-            {c.label}
-          </span>
+          <StyledTooltip key={`${c.kind}-${c.label}`} content={tip}>
+            <span className={cls} data-testid={`identity-id-${c.kind}`}>
+              {c.label}
+            </span>
+          </StyledTooltip>
         )
       })}
     </span>

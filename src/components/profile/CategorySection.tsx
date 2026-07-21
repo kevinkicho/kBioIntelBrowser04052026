@@ -6,6 +6,7 @@ import {
   isCategoryLoading,
   useProfilePanelContext,
 } from '@/components/profile/ProfilePanelContext'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface CategorySectionProps {
   icon: string
@@ -80,6 +81,7 @@ export function CategorySection({
           </span>
         </button>
         {canRefresh && (
+          <StyledTooltip content={`Refresh ${label} (re-query all sources in this category)`}>
           <button
             type="button"
             onClick={(e) => {
@@ -89,7 +91,6 @@ export function CategorySection({
             }}
             disabled={Boolean(refreshing)}
             className="shrink-0 rounded p-1.5 text-slate-500 hover:bg-slate-700/60 hover:text-amber-300 transition-colors disabled:opacity-40"
-            title={`Refresh ${label} (re-query all sources in this category)`}
             aria-label={`Refresh ${label}`}
             data-testid={
               categoryId ? `category-refresh-${categoryId}` : 'category-refresh'
@@ -109,6 +110,7 @@ export function CategorySection({
               />
             </svg>
           </button>
+          </StyledTooltip>
         )}
       </div>
       {!isCollapsed && (

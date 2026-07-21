@@ -90,7 +90,7 @@ export const OpenTargetsPanel = memo(function OpenTargetsPanel({
                   href={otUrl}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title="Open on Open Targets Platform"
+                  aria-label="Open on Open Targets Platform"
                   onClick={() =>
                     onDeepLinkClick('opentargets', otUrl, {
                       panelId: 'opentargets',

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TdlBadge } from '@/components/discover/TdlBadge'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface TargetPinPanelProps {
   targets: string[]
@@ -81,13 +82,14 @@ export function TargetPinPanel({
             key={symbol}
             className="inline-flex items-center gap-1 rounded-md border border-emerald-800/50 bg-emerald-900/40 pl-2 pr-1 py-0.5"
           >
-            <Link
-              href={`/gene/${encodeURIComponent(symbol)}`}
-              className="text-xs font-mono font-semibold text-emerald-300 hover:text-emerald-200"
-              title={`Open ${symbol} gene page`}
-            >
-              {symbol}
-            </Link>
+            <StyledTooltip content={`Open ${symbol} gene page`}>
+              <Link
+                href={`/gene/${encodeURIComponent(symbol)}`}
+                className="text-xs font-mono font-semibold text-emerald-300 hover:text-emerald-200"
+              >
+                {symbol}
+              </Link>
+            </StyledTooltip>
             <TdlBadge tdl={tdlMap[symbol.toUpperCase()]} />
             {onRemove && (
               <button

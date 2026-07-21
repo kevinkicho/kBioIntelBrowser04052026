@@ -48,6 +48,7 @@ import { LoadingOverlay } from '@/components/profile/LoadingOverlay'
 import { useElapsedMs } from '@/components/ui/ElapsedTimer'
 import { formatElapsed } from '@/lib/elapsedTime'
 import { AICopilot } from '@/components/ai/AICopilot'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { NextStepsPanel, DiscoverBreadcrumb } from '@/components/profile/NextStepsPanel'
 import { PipelinePanel } from '@/components/profile/PipelinePanel'
 import { VendorsPanel } from '@/components/profile/VendorsPanel'
@@ -1511,18 +1512,22 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             {nError > 0 && <span className="text-red-400/90">{nError} errors</span>}
             {nDisabled > 0 && <span className="text-slate-500">{nDisabled} disabled</span>}
             {fromCache && (
-              <span className="text-cyan-500/80" title="Served from local profile cache">
-                · cache
-                {categoryFetchedAt ? ` ${categoryFetchedAt.toLocaleString()}` : ''}
-              </span>
+              <StyledTooltip content="Served from local profile cache">
+                <span className="text-cyan-500/80">
+                  · cache
+                  {categoryFetchedAt ? ` ${categoryFetchedAt.toLocaleString()}` : ''}
+                </span>
+              </StyledTooltip>
             )}
           </div>
         )}
         {!hasActionableStatus && fromCache && (
-          <p className="text-[9px] text-slate-600 px-0.5" title="Served from local profile cache">
-            Local cache
-            {categoryFetchedAt ? ` · fetched ${categoryFetchedAt.toLocaleString()}` : ''}
-          </p>
+          <StyledTooltip content="Served from local profile cache">
+            <p className="text-[9px] text-slate-600 px-0.5">
+              Local cache
+              {categoryFetchedAt ? ` · fetched ${categoryFetchedAt.toLocaleString()}` : ''}
+            </p>
+          </StyledTooltip>
         )}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {allowedVisible.map((p) => (
@@ -1558,8 +1563,22 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             <Link href="/" className="text-slate-500 hover:text-slate-300 shrink-0">Home</Link>
             <span className="text-slate-700">/</span>
             <span className="text-indigo-300/80">CID:{cid}</span>
-            {inchiKey && <><span className="text-slate-700">|</span><span className="text-emerald-300/60" title="InChIKey">{inchiKey}</span></>}
-            {iupacName && <><span className="text-slate-700">|</span><span className="text-slate-400 truncate max-w-[200px]" title={iupacName}>{iupacName}</span></>}
+            {inchiKey && (
+              <>
+                <span className="text-slate-700">|</span>
+                <StyledTooltip content="InChIKey">
+                  <span className="text-emerald-300/60">{inchiKey}</span>
+                </StyledTooltip>
+              </>
+            )}
+            {iupacName && (
+              <>
+                <span className="text-slate-700">|</span>
+                <StyledTooltip content={iupacName}>
+                  <span className="text-slate-400 truncate max-w-[200px]">{iupacName}</span>
+                </StyledTooltip>
+              </>
+            )}
             <div className="ml-auto flex items-center gap-2">
               <ProfileModeToggle
                 active={profileMode}

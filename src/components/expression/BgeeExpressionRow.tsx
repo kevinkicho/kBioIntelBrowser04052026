@@ -3,6 +3,7 @@
 import type { BgeeExpression } from '@/lib/types'
 import { bgeeRecordUrl } from '@/lib/api/bgee'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function formatAnatId(id: string | undefined): string {
   if (!id) return ''
@@ -101,12 +102,9 @@ export function BgeeExpressionRow({ expr, fetchedAt, compact = false }: BgeeExpr
               </p>
             )}
             {metaLine ? (
-              <p
-                className="mt-0.5 text-[10px] font-mono text-slate-500 truncate"
-                title={metaLine}
-              >
-                {metaLine}
-              </p>
+              <StyledTooltip content={metaLine}>
+                <p className="mt-0.5 text-[10px] font-mono text-slate-500 truncate">{metaLine}</p>
+              </StyledTooltip>
             ) : null}
             <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5">
               <a
@@ -131,23 +129,23 @@ export function BgeeExpressionRow({ expr, fetchedAt, compact = false }: BgeeExpr
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             {typeof expr.expressionScore === 'number' && expr.expressionScore > 0 ? (
-              <span
-                className="text-[10px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded tabular-nums"
-                title="Bgee expression score"
-              >
-                score {expr.expressionScore.toFixed(2)}
-              </span>
+              <StyledTooltip content="Bgee expression score">
+                <span className="text-[10px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded tabular-nums">
+                  score {expr.expressionScore.toFixed(2)}
+                </span>
+              </StyledTooltip>
             ) : null}
-            <span
-              className={`text-[9px] px-1.5 py-0.5 rounded border ${level.className}`}
-              title={level.title}
-            >
-              {level.text}
-            </span>
-            {typeof expr.confidenceScore === 'number' && expr.confidenceScore > 0 ? (
-              <span className="text-[9px] text-slate-500 tabular-nums" title="Confidence">
-                conf {expr.confidenceScore.toFixed(2)}
+            <StyledTooltip content={level.title}>
+              <span className={`text-[9px] px-1.5 py-0.5 rounded border ${level.className}`}>
+                {level.text}
               </span>
+            </StyledTooltip>
+            {typeof expr.confidenceScore === 'number' && expr.confidenceScore > 0 ? (
+              <StyledTooltip content="Confidence">
+                <span className="text-[9px] text-slate-500 tabular-nums">
+                  conf {expr.confidenceScore.toFixed(2)}
+                </span>
+              </StyledTooltip>
             ) : null}
           </div>
         </div>

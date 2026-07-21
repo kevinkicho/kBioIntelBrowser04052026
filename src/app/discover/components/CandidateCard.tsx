@@ -15,6 +15,7 @@ import {
 } from '@/components/projects/SaveToProjectButton'
 import { buildMoleculeLinkUrl } from '@/lib/profileMode'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 import { ConfidenceBadge } from './DiscoveryProgress'
@@ -107,22 +108,23 @@ function SourcePill({
 
   if (link.href) {
     return (
-      <a
-        href={link.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={link.title}
-        className={`text-[9px] px-1.5 py-0.5 rounded border hover:brightness-125 transition-colors ${colorClass}`}
-      >
-        {source} ↗
-      </a>
+      <StyledTooltip content={link.title}>
+        <a
+          href={link.href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`text-[9px] px-1.5 py-0.5 rounded border hover:brightness-125 transition-colors ${colorClass}`}
+        >
+          {source} ↗
+        </a>
+      </StyledTooltip>
     )
   }
 
   return (
-    <span className={`text-[9px] px-1.5 py-0.5 rounded border ${colorClass}`} title={link.title}>
-      {source}
-    </span>
+    <StyledTooltip content={link.title}>
+      <span className={`text-[9px] px-1.5 py-0.5 rounded border ${colorClass}`}>{source}</span>
+    </StyledTooltip>
   )
 }
 
@@ -239,12 +241,11 @@ export function CandidateCard({
             )}
           </div>
           {identity.inchiKey && (
-            <p
-              className="mb-1.5 max-w-full truncate font-mono text-[10px] text-slate-600"
-              title={identity.inchiKey}
-            >
-              InChIKey {identity.inchiKey}
-            </p>
+            <StyledTooltip content={identity.inchiKey}>
+              <p className="mb-1.5 max-w-full truncate font-mono text-[10px] text-slate-600">
+                InChIKey {identity.inchiKey}
+              </p>
+            </StyledTooltip>
           )}
           <AlternateCids
             primaryCid={identity.pubchemCid ?? candidate.cid}
@@ -307,14 +308,15 @@ export function CandidateCard({
               </span>
             )}
           </div>
-          <p
-            className="mt-2 text-[11px] text-slate-500 leading-snug border-t border-slate-800/80 pt-2"
-            data-testid="candidate-why"
-            title={buildCandidateWhy(candidate, diseaseName)}
-          >
-            <span className="text-slate-600 font-medium">Why this row: </span>
-            {buildCandidateWhy(candidate, diseaseName)}
-          </p>
+          <StyledTooltip content={buildCandidateWhy(candidate, diseaseName)}>
+            <p
+              className="mt-2 text-[11px] text-slate-500 leading-snug border-t border-slate-800/80 pt-2"
+              data-testid="candidate-why"
+            >
+              <span className="text-slate-600 font-medium">Why this row: </span>
+              {buildCandidateWhy(candidate, diseaseName)}
+            </p>
+          </StyledTooltip>
         </div>
       </div>
     </>

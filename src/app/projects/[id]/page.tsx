@@ -38,6 +38,7 @@ import {
   type CandidateSignalRow,
 } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { BoardClaimStrip } from '@/components/projects/BoardClaimStrip'
 import { BoardAiRecommend } from '@/components/projects/BoardAiRecommend'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
@@ -443,18 +444,20 @@ export default function ProjectBoardPage() {
             ) : (
               <div className="flex flex-wrap items-center gap-2">
                 <h1 className="text-2xl font-bold text-slate-100 sm:text-3xl">{project.name}</h1>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setNameDraft(project.name)
-                    setRenaming(true)
-                  }}
-                  className="rounded-lg border border-slate-700 px-2 py-1 text-[11px] text-slate-400 hover:border-slate-500 hover:text-slate-200"
-                  data-testid="project-rename-btn"
-                  title="Rename project"
-                >
-                  Rename
-                </button>
+                <StyledTooltip content="Rename project">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setNameDraft(project.name)
+                      setRenaming(true)
+                    }}
+                    className="rounded-lg border border-slate-700 px-2 py-1 text-[11px] text-slate-400 hover:border-slate-500 hover:text-slate-200"
+                    data-testid="project-rename-btn"
+                    aria-label="Rename project"
+                  >
+                    Rename
+                  </button>
+                </StyledTooltip>
               </div>
             )}
             {project.description && (
@@ -504,16 +507,18 @@ export default function ProjectBoardPage() {
                   {totalSignals} signal{totalSignals === 1 ? '' : 's'}
                 </span>
               )}
-              <button
-                type="button"
-                onClick={() => handleRefreshSignals()}
-                disabled={signalsLoading || project.candidates.length === 0}
-                className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:border-cyan-700/50 hover:text-cyan-300 disabled:opacity-40"
-                title="Re-check free-API count diffs for board candidates"
-                data-testid="board-refresh-signals"
-              >
-                {signalsLoading ? 'Signals…' : 'Refresh signals'}
-              </button>
+              <StyledTooltip content="Re-check free-API count diffs for board candidates">
+                <button
+                  type="button"
+                  onClick={() => handleRefreshSignals()}
+                  disabled={signalsLoading || project.candidates.length === 0}
+                  className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:border-cyan-700/50 hover:text-cyan-300 disabled:opacity-40"
+                  data-testid="board-refresh-signals"
+                  aria-label="Re-check free-API count diffs for board candidates"
+                >
+                  {signalsLoading ? 'Signals…' : 'Refresh signals'}
+                </button>
+              </StyledTooltip>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {BOARD_STATUSES.map((s) => (
@@ -533,15 +538,17 @@ export default function ProjectBoardPage() {
             )}
           </div>
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
-              onClick={handleLoadSafety}
-              disabled={harvestBusy}
-              className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-900/40 disabled:opacity-50"
-              title="Load safety & novelty for promote/watching candidates missing axes"
-            >
-              {harvestBusy ? 'Loading safety…' : 'Load safety scores'}
-            </button>
+            <StyledTooltip content="Load safety & novelty for promote/watching candidates missing axes">
+              <button
+                type="button"
+                onClick={handleLoadSafety}
+                disabled={harvestBusy}
+                className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-1.5 text-xs text-amber-200 hover:bg-amber-900/40 disabled:opacity-50"
+                aria-label="Load safety & novelty for promote/watching candidates missing axes"
+              >
+                {harvestBusy ? 'Loading safety…' : 'Load safety scores'}
+              </button>
+            </StyledTooltip>
             <button
               type="button"
               onClick={handleExport}

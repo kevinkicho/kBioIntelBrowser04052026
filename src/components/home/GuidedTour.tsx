@@ -9,6 +9,7 @@ import {
   type TourExampleSetPref,
 } from '@/lib/discovery/preferences'
 import { examplesForTourSet } from '@/lib/discovery/tourExamples'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const STORAGE_KEY = 'guided-tour-dismissed'
 
@@ -55,16 +56,17 @@ export function GuidedTour({ searchType }: { searchType: string }) {
         </p>
         <div className="flex items-center gap-1">
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => setGearOpen((o) => !o)}
-              aria-label="Example set settings"
-              aria-expanded={gearOpen}
-              title={PREFERENCE_TOOLTIPS.tourExampleSet[tourSet]}
-              className="text-slate-500 hover:text-slate-300 text-sm leading-none px-1.5 py-0.5 rounded"
-            >
-              ⚙
-            </button>
+            <StyledTooltip content={PREFERENCE_TOOLTIPS.tourExampleSet[tourSet]}>
+              <button
+                type="button"
+                onClick={() => setGearOpen((o) => !o)}
+                aria-label="Example set settings"
+                aria-expanded={gearOpen}
+                className="text-slate-500 hover:text-slate-300 text-sm leading-none px-1.5 py-0.5 rounded"
+              >
+                ⚙
+              </button>
+            </StyledTooltip>
             {gearOpen && (
               <div
                 role="menu"
@@ -74,12 +76,11 @@ export function GuidedTour({ searchType }: { searchType: string }) {
                   Example set
                 </p>
                 {TOUR_SET_OPTIONS.map((opt) => (
+                  <StyledTooltip key={opt} content={PREFERENCE_TOOLTIPS.tourExampleSet[opt]} className="w-full">
                   <button
-                    key={opt}
                     type="button"
                     role="menuitemradio"
                     aria-checked={tourSet === opt}
-                    title={PREFERENCE_TOOLTIPS.tourExampleSet[opt]}
                     onClick={() => handleTourSetChange(opt)}
                     className={`w-full text-left px-3 py-2 text-sm transition-colors ${
                       tourSet === opt
@@ -95,6 +96,7 @@ export function GuidedTour({ searchType }: { searchType: string }) {
                       {PREFERENCE_TOOLTIPS.tourExampleSet[opt]}
                     </span>
                   </button>
+                  </StyledTooltip>
                 ))}
               </div>
             )}

@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { UserMenu } from './UserMenu'
 import { AIStatusIndicator } from '@/components/ai/AIStatusIndicator'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const NAV = [
   { href: '/', label: 'Home', match: (p: string) => p === '/' },
@@ -68,27 +69,29 @@ export function AppHeader() {
 
         <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
           <AIStatusIndicator />
-          <Link
-            href="/?focus=search"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200"
-            title="Search molecules, diseases, genes"
-          >
-            <svg
-              className="h-3.5 w-3.5"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor"
-              aria-hidden
+          <StyledTooltip content="Search molecules, diseases, genes">
+            <Link
+              href="/?focus=search"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700/60 bg-slate-900/60 px-2.5 py-1 text-xs text-slate-400 transition-colors hover:border-slate-600 hover:text-slate-200"
+              aria-label="Search molecules, diseases, genes"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
-              />
-            </svg>
-            <span className="hidden sm:inline">Search</span>
-          </Link>
+              <svg
+                className="h-3.5 w-3.5"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                aria-hidden
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M21 21l-4.35-4.35M11 18a7 7 0 100-14 7 7 0 000 14z"
+                />
+              </svg>
+              <span className="hidden sm:inline">Search</span>
+            </Link>
+          </StyledTooltip>
           <UserMenu />
         </div>
       </div>

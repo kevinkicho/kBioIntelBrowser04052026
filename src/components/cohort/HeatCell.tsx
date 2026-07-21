@@ -1,6 +1,7 @@
 'use client'
 
 import type { MatrixCell } from '@/lib/cohort/types'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface HeatCellProps {
   cell: MatrixCell
@@ -48,13 +49,16 @@ export function HeatCell({ cell, loading }: HeatCellProps) {
     textColor = 'text-indigo-200'
   }
 
+  const tip = cell.value === null ? 'No data' : String(cell.value)
+
   return (
     <td
       className={`px-3 py-2 border-b border-slate-800 text-sm font-mono whitespace-nowrap ${textColor}`}
       style={bgStyle}
-      title={cell.value === null ? 'No data' : String(cell.value)}
     >
-      {cell.display}
+      <StyledTooltip content={tip} className="w-full">
+        <span className="block w-full">{cell.display}</span>
+      </StyledTooltip>
     </td>
   )
 }

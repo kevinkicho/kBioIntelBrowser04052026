@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect, useMemo } from 'react'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { buildExportSections, exportToCsv, exportToJson, downloadFile } from '@/lib/exportData'
 import { printReport, printSummaryReport } from '@/lib/printReport'
 import { computeCandidateId } from '@/lib/domain'
@@ -167,14 +168,16 @@ export function ExportButton({
           >
             🗺 Landscape pack (MD)
           </button>
-          <button
-            type="button"
-            disabled
-            title="Share pack links ship later (content-hashed snapshots). Download is always available."
-            className="w-full cursor-not-allowed text-left px-4 py-2 text-sm text-slate-600"
-          >
-            🔗 Share pack (soon)
-          </button>
+          <StyledTooltip content="Share pack links ship later (content-hashed snapshots). Download is always available." className="w-full">
+            <button
+              type="button"
+              disabled
+              aria-label="Share pack links ship later (content-hashed snapshots). Download is always available."
+              className="w-full cursor-not-allowed text-left px-4 py-2 text-sm text-slate-600"
+            >
+              🔗 Share pack (soon)
+            </button>
+          </StyledTooltip>
           <div className="border-t border-slate-700" />
           <button
             onClick={() => { if (!printReport(data, moleculeName, cid)) { alert('Please allow popups to print the report.') } setOpen(false) }}

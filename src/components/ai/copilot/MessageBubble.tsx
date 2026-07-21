@@ -4,6 +4,7 @@ import React from 'react'
 import Link from 'next/link'
 import type { CopilotMessage } from '@/hooks/useAICopilot'
 import { renderSimpleMarkdown } from '@/lib/sanitize'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function renderMarkdown(text: string) {
   const parts: React.ReactNode[] = []
@@ -198,17 +199,17 @@ export function MessageBubble({ message, isStreaming }: { message: CopilotMessag
       {!isUser && message.tools && message.tools.length > 0 && (
         <div className="mb-1.5 flex flex-wrap gap-1" data-testid="copilot-tool-chips">
           {message.tools.map((t, i) => (
-            <span
-              key={`${t.name}-${i}`}
-              title={t.summary}
-              className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${
-                t.ok
-                  ? 'border-emerald-800/50 bg-emerald-950/40 text-emerald-300'
-                  : 'border-red-800/50 bg-red-950/40 text-red-300'
-              }`}
-            >
-              {t.ok ? '✓' : '✗'} {t.name}
-            </span>
+            <StyledTooltip key={`${t.name}-${i}`} content={t.summary}>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded border font-mono ${
+                  t.ok
+                    ? 'border-emerald-800/50 bg-emerald-950/40 text-emerald-300'
+                    : 'border-red-800/50 bg-red-950/40 text-red-300'
+                }`}
+              >
+                {t.ok ? '✓' : '✗'} {t.name}
+              </span>
+            </StyledTooltip>
           ))}
         </div>
       )}

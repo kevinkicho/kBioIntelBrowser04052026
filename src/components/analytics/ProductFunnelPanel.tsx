@@ -17,6 +17,7 @@ import {
   type M1FunnelSnapshot,
 } from '@/lib/analytics/m1Funnel'
 import { downloadFile } from '@/lib/exportData'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface ServerCall {
   endpoint?: string
@@ -236,15 +237,13 @@ export function ProductFunnelPanel() {
       {byMetric.length > 0 && (
         <div className="mb-4 flex flex-wrap gap-2">
           {byMetric.map(([id, count]) => (
-            <span
-              key={id}
-              className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/60 px-2.5 py-1 text-[10px] text-slate-400"
-              title={PRODUCT_METRIC_LABELS[id]}
-            >
-              <span className="font-semibold text-indigo-300">{id}</span>
-              <span className="text-slate-500">{PRODUCT_METRIC_LABELS[id]}</span>
-              <span className="font-mono text-slate-300">{count}</span>
-            </span>
+            <StyledTooltip key={id} content={PRODUCT_METRIC_LABELS[id]}>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-700 bg-slate-900/60 px-2.5 py-1 text-[10px] text-slate-400">
+                <span className="font-semibold text-indigo-300">{id}</span>
+                <span className="text-slate-500">{PRODUCT_METRIC_LABELS[id]}</span>
+                <span className="font-mono text-slate-300">{count}</span>
+              </span>
+            </StyledTooltip>
           ))}
         </div>
       )}

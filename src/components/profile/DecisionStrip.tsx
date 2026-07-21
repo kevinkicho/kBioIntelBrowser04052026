@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { EvidenceClaim, ScoreAxisKey, ScoreVector } from '@/lib/domain'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface DecisionStripProps {
   moleculeName: string
@@ -101,23 +102,25 @@ export function DecisionStrip({
           <span className="text-[10px] font-mono text-slate-500">#{rank}</span>
         )}
         {disease && (
-          <span className="text-[10px] text-slate-400 truncate max-w-[200px]" title={disease}>
-            Disease: <span className="text-slate-300">{disease}</span>
-          </span>
+          <StyledTooltip content={disease}>
+            <span className="text-[10px] text-slate-400 truncate max-w-[200px]">
+              Disease: <span className="text-slate-300">{disease}</span>
+            </span>
+          </StyledTooltip>
         )}
-        {projectId && (
-          projectHref ? (
-            <Link
-              href={projectHref}
-              className="text-[10px] text-emerald-400/90 hover:text-emerald-300 truncate max-w-[160px]"
-              title={projectName ?? projectId}
-            >
-              Project: {projectName ?? projectId.slice(0, 12)}
-            </Link>
+        {projectId &&
+          (projectHref ? (
+            <StyledTooltip content={projectName ?? projectId}>
+              <Link
+                href={projectHref}
+                className="text-[10px] text-emerald-400/90 hover:text-emerald-300 truncate max-w-[160px]"
+              >
+                Project: {projectName ?? projectId.slice(0, 12)}
+              </Link>
+            </StyledTooltip>
           ) : (
             <span className="text-[10px] text-slate-500">Project: {projectId.slice(0, 12)}</span>
-          )
-        )}
+          ))}
         {boardStatus && (
           <span className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/50 text-slate-400 capitalize">
             {boardStatus}
@@ -164,14 +167,15 @@ export function DecisionStrip({
                         />
                       )}
                     </div>
-                    <span
-                      className={`text-[10px] w-8 text-right tabular-nums ${
-                        missing ? 'text-slate-600' : 'text-slate-400'
-                      }`}
-                      title={missing ? `Status: ${status}` : undefined}
-                    >
-                      {axisPct(v)}
-                    </span>
+                    <StyledTooltip content={missing ? `Status: ${status}` : undefined}>
+                      <span
+                        className={`text-[10px] w-8 text-right tabular-nums ${
+                          missing ? 'text-slate-600' : 'text-slate-400'
+                        }`}
+                      >
+                        {axisPct(v)}
+                      </span>
+                    </StyledTooltip>
                   </div>
                 )
               })}

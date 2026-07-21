@@ -11,6 +11,7 @@ import {
 } from '@/lib/listControls'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import {
   faersApiLinkTitle,
   faersEvidenceApiUrl,
@@ -118,19 +119,20 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
                 </div>
               )}
               <div className="grid grid-cols-[minmax(0,1.3fr)_4rem_4rem_minmax(4rem,0.8fr)_2.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group">
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={linkTitle}
-                  data-testid={`ae-row-${name}`}
-                  onClick={() =>
-                    onDeepLinkClick('faers', href, { panelId: 'adverse-events', label: name })
-                  }
-                  className="text-sm text-slate-100 capitalize truncate group-hover:text-rose-200 min-w-0"
-                >
-                  {name}
-                </a>
+                <StyledTooltip content={linkTitle} className="min-w-0">
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`ae-row-${name}`}
+                    onClick={() =>
+                      onDeepLinkClick('faers', href, { panelId: 'adverse-events', label: name })
+                    }
+                    className="text-sm text-slate-100 capitalize truncate group-hover:text-rose-200 min-w-0 block"
+                  >
+                    {name}
+                  </a>
+                </StyledTooltip>
                 <span className="text-xs font-mono tabular-nums text-slate-300 text-right">
                   {event.count.toLocaleString()}
                 </span>
@@ -152,22 +154,24 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
                     {pct}%
                   </span>
                 </div>
-                <a
-                  href={apiHref}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  title={apiTitle}
-                  data-testid={`ae-api-${name}`}
-                  onClick={() =>
-                    onDeepLinkClick('faers', apiHref, {
-                      panelId: 'adverse-events',
-                      label: `api:${name}`,
-                    })
-                  }
-                  className="text-[10px] text-slate-500 hover:text-cyan-300 text-right shrink-0"
-                >
-                  API↗
-                </a>
+                <StyledTooltip content={apiTitle}>
+                  <a
+                    href={apiHref}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    data-testid={`ae-api-${name}`}
+                    onClick={() =>
+                      onDeepLinkClick('faers', apiHref, {
+                        panelId: 'adverse-events',
+                        label: `api:${name}`,
+                      })
+                    }
+                    className="text-[10px] text-slate-500 hover:text-cyan-300 text-right shrink-0"
+                    aria-label={apiTitle}
+                  >
+                    API↗
+                  </a>
+                </StyledTooltip>
               </div>
             </div>
           )

@@ -7,6 +7,7 @@ import { sortByVariance } from '@/lib/cohort/buildMatrix'
 import type { MatrixRow, Molecule } from '@/lib/cohort/types'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 import type { CategoryId } from '@/lib/categoryConfig'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface MatrixViewProps {
   molecules: Molecule[]
@@ -49,13 +50,14 @@ export function MatrixView({
                 className="px-3 py-3 border-b border-slate-700 text-xs text-slate-300 font-semibold whitespace-nowrap"
               >
                 <div className="flex items-center gap-2">
-                  <Link
-                    href={`/molecule/${m.cid}`}
-                    className="hover:text-indigo-300 transition-colors truncate max-w-[10rem]"
-                    title={`${m.name} (CID ${m.cid})`}
-                  >
-                    {m.name}
-                  </Link>
+                  <StyledTooltip content={`${m.name} (CID ${m.cid})`}>
+                    <Link
+                      href={`/molecule/${m.cid}`}
+                      className="hover:text-indigo-300 transition-colors truncate max-w-[10rem]"
+                    >
+                      {m.name}
+                    </Link>
+                  </StyledTooltip>
                   <span className="text-[10px] text-slate-500">CID {m.cid}</span>
                   {onRemoveMolecule && (
                     <button
@@ -77,11 +79,15 @@ export function MatrixView({
             <tr key={row.attribute.id} className="hover:bg-slate-800/30 transition-colors">
               <td className="px-3 py-2 sticky left-0 bg-slate-900/90 backdrop-blur z-10 text-sm text-slate-300 border-b border-slate-800 min-w-[14rem]">
                 <div className="flex items-center justify-between gap-2">
-                  <span title={row.attribute.label}>{row.attribute.label}</span>
+                  <StyledTooltip content={row.attribute.label}>
+                    <span>{row.attribute.label}</span>
+                  </StyledTooltip>
                   {sortBy === 'variance' && row.variance > 0 && (
-                    <span className="text-[10px] text-slate-500" title="Row variance (heat space)">
-                      σ²={row.variance.toFixed(2)}
-                    </span>
+                    <StyledTooltip content="Row variance (heat space)">
+                      <span className="text-[10px] text-slate-500">
+                        σ²={row.variance.toFixed(2)}
+                      </span>
+                    </StyledTooltip>
                   )}
                 </div>
               </td>

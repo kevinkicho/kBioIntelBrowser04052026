@@ -23,6 +23,7 @@ import { addPackIndexEntryAndSave, putPackInCache } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { PackView } from './PackView'
 import { PackAiPanel } from './PackAiPanel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface PackBuilderProps {
   /** Profile merged-data bag or already-shaped Core panels. */
@@ -424,23 +425,31 @@ export function PackBuilder({
         >
           Download Markdown
         </button>
-        <button
-          type="button"
-          disabled={!shareEnabled || shareBusy}
-          onClick={() => void handleShare()}
-          title={
+        <StyledTooltip
+          content={
             shareEnabled
               ? 'Create a content-hashed snapshot link (30-day TTL). Server stores the pack payload.'
               : 'Enable “Share links when available” in Discover preferences (collaboration mode) to use server share links. Download always works.'
           }
-          className={
-            shareEnabled
-              ? 'rounded-lg border border-cyan-800/50 bg-cyan-950/30 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-900/40 disabled:opacity-50'
-              : 'cursor-not-allowed rounded-lg border border-slate-800 px-3 py-1.5 text-xs text-slate-600'
-          }
         >
-          {shareBusy ? 'Sharing…' : shareEnabled ? 'Share pack' : 'Share pack (enable in prefs)'}
-        </button>
+          <button
+            type="button"
+            disabled={!shareEnabled || shareBusy}
+            onClick={() => void handleShare()}
+            aria-label={
+              shareEnabled
+                ? 'Create a content-hashed snapshot link (30-day TTL). Server stores the pack payload.'
+                : 'Enable “Share links when available” in Discover preferences (collaboration mode) to use server share links. Download always works.'
+            }
+            className={
+              shareEnabled
+                ? 'rounded-lg border border-cyan-800/50 bg-cyan-950/30 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-900/40 disabled:opacity-50'
+                : 'cursor-not-allowed rounded-lg border border-slate-800 px-3 py-1.5 text-xs text-slate-600'
+            }
+          >
+            {shareBusy ? 'Sharing…' : shareEnabled ? 'Share pack' : 'Share pack (enable in prefs)'}
+          </button>
+        </StyledTooltip>
         <button
           type="button"
           onClick={() => setShowPreview((v) => !v)}

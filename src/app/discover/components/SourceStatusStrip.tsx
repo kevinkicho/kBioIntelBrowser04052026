@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { DataLoadStatus, SourceFetchStatus } from '@/lib/dataStatus'
 import { emitProductEvent } from '@/lib/productEvents'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export type SourceStatusBucket = 'ok' | 'empty' | 'issue'
 
@@ -130,22 +131,22 @@ export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceSt
           const meta = BUCKET_META[bucket]
           // Dim zero counts so real load/empty/issue signal stands out (summary empty-data contract)
           const dim = n === 0
+          const tip =
+            byBucket[bucket].length > 0
+              ? byBucket[bucket].map(statusDetailLabel).join('\n')
+              : undefined
           return (
-            <span
-              key={bucket}
-              data-testid={`source-status-count-${bucket}`}
-              data-count={n}
-              data-empty={dim ? 'true' : 'false'}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${meta.className} ${dim ? 'opacity-20' : ''}`}
-              title={
-                byBucket[bucket].length > 0
-                  ? byBucket[bucket].map(statusDetailLabel).join('\n')
-                  : undefined
-              }
-            >
-              <span className={`h-1.5 w-1.5 rounded-full ${meta.dotClass}`} aria-hidden />
-              {meta.label}: {n}
-            </span>
+            <StyledTooltip key={bucket} content={tip}>
+              <span
+                data-testid={`source-status-count-${bucket}`}
+                data-count={n}
+                data-empty={dim ? 'true' : 'false'}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${meta.className} ${dim ? 'opacity-20' : ''}`}
+              >
+                <span className={`h-1.5 w-1.5 rounded-full ${meta.dotClass}`} aria-hidden />
+                {meta.label}: {n}
+              </span>
+            </StyledTooltip>
           )
         })}
       </div>

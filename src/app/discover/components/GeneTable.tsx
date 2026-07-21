@@ -7,6 +7,7 @@ import { MAX_DISCOVER_TARGETS } from '@/lib/discovery/discoverUrl'
 import { diseaseAssociationGenesOnly } from '@/lib/discovery/sources/genes'
 import { TdlBadge } from '@/components/discover/TdlBadge'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function geneSourceKey(source: string): string {
   const s = source.toLowerCase()
@@ -149,39 +150,42 @@ export function GeneTable({
                 data-gene-source={gene.source}
               >
                 {onTogglePin && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (pinDisabled) return
-                      onTogglePin(gene.symbol)
-                    }}
-                    disabled={pinDisabled}
-                    title={
+                  <StyledTooltip
+                    content={
                       pinned
                         ? `Unpin ${gene.symbol}`
                         : pinDisabled
                           ? `Maximum ${maxPins} pinned targets`
                           : `Pin ${gene.symbol} to bias ranking`
                     }
-                    aria-label={
-                      pinned
-                        ? `Unpin ${gene.symbol}`
-                        : pinDisabled
-                          ? `Cannot pin ${gene.symbol}: maximum ${maxPins} targets`
-                          : `Pin ${gene.symbol}`
-                    }
-                    aria-pressed={pinned}
-                    data-testid={`gene-pin-${gene.symbol}`}
-                    className={`shrink-0 rounded p-0.5 text-xs leading-none transition-colors ${
-                      pinned
-                        ? 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-900/60'
-                        : pinDisabled
-                          ? 'text-slate-700 cursor-not-allowed'
-                          : 'text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60'
-                    }`}
                   >
-                    {pinned ? '●' : '○'}
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (pinDisabled) return
+                        onTogglePin(gene.symbol)
+                      }}
+                      disabled={pinDisabled}
+                      aria-label={
+                        pinned
+                          ? `Unpin ${gene.symbol}`
+                          : pinDisabled
+                            ? `Cannot pin ${gene.symbol}: maximum ${maxPins} targets`
+                            : `Pin ${gene.symbol}`
+                      }
+                      aria-pressed={pinned}
+                      data-testid={`gene-pin-${gene.symbol}`}
+                      className={`shrink-0 rounded p-0.5 text-xs leading-none transition-colors ${
+                        pinned
+                          ? 'text-emerald-300 hover:text-emerald-200 hover:bg-emerald-900/60'
+                          : pinDisabled
+                            ? 'text-slate-700 cursor-not-allowed'
+                            : 'text-slate-500 hover:text-indigo-300 hover:bg-slate-700/60'
+                      }`}
+                    >
+                      {pinned ? '●' : '○'}
+                    </button>
+                  </StyledTooltip>
                 )}
                 <DataPoint
                   sourceKey={geneSourceKey(gene.source)}
@@ -189,25 +193,30 @@ export function GeneTable({
                   recordUrl={geneRecordUrl(gene.symbol, gene.source)}
                   className="min-w-0 flex-1"
                 >
-                  <Link
-                    href={`/gene/${encodeURIComponent(gene.symbol)}`}
-                    className="min-w-0 flex-1 flex items-center gap-1.5"
-                    title={`${gene.symbol} · ${gene.source} · assoc. score ${gene.score.toFixed(2)}`}
+                  <StyledTooltip
+                    content={`${gene.symbol} · ${gene.source} · assoc. score ${gene.score.toFixed(2)}`}
                   >
-                    <span
-                      className={`text-sm font-mono font-semibold truncate ${
-                        pinned
-                          ? 'text-emerald-300 hover:text-emerald-200'
-                          : 'text-indigo-300 hover:text-indigo-200'
-                      }`}
+                    <Link
+                      href={`/gene/${encodeURIComponent(gene.symbol)}`}
+                      className="min-w-0 flex-1 flex items-center gap-1.5"
                     >
-                      {gene.symbol}
-                    </span>
-                    <TdlBadge tdl={tdl} />
-                    <span className="text-[10px] text-slate-500 shrink-0" title="Association score">
-                      {gene.score.toFixed(2)}
-                    </span>
-                  </Link>
+                      <span
+                        className={`text-sm font-mono font-semibold truncate ${
+                          pinned
+                            ? 'text-emerald-300 hover:text-emerald-200'
+                            : 'text-indigo-300 hover:text-indigo-200'
+                        }`}
+                      >
+                        {gene.symbol}
+                      </span>
+                      <TdlBadge tdl={tdl} />
+                      <StyledTooltip content="Association score">
+                        <span className="text-[10px] text-slate-500 shrink-0">
+                          {gene.score.toFixed(2)}
+                        </span>
+                      </StyledTooltip>
+                    </Link>
+                  </StyledTooltip>
                 </DataPoint>
               </div>
             )

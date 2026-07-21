@@ -36,4 +36,18 @@ describe('isIdentityShellMolecule', () => {
       }),
     ).toBe(false)
   })
+
+  it('does not flag MyChem-filled identity with real chemistry', () => {
+    expect(
+      isIdentityShellMolecule({
+        name: 'ASPIRIN',
+        description:
+          'Identity filled via MyChem (PubChem PUG unavailable from this host). Structure image still from PubChem CDN when available.',
+        formula: 'C9H8O4',
+        inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N',
+        molecularWeight: 180.16,
+      }),
+    ).toBe(false)
+  })
 })
+

@@ -7,6 +7,7 @@ import type { DrugGeneInteraction } from '@/lib/types'
 import { preferStableDeepLink } from '@/lib/deepLinkPolicy'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function dgidbHref(interaction: DrugGeneInteraction): string {
   const gene = interaction.geneSymbol || interaction.geneName
@@ -89,7 +90,7 @@ export const DgidbPanel = memo(function DgidbPanel({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={`View ${gene} interaction in DGIdb`}
+                  aria-label={`View ${gene} interaction in DGIdb`}
                   onClick={() =>
                     onDeepLinkClick('dgidb', href, {
                       panelId: 'dgidb',
@@ -98,15 +99,19 @@ export const DgidbPanel = memo(function DgidbPanel({
                   }
                   className="grid grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_minmax(0,1fr)_3.5rem] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors group"
                 >
-                  <span className="text-xs font-semibold text-cyan-300 group-hover:text-cyan-200 truncate" title={gene}>
-                    {gene}
-                  </span>
+                  <StyledTooltip content={gene}>
+                    <span className="text-xs font-semibold text-cyan-300 group-hover:text-cyan-200 truncate">
+                      {gene}
+                    </span>
+                  </StyledTooltip>
                   <span className="text-xs text-violet-300/90 truncate">
                     {interaction.interactionType || '—'}
                   </span>
-                  <span className="text-[11px] text-slate-500 truncate" title={interaction.source}>
-                    {interaction.source || '—'}
-                  </span>
+                  <StyledTooltip content={interaction.source || undefined}>
+                    <span className="text-[11px] text-slate-500 truncate">
+                      {interaction.source || '—'}
+                    </span>
+                  </StyledTooltip>
                   <span className="text-[11px] text-slate-500 text-right tabular-nums">
                     {interaction.score > 0 ? interaction.score.toFixed(1) : '—'}
                   </span>

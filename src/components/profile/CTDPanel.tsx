@@ -3,6 +3,7 @@
 import { memo, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CTDInteraction, CTDDiseaseAssociation } from '@/lib/types'
 import {
@@ -141,15 +142,17 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
                   >
                     {disease.diseaseName}
                   </Link>
-                  <a
-                    href={`http://ctdbase.org/detail.go?type=disease&acc=${disease.diseaseId}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-blue-400 hover:text-blue-300"
-                    title="View on CTD"
-                  >
-                    ↗
-                  </a>
+                  <StyledTooltip content="View on CTD">
+                    <a
+                      href={`http://ctdbase.org/detail.go?type=disease&acc=${disease.diseaseId}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-blue-400 hover:text-blue-300"
+                      aria-label="View on CTD"
+                    >
+                      ↗
+                    </a>
+                  </StyledTooltip>
                 </div>
                 {disease.inferenceScore > 0 && (
                   <span className="text-xs px-1.5 py-0.5 bg-orange-900/50 text-orange-300 rounded">

@@ -9,6 +9,7 @@ import {
   type ApiParamValue,
 } from '@/lib/apiIdentifiers'
 import { recordSearch } from '@/lib/searchHistory'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export type UnifiedSearchHit = {
   kind: 'disease' | 'molecule' | 'gene'
@@ -366,9 +367,9 @@ export function SearchBar({
                         <span>{c.molecularWeight.toFixed(2)} g/mol</span>
                       )}
                       {c.inchiKey && (
-                        <span className="truncate max-w-[200px]" title={c.inchiKey}>
-                          {c.inchiKey}
-                        </span>
+                        <StyledTooltip content={c.inchiKey}>
+                          <span className="truncate max-w-[200px]">{c.inchiKey}</span>
+                        </StyledTooltip>
                       )}
                     </div>
                   </button>

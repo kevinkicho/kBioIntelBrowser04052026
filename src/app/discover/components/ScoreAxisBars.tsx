@@ -9,6 +9,7 @@ import {
   formatAxisTooltip,
 } from '@/lib/domain/scoreAxisHelp'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface ScoreAxisBarsProps {
   scores: ScoreVector
@@ -60,21 +61,15 @@ function epistemicLabel(status: AxisStatus | undefined): string {
 
 function EpistemicChip({
   status,
-  tip,
-  useNativeTitle,
 }: {
   status: AxisStatus | undefined
-  tip: string
-  /** Only when no custom flyout is used (compact boards) */
-  useNativeTitle?: boolean
 }) {
   const label = epistemicLabel(status)
   return (
     <span
-      className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-800/60 text-slate-500 font-medium whitespace-nowrap cursor-help"
+      className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-800/60 text-slate-500 font-medium whitespace-nowrap"
       data-testid="score-axis-epistemic"
       data-status={label}
-      title={useNativeTitle ? tip : undefined}
     >
       {label}
     </span>
@@ -84,8 +79,7 @@ function EpistemicChip({
 /**
  * Multi-axis ScoreVector bars using shared AXIS_ORDER.
  * Null axes render an epistemic chip — never a zero bar.
- * Non-compact: styled flyout only (no native title — avoids double tooltips).
- * Compact: single native title on the row (board density).
+ * Always styled tooltips (never native title).
  */
 export function ScoreAxisBars({
   scores,
@@ -98,8 +92,6 @@ export function ScoreAxisBars({
   const labelWidth = compact ? 'w-[72px]' : 'w-24'
   const explainerOn = showExplainer ?? !compact
   const [hoverKey, setHoverKey] = useState<ScoreAxisKey | null>(null)
-  /** Native browser title only in compact mode (no flyout). */
-  const nativeTips = compact
 
   return (
     <div
@@ -152,25 +144,21 @@ export function ScoreAxisBars({
         const tip = formatAxisTooltip(key, scores, rubric)
         const help = AXIS_HELP[key]
         const showFlyout = hoverKey === key && !compact
-        const rowTip = nativeTips ? tip : undefined
+        const compactTip = `${tip}\n${axisStatusHelp(status)}`
 
-        return (
+        const row = (
           <div
-            key={key}
-            className="relative flex items-center gap-2"
+            className="relative flex w-full items-center gap-2"
             data-testid={`score-axis-row-${key}`}
             data-axis={key}
             data-missing={missing ? 'true' : 'false'}
-            title={rowTip}
             onMouseEnter={() => setHoverKey(key)}
             onMouseLeave={() => setHoverKey(null)}
             onFocus={() => setHoverKey(key)}
             onBlur={() => setHoverKey(null)}
           >
             <span
-              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate ${
-                !nativeTips ? 'cursor-help' : ''
-              }`}
+              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate cursor-help`}
             >
               {AXIS_LABELS[key]}
               {weightPct != null && !compact && (
@@ -179,19 +167,10 @@ export function ScoreAxisBars({
             </span>
             {missing ? (
               <div className="flex-1 flex items-center min-h-[6px]">
-                {/* No chip-level title — row already owns the single native tip in compact mode */}
-                <EpistemicChip
-                  status={status}
-                  tip={`${tip}\n${axisStatusHelp(status)}`}
-                  useNativeTitle={false}
-                />
+                <EpistemicChip status={status} />
               </div>
             ) : (
-              <div
-                className={`flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden ${
-                  !nativeTips ? 'cursor-help' : ''
-                }`}
-              >
+              <div className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden cursor-help">
                 <div
                   className={`h-1.5 rounded-full transition-all duration-500 ${axisBarColor(key)}`}
                   style={{ width: `${Math.round((v as number) * 100)}%` }}
@@ -227,18 +206,27 @@ export function ScoreAxisBars({
             )}
           </div>
         )
+
+        return compact ? (
+          <StyledTooltip key={key} content={compactTip} side="top" align="left" className="w-full">
+            {row}
+          </StyledTooltip>
+        ) : (
+          <div key={key}>{row}</div>
+        )
       })}
 
       {scores.safetyFlags && scores.safetyFlags.length > 0 && (
         <div className="flex flex-wrap gap-1 pt-1" data-testid="score-axis-safety-flags">
           {scores.safetyFlags.map((flag) => (
-            <span
+            <StyledTooltip
               key={`${flag.kind}:${flag.label}`}
-              className="text-[9px] px-1.5 py-0.5 rounded border border-amber-700/50 bg-amber-900/30 text-amber-300 cursor-help"
-              title={`${flag.kind} · ${flag.severity}\nSoft flag: may not hard-penalize composite unless AE policy is hard-penalty.`}
+              content={`${flag.kind} · ${flag.severity}\nSoft flag: may not hard-penalize composite unless AE policy is hard-penalty.`}
             >
-              {flag.label}
-            </span>
+              <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-700/50 bg-amber-900/30 text-amber-300 cursor-help">
+                {flag.label}
+              </span>
+            </StyledTooltip>
           ))}
         </div>
       )}

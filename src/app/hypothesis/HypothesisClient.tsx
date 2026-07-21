@@ -16,6 +16,7 @@ import { SavedHypotheses } from '@/components/hypothesis/SavedHypotheses'
 import { listProjects, sendIntersectMatchesToBoard } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import Link from 'next/link'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const VALID_AXES: FilterAxis[] = ['targets-gene', 'indicated-for', 'trial-phase', 'atc-class']
 
@@ -261,15 +262,17 @@ export function HypothesisClient() {
                 </button>
                 {matches.length > 0 && (
                   <>
-                    <button
-                      type="button"
-                      onClick={handleSendToBoard}
-                      disabled={boardBusy}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-900/40 border border-emerald-800/50 text-xs font-medium text-emerald-300 hover:bg-emerald-900/60 disabled:opacity-50 transition-colors"
-                      title="Add intersect matches to a project triage board (does not change set-ops hypothesis types)"
-                    >
-                      Send to project board
-                    </button>
+                    <StyledTooltip content="Add intersect matches to a project triage board (does not change set-ops hypothesis types)">
+                      <button
+                        type="button"
+                        onClick={handleSendToBoard}
+                        disabled={boardBusy}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-900/40 border border-emerald-800/50 text-xs font-medium text-emerald-300 hover:bg-emerald-900/60 disabled:opacity-50 transition-colors"
+                        aria-label="Add intersect matches to a project triage board (does not change set-ops hypothesis types)"
+                      >
+                        Send to project board
+                      </button>
+                    </StyledTooltip>
                     <button
                       type="button"
                       onClick={handleExport}

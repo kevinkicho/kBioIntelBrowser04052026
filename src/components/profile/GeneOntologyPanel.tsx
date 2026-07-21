@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GoAnnotation } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
@@ -89,12 +90,13 @@ export const GeneOntologyPanel = memo(function GeneOntologyPanel({
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <span
-                        className={`text-[10px] border px-1.5 py-0.5 rounded shrink-0 ${goAspectBadge(term.goAspect)}`}
-                        title={normalizeAspect(term.goAspect)}
-                      >
-                        {shortAspect(term.goAspect)}
-                      </span>
+                      <StyledTooltip content={normalizeAspect(term.goAspect)}>
+                        <span
+                          className={`text-[10px] border px-1.5 py-0.5 rounded shrink-0 ${goAspectBadge(term.goAspect)}`}
+                        >
+                          {shortAspect(term.goAspect)}
+                        </span>
+                      </StyledTooltip>
                       <a
                         href={href}
                         target="_blank"

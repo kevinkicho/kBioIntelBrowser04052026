@@ -5,6 +5,7 @@ import { clientFetch } from '@/lib/clientFetch'
 import { chemblCompoundUrl, chemblTargetUrl, normalizeChemblId } from '@/lib/chemblLinks'
 import type { ChemblActivity, RelatedCompound } from '@/lib/types'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   activities: ChemblActivity[]
@@ -144,25 +145,28 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
               <div className="flex items-center justify-between gap-2 mb-1.5">
                 <div className="min-w-0">
                   {targetHref ? (
-                    <a
-                      href={targetHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() =>
-                        onDeepLinkClick('chembl', targetHref, {
-                          panelId: 'competitive-landscape',
-                          label: name,
-                        })
-                      }
-                      className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 truncate block"
-                      title={`Open target ${name} in ChEMBL`}
-                    >
-                      Target: {name}
-                    </a>
+                    <StyledTooltip content={`Open target ${name} in ChEMBL`}>
+                      <a
+                        href={targetHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={() =>
+                          onDeepLinkClick('chembl', targetHref, {
+                            panelId: 'competitive-landscape',
+                            label: name,
+                          })
+                        }
+                        className="text-[11px] font-medium text-indigo-400 hover:text-indigo-300 truncate block"
+                      >
+                        Target: {name}
+                      </a>
+                    </StyledTooltip>
                   ) : (
-                    <div className="text-[11px] font-medium text-indigo-400 truncate" title={name}>
-                      Target: {name}
-                    </div>
+                    <StyledTooltip content={name}>
+                      <div className="text-[11px] font-medium text-indigo-400 truncate">
+                        Target: {name}
+                      </div>
+                    </StyledTooltip>
                   )}
                   <div className="text-[10px] font-mono text-slate-600">{id}</div>
                 </div>
@@ -197,7 +201,7 @@ export function CompetitiveLandscape({ activities, currentChemblId }: Props) {
                       href={href}
                       target="_blank"
                       rel="noopener noreferrer"
-                      title={`${label} in ChEMBL`}
+                      aria-label={`${label} in ChEMBL`}
                       onClick={() =>
                         onDeepLinkClick('chembl', href, {
                           panelId: 'competitive-landscape',

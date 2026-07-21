@@ -7,6 +7,7 @@ import type { Patent } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export const PatentsPanel = memo(function PatentsPanel({
   patents,
@@ -76,9 +77,11 @@ export const PatentsPanel = memo(function PatentsPanel({
               <span className="text-[10px] font-mono text-cyan-300/90 truncate">
                 {patent.patentNumber || '—'}
               </span>
-              <span className="text-[11px] text-slate-500 truncate" title={patent.assignee}>
-                {patent.assignee || '—'}
-              </span>
+              <StyledTooltip content={patent.assignee || undefined}>
+                <span className="text-[11px] text-slate-500 truncate">
+                  {patent.assignee || '—'}
+                </span>
+              </StyledTooltip>
               <span
                 className={`text-[11px] text-slate-500 tabular-nums truncate ${emptyDataClass(isEmptyMetric(date))}`}
               >

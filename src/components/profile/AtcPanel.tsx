@@ -11,6 +11,7 @@ import {
 } from '@/lib/api/atc'
 import { alphaSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function rowHref(cls: AtcClassification): string {
   if (cls.url?.includes('atcddd.fhi.no') || cls.url?.includes('whocc.no')) {
@@ -102,7 +103,7 @@ export const AtcPanel = memo(function AtcPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${cls.code} — ${cls.name || 'ATC class'} in WHO ATC/DDD Index`}
+                    aria-label={`Open ${cls.code} — ${cls.name || 'ATC class'} in WHO ATC/DDD Index`}
                     onClick={() =>
                       onDeepLinkClick('atc', href, { panelId: 'atc', label: cls.code })
                     }
@@ -114,9 +115,9 @@ export const AtcPanel = memo(function AtcPanel({
                     <span className="text-sm text-slate-200 group-hover:text-cyan-200 truncate min-w-0">
                       {cls.name || '—'}
                     </span>
-                    <span className="text-[11px] text-slate-500 truncate" title={level}>
-                      {level}
-                    </span>
+                    <StyledTooltip content={level}>
+                      <span className="text-[11px] text-slate-500 truncate">{level}</span>
+                    </StyledTooltip>
                   </a>
                 </div>
               )

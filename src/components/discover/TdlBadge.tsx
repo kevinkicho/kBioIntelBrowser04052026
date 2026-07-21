@@ -1,5 +1,7 @@
 'use client'
 
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
+
 /** Pharos Target Development Level badge (V2-10). Hidden when tdl empty. */
 
 const TDL_STYLES: Record<string, string> = {
@@ -14,13 +16,14 @@ export function TdlBadge({ tdl, className = '' }: { tdl?: string | null; classNa
   const key = tdl.trim()
   const style = TDL_STYLES[key] ?? 'border-slate-700 bg-slate-800/50 text-slate-400'
   return (
-    <span
-      className={`inline-flex shrink-0 rounded border px-1 py-0.5 text-[9px] font-medium ${style} ${className}`}
-      title={`Pharos Target Development Level: ${key}`}
-      data-testid="pharos-tdl-badge"
-      data-tdl={key}
-    >
-      {key}
-    </span>
+    <StyledTooltip content={`Pharos Target Development Level: ${key}`}>
+      <span
+        className={`inline-flex shrink-0 rounded border px-1 py-0.5 text-[9px] font-medium ${style} ${className}`}
+        data-testid="pharos-tdl-badge"
+        data-tdl={key}
+      >
+        {key}
+      </span>
+    </StyledTooltip>
   )
 }

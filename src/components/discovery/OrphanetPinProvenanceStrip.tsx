@@ -1,6 +1,7 @@
 'use client'
 
 import type { OrphanetPinProvenance } from '@/app/discover/hooks/useDiscovery'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface OrphanetPinProvenanceStripProps {
   provenance: OrphanetPinProvenance | null
@@ -71,16 +72,18 @@ export function OrphanetPinProvenanceStrip({
           )}
         </div>
         {onRerank && (
-          <button
-            type="button"
-            onClick={onRerank}
-            disabled={rerankDisabled}
-            className="shrink-0 rounded-lg border border-violet-700/50 bg-violet-900/40 px-3 py-1.5 text-[11px] font-medium text-violet-100 hover:bg-violet-800/50 disabled:opacity-50"
-            data-testid="orphanet-rerank-cta"
-            title="Re-run rank with current gene pins (never automatic)"
-          >
-            Re-rank with pins
-          </button>
+          <StyledTooltip content="Re-run rank with current gene pins (never automatic)">
+            <button
+              type="button"
+              onClick={onRerank}
+              disabled={rerankDisabled}
+              className="shrink-0 rounded-lg border border-violet-700/50 bg-violet-900/40 px-3 py-1.5 text-[11px] font-medium text-violet-100 hover:bg-violet-800/50 disabled:opacity-50"
+              data-testid="orphanet-rerank-cta"
+              aria-label="Re-run rank with current gene pins (never automatic)"
+            >
+              Re-rank with pins
+            </button>
+          </StyledTooltip>
         )}
       </div>
     </div>

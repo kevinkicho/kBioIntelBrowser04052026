@@ -22,6 +22,7 @@ import {
   formatAiGenerationPreview,
 } from '@/lib/ai/formatAiGeneration'
 import { clearAiHistoryLocal } from '@/lib/ai/aiHistoryIdb'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const KINDS: Array<AiDataKind | 'all'> = [
   'all',
@@ -279,27 +280,35 @@ export default function AiHistoryPage() {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            onClick={() => void handleClearLocal()}
-            onBlur={() => {
-              // disarm if user clicks away without confirming
-              window.setTimeout(() => setClearArmed(false), 200)
-            }}
-            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${
-              clearArmed
-                ? 'border-red-500 bg-red-900/50 text-red-100 ring-1 ring-red-500/40'
-                : 'border-red-900/50 bg-red-950/30 text-red-300/90 hover:border-red-700 hover:text-red-200'
-            }`}
-            data-testid="ai-history-clear"
-            title={
+          <StyledTooltip
+            content={
               clearArmed
                 ? 'Click again, then confirm in the dialog'
                 : 'Clear local browser AI history'
             }
           >
-            {clearArmed ? 'Confirm clear?' : 'Clear'}
-          </button>
+            <button
+              type="button"
+              onClick={() => void handleClearLocal()}
+              onBlur={() => {
+                // disarm if user clicks away without confirming
+                window.setTimeout(() => setClearArmed(false), 200)
+              }}
+              className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${
+                clearArmed
+                  ? 'border-red-500 bg-red-900/50 text-red-100 ring-1 ring-red-500/40'
+                  : 'border-red-900/50 bg-red-950/30 text-red-300/90 hover:border-red-700 hover:text-red-200'
+              }`}
+              data-testid="ai-history-clear"
+              aria-label={
+                clearArmed
+                  ? 'Click again, then confirm in the dialog'
+                  : 'Clear local browser AI history'
+              }
+            >
+              {clearArmed ? 'Confirm clear?' : 'Clear'}
+            </button>
+          </StyledTooltip>
         </div>
 
         {/* Sort + page size + pagination controls */}
@@ -427,23 +436,21 @@ export default function AiHistoryPage() {
                           <span className="ml-1 text-[9px] text-red-400">err</span>
                         ) : null}
                       </span>
-                      <span
-                        className="truncate font-mono text-[10px] text-slate-500"
-                        title={entry.mode}
-                      >
-                        {entry.mode || '—'}
-                      </span>
-                      <span
-                        className="truncate text-[11px] text-slate-400"
-                        title={contextLabel(entry)}
-                      >
-                        {contextLabel(entry)}
-                        {entry.model ? (
-                          <span className="ml-1 font-mono text-[9px] text-slate-600">
-                            · {entry.model}
-                          </span>
-                        ) : null}
-                      </span>
+                      <StyledTooltip content={entry.mode || undefined} className="min-w-0">
+                        <span className="block truncate font-mono text-[10px] text-slate-500">
+                          {entry.mode || '—'}
+                        </span>
+                      </StyledTooltip>
+                      <StyledTooltip content={contextLabel(entry)} className="min-w-0">
+                        <span className="block truncate text-[11px] text-slate-400">
+                          {contextLabel(entry)}
+                          {entry.model ? (
+                            <span className="ml-1 font-mono text-[9px] text-slate-600">
+                              · {entry.model}
+                            </span>
+                          ) : null}
+                        </span>
+                      </StyledTooltip>
                       <span className="line-clamp-2 text-[11px] leading-snug text-slate-300 sm:line-clamp-1">
                         {preview}
                         {entry.userComment?.trim() ? (

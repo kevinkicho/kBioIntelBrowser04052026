@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
 import { DiscoverAlgorithmGuide } from '@/components/discovery/DiscoverAlgorithmGuide'
 import { PrefTooltip } from '@/components/discovery/PrefTooltip'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   onSearch: (query: string, opts?: { diseaseId?: string }) => void
@@ -306,21 +307,24 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
         </p>
         <div className="flex flex-wrap justify-center gap-2">
           {EXAMPLE_DISEASES.map((d) => (
-            <button
+            <StyledTooltip
               key={d}
-              type="button"
-              onClick={() => {
-                typeaheadEnabled.current = false
-                setQuery(d)
-                closeSuggestions()
-                onSearch(d)
-              }}
-              disabled={isLoading}
-              className="text-xs px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-indigo-300 hover:border-indigo-600/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-              title={`Rank candidates for ${d} using free public APIs and your rubric`}
+              content={`Rank candidates for ${d} using free public APIs and your rubric`}
             >
-              {d}
-            </button>
+              <button
+                type="button"
+                onClick={() => {
+                  typeaheadEnabled.current = false
+                  setQuery(d)
+                  closeSuggestions()
+                  onSearch(d)
+                }}
+                disabled={isLoading}
+                className="text-xs px-3 py-1.5 rounded-full bg-slate-800/50 border border-slate-700/50 text-slate-400 hover:text-indigo-300 hover:border-indigo-600/50 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {d}
+              </button>
+            </StyledTooltip>
           ))}
         </div>
       </div>

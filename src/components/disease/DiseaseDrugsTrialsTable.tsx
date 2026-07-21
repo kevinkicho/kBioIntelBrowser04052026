@@ -8,6 +8,7 @@ import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emptyDataClass } from '@/lib/summaryEmpty'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const CT_SOURCE = 'clinical-trials'
 const CT_API = 'https://clinicaltrials.gov/api/v2/studies'
@@ -250,12 +251,11 @@ function TrialRow({
         <span className="text-[11px] font-mono text-indigo-300 group-hover:text-indigo-200 truncate">
           {trial.nctId || '—'}
         </span>
-        <span
-          className="text-xs text-slate-200 group-hover:text-cyan-200 truncate"
-          title={trial.title}
-        >
-          {trial.title || '—'}
-        </span>
+        <StyledTooltip content={trial.title || undefined}>
+          <span className="text-xs text-slate-200 group-hover:text-cyan-200 truncate">
+            {trial.title || '—'}
+          </span>
+        </StyledTooltip>
         <span
           className={`text-[10px] text-violet-300/90 truncate ${emptyDataClass(phase === '—')}`}
         >
@@ -266,12 +266,13 @@ function TrialRow({
         >
           {trial.status || '—'}
         </span>
-        <span
-          className={`text-[10px] text-slate-500 truncate ${emptyDataClass(!trial.sponsor)}`}
-          title={trial.sponsor}
-        >
-          {trial.sponsor || '—'}
-        </span>
+        <StyledTooltip content={trial.sponsor || undefined}>
+          <span
+            className={`text-[10px] text-slate-500 truncate ${emptyDataClass(!trial.sponsor)}`}
+          >
+            {trial.sponsor || '—'}
+          </span>
+        </StyledTooltip>
         <span
           className={`text-[10px] font-mono tabular-nums text-right text-slate-400 ${emptyDataClass(n === '—')}`}
         >

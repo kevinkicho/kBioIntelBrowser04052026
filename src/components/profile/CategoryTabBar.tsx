@@ -3,6 +3,7 @@
 import { MOLECULE_CATEGORIES, type CategoryId, type CategoryDataCount } from '@/lib/categoryConfig'
 import type { FreshnessMap } from '@/lib/dataFreshness'
 import { formatTimeSince } from '@/lib/dataFreshness'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface CategoryTabBarProps {
   active: 'all' | CategoryId
@@ -19,20 +20,22 @@ interface CategoryTabBarProps {
 function StatusDot({ health }: { health: string }) {
   if (health === 'loading') {
     return (
-      <span
-        className="w-1 h-1 rounded-full bg-amber-400 animate-pulse shrink-0"
-        title="Loading…"
-        data-testid="tab-health-loading"
-      />
+      <StyledTooltip content="Loading…">
+        <span
+          className="w-1 h-1 rounded-full bg-amber-400 animate-pulse shrink-0"
+          data-testid="tab-health-loading"
+        />
+      </StyledTooltip>
     )
   }
   if (health === 'error') {
     return (
-      <span
-        className="w-1 h-1 rounded-full bg-red-400 shrink-0"
-        title="Failed — click to retry"
-        data-testid="tab-health-error"
-      />
+      <StyledTooltip content="Failed — click to retry">
+        <span
+          className="w-1 h-1 rounded-full bg-red-400 shrink-0"
+          data-testid="tab-health-error"
+        />
+      </StyledTooltip>
     )
   }
   return null
@@ -76,30 +79,30 @@ export function CategoryTabBar({ active, counts, onChange, freshness, disabled }
           : 'Not loaded yet'
 
         return (
-          <button
-            key={cat.id}
-            className={`shrink-0 flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-t-md transition-colors whitespace-nowrap ${
-              isAct
-                ? 'bg-slate-800/80 text-slate-100 border-b-2 border-indigo-500'
-                : hasData
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
-                  : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/30'
-            } ${!hasData ? 'opacity-30' : ''} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
-            onClick={() => onChange(cat.id)}
-            disabled={disabled}
-            title={title}
-            data-testid={`category-tab-${cat.id}`}
-            data-has-data={hasData ? 'true' : 'false'}
-            data-empty={!hasData ? 'true' : 'false'}
-          >
-            <span>{cat.label}</span>
-            <span
-              className={`text-[9px] ${hasData ? 'text-indigo-300/70' : 'text-slate-600'}`}
+          <StyledTooltip key={cat.id} content={title}>
+            <button
+              className={`shrink-0 flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium rounded-t-md transition-colors whitespace-nowrap ${
+                isAct
+                  ? 'bg-slate-800/80 text-slate-100 border-b-2 border-indigo-500'
+                  : hasData
+                    ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                    : 'text-slate-600 hover:text-slate-400 hover:bg-slate-800/30'
+              } ${!hasData ? 'opacity-30' : ''} ${disabled ? 'opacity-50 pointer-events-none' : ''}`}
+              onClick={() => onChange(cat.id)}
+              disabled={disabled}
+              data-testid={`category-tab-${cat.id}`}
+              data-has-data={hasData ? 'true' : 'false'}
+              data-empty={!hasData ? 'true' : 'false'}
             >
-              {count.withData}/{count.total}
-            </span>
-            {f && <StatusDot health={f.health} />}
-          </button>
+              <span>{cat.label}</span>
+              <span
+                className={`text-[9px] ${hasData ? 'text-indigo-300/70' : 'text-slate-600'}`}
+              >
+                {count.withData}/{count.total}
+              </span>
+              {f && <StatusDot health={f.health} />}
+            </button>
+          </StyledTooltip>
         )
       })}
     </div>

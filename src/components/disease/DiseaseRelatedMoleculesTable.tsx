@@ -7,6 +7,7 @@ import { DataPoint } from '@/components/ui/DataPoint'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { emitProductEvent } from '@/lib/productEvents'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   molecules: DedupedDiseaseMolecule[]
@@ -184,12 +185,11 @@ export function DiseaseRelatedMoleculesTable({
                       {kindLabel(m.relationKind)}
                     </span>
                   </div>
-                  <p
-                    className="text-[11px] text-slate-400 leading-snug line-clamp-3"
-                    title={m.reasons?.length > 1 ? m.reasons.join(' · ') : m.reason}
+                  <StyledTooltip
+                    content={m.reasons?.length > 1 ? m.reasons.join(' · ') : m.reason}
                   >
-                    {m.reason}
-                  </p>
+                    <p className="text-[11px] text-slate-400 leading-snug line-clamp-3">{m.reason}</p>
+                  </StyledTooltip>
                 </div>
               </DataPoint>
             )

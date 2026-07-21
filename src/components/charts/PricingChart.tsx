@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import type { DrugPrice } from '@/lib/types'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   prices: DrugPrice[]
@@ -35,9 +36,9 @@ export function PricingChart({ prices }: Props) {
           return (
             <div key={i} className="group">
               <div className="flex items-center justify-between text-[10px] mb-0.5">
-                <span className="text-slate-400 truncate flex-1 mr-2" title={price.ndcDescription}>
-                  {label}
-                </span>
+                <StyledTooltip content={price.ndcDescription} className="min-w-0 flex-1 mr-2">
+                  <span className="block text-slate-400 truncate">{label}</span>
+                </StyledTooltip>
                 <span className="text-emerald-400 font-mono font-medium">
                   ${price.nadacPerUnit.toFixed(4)}
                   <span className="text-slate-600 ml-0.5">/{price.pricingUnit || 'unit'}</span>

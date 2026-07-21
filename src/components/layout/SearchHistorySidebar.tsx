@@ -11,6 +11,7 @@ import {
   kindLabel,
 } from '@/lib/searchHistory'
 import { clearAllProfileRevisitCache } from '@/lib/profileClientCache'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const FILTERS: { id: SearchHistoryFilter; label: string }[] = [
   { id: 'all', label: 'All' },
@@ -144,18 +145,19 @@ export function SearchHistorySidebar() {
         data-testid="search-history-sidebar-collapsed"
         aria-label="Search history (collapsed)"
       >
-        <button
-          type="button"
-          onClick={() => setCollapsed(false)}
-          className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
-          title="Expand search history"
-          aria-label="Expand search history"
-          data-testid="search-history-expand"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+        <StyledTooltip content="Expand search history">
+          <button
+            type="button"
+            onClick={() => setCollapsed(false)}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-800 hover:text-slate-100"
+            aria-label="Expand search history"
+            data-testid="search-history-expand"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </StyledTooltip>
         <span className="mt-3 text-[9px] font-medium uppercase tracking-wider text-slate-600 [writing-mode:vertical-rl]">
           History ({entries.length})
         </span>
@@ -176,18 +178,19 @@ export function SearchHistorySidebar() {
             {entries.length} saved · reopen uses cache when warm
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setCollapsed(true)}
-          className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
-          title="Collapse sidebar"
-          aria-label="Collapse search history"
-          data-testid="search-history-collapse"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
+        <StyledTooltip content="Collapse sidebar">
+          <button
+            type="button"
+            onClick={() => setCollapsed(true)}
+            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+            aria-label="Collapse search history"
+            data-testid="search-history-collapse"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+        </StyledTooltip>
       </div>
 
       <div className="space-y-2 border-b border-slate-800/60 px-3 py-2">
@@ -230,16 +233,18 @@ export function SearchHistorySidebar() {
             ))}
           </select>
           {entries.length > 0 && (
-            <button
-              type="button"
-              onClick={() => {
-                if (window.confirm('Clear all search history?')) clear()
-              }}
-              className="text-[10px] text-slate-600 hover:text-red-400"
-              title="Clear all history"
-            >
-              Clear
-            </button>
+            <StyledTooltip content="Clear all history">
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm('Clear all search history?')) clear()
+                }}
+                className="text-[10px] text-slate-600 hover:text-red-400"
+                aria-label="Clear all history"
+              >
+                Clear
+              </button>
+            </StyledTooltip>
           )}
         </div>
       </div>
@@ -265,68 +270,74 @@ export function SearchHistorySidebar() {
                   data-testid={`search-history-item-${entry.id}`}
                 >
                   <div className="flex items-start gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => openEntry(entry, false)}
-                      className="min-w-0 flex-1 text-left"
-                      title={`Open ${entry.title} (session cache when previously loaded)`}
+                    <StyledTooltip
+                      content={`Open ${entry.title} (session cache when previously loaded)`}
+                      className="min-w-0 flex-1"
                     >
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[11px]" aria-hidden>
-                          {kindIcon(entry.kind)}
-                        </span>
-                        <span className="truncate text-xs font-medium text-slate-200">
-                          {entry.title}
-                        </span>
-                      </div>
-                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-5 text-[9px] text-slate-500">
-                        <span className="uppercase tracking-wide text-slate-600">
-                          {kindLabel(entry.kind)}
-                        </span>
-                        <span>{timeAgo(entry.lastVisitedAt)}</span>
-                        {entry.visitCount > 1 && <span>×{entry.visitCount}</span>}
-                        {entry.meta?.cid != null && (
-                          <span className="font-mono">CID {entry.meta.cid}</span>
-                        )}
-                        {entry.meta?.candidateCount != null && (
-                          <span>{entry.meta.candidateCount} candidates</span>
-                        )}
-                      </div>
-                    </button>
+                      <button
+                        type="button"
+                        onClick={() => openEntry(entry, false)}
+                        className="min-w-0 w-full flex-1 text-left"
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[11px]" aria-hidden>
+                            {kindIcon(entry.kind)}
+                          </span>
+                          <span className="truncate text-xs font-medium text-slate-200">
+                            {entry.title}
+                          </span>
+                        </div>
+                        <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 pl-5 text-[9px] text-slate-500">
+                          <span className="uppercase tracking-wide text-slate-600">
+                            {kindLabel(entry.kind)}
+                          </span>
+                          <span>{timeAgo(entry.lastVisitedAt)}</span>
+                          {entry.visitCount > 1 && <span>×{entry.visitCount}</span>}
+                          {entry.meta?.cid != null && (
+                            <span className="font-mono">CID {entry.meta.cid}</span>
+                          )}
+                          {entry.meta?.candidateCount != null && (
+                            <span>{entry.meta.candidateCount} candidates</span>
+                          )}
+                        </div>
+                      </button>
+                    </StyledTooltip>
                     <div className="flex shrink-0 flex-col gap-0.5 opacity-70 group-hover:opacity-100">
-                      <button
-                        type="button"
-                        onClick={() => openEntry(entry, true)}
-                        className="rounded p-1 text-slate-500 hover:bg-amber-950/40 hover:text-amber-300"
-                        title="Refresh — re-query sources for latest data"
-                        aria-label={`Refresh ${entry.title}`}
-                        data-testid={`search-history-refresh-${entry.id}`}
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                          />
-                        </svg>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => remove(entry.id)}
-                        className="rounded p-1 text-slate-600 hover:bg-red-950/30 hover:text-red-400"
-                        title="Remove from history"
-                        aria-label={`Remove ${entry.title}`}
-                      >
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                            strokeWidth={2}
-                            d="M6 18L18 6M6 6l12 12"
-                          />
-                        </svg>
-                      </button>
+                      <StyledTooltip content="Refresh — re-query sources for latest data">
+                        <button
+                          type="button"
+                          onClick={() => openEntry(entry, true)}
+                          className="rounded p-1 text-slate-500 hover:bg-amber-950/40 hover:text-amber-300"
+                          aria-label={`Refresh ${entry.title}`}
+                          data-testid={`search-history-refresh-${entry.id}`}
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                            />
+                          </svg>
+                        </button>
+                      </StyledTooltip>
+                      <StyledTooltip content="Remove from history">
+                        <button
+                          type="button"
+                          onClick={() => remove(entry.id)}
+                          className="rounded p-1 text-slate-600 hover:bg-red-950/30 hover:text-red-400"
+                          aria-label={`Remove ${entry.title}`}
+                        >
+                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                              strokeWidth={2}
+                              d="M6 18L18 6M6 6l12 12"
+                            />
+                          </svg>
+                        </button>
+                      </StyledTooltip>
                     </div>
                   </div>
                 </li>
@@ -341,16 +352,18 @@ export function SearchHistorySidebar() {
           <strong className="text-slate-500">Open</strong> uses session/disk cache when available.{' '}
           <strong className="text-slate-500">Refresh</strong> re-queries public APIs (slower).
         </p>
-        <button
-          type="button"
-          onClick={() => void clearProfileCache()}
-          disabled={cacheClearing}
-          className="w-full rounded border border-slate-800 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500 hover:border-slate-700 hover:text-slate-300 disabled:opacity-50"
-          title="Clear cached category and pipeline data (keeps search history)"
-          data-testid="search-history-clear-profile-cache"
-        >
-          {cacheClearing ? 'Clearing profile cache…' : 'Clear profile cache'}
-        </button>
+        <StyledTooltip content="Clear cached category and pipeline data (keeps search history)" className="w-full">
+          <button
+            type="button"
+            onClick={() => void clearProfileCache()}
+            disabled={cacheClearing}
+            className="w-full rounded border border-slate-800 bg-slate-950/60 px-2 py-1 text-[10px] text-slate-500 hover:border-slate-700 hover:text-slate-300 disabled:opacity-50"
+            aria-label="Clear cached category and pipeline data (keeps search history)"
+            data-testid="search-history-clear-profile-cache"
+          >
+            {cacheClearing ? 'Clearing profile cache…' : 'Clear profile cache'}
+          </button>
+        </StyledTooltip>
       </div>
     </aside>
   )

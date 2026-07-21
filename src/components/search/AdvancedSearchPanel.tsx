@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { API_IDENTIFIER_CONFIGS, IDENTIFIER_TYPE_LABELS, API_PARAMETERS, type ApiIdentifierType, type SearchType, type ApiParamValue } from '@/lib/apiIdentifiers'
 import { getPanelSource } from '@/lib/panelSources'
 import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface AdvancedSearchPanelProps {
   searchType: SearchType
@@ -183,31 +184,51 @@ function ParamCell({ panelId, params, currentParams, onParamChange }: {
         const currentVal = currentParams[param.key]
         if (param.type === 'select' && param.options) {
           return (
-            <select key={param.key} value={String(currentVal ?? param.default)}
-              onChange={(e) => onParamChange(panelId, param.key, e.target.value)}
-              className="bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-300 px-1 py-px h-[16px]"
-              title={param.label}>
-              {param.options.map(opt => <option key={opt.value} value={opt.value}>{opt.label}</option>)}
-            </select>
+            <StyledTooltip key={param.key} content={param.label}>
+              <select
+                value={String(currentVal ?? param.default)}
+                onChange={(e) => onParamChange(panelId, param.key, e.target.value)}
+                className="bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-300 px-1 py-px h-[16px]"
+                aria-label={param.label}
+              >
+                {param.options.map(opt => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </StyledTooltip>
           )
         }
         if (param.type === 'number') {
           return (
-            <input key={param.key} type="number" min={param.min} max={param.max}
-              value={String(currentVal ?? param.default)}
-              onChange={(e) => onParamChange(panelId, param.key, Number(e.target.value))}
-              className="bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-300 px-1 py-px w-10 h-[16px] text-center"
-              title={param.label} />
+            <StyledTooltip key={param.key} content={param.label}>
+              <input
+                type="number"
+                min={param.min}
+                max={param.max}
+                value={String(currentVal ?? param.default)}
+                onChange={(e) => onParamChange(panelId, param.key, Number(e.target.value))}
+                className="bg-slate-700 border border-slate-600 rounded text-[9px] text-slate-300 px-1 py-px w-10 h-[16px] text-center"
+                aria-label={param.label}
+              />
+            </StyledTooltip>
           )
         }
         if (param.type === 'toggle') {
           const on = !!(currentVal ?? param.default)
           return (
-            <button key={param.key} onClick={() => onParamChange(panelId, param.key, !on)}
-              className={`relative w-5 h-3 rounded-full transition-colors ${on ? 'bg-indigo-600' : 'bg-slate-600'}`}
-              title={param.label}>
-              <span className={`absolute top-px left-px w-[10px] h-[10px] rounded-full bg-white transition-transform ${on ? 'translate-x-2' : ''}`} />
-            </button>
+            <StyledTooltip key={param.key} content={param.label}>
+              <button
+                onClick={() => onParamChange(panelId, param.key, !on)}
+                className={`relative w-5 h-3 rounded-full transition-colors ${on ? 'bg-indigo-600' : 'bg-slate-600'}`}
+                aria-label={param.label}
+              >
+                <span
+                  className={`absolute top-px left-px w-[10px] h-[10px] rounded-full bg-white transition-transform ${on ? 'translate-x-2' : ''}`}
+                />
+              </button>
+            </StyledTooltip>
           )
         }
         return null

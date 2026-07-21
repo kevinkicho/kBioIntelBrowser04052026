@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { mergeAlternateCids } from '@/lib/domain'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface AlternateCidsProps {
   /** Primary PubChem CID (excluded from the list). */
@@ -48,14 +49,14 @@ export function AlternateCids({
       >
         <span className="text-slate-600">Alt</span>
         {visible.map((cid) => (
-          <Link
-            key={cid}
-            href={`/molecule/${cid}${qs}`}
-            className="rounded border border-slate-700/60 bg-slate-800/40 px-1 py-0.5 font-mono text-slate-400 hover:border-cyan-700/50 hover:text-cyan-300"
-            title={`Alternate PubChem CID ${cid}`}
-          >
-            {cid}
-          </Link>
+          <StyledTooltip key={cid} content={`Alternate PubChem CID ${cid}`}>
+            <Link
+              href={`/molecule/${cid}${qs}`}
+              className="rounded border border-slate-700/60 bg-slate-800/40 px-1 py-0.5 font-mono text-slate-400 hover:border-cyan-700/50 hover:text-cyan-300"
+            >
+              {cid}
+            </Link>
+          </StyledTooltip>
         ))}
         {rest > 0 && <span className="text-slate-600">+{rest}</span>}
       </div>
@@ -69,19 +70,22 @@ export function AlternateCids({
     >
       <span className="text-slate-500 font-medium">Alternate CIDs</span>
       {visible.map((cid) => (
-        <Link
+        <StyledTooltip
           key={cid}
-          href={`/molecule/${cid}${qs}`}
-          className="rounded border border-amber-800/40 bg-amber-900/15 px-1.5 py-0.5 font-mono text-amber-300/90 hover:border-amber-600/50 hover:text-amber-200"
-          title={`Alternate PubChem CID ${cid} — may be a different structure or tautomer`}
+          content={`Alternate PubChem CID ${cid} — may be a different structure or tautomer`}
         >
-          CID {cid}
-        </Link>
+          <Link
+            href={`/molecule/${cid}${qs}`}
+            className="rounded border border-amber-800/40 bg-amber-900/15 px-1.5 py-0.5 font-mono text-amber-300/90 hover:border-amber-600/50 hover:text-amber-200"
+          >
+            CID {cid}
+          </Link>
+        </StyledTooltip>
       ))}
       {rest > 0 && (
-        <span className="text-slate-600" title={alts.slice(maxVisible).join(', ')}>
-          +{rest} more
-        </span>
+        <StyledTooltip content={alts.slice(maxVisible).join(', ')}>
+          <span className="text-slate-600">+{rest} more</span>
+        </StyledTooltip>
       )}
     </div>
   )

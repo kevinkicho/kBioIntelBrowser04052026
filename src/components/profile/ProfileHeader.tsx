@@ -10,27 +10,42 @@ import { MoleculeViewer3D } from '@/components/profile/MoleculeViewer3D'
 import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
 import { mapLegacyCandidateToMoleculeCandidate } from '@/lib/domain'
 import { probePubChem3dClient } from '@/lib/api/pubchem3d'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
-/** True when identity fell back to a minimal CID shell (PubChem/MyChem limited). */
+/**
+ * True when identity is a bare CID shell with almost no chemistry metadata.
+ * Do NOT flag successful MyChem/ChEMBL fills that have a real name + formula —
+ * those are usable profiles even when PubChem PUG was down on the server host.
+ */
 export function isIdentityShellMolecule(molecule: Pick<Molecule, 'name' | 'description' | 'formula' | 'inchiKey' | 'molecularWeight'>): boolean {
+  const hasFormula = Boolean(molecule.formula?.trim())
+  const hasKey = Boolean(molecule.inchiKey?.trim())
+  const hasMw = molecule.molecularWeight > 0
+  const bareCidName = /^CID\s+\d+$/i.test(molecule.name.trim())
   const desc = (molecule.description || '').toLowerCase()
+
+  // Explicit empty shells from fallback path
   if (
     desc.includes('minimal identity shell') ||
     desc.includes('full structure metadata unavailable') ||
-    desc.includes('identity resolved via mychem fallback') ||
     desc.includes('upstream identity apis unavailable')
   ) {
     return true
   }
-  // Bare CID name + empty chemistry fields
+
+  // Bare CID + no chemistry = shell
+  if (bareCidName && !hasFormula && !hasKey && !hasMw) return true
+
+  // Legacy MyChem-fallback description without chemistry still counts as shell
   if (
-    /^CID\s+\d+$/i.test(molecule.name.trim()) &&
-    !molecule.formula?.trim() &&
-    !molecule.inchiKey?.trim() &&
-    !(molecule.molecularWeight > 0)
+    (desc.includes('mychem fallback') || desc.includes('via mychem')) &&
+    !hasFormula &&
+    !hasKey &&
+    !hasMw
   ) {
     return true
   }
+
   return false
 }
 
@@ -101,31 +116,46 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
             />
           </div>
         )}
-        <button
-          type="button"
-          disabled={toggleDisabled || has3d === null}
-          onClick={() => {
-            if (toggleDisabled) return
-            setShow3D((v) => !v)
-          }}
-          title={
-            has3d === false
-              ? 'PubChem has no 3D conformer for this CID — 2D structure only'
-              : has3d === null
-                ? 'Checking 3D availability…'
-                : show3D
-                  ? 'Show 2D structure image'
-                  : 'Show interactive 3D (MolView)'
-          }
-          className={`absolute -bottom-2 left-1/2 -translate-x-1/2 text-xs px-2 py-0.5 rounded-full border transition-colors ${
-            toggleDisabled || has3d === null
-              ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
-              : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'
-          }`}
-          data-testid="structure-3d-toggle"
-        >
-          {toggleLabel}
-        </button>
+        <div className="absolute -bottom-2 left-1/2 z-10 -translate-x-1/2">
+          <StyledTooltip
+            content={
+              has3d === false
+                ? 'PubChem has no 3D conformer for this CID — 2D structure only'
+                : has3d === null
+                  ? 'Checking 3D availability…'
+                  : show3D
+                    ? 'Show 2D structure image'
+                    : 'Show interactive 3D (MolView)'
+            }
+            align="center"
+          >
+            <button
+              type="button"
+              disabled={toggleDisabled || has3d === null}
+              onClick={() => {
+                if (toggleDisabled) return
+                setShow3D((v) => !v)
+              }}
+              aria-label={
+                has3d === false
+                  ? 'PubChem has no 3D conformer for this CID — 2D structure only'
+                  : has3d === null
+                    ? 'Checking 3D availability…'
+                    : show3D
+                      ? 'Show 2D structure image'
+                      : 'Show interactive 3D (MolView)'
+              }
+              className={`text-xs px-2 py-0.5 rounded-full border transition-colors ${
+                toggleDisabled || has3d === null
+                  ? 'bg-slate-800 text-slate-600 border-slate-700 cursor-not-allowed'
+                  : 'bg-slate-700 hover:bg-slate-600 text-slate-300 border-slate-600'
+              }`}
+              data-testid="structure-3d-toggle"
+            >
+              {toggleLabel}
+            </button>
+          </StyledTooltip>
+        </div>
       </div>
       <div className="flex-1 min-w-0">
         {identityShell && (
@@ -135,9 +165,8 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
             role="status"
           >
             <span className="font-semibold text-amber-200">Limited identity metadata. </span>
-            PubChem structure lookup was unavailable from this host, so the profile is using a
-            minimal CID shell. Evidence panels may still load by CID; names, formula, and InChIKey
-            can be incomplete until identity APIs recover.
+            PubChem PUG was unavailable from this host and MyChem could not fill name/formula/InChIKey.
+            Evidence panels may still load by CID; identity fields stay incomplete until APIs recover.
           </div>
         )}
         <div className="flex flex-wrap items-center gap-3 mb-2">

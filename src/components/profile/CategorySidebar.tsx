@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { MOLECULE_CATEGORIES, type CategoryId, type CategoryDataCount } from '@/lib/categoryConfig'
 import type { FreshnessMap } from '@/lib/dataFreshness'
 import { formatTimeSince } from '@/lib/dataFreshness'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface CategorySidebarProps {
   active: 'all' | CategoryId
@@ -54,63 +55,72 @@ export function CategorySidebar({ active, counts, onChange, freshness, disabled 
             Categories
           </span>
         )}
-        <button
-          onClick={() => setCollapsed(!collapsed)}
-          className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        >
-          <svg
-            className={`w-3.5 h-3.5 transition-transform ${collapsed ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
+        <StyledTooltip content={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}>
+          <button
+            onClick={() => setCollapsed(!collapsed)}
+            className="p-1 rounded hover:bg-slate-800 text-slate-500 hover:text-slate-300 transition-colors"
+            aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </button>
+            <svg
+              className={`w-3.5 h-3.5 transition-transform ${collapsed ? 'rotate-180' : ''}`}
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </button>
+        </StyledTooltip>
       </div>
 
       {/* Navigation items */}
       <nav className="flex-1 overflow-y-auto py-1.5">
         {/* All categories item */}
-        <button
-          className={`${baseItemClasses} ${active === 'all' ? activeClasses : inactiveClasses} mb-0.5`}
-          onClick={() => onChange('all')}
-          disabled={disabled}
-          title={collapsed ? `All (${totalWithData}/${totalAll})` : undefined}
-        >
-          <span className="text-base">📊</span>
-          {!collapsed && (
-            <>
-              <span className="flex-1 text-xs font-medium">All</span>
-              <span className="text-[10px] bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
-                {totalWithData}/{totalAll}
-              </span>
-            </>
-          )}
-        </button>
+        <StyledTooltip content={collapsed ? `All (${totalWithData}/${totalAll})` : undefined} className="w-full">
+          <button
+            className={`${baseItemClasses} ${active === 'all' ? activeClasses : inactiveClasses} mb-0.5`}
+            onClick={() => onChange('all')}
+            disabled={disabled}
+          >
+            <span className="text-base">📊</span>
+            {!collapsed && (
+              <>
+                <span className="flex-1 text-xs font-medium">All</span>
+                <span className="text-[10px] bg-slate-700/50 text-slate-300 px-1.5 py-0.5 rounded">
+                  {totalWithData}/{totalAll}
+                </span>
+              </>
+            )}
+          </button>
+        </StyledTooltip>
 
         {/* Category items */}
-         {MOLECULE_CATEGORIES.map((cat) => {
-           const count = counts[cat.id] ?? { withData: 0, total: cat.panels.length }
-           const isActive = active === cat.id
-           const f = freshness?.[cat.id]
-           const hasData = (count.withData ?? 0) > 0
-           const tooltip = f
-             ? f.health === 'ok'
-               ? hasData
-                 ? `Loaded ${formatTimeSince(f.fetchedAt)}`
-                 : `Loaded · no panel data`
-               : f.health === 'loading'
-                 ? 'Loading...'
-                 : f.health === 'error'
-                   ? 'Failed — click to retry'
-                   : 'Not loaded yet'
-             : 'Not loaded yet'
+        {MOLECULE_CATEGORIES.map((cat) => {
+          const count = counts[cat.id] ?? { withData: 0, total: cat.panels.length }
+          const isActive = active === cat.id
+          const f = freshness?.[cat.id]
+          const hasData = (count.withData ?? 0) > 0
+          const tooltip = f
+            ? f.health === 'ok'
+              ? hasData
+                ? `Loaded ${formatTimeSince(f.fetchedAt)}`
+                : `Loaded · no panel data`
+              : f.health === 'loading'
+                ? 'Loading...'
+                : f.health === 'error'
+                  ? 'Failed — click to retry'
+                  : 'Not loaded yet'
+            : 'Not loaded yet'
 
-           return (
+          return (
+            <StyledTooltip
+              key={cat.id}
+              content={
+                collapsed ? `${cat.icon} ${cat.label} (${count.withData}/${count.total})` : undefined
+              }
+              className="w-full"
+            >
               <a
-                key={cat.id}
                 href={`#${cat.id}`}
                 className={`${baseItemClasses} ${isActive ? activeClasses : inactiveClasses} ${
                   !hasData ? 'opacity-30' : ''
@@ -119,24 +129,24 @@ export function CategorySidebar({ active, counts, onChange, freshness, disabled 
                   e.preventDefault()
                   if (!disabled) onChange(cat.id)
                 }}
-               title={collapsed ? `${cat.icon} ${cat.label} (${count.withData}/${count.total})` : undefined}
-               data-has-data={hasData ? 'true' : 'false'}
-               data-empty={!hasData ? 'true' : 'false'}
-             >
-               <span className="text-base">{cat.icon}</span>
-               {!collapsed && (
-                 <>
-                   <span className="flex-1 text-xs font-medium truncate">{cat.label}</span>
-                   <span className={`text-[10px] px-1.5 py-0.5 rounded ${hasData ? 'bg-indigo-900/30 text-indigo-300' : 'bg-slate-800/50 text-slate-500'}`}>
-                     {count.withData}/{count.total}
-                   </span>
-                   {f && (
-                     <StatusIndicator health={f.health} tooltip={tooltip} />
-                   )}
-                 </>
-               )}
-             </a>
-           )
+                data-has-data={hasData ? 'true' : 'false'}
+                data-empty={!hasData ? 'true' : 'false'}
+              >
+                <span className="text-base">{cat.icon}</span>
+                {!collapsed && (
+                  <>
+                    <span className="flex-1 text-xs font-medium truncate">{cat.label}</span>
+                    <span
+                      className={`text-[10px] px-1.5 py-0.5 rounded ${hasData ? 'bg-indigo-900/30 text-indigo-300' : 'bg-slate-800/50 text-slate-500'}`}
+                    >
+                      {count.withData}/{count.total}
+                    </span>
+                    {f && <StatusIndicator health={f.health} tooltip={tooltip} />}
+                  </>
+                )}
+              </a>
+            </StyledTooltip>
+          )
         })}
       </nav>
 

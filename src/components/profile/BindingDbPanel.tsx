@@ -7,6 +7,7 @@ import type { BindingAffinity } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const AFFINITY_TYPE_COLORS: Record<string, string> = {
   Ki: 'text-violet-300',
@@ -79,7 +80,7 @@ export const BindingDbPanel = memo(function BindingDbPanel({
                     href={doiHref}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open DOI for ${aff.targetName || 'affinity'}`}
+                    aria-label={`Open DOI for ${aff.targetName || 'affinity'}`}
                     onClick={() =>
                       onDeepLinkClick('other', doiHref, {
                         panelId: 'bindingdb',
@@ -88,9 +89,11 @@ export const BindingDbPanel = memo(function BindingDbPanel({
                     }
                     className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/50 transition-colors group"
                   >
-                    <span className="text-sm font-medium text-slate-100 group-hover:text-sky-200 truncate" title={aff.targetName}>
-                      {aff.targetName || '—'}
-                    </span>
+                    <StyledTooltip content={aff.targetName || undefined}>
+                      <span className="text-sm font-medium text-slate-100 group-hover:text-sky-200 truncate">
+                        {aff.targetName || '—'}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-xs font-medium ${AFFINITY_TYPE_COLORS[aff.affinityType] ?? 'text-slate-300'}`}
                     >
@@ -103,15 +106,19 @@ export const BindingDbPanel = memo(function BindingDbPanel({
                         ? '—'
                         : `${aff.affinityValue} ${aff.affinityUnits || aff.affinityUnit || ''}`.trim()}
                     </span>
-                    <span className="text-[11px] text-slate-500 truncate" title={aff.source}>
-                      {aff.source || '—'}
-                    </span>
+                    <StyledTooltip content={aff.source || undefined}>
+                      <span className="text-[11px] text-slate-500 truncate">
+                        {aff.source || '—'}
+                      </span>
+                    </StyledTooltip>
                   </a>
                 ) : (
                   <div className="grid grid-cols-[minmax(0,1.3fr)_3.5rem_minmax(5rem,0.8fr)_minmax(0,0.9fr)] gap-x-2 items-center px-2 py-2 border-b border-slate-700/50 last:border-0">
-                    <span className="text-sm font-medium text-slate-100 truncate" title={aff.targetName}>
-                      {aff.targetName || '—'}
-                    </span>
+                    <StyledTooltip content={aff.targetName || undefined}>
+                      <span className="text-sm font-medium text-slate-100 truncate">
+                        {aff.targetName || '—'}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-xs font-medium ${AFFINITY_TYPE_COLORS[aff.affinityType] ?? 'text-slate-300'}`}
                     >
@@ -124,9 +131,11 @@ export const BindingDbPanel = memo(function BindingDbPanel({
                         ? '—'
                         : `${aff.affinityValue} ${aff.affinityUnits || aff.affinityUnit || ''}`.trim()}
                     </span>
-                    <span className="text-[11px] text-slate-500 truncate" title={aff.source}>
-                      {aff.source || '—'}
-                    </span>
+                    <StyledTooltip content={aff.source || undefined}>
+                      <span className="text-[11px] text-slate-500 truncate">
+                        {aff.source || '—'}
+                      </span>
+                    </StyledTooltip>
                   </div>
                 )}
               </div>

@@ -7,6 +7,7 @@ import {
   stageIdFromProgressLabel,
 } from '@/lib/discovery/algorithmGuide'
 import { PrefTooltip } from '@/components/discovery/PrefTooltip'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   state: DiscoveryState
@@ -51,17 +52,17 @@ export function DiscoveryProgress({ state }: Props) {
           {DISCOVER_PIPELINE_STAGES.filter((s) => s.id !== 'harvest' || state.progressLabel.toLowerCase().includes('harvest') || state.progressLabel.toLowerCase().includes('safety') || state.progressLabel.toLowerCase().includes('full')).map((s) => {
             const active = s.id === stageId
             return (
-              <span
-                key={s.id}
-                className={`rounded-full border px-2 py-0.5 text-[9px] transition-colors ${
-                  active
-                    ? 'border-indigo-500/60 bg-indigo-950/50 text-indigo-200'
-                    : 'border-slate-800 text-slate-600'
-                }`}
-                title={s.short}
-              >
-                {s.title}
-              </span>
+              <StyledTooltip key={s.id} content={s.short}>
+                <span
+                  className={`rounded-full border px-2 py-0.5 text-[9px] transition-colors ${
+                    active
+                      ? 'border-indigo-500/60 bg-indigo-950/50 text-indigo-200'
+                      : 'border-slate-800 text-slate-600'
+                  }`}
+                >
+                  {s.title}
+                </span>
+              </StyledTooltip>
             )
           })}
         </div>

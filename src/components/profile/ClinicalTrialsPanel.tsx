@@ -15,6 +15,7 @@ import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emitProductEvent } from '@/lib/productEvents'
 import { eudraCtRegisterUrl } from '@/lib/euClinicalTrials'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const STATUS_BADGE: Record<string, string> = {
   COMPLETED: 'bg-emerald-900/40 text-emerald-300 border-emerald-800/40',
@@ -367,22 +368,22 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                     {(trial.eudraCtNumbers ?? []).map((eu) => {
                       const euHref = eudraCtRegisterUrl(eu)
                       return (
-                        <a
-                          key={eu}
-                          href={euHref}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-block text-[10px] text-cyan-400 hover:underline"
-                          title="EU Clinical Trials Register (EudraCT)"
-                          onClick={() =>
-                            onDeepLinkClick('other', euHref, {
-                              panelId: 'clinical-trials',
-                              label: eu,
-                            })
-                          }
-                        >
-                          EU CTR {eu} ↗
-                        </a>
+                        <StyledTooltip key={eu} content="EU Clinical Trials Register (EudraCT)">
+                          <a
+                            href={euHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-block text-[10px] text-cyan-400 hover:underline"
+                            onClick={() =>
+                              onDeepLinkClick('other', euHref, {
+                                panelId: 'clinical-trials',
+                                label: eu,
+                              })
+                            }
+                          >
+                            EU CTR {eu} ↗
+                          </a>
+                        </StyledTooltip>
                       )
                     })}
                   </div>
@@ -400,47 +401,60 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                   >
                     {cell(
                       'nct',
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(key)}
-                        className="text-left w-full min-w-0"
-                        title={isOpen ? 'Hide details' : 'Show conditions & interventions'}
-                        aria-expanded={isOpen}
+                      <StyledTooltip
+                        content={isOpen ? 'Hide details' : 'Show conditions & interventions'}
+                        className="w-full"
                       >
-                        <span className="text-[11px] font-mono text-indigo-300 group-hover:text-indigo-200 truncate block">
-                          <span className="text-slate-600 mr-0.5" aria-hidden>
-                            {isOpen ? '▾' : '▸'}
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(key)}
+                          className="text-left w-full min-w-0"
+                          aria-expanded={isOpen}
+                          aria-label={
+                            isOpen ? 'Hide details' : 'Show conditions & interventions'
+                          }
+                        >
+                          <span className="text-[11px] font-mono text-indigo-300 group-hover:text-indigo-200 truncate block">
+                            <span className="text-slate-600 mr-0.5" aria-hidden>
+                              {isOpen ? '▾' : '▸'}
+                            </span>
+                            {trial.nctId || '—'}
                           </span>
-                          {trial.nctId || '—'}
-                        </span>
-                      </button>,
+                        </button>
+                      </StyledTooltip>,
                     )}
                     {cell(
                       'title',
-                      <button
-                        type="button"
-                        onClick={() => toggleExpand(key)}
-                        className="text-left w-full min-w-0"
-                        title={isOpen ? 'Collapse detail' : 'Expand detail'}
+                      <StyledTooltip
+                        content={isOpen ? 'Collapse detail' : 'Expand detail'}
+                        className="w-full"
                       >
-                        <span className="text-sm text-slate-100 group-hover:text-cyan-200 line-clamp-2 block">
-                          {trial.title || '—'}
-                          {diseaseMatch && (
-                            <span className="ml-1 text-[9px] text-amber-300 font-normal">
-                              Match
-                            </span>
-                          )}
-                        </span>
-                      </button>,
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(key)}
+                          className="text-left w-full min-w-0"
+                          aria-label={isOpen ? 'Collapse detail' : 'Expand detail'}
+                        >
+                          <span className="text-sm text-slate-100 group-hover:text-cyan-200 line-clamp-2 block">
+                            {trial.title || '—'}
+                            {diseaseMatch && (
+                              <span className="ml-1 text-[9px] text-amber-300 font-normal">
+                                Match
+                              </span>
+                            )}
+                          </span>
+                        </button>
+                      </StyledTooltip>,
                     )}
                     {cell(
                       'status',
-                      <span
-                        className={`inline-block text-[9px] px-1.5 py-0.5 rounded border truncate max-w-full ${statusBadge}`}
-                        title={trial.status}
-                      >
-                        {(trial.status || '—').replace(/_/g, ' ')}
-                      </span>,
+                      <StyledTooltip content={trial.status || undefined}>
+                        <span
+                          className={`inline-block text-[9px] px-1.5 py-0.5 rounded border truncate max-w-full ${statusBadge}`}
+                        >
+                          {(trial.status || '—').replace(/_/g, ' ')}
+                        </span>
+                      </StyledTooltip>,
                     )}
                     {cell(
                       'phase',
@@ -468,12 +482,13 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                     )}
                     {cell(
                       'sponsor',
-                      <span
-                        className={`text-[10px] text-slate-500 truncate block ${emptyDataClass(!trial.sponsor)}`}
-                        title={trial.sponsor}
-                      >
-                        {trial.sponsor || '—'}
-                      </span>,
+                      <StyledTooltip content={trial.sponsor || undefined}>
+                        <span
+                          className={`text-[10px] text-slate-500 truncate block ${emptyDataClass(!trial.sponsor)}`}
+                        >
+                          {trial.sponsor || '—'}
+                        </span>
+                      </StyledTooltip>,
                     )}
                     {cell(
                       'enroll',

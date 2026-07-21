@@ -11,6 +11,7 @@ import {
   formatCompositeTooltip,
 } from '@/lib/domain/scoreAxisHelp'
 import { emitProductEvent } from '@/lib/productEvents'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface ScoreExplainerProps {
   rubric?: ScoreRubric
@@ -140,29 +141,33 @@ export function ScoreExplainer({
                     ? 'excl.'
                     : null
               return (
-                <div
+                <StyledTooltip
                   key={key}
-                  className="rounded border border-slate-700/60 bg-slate-900/40 px-2 py-1.5"
-                  title={`${help.summary}\nSources: ${help.sources}`}
-                  data-testid={`score-explainer-axis-${key}`}
+                  content={`${help.summary}\nSources: ${help.sources}`}
+                  className="w-full"
                 >
-                  <div className="flex justify-between gap-2">
-                    <span className="text-indigo-400 font-medium">{AXIS_LABELS[key]}</span>
-                    <span className="text-slate-400 tabular-nums shrink-0">
-                      {val != null && <span className="text-slate-200">{val}</span>}
-                      <span className="text-slate-600"> · {w}% wt</span>
-                      {share != null && (
-                        <span className="text-slate-500"> · {share}</span>
-                      )}
-                    </span>
+                  <div
+                    className="rounded border border-slate-700/60 bg-slate-900/40 px-2 py-1.5 w-full"
+                    data-testid={`score-explainer-axis-${key}`}
+                  >
+                    <div className="flex justify-between gap-2">
+                      <span className="text-indigo-400 font-medium">{AXIS_LABELS[key]}</span>
+                      <span className="text-slate-400 tabular-nums shrink-0">
+                        {val != null && <span className="text-slate-200">{val}</span>}
+                        <span className="text-slate-600"> · {w}% wt</span>
+                        {share != null && (
+                          <span className="text-slate-500"> · {share}</span>
+                        )}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[10px] text-slate-500 leading-snug">{help.summary}</p>
+                    {scores && (
+                      <p className="mt-0.5 text-[9px] text-slate-600">
+                        {axisStatusHelp(scores.axisStatus[key])}
+                      </p>
+                    )}
                   </div>
-                  <p className="mt-0.5 text-[10px] text-slate-500 leading-snug">{help.summary}</p>
-                  {scores && (
-                    <p className="mt-0.5 text-[9px] text-slate-600">
-                      {axisStatusHelp(scores.axisStatus[key])}
-                    </p>
-                  )}
-                </div>
+                </StyledTooltip>
               )
             })}
           </div>

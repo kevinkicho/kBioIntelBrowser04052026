@@ -12,6 +12,7 @@ import {
   type ListSortOption,
 } from '@/lib/listControls'
 import { downloadCsv, rowsToCsv } from '@/lib/listCsv'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface CsvColumn<T> {
   header: string
@@ -195,15 +196,17 @@ export function FilterablePaginatedList<T>({
             </div>
           )}
           {csvExport && (
-            <button
-              type="button"
-              onClick={handleExport}
-              className="rounded-lg border border-slate-700 px-2 py-1.5 text-[10px] text-slate-400 hover:text-indigo-300 hover:border-indigo-700/50 shrink-0"
-              data-testid="list-export-csv"
-              title="Download filtered rows as CSV"
-            >
-              Export CSV
-            </button>
+            <StyledTooltip content="Download filtered rows as CSV">
+              <button
+                type="button"
+                onClick={handleExport}
+                className="rounded-lg border border-slate-700 px-2 py-1.5 text-[10px] text-slate-400 hover:text-indigo-300 hover:border-indigo-700/50 shrink-0"
+                data-testid="list-export-csv"
+                aria-label="Download filtered rows as CSV"
+              >
+                Export CSV
+              </button>
+            </StyledTooltip>
           )}
           <span className="text-[10px] text-slate-600 tabular-nums shrink-0">
             {filtered.length === items.length

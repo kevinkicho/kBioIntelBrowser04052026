@@ -2,6 +2,7 @@
 
 import type { CategoryApiTrace } from '@/lib/panelApiTrace'
 import type { PanelSourceInfo } from '@/lib/panelSources'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface PanelApiDetailModalProps {
   open: boolean
@@ -101,9 +102,11 @@ export function PanelApiDetailModal({
                 </a>
               )}
               {!isBrowseableUrl(sourceInfo.endpoint) && sourceInfo.endpoint && (
-                <span className="text-[10px] text-slate-500" title="Not a public HTTP link">
-                  Join path: {sourceInfo.endpoint}
-                </span>
+                <StyledTooltip content="Not a public HTTP link">
+                  <span className="text-[10px] text-slate-500">
+                    Join path: {sourceInfo.endpoint}
+                  </span>
+                </StyledTooltip>
               )}
             </div>
           </section>
@@ -202,12 +205,11 @@ export function PanelApiDetailModal({
                               {s.endpoint}
                             </a>
                           ) : (
-                            <span
-                              className="break-all font-mono text-[10px] text-slate-500"
-                              title="Internal path or non-HTTP token — not a public registry link"
-                            >
-                              {formatNonHttpEndpoint(s.endpoint)}
-                            </span>
+                            <StyledTooltip content="Internal path or non-HTTP token — not a public registry link">
+                              <span className="break-all font-mono text-[10px] text-slate-500">
+                                {formatNonHttpEndpoint(s.endpoint)}
+                              </span>
+                            </StyledTooltip>
                           )}
                         </div>
                       ) : null}

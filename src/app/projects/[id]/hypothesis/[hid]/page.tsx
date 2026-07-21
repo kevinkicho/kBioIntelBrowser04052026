@@ -38,6 +38,7 @@ import { RhAiPanel } from '@/components/evidence/RhAiPanel'
 import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const STATUSES: ResearchHypothesisStatus[] = [
   'draft',
@@ -776,9 +777,9 @@ export default function ResearchHypothesisEditorPage() {
                         {c.claimType}
                       </span>
                       <p className="leading-snug text-slate-200">{c.statement}</p>
-                      <span className="font-mono text-[9px] text-slate-600 truncate" title={c.id}>
-                        {c.id}
-                      </span>
+                      <StyledTooltip content={c.id}>
+                        <span className="font-mono text-[9px] text-slate-600 truncate">{c.id}</span>
+                      </StyledTooltip>
                       {href ? (
                         <a
                           href={href}
@@ -886,9 +887,9 @@ export default function ResearchHypothesisEditorPage() {
                   >
                     <span className="font-mono text-[10px] text-slate-600">{i + 1}</span>
                     <span className="text-[9px] uppercase text-slate-500">{n.kind}</span>
-                    <span className="truncate text-slate-200" title={n.label}>
-                      {n.label}
-                    </span>
+                    <StyledTooltip content={n.label}>
+                      <span className="truncate text-slate-200">{n.label}</span>
+                    </StyledTooltip>
                     <span className="text-right text-[9px] text-slate-600">
                       {n.claimIds.length} cl.
                     </span>

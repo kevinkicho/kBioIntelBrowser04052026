@@ -3,6 +3,7 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { CitationMetric } from '@/lib/types'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import {
   alphaSortOptions,
   dateSortOptions,
@@ -64,29 +65,31 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
 
         {/* Counts */}
         <div className="mt-2 flex flex-wrap items-center gap-2">
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded border tabular-nums ${
-              hasCiteSignal
-                ? 'bg-cyan-900/40 text-cyan-200 border-cyan-700/40'
-                : 'bg-slate-800/60 text-slate-500 border-slate-700/50'
-            }`}
-            title="Times cited in OpenCitations index (not Google Scholar)"
-          >
-            Cited by <span className="font-semibold font-mono">{metric.citationCount}</span>
-          </span>
-          <span
-            className={`text-[11px] px-2 py-0.5 rounded border tabular-nums ${
-              hasRefSignal
-                ? 'bg-indigo-900/30 text-indigo-200 border-indigo-700/40'
-                : 'bg-slate-800/60 text-slate-500 border-slate-700/50'
-            }`}
-            title="Outgoing references in OpenCitations"
-          >
-            Refs{' '}
-            <span className="font-semibold font-mono">
-              {metric.referenceCount ?? metric.references.length}
+          <StyledTooltip content="Times cited in OpenCitations index (not Google Scholar)">
+            <span
+              className={`text-[11px] px-2 py-0.5 rounded border tabular-nums ${
+                hasCiteSignal
+                  ? 'bg-cyan-900/40 text-cyan-200 border-cyan-700/40'
+                  : 'bg-slate-800/60 text-slate-500 border-slate-700/50'
+              }`}
+            >
+              Cited by <span className="font-semibold font-mono">{metric.citationCount}</span>
             </span>
-          </span>
+          </StyledTooltip>
+          <StyledTooltip content="Outgoing references in OpenCitations">
+            <span
+              className={`text-[11px] px-2 py-0.5 rounded border tabular-nums ${
+                hasRefSignal
+                  ? 'bg-indigo-900/30 text-indigo-200 border-indigo-700/40'
+                  : 'bg-slate-800/60 text-slate-500 border-slate-700/50'
+              }`}
+            >
+              Refs{' '}
+              <span className="font-semibold font-mono">
+                {metric.referenceCount ?? metric.references.length}
+              </span>
+            </span>
+          </StyledTooltip>
           {metric.volume && (
             <span className="text-[10px] text-slate-600">
               vol. {metric.volume}
@@ -110,16 +113,16 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
             </p>
             <div className="flex flex-wrap gap-1">
               {metric.citedBy.slice(0, 4).map((d) => (
-                <a
-                  key={d}
-                  href={`https://doi.org/${d}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] font-mono text-cyan-500/80 hover:text-cyan-300 truncate max-w-[200px]"
-                  title={d}
-                >
-                  {shortDoi(d)}
-                </a>
+                <StyledTooltip key={d} content={d}>
+                  <a
+                    href={`https://doi.org/${d}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-mono text-cyan-500/80 hover:text-cyan-300 truncate max-w-[200px]"
+                  >
+                    {shortDoi(d)}
+                  </a>
+                </StyledTooltip>
               ))}
             </div>
           </div>
@@ -131,16 +134,16 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
             </p>
             <div className="flex flex-wrap gap-1">
               {metric.references.slice(0, 4).map((d) => (
-                <a
-                  key={d}
-                  href={`https://doi.org/${d}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-[10px] font-mono text-indigo-400/80 hover:text-indigo-300 truncate max-w-[200px]"
-                  title={d}
-                >
-                  {shortDoi(d)}
-                </a>
+                <StyledTooltip key={d} content={d}>
+                  <a
+                    href={`https://doi.org/${d}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] font-mono text-indigo-400/80 hover:text-indigo-300 truncate max-w-[200px]"
+                  >
+                    {shortDoi(d)}
+                  </a>
+                </StyledTooltip>
               ))}
             </div>
           </div>
@@ -184,9 +187,11 @@ function MetricRow({ metric }: { metric: CitationMetric }) {
               PubMed ↗
             </a>
           )}
-          <span className="font-mono text-slate-600 truncate max-w-[180px]" title={metric.doi}>
-            {shortDoi(metric.doi)}
-          </span>
+          <StyledTooltip content={metric.doi}>
+            <span className="font-mono text-slate-600 truncate max-w-[180px]">
+              {shortDoi(metric.doi)}
+            </span>
+          </StyledTooltip>
         </div>
       </div>
     </DataPoint>

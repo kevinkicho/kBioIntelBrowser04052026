@@ -8,6 +8,7 @@ import {
 } from '@/lib/landscapeDualStrip'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const TONE: Record<NonNullable<LandscapeStripChip['tone']>, string> = {
   emerald: 'border-emerald-800/40 bg-emerald-950/30 text-emerald-200',
@@ -293,25 +294,28 @@ function Chip({
 
   if (clickable) {
     return (
-      <button
-        type="button"
-        className={className}
-        data-testid={`landscape-chip-${chip.id}`}
-        title={`Open ${chip.label} panel`}
-        onClick={() => onOpenPanel!(chip.categoryId!, chip.panelId!)}
-      >
-        {body}
-      </button>
+      <StyledTooltip content={`Open ${chip.label} panel`}>
+        <button
+          type="button"
+          className={className}
+          data-testid={`landscape-chip-${chip.id}`}
+          aria-label={`Open ${chip.label} panel`}
+          onClick={() => onOpenPanel!(chip.categoryId!, chip.panelId!)}
+        >
+          {body}
+        </button>
+      </StyledTooltip>
     )
   }
   return (
-    <span
-      className={className}
-      data-testid={`landscape-chip-${chip.id}`}
-      data-empty={empty ? 'true' : 'false'}
-      title={empty ? `${chip.label}: no data` : chip.label}
-    >
-      {body}
-    </span>
+    <StyledTooltip content={empty ? `${chip.label}: no data` : chip.label}>
+      <span
+        className={className}
+        data-testid={`landscape-chip-${chip.id}`}
+        data-empty={empty ? 'true' : 'false'}
+      >
+        {body}
+      </span>
+    </StyledTooltip>
   )
 }

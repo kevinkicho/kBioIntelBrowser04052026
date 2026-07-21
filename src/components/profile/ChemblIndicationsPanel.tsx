@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { isMatch } from '@/hooks/useDiseaseContext'
 import type { ChemblIndication } from '@/lib/types'
@@ -182,7 +183,7 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title={openTitle}
+                  aria-label={openTitle}
                   data-testid={`chembl-indication-row-${ind.meshId || ind.efoId || displayName}`}
                   onClick={() =>
                     onDeepLinkClick('chembl', href, {
@@ -202,9 +203,11 @@ export const ChemblIndicationsPanel = memo(function ChemblIndicationsPanel({
                       )}
                     </div>
                   </div>
-                  <span className="text-[11px] font-mono text-slate-500 truncate" title={displayId}>
-                    {displayId || '—'}
-                  </span>
+                  <StyledTooltip content={displayId || undefined}>
+                    <span className="text-[11px] font-mono text-slate-500 truncate">
+                      {displayId || '—'}
+                    </span>
+                  </StyledTooltip>
                   <span className={`text-[11px] text-right border px-1.5 py-0.5 rounded justify-self-end ${phase.bg}`}>
                     {phase.label.replace('Phase ', 'P')}
                   </span>

@@ -2,6 +2,7 @@
 
 import type { CandidateMolecule } from '@/lib/candidateRanker'
 import type { SourceFetchStatus } from '@/lib/dataStatus'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   candidates: CandidateMolecule[]
@@ -67,12 +68,12 @@ export function SourceHonestyHeatmap({
               Candidate
             </th>
             {sourceKeys.map((s) => (
-              <th
-                key={s}
-                className="px-1 py-1 text-slate-500 font-normal max-w-[4rem] truncate"
-                title={s}
-              >
-                {s.length > 8 ? `${s.slice(0, 7)}…` : s}
+              <th key={s} className="px-1 py-1 text-slate-500 font-normal max-w-[4rem]">
+                <StyledTooltip content={s}>
+                  <span className="block truncate">
+                    {s.length > 8 ? `${s.slice(0, 7)}…` : s}
+                  </span>
+                </StyledTooltip>
               </th>
             ))}
           </tr>
@@ -87,10 +88,11 @@ export function SourceHonestyHeatmap({
                 const k = cell(c, s)
                 return (
                   <td key={s} className="px-0.5 py-0.5">
-                    <span
-                      className={`inline-block h-3 w-full min-w-[0.75rem] rounded-sm ${color[k]}`}
-                      title={`${c.name} · ${s}: ${k}`}
-                    />
+                    <StyledTooltip content={`${c.name} · ${s}: ${k}`} className="w-full">
+                      <span
+                        className={`inline-block h-3 w-full min-w-[0.75rem] rounded-sm ${color[k]}`}
+                      />
+                    </StyledTooltip>
                   </td>
                 )
               })}

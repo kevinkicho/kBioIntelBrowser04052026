@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { ChemblMechanism } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
@@ -100,7 +101,7 @@ export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({
                   href={href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  title="Open in ChEMBL"
+                  aria-label="Open in ChEMBL"
                   onClick={() =>
                     onDeepLinkClick('chembl', href, {
                       panelId: 'chembl-mechanisms',
@@ -112,13 +113,15 @@ export const ChemblMechanismsPanel = memo(function ChemblMechanismsPanel({
                   <span className="text-sm font-medium text-slate-100 group-hover:text-cyan-200 truncate">
                     {mech.mechanismOfAction || 'Mechanism'}
                   </span>
-                  <span className="text-xs text-slate-400 truncate" title={mech.targetName}>
-                    {targetId && targetHref ? (
-                      <span className="font-mono text-indigo-400/90">{targetId}</span>
-                    ) : (
-                      mech.targetName || '—'
-                    )}
-                  </span>
+                  <StyledTooltip content={mech.targetName || undefined}>
+                    <span className="text-xs text-slate-400 truncate">
+                      {targetId && targetHref ? (
+                        <span className="font-mono text-indigo-400/90">{targetId}</span>
+                      ) : (
+                        mech.targetName || '—'
+                      )}
+                    </span>
+                  </StyledTooltip>
                   <span className={`text-xs truncate ${typeColor}`}>
                     {mech.actionType || '—'}
                   </span>

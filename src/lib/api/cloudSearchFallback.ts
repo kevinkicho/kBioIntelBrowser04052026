@@ -204,14 +204,74 @@ function identityShell(
   }
 }
 
-/** Build a minimal Molecule from MyChem when PubChem property PUG is down. */
+const INCHIKEY_RE = /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/
+
+function asStr(v: unknown): string {
+  return typeof v === 'string' ? v.trim() : v != null ? String(v).trim() : ''
+}
+
+function asNum(v: unknown): number {
+  if (typeof v === 'number' && Number.isFinite(v)) return v
+  const n = parseFloat(String(v ?? ''))
+  return Number.isFinite(n) ? n : 0
+}
+
+/**
+ * Pull formula / MW / InChIKey / IUPAC from MyChem hit.
+ * MyChem nests most chemistry under `pubchem.*` (not top-level formula/mass).
+ */
+function extractChemFromMyChemHit(hit: Record<string, unknown>): {
+  formula: string
+  molecularWeight: number
+  inchiKey: string
+  iupacName: string
+} {
+  const pc =
+    hit.pubchem && typeof hit.pubchem === 'object' && !Array.isArray(hit.pubchem)
+      ? (hit.pubchem as Record<string, unknown>)
+      : {}
+  const formula =
+    asStr(hit.formula) ||
+    asStr(pc.molecular_formula) ||
+    asStr(pc.MolecularFormula) ||
+    ''
+  const molecularWeight =
+    asNum(hit.mass) ||
+    asNum(pc.molecular_weight) ||
+    asNum(pc.exact_mass) ||
+    asNum(pc.monoisotopic_weight) ||
+    0
+  let inchiKey =
+    asStr(hit.inchi_key) ||
+    asStr(hit.inchikey) ||
+    asStr(pc.inchikey) ||
+    asStr(pc.inchi_key) ||
+    ''
+  // MyChem document _id is often the InChIKey
+  const id = asStr(hit._id)
+  if (!inchiKey && INCHIKEY_RE.test(id)) inchiKey = id
+  const iupacObj =
+    pc.iupac && typeof pc.iupac === 'object'
+      ? (pc.iupac as Record<string, unknown>)
+      : null
+  const iupacName =
+    asStr(hit.iupac_name) ||
+    asStr(iupacObj?.preferred) ||
+    asStr(iupacObj?.systematic) ||
+    asStr(iupacObj?.traditional) ||
+    ''
+  return { formula, molecularWeight, inchiKey, iupacName }
+}
+
+/** Build a Molecule from MyChem when PubChem property PUG is down (App Hosting). */
 export async function getMoleculeByCidViaMyChem(
   cid: number,
 ): Promise<Molecule | null> {
   try {
+    // Request nested pubchem chemistry — top-level formula/mass are usually empty
     const url =
       `${MYCHEM_QUERY}?q=pubchem.cid:${cid}` +
-      `&fields=name,pubchem.cid,chembl.pref_name,chebi.name,formula,mass,inchi_key,synonyms&size=1`
+      `&fields=name,_id,pubchem,chembl.pref_name,chebi.name,formula,mass,inchi_key,synonyms&size=3`
     const res = await fetch(url, fetchOpts)
     if (!res.ok) {
       // Still shell so category routes do not 502 the whole profile on App Hosting
@@ -223,38 +283,53 @@ export async function getMoleculeByCidViaMyChem(
     const data = (await res.json()) as {
       hits?: Array<Record<string, unknown>>
     }
-    const hit = data.hits?.[0]
-    if (!hit) {
+    const hits = data.hits ?? []
+    if (hits.length === 0) {
       return identityShell(
         cid,
         'CID resolved; full structure metadata unavailable (PubChem PUG / MyChem limited).',
       )
     }
 
-    const name = extractNameFromHit(hit) || `CID ${cid}`
-    const synonyms = Array.isArray(hit.synonyms)
-      ? (hit.synonyms as string[]).filter((s) => typeof s === 'string').slice(0, 10)
+    // Prefer the hit with the richest chemistry fields
+    let best = hits[0]!
+    let bestScore = -1
+    for (const h of hits) {
+      const chem = extractChemFromMyChemHit(h)
+      const score =
+        (extractNameFromHit(h) ? 4 : 0) +
+        (chem.formula ? 2 : 0) +
+        (chem.inchiKey ? 2 : 0) +
+        (chem.molecularWeight > 0 ? 1 : 0) +
+        (chem.iupacName ? 1 : 0)
+      if (score > bestScore) {
+        bestScore = score
+        best = h
+      }
+    }
+
+    const name = extractNameFromHit(best) || `CID ${cid}`
+    const synonyms = Array.isArray(best.synonyms)
+      ? (best.synonyms as string[]).filter((s) => typeof s === 'string').slice(0, 10)
       : []
-    const formula = typeof hit.formula === 'string' ? hit.formula : ''
-    const mw =
-      typeof hit.mass === 'number'
-        ? hit.mass
-        : parseFloat(String(hit.mass || '0')) || 0
-    const inchiKey =
-      typeof hit.inchi_key === 'string' ? hit.inchi_key : ''
+    const chem = extractChemFromMyChemHit(best)
+    const hasChem = Boolean(chem.formula || chem.inchiKey || chem.molecularWeight > 0)
+    const realName = !/^CID\s+\d+$/i.test(name)
 
     return {
       cid,
       name,
-      formula,
-      molecularWeight: mw,
+      formula: chem.formula,
+      molecularWeight: chem.molecularWeight,
       synonyms,
-      inchiKey,
-      iupacName: '',
+      inchiKey: chem.inchiKey,
+      iupacName: chem.iupacName,
       classification: classifyMolecule(name, synonyms),
       structureImageUrl: buildStructureImageUrl(cid),
       description:
-        'Identity resolved via MyChem fallback (PubChem PUG unavailable from this host).',
+        hasChem || realName
+          ? 'Identity filled via MyChem (PubChem PUG unavailable from this host). Structure image still from PubChem CDN when available.'
+          : 'CID resolved; full structure metadata unavailable (PubChem PUG / MyChem limited).',
     }
   } catch {
     return identityShell(

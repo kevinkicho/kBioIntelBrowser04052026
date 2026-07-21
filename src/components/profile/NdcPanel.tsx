@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { NdcProduct } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
@@ -121,7 +122,7 @@ export const NdcPanel = memo(function NdcPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={title}
+                    aria-label={title}
                     onClick={() =>
                       onDeepLinkClick('ndc', href, {
                         panelId: 'ndc',
@@ -147,13 +148,11 @@ export const NdcPanel = memo(function NdcPanel({
                       {product.pharmClass?.length > 0 && (
                         <div className="flex flex-wrap gap-1 mt-1">
                           {product.pharmClass.slice(0, 3).map((pc) => (
-                            <span
-                              key={pc}
-                              className="text-[9px] border px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 border-violet-700/30 truncate max-w-full"
-                              title={pc}
-                            >
-                              {pc}
-                            </span>
+                            <StyledTooltip key={pc} content={pc}>
+                              <span className="text-[9px] border px-1.5 py-0.5 rounded bg-violet-900/40 text-violet-300 border-violet-700/30 truncate max-w-full">
+                                {pc}
+                              </span>
+                            </StyledTooltip>
                           ))}
                           {product.pharmClass.length > 3 && (
                             <span className="text-[9px] text-slate-600">
@@ -163,27 +162,26 @@ export const NdcPanel = memo(function NdcPanel({
                         </div>
                       )}
                     </div>
-                    <span
-                      className="text-[11px] font-mono text-cyan-300/90 tabular-nums truncate"
-                      title={product.productNdc}
-                    >
-                      {product.productNdc || '—'}
-                    </span>
-                    <span className="text-[10px] text-slate-400 truncate" title={formRoute}>
-                      {formRoute || '—'}
-                    </span>
-                    <span
-                      className="text-[10px] text-slate-500 truncate"
-                      title={product.marketingCategory}
-                    >
-                      {product.marketingCategory || '—'}
-                    </span>
-                    <span
-                      className="text-[10px] text-slate-500 truncate"
-                      title={product.labelerName}
-                    >
-                      {product.labelerName || '—'}
-                    </span>
+                    <StyledTooltip content={product.productNdc || undefined}>
+                      <span className="text-[11px] font-mono text-cyan-300/90 tabular-nums truncate">
+                        {product.productNdc || '—'}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={formRoute || undefined}>
+                      <span className="text-[10px] text-slate-400 truncate">
+                        {formRoute || '—'}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={product.marketingCategory || undefined}>
+                      <span className="text-[10px] text-slate-500 truncate">
+                        {product.marketingCategory || '—'}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={product.labelerName || undefined}>
+                      <span className="text-[10px] text-slate-500 truncate">
+                        {product.labelerName || '—'}
+                      </span>
+                    </StyledTooltip>
                   </a>
                   {labelHref && labelHref !== href && (
                     <div className="px-2 pb-2 -mt-0.5">

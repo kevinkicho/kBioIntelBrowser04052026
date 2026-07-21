@@ -2,6 +2,7 @@
 
 import { memo, useEffect, useMemo, useState } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { StructureViewer } from '@/components/charts/StructureViewer'
 import type { PdbStructure } from '@/lib/types'
@@ -134,30 +135,31 @@ function CharacterizationChipRow({
         Char:
       </span>
       {chips.map((chip) => (
-        <a
-          key={chip.id}
-          href={chip.href}
-          target="_blank"
-          rel="noopener noreferrer"
-          title={characterizationChipTitle(chip)}
-          data-testid={`pdb-char-${chip.id}-${structure.pdbId}`}
-          data-availability={chip.availability}
-          onClick={(e) => {
-            e.stopPropagation()
-            onDeepLinkClick('pdb', chip.href, {
-              panelId: 'pdb',
-              label: `char:${chip.id}:${structure.pdbId}`,
-            })
-          }}
-          className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-opacity ${charChipClass(chip)}`}
-        >
-          {chip.abbrev}
-        </a>
+        <StyledTooltip key={chip.id} content={characterizationChipTitle(chip)}>
+          <a
+            href={chip.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            data-testid={`pdb-char-${chip.id}-${structure.pdbId}`}
+            data-availability={chip.availability}
+            onClick={(e) => {
+              e.stopPropagation()
+              onDeepLinkClick('pdb', chip.href, {
+                panelId: 'pdb',
+                label: `char:${chip.id}:${structure.pdbId}`,
+              })
+            }}
+            className={`text-[9px] font-semibold px-1.5 py-0.5 rounded border transition-opacity ${charChipClass(chip)}`}
+            aria-label={characterizationChipTitle(chip)}
+          >
+            {chip.abbrev}
+          </a>
+        </StyledTooltip>
       ))}
       {probing && (
-        <span className="text-[8px] text-slate-600 animate-pulse" title="Probing PRIDE / PCDDB…">
-          …
-        </span>
+        <StyledTooltip content="Probing PRIDE / PCDDB…">
+          <span className="text-[8px] text-slate-600 animate-pulse">…</span>
+        </StyledTooltip>
       )}
     </div>
   )
@@ -264,22 +266,7 @@ export const PdbPanel = memo(function PdbPanel({
                     </div>
                   )}
                   <div className="grid grid-cols-[4.5rem_minmax(0,1.4fr)_minmax(4.5rem,0.55fr)_minmax(3.5rem,0.4fr)_minmax(5rem,0.55fr)_5.5rem] gap-x-2 items-start px-2 py-2 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/40 transition-colors">
-                    <a
-                      href={href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={`Open ${structure.pdbId} on RCSB PDB`}
-                      onClick={() =>
-                        onDeepLinkClick('pdb', href, {
-                          panelId: 'pdb',
-                          label: structure.pdbId,
-                        })
-                      }
-                      className="text-xs font-mono font-semibold text-blue-400 hover:text-blue-300"
-                    >
-                      {structure.pdbId}
-                    </a>
-                    <div className="min-w-0">
+                    <StyledTooltip content={`Open ${structure.pdbId} on RCSB PDB`}>
                       <a
                         href={href}
                         target="_blank"
@@ -290,27 +277,42 @@ export const PdbPanel = memo(function PdbPanel({
                             label: structure.pdbId,
                           })
                         }
-                        className="text-sm text-slate-100 hover:text-cyan-200 line-clamp-2 leading-snug"
-                        title={structure.title}
+                        className="text-xs font-mono font-semibold text-blue-400 hover:text-blue-300"
                       >
-                        {structure.title || '—'}
+                        {structure.pdbId}
                       </a>
+                    </StyledTooltip>
+                    <div className="min-w-0">
+                      <StyledTooltip content={structure.title || undefined}>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() =>
+                            onDeepLinkClick('pdb', href, {
+                              panelId: 'pdb',
+                              label: structure.pdbId,
+                            })
+                          }
+                          className="text-sm text-slate-100 hover:text-cyan-200 line-clamp-2 leading-snug"
+                        >
+                          {structure.title || '—'}
+                        </a>
+                      </StyledTooltip>
                       <div className="flex flex-wrap gap-1 mt-1">
                         {structure.spaceGroup && (
-                          <span
-                            className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900/60 text-slate-400 font-mono"
-                            title="Crystallographic space group"
-                          >
-                            {structure.spaceGroup}
-                          </span>
+                          <StyledTooltip content="Crystallographic space group">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900/60 text-slate-400 font-mono">
+                              {structure.spaceGroup}
+                            </span>
+                          </StyledTooltip>
                         )}
                         {structure.polymerTypes && (
-                          <span
-                            className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900/60 text-slate-500"
-                            title="Polymer entity types"
-                          >
-                            {structure.polymerTypes}
-                          </span>
+                          <StyledTooltip content="Polymer entity types">
+                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-slate-700 bg-slate-900/60 text-slate-500">
+                              {structure.polymerTypes}
+                            </span>
+                          </StyledTooltip>
                         )}
                         {structure.molecularWeightKda != null &&
                           structure.molecularWeightKda > 0 && (
@@ -319,88 +321,95 @@ export const PdbPanel = memo(function PdbPanel({
                             </span>
                           )}
                         {structure.keywords && (
-                          <span
-                            className="text-[9px] px-1.5 py-0.5 rounded border border-violet-900/40 bg-violet-950/30 text-violet-300/90 truncate max-w-[10rem]"
-                            title={structure.keywords}
-                          >
-                            {structure.keywords}
-                          </span>
+                          <StyledTooltip content={structure.keywords}>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded border border-violet-900/40 bg-violet-950/30 text-violet-300/90 truncate max-w-[10rem]">
+                              {structure.keywords}
+                            </span>
+                          </StyledTooltip>
                         )}
                         {doi && (
-                          <a
-                            href={doi}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[9px] px-1.5 py-0.5 rounded border border-indigo-800/40 bg-indigo-950/30 text-indigo-300 hover:text-indigo-200"
-                            title="Primary citation DOI"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeepLinkClick('pdb', doi, {
-                                panelId: 'pdb',
-                                label: `doi:${structure.pdbId}`,
-                              })
-                            }}
-                          >
-                            DOI
-                          </a>
+                          <StyledTooltip content="Primary citation DOI">
+                            <a
+                              href={doi}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] px-1.5 py-0.5 rounded border border-indigo-800/40 bg-indigo-950/30 text-indigo-300 hover:text-indigo-200"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onDeepLinkClick('pdb', doi, {
+                                  panelId: 'pdb',
+                                  label: `doi:${structure.pdbId}`,
+                                })
+                              }}
+                            >
+                              DOI
+                            </a>
+                          </StyledTooltip>
                         )}
                         {pmid && (
-                          <a
-                            href={pmid}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-[9px] px-1.5 py-0.5 rounded border border-emerald-900/40 bg-emerald-950/20 text-emerald-300/90 hover:text-emerald-200"
-                            title="PubMed"
-                            onClick={(e) => {
-                              e.stopPropagation()
-                              onDeepLinkClick('pubmed', pmid, {
-                                panelId: 'pdb',
-                                label: `pmid:${structure.pdbId}`,
-                              })
-                            }}
-                          >
-                            PubMed
-                          </a>
+                          <StyledTooltip content="PubMed">
+                            <a
+                              href={pmid}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-[9px] px-1.5 py-0.5 rounded border border-emerald-900/40 bg-emerald-950/20 text-emerald-300/90 hover:text-emerald-200"
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                onDeepLinkClick('pubmed', pmid, {
+                                  panelId: 'pdb',
+                                  label: `pmid:${structure.pdbId}`,
+                                })
+                              }}
+                            >
+                              PubMed
+                            </a>
+                          </StyledTooltip>
                         )}
                       </div>
                       {/* CIF lives in Char: row with SS/CD/MS/SPR/ITC/DSC/UV */}
                       <CharacterizationChipRow structure={structure} />
                     </div>
-                    <a
-                      href={methodHref}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      title={
+                    <StyledTooltip
+                      content={
                         xray
                           ? `X-ray crystallography experimental details for ${structure.pdbId} (PDBe / RCSB)`
                           : `Experimental method details for ${structure.pdbId}`
                       }
-                      data-testid={`pdb-method-${structure.pdbId}`}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        onDeepLinkClick('pdb', methodHref, {
-                          panelId: 'pdb',
-                          label: `method:${structure.pdbId}`,
-                        })
-                      }}
-                      className={`text-[10px] border px-1.5 py-0.5 rounded truncate hover:brightness-125 transition-all ${colors}`}
                     >
-                      {methodLabel}
-                    </a>
-                    <span
-                      className={`text-[11px] font-mono tabular-nums text-right ${
-                        structure.resolution > 0 ? 'text-slate-300' : 'text-slate-600'
-                      }`}
-                      title={
+                      <a
+                        href={methodHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        data-testid={`pdb-method-${structure.pdbId}`}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          onDeepLinkClick('pdb', methodHref, {
+                            panelId: 'pdb',
+                            label: `method:${structure.pdbId}`,
+                          })
+                        }}
+                        className={`text-[10px] border px-1.5 py-0.5 rounded truncate hover:brightness-125 transition-all ${colors}`}
+                      >
+                        {methodLabel}
+                      </a>
+                    </StyledTooltip>
+                    <StyledTooltip
+                      content={
                         structure.resolution > 0
                           ? `Resolution ${structure.resolution} Å`
                           : 'No resolution reported (common for NMR)'
                       }
                     >
-                      {structure.resolution > 0
-                        ? `${structure.resolution.toFixed(1)} Å`
-                        : '—'}
-                    </span>
+                      <span
+                        className={`text-[11px] font-mono tabular-nums text-right ${
+                          structure.resolution > 0 ? 'text-slate-300' : 'text-slate-600'
+                        }`}
+                      >
+                        {structure.resolution > 0
+                          ? `${structure.resolution.toFixed(1)} Å`
+                          : '—'}
+                      </span>
+                    </StyledTooltip>
                     <span className="text-[10px] font-mono text-slate-500 tabular-nums">
                       {structure.depositionDate || structure.releaseDate || '—'}
                     </span>

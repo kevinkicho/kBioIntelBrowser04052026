@@ -5,6 +5,7 @@ import { Panel } from '@/components/ui/Panel'
 import type { EmaMedicineRecord } from '@/lib/api/emaMedicines'
 import { getEmaBulkDownloadLinks } from '@/lib/api/emaBulk'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
   medicines,
@@ -135,21 +136,22 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                   </a>
                 )}
                 {m.eparProductInfoUrl && (
-                  <a
-                    href={m.eparProductInfoUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-[10px] text-slate-400 hover:underline"
-                    title="Best-effort EPAR product information PDF (may 404 if slug differs)"
-                    onClick={() =>
-                      onDeepLinkClick('other', m.eparProductInfoUrl!, {
-                        panelId: panelId || 'ema-medicines',
-                        label: 'epar-pdf',
-                      })
-                    }
-                  >
-                    EPAR product info PDF (guess) ↗
-                  </a>
+                  <StyledTooltip content="Best-effort EPAR product information PDF (may 404 if slug differs)">
+                    <a
+                      href={m.eparProductInfoUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-[10px] text-slate-400 hover:underline"
+                      onClick={() =>
+                        onDeepLinkClick('other', m.eparProductInfoUrl!, {
+                          panelId: panelId || 'ema-medicines',
+                          label: 'epar-pdf',
+                        })
+                      }
+                    >
+                      EPAR product info PDF (guess) ↗
+                    </a>
+                  </StyledTooltip>
                 )}
               </div>
             </div>

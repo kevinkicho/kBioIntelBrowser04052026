@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OrphanetDisease } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
@@ -72,15 +73,17 @@ export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, la
                     >
                       {disease.diseaseName}
                     </Link>
-                    <a
-                      href={disease.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-[10px] text-blue-400 hover:text-blue-300"
-                      title="View on Orphanet"
-                    >
-                      ↗
-                    </a>
+                    <StyledTooltip content="View on Orphanet">
+                      <a
+                        href={disease.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] text-blue-400 hover:text-blue-300"
+                        aria-label="View on Orphanet"
+                      >
+                        ↗
+                      </a>
+                    </StyledTooltip>
                   </div>
                   <p className="text-xs text-slate-400 mt-1">
                     ORPHA: {disease.orphaCode} | Type: {disease.diseaseType}

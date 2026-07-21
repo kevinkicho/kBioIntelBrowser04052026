@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { RankResult } from '@/lib/candidateRanker'
 import { DISCOVER_PIPELINE_STAGES } from '@/lib/discovery/algorithmGuide'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   result: RankResult
@@ -97,9 +98,11 @@ export function DiscoverRunTelemetry({
           </span>
         )}
         {result.generatedAt && (
-          <span className="text-slate-600" title={result.generatedAt}>
-            At {new Date(result.generatedAt).toLocaleString()}
-          </span>
+          <StyledTooltip content={result.generatedAt}>
+            <span className="text-slate-600">
+              At {new Date(result.generatedAt).toLocaleString()}
+            </span>
+          </StyledTooltip>
         )}
       </div>
 
@@ -108,26 +111,25 @@ export function DiscoverRunTelemetry({
           {stages.map((s) => {
             const ms = timing[s.key] as number | undefined
             const isSlow = s.key !== 'total' && ms != null && ms >= slowStageMs
+            const tip = isSlow
+              ? `${s.label} took ${(ms! / 1000).toFixed(1)}s — usually free-API latency; try deferred harvest if this is harvest.`
+              : DISCOVER_PIPELINE_STAGES.find((g) => g.id === s.guideId)?.short
             return (
-              <Link
-                key={s.key}
-                href={`/how-it-works#discover_rank`}
-                className={`rounded-full border px-2 py-0.5 text-[9px] tabular-nums ${
-                  isSlow
-                    ? 'border-amber-700/50 bg-amber-950/30 text-amber-200'
-                    : 'border-slate-800 text-slate-500 hover:text-slate-300'
-                }`}
-                title={
-                  isSlow
-                    ? `${s.label} took ${(ms! / 1000).toFixed(1)}s — usually free-API latency; try deferred harvest if this is harvest.`
-                    : DISCOVER_PIPELINE_STAGES.find((g) => g.id === s.guideId)?.short
-                }
-              >
-                {s.label}
-                {ms != null && (
-                  <> · {ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`}</>
-                )}
-              </Link>
+              <StyledTooltip key={s.key} content={tip}>
+                <Link
+                  href={`/how-it-works#discover_rank`}
+                  className={`rounded-full border px-2 py-0.5 text-[9px] tabular-nums ${
+                    isSlow
+                      ? 'border-amber-700/50 bg-amber-950/30 text-amber-200'
+                      : 'border-slate-800 text-slate-500 hover:text-slate-300'
+                  }`}
+                >
+                  {s.label}
+                  {ms != null && (
+                    <> · {ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`}</>
+                  )}
+                </Link>
+              </StyledTooltip>
             )
           })}
         </div>

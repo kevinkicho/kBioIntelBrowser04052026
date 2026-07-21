@@ -4,6 +4,7 @@
  */
 
 import type { WhoGhoFact, WhoGhoIndicator } from '@/lib/api/whoGho'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export function WhoGhoContextStrip({
   diseaseName,
@@ -47,9 +48,10 @@ export function WhoGhoContextStrip({
             <li
               key={ind.code}
               className="rounded border border-slate-700 bg-slate-950/50 px-2 py-0.5 text-[10px] text-slate-300"
-              title={ind.code}
             >
-              {ind.name}
+              <StyledTooltip content={ind.code}>
+                <span>{ind.name}</span>
+              </StyledTooltip>
             </li>
           ))}
         </ul>

@@ -16,6 +16,7 @@ import { getLastMigrateAt } from '@/lib/firebase/migrate'
 import { backupProjectsJsonToCloud } from '@/lib/firebase/storageSync'
 import { deleteAllUserData } from '@/lib/firebase/deleteUserData'
 import { exportProjectsToJson, listProjects } from '@/lib/project'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function initialsFromUser(name: string | null | undefined, email: string | null | undefined): string {
   const n = (name || '').trim()
@@ -315,9 +316,9 @@ export function UserMenu() {
                       {displayName}
                     </p>
                     {email && (
-                      <p className="truncate text-[11px] text-slate-400" title={email}>
-                        {email}
-                      </p>
+                      <StyledTooltip content={email}>
+                        <p className="truncate text-[11px] text-slate-400">{email}</p>
+                      </StyledTooltip>
                     )}
                   </div>
                 </div>

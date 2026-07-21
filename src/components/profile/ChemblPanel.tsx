@@ -144,7 +144,7 @@ export const ChemblPanel = memo(function ChemblPanel({
                 href={rowHref}
                 target="_blank"
                 rel="noopener noreferrer"
-                title={`Open ${activity.targetName || 'activity'} in ChEMBL`}
+                aria-label={`Open ${activity.targetName || 'activity'} in ChEMBL`}
                 onClick={() =>
                   onDeepLinkClick('chembl', rowHref, {
                     panelId: 'chembl',

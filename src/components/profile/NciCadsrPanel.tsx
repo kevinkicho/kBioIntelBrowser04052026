@@ -7,6 +7,7 @@ import type { CadsrConcept } from '@/lib/types'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DataPoint } from '@/components/ui/DataPoint'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { alphaSortOptions } from '@/lib/listControls'
 
 interface NciCadsrPanelProps {
@@ -86,15 +87,16 @@ export const NciCadsrPanel = memo(function NciCadsrPanel({
                 <div className="py-2 border-b border-slate-700/60 last:border-0 pr-1">
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm font-medium text-slate-100 hover:text-cyan-300"
-                        title={`Open ${c.preferredName} in NCI EVS`}
-                      >
-                        {c.preferredName}
-                      </a>
+                      <StyledTooltip content={`Open ${c.preferredName} in NCI EVS`}>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm font-medium text-slate-100 hover:text-cyan-300"
+                        >
+                          {c.preferredName}
+                        </a>
+                      </StyledTooltip>
                       {c.conceptId && (
                         <span className="text-[10px] font-mono bg-cyan-900/30 text-cyan-300 border border-cyan-800/40 px-1.5 py-0.5 rounded">
                           {c.conceptId}

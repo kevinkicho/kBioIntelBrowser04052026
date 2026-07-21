@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { probePubChem3dClient } from '@/lib/api/pubchem3d'
 import { buildStructureImageUrl } from '@/lib/utils'
 import { emitProductEvent } from '@/lib/productEvents'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   cid: number
@@ -117,10 +118,10 @@ export function MoleculeViewer3D({ cid, name, fallbackImageUrl, has3d: has3dProp
       : 'PubChem has no 3D conformer for this CID (common for peptides, salts, and some large molecules). Showing 2D structure.'
 
   return (
+    <StyledTooltip content={detail} className="w-32 h-32 md:w-48 md:h-48">
     <div
       className="bg-slate-800 rounded-xl overflow-hidden w-32 h-32 md:w-48 md:h-48 relative flex flex-col"
       data-testid="molecule-viewer-fallback"
-      title={detail}
     >
       <div className="flex-1 bg-white flex items-center justify-center p-2 min-h-0">
         <Image
@@ -138,5 +139,6 @@ export function MoleculeViewer3D({ cid, name, fallbackImageUrl, has3d: has3dProp
         </p>
       </div>
     </div>
+    </StyledTooltip>
   )
 }

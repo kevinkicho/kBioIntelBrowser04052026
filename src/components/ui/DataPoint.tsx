@@ -20,6 +20,7 @@ import {
   resolveProvenance,
   type ProvenanceInfo,
 } from '@/lib/provenance'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 /** Above AI modal (z-200), panel modals, sticky chrome */
 const PROVENANCE_Z = 300
@@ -197,23 +198,25 @@ export function DataPoint({
     <div className={`group/dp flex items-start gap-1.5 min-w-0 ${className}`}>
       <div className="min-w-0 flex-1">{children}</div>
       {!disabled && (
-        <button
-          ref={btnRef}
-          type="button"
-          onClick={(e) => {
-            e.preventDefault()
-            e.stopPropagation()
-            setOpen((v) => !v)
-          }}
-          aria-expanded={open}
-          aria-controls={open ? popoverId : undefined}
-          aria-haspopup="dialog"
-          title="API provenance — source, timestamp, endpoint"
-          data-testid="datapoint-provenance-btn"
-          className="shrink-0 mt-0.5 px-0.5 py-0 text-[9px] font-normal text-slate-500 opacity-30 hover:opacity-100 hover:text-cyan-400/90 focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cyan-500/50 rounded transition-opacity"
-        >
-          API
-        </button>
+        <StyledTooltip content="API provenance — source, timestamp, endpoint">
+          <button
+            ref={btnRef}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              setOpen((v) => !v)
+            }}
+            aria-expanded={open}
+            aria-controls={open ? popoverId : undefined}
+            aria-haspopup="dialog"
+            aria-label="API provenance — source, timestamp, endpoint"
+            data-testid="datapoint-provenance-btn"
+            className="shrink-0 mt-0.5 px-0.5 py-0 text-[9px] font-normal text-slate-500 opacity-30 hover:opacity-100 hover:text-cyan-400/90 focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-cyan-500/50 rounded transition-opacity"
+          >
+            API
+          </button>
+        </StyledTooltip>
       )}
       {popover}
     </div>
@@ -250,17 +253,19 @@ function Row({
           <span className={`break-all text-slate-300 ${mono ? 'font-mono text-[10px]' : ''}`}>{value}</span>
         )}
         {onCopy && (
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation()
-              onCopy()
-            }}
-            className="ml-1 text-[9px] text-slate-600 hover:text-slate-300"
-            title="Copy"
-          >
-            copy
-          </button>
+          <StyledTooltip content="Copy">
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation()
+                onCopy()
+              }}
+              className="ml-1 text-[9px] text-slate-600 hover:text-slate-300"
+              aria-label="Copy"
+            >
+              copy
+            </button>
+          </StyledTooltip>
         )}
       </dd>
     </div>

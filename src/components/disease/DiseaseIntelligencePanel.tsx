@@ -15,6 +15,7 @@ import {
 } from '@/lib/ai/diseasePrompts'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { renderInsightMarkdown } from '@/lib/sanitize'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface ModeState {
   content: string
@@ -603,9 +604,12 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                     }}
                     disabled={active.isStreaming}
                     className="rounded-full border border-slate-700 px-2.5 py-1 text-[10px] text-slate-500 hover:text-slate-300 hover:border-slate-500 disabled:opacity-40 max-w-full truncate"
-                    title={q}
                   >
-                    {q.length > 48 ? `${q.slice(0, 46)}…` : q}
+                    <StyledTooltip content={q}>
+                      <span className="block truncate">
+                        {q.length > 48 ? `${q.slice(0, 46)}…` : q}
+                      </span>
+                    </StyledTooltip>
                   </button>
                 ))}
               </div>

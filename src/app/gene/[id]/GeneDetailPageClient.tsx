@@ -26,6 +26,7 @@ import { clientFetch } from '@/lib/clientFetch'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -57,13 +58,14 @@ function GeneAliasChip({
       ? 'text-[10px] px-1.5 py-0.5'
       : 'text-xs px-1.5 py-0.5'
   return (
-    <Link
-      href={`/gene?q=${encodeURIComponent(alias)}`}
-      className={`${sizeClass} rounded border border-slate-700/60 bg-slate-800 text-slate-400 transition-colors hover:border-indigo-600/50 hover:bg-indigo-950/50 hover:text-indigo-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500`}
-      title={`Search genes for “${alias}”`}
-    >
-      {alias}
-    </Link>
+    <StyledTooltip content={`Search genes for “${alias}”`}>
+      <Link
+        href={`/gene?q=${encodeURIComponent(alias)}`}
+        className={`${sizeClass} rounded border border-slate-700/60 bg-slate-800 text-slate-400 transition-colors hover:border-indigo-600/50 hover:bg-indigo-950/50 hover:text-indigo-300 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500`}
+      >
+        {alias}
+      </Link>
+    </StyledTooltip>
   )
 }
 
@@ -318,13 +320,14 @@ function GeneDiseasesPanel({
                       >
                         {d.diseaseName}
                       </Link>
-                      <Link
-                        href={discoverHref}
-                        className="shrink-0 text-[9px] px-1.5 py-0.5 rounded border border-emerald-800/50 text-emerald-400 hover:border-emerald-500"
-                        title="Rank candidates in Discover"
-                      >
-                        Discover
-                      </Link>
+                      <StyledTooltip content="Rank candidates in Discover">
+                        <Link
+                          href={discoverHref}
+                          className="shrink-0 text-[9px] px-1.5 py-0.5 rounded border border-emerald-800/50 text-emerald-400 hover:border-emerald-500"
+                        >
+                          Discover
+                        </Link>
+                      </StyledTooltip>
                     </div>
                     <span
                       className={`text-[10px] font-mono text-slate-500 truncate ${emptyDataClass(!d.diseaseId)}`}
@@ -699,7 +702,7 @@ function GeneVariantsPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${title} in ClinVar`}
+                    aria-label={`Open ${title} in ClinVar`}
                     onClick={() =>
                       onDeepLinkClick('clinvar', href, {
                         panelId: 'gene-variants',
@@ -718,29 +721,32 @@ function GeneVariantsPanel({
                           .join(' · ') || '—'}
                       </div>
                     </div>
-                    <span
-                      className={`justify-self-start text-[10px] border px-1.5 py-0.5 rounded truncate max-w-full ${significanceBadgeClass(sig)} ${emptyDataClass(isEmptyMetric(sig === '—' ? null : sig))}`}
-                      title={sig}
-                    >
-                      {sig}
-                    </span>
-                    <span
-                      className={`text-xs text-slate-300 truncate ${emptyDataClass(isEmptyMetric(condition === '—' ? null : condition))}`}
-                      title={condition}
-                    >
-                      {condition}
-                    </span>
+                    <StyledTooltip content={sig === '—' ? undefined : sig}>
+                      <span
+                        className={`justify-self-start text-[10px] border px-1.5 py-0.5 rounded truncate max-w-full ${significanceBadgeClass(sig)} ${emptyDataClass(isEmptyMetric(sig === '—' ? null : sig))}`}
+                      >
+                        {sig}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={condition === '—' ? undefined : condition}>
+                      <span
+                        className={`text-xs text-slate-300 truncate ${emptyDataClass(isEmptyMetric(condition === '—' ? null : condition))}`}
+                      >
+                        {condition}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-[11px] font-mono text-slate-400 truncate ${emptyDataClass(locus === '—')}`}
                     >
                       {locus}
                     </span>
-                    <span
-                      className={`text-[10px] text-slate-500 truncate ${emptyDataClass(isEmptyMetric(review === '—' ? null : review))}`}
-                      title={review}
-                    >
-                      {review}
-                    </span>
+                    <StyledTooltip content={review === '—' ? undefined : review}>
+                      <span
+                        className={`text-[10px] text-slate-500 truncate ${emptyDataClass(isEmptyMetric(review === '—' ? null : review))}`}
+                      >
+                        {review}
+                      </span>
+                    </StyledTooltip>
                     <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
                   </a>
                 </div>
@@ -814,7 +820,7 @@ function GeneVariantsPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${rs} in dbSNP`}
+                    aria-label={`Open ${rs} in dbSNP`}
                     onClick={() =>
                       onDeepLinkClick('dbsnp', href, {
                         panelId: 'gene-variants',
@@ -831,20 +837,24 @@ function GeneVariantsPanel({
                     >
                       {locus}
                     </span>
-                    <span
-                      className={`text-xs font-mono text-teal-300/90 truncate ${emptyDataClass(alleles === '—')}`}
-                      title={alleles}
-                    >
-                      {alleles}
-                    </span>
-                    <span
-                      className={`justify-self-start text-[10px] border px-1.5 py-0.5 rounded truncate max-w-full ${significanceBadgeClass(clinical)} ${emptyDataClass(clinical === '—')}`}
-                      title={[clinical, v.clinicalAllele, v.reviewed ? 'reviewed' : '']
+                    <StyledTooltip content={alleles === '—' ? undefined : alleles}>
+                      <span
+                        className={`text-xs font-mono text-teal-300/90 truncate ${emptyDataClass(alleles === '—')}`}
+                      >
+                        {alleles}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip
+                      content={[clinical, v.clinicalAllele, v.reviewed ? 'reviewed' : '']
                         .filter(Boolean)
                         .join(' · ')}
                     >
-                      {clinical}
-                    </span>
+                      <span
+                        className={`justify-self-start text-[10px] border px-1.5 py-0.5 rounded truncate max-w-full ${significanceBadgeClass(clinical)} ${emptyDataClass(clinical === '—')}`}
+                      >
+                        {clinical}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-[11px] font-mono tabular-nums text-right text-slate-400 ${emptyDataClass(freq === '—')}`}
                     >
@@ -1117,7 +1127,7 @@ function GeneExpressionPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${tissue} on GTEx`}
+                    aria-label={`Open ${tissue} on GTEx`}
                     onClick={() =>
                       onDeepLinkClick('gtex', href, {
                         panelId: 'gene-expression',
@@ -1126,9 +1136,11 @@ function GeneExpressionPanel({
                     }
                     className={`${gridGtex} items-center px-2 py-1.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group`}
                   >
-                    <span className="text-sm text-slate-200 group-hover:text-cyan-200 truncate">
-                      {tissue}
-                    </span>
+                    <StyledTooltip content={tissue === '—' ? undefined : tissue}>
+                      <span className="text-sm text-slate-200 group-hover:text-cyan-200 truncate">
+                        {tissue}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-xs font-mono tabular-nums text-right text-indigo-300 ${emptyDataClass(tpm === '—')}`}
                     >
@@ -1200,7 +1212,7 @@ function GeneExpressionPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${anat} in Bgee`}
+                    aria-label={`Open ${anat} in Bgee`}
                     onClick={() =>
                       onDeepLinkClick('bgee', href, {
                         panelId: 'gene-expression',
@@ -1209,21 +1221,25 @@ function GeneExpressionPanel({
                     }
                     className={`${gridBgee} items-center px-2 py-1.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group`}
                   >
-                    <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate" title={anat}>
-                      {anat}
-                    </span>
-                    <span
-                      className={`text-[10px] font-mono text-slate-500 truncate ${emptyDataClass(anatId === '—')}`}
-                      title={anatId}
-                    >
-                      {anatId}
-                    </span>
-                    <span
-                      className={`text-[11px] text-slate-400 truncate ${emptyDataClass(stage === '—')}`}
-                      title={stage}
-                    >
-                      {stage}
-                    </span>
+                    <StyledTooltip content={anat === '—' ? undefined : anat}>
+                      <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                        {anat}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={anatId === '—' ? undefined : anatId}>
+                      <span
+                        className={`text-[10px] font-mono text-slate-500 truncate ${emptyDataClass(anatId === '—')}`}
+                      >
+                        {anatId}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={stage === '—' ? undefined : stage}>
+                      <span
+                        className={`text-[11px] text-slate-400 truncate ${emptyDataClass(stage === '—')}`}
+                      >
+                        {stage}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`justify-self-start text-[9px] px-1.5 py-0.5 rounded border truncate max-w-full ${presence.className}`}
                     >
@@ -1298,7 +1314,7 @@ function GeneExpressionPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open experiment in Expression Atlas`}
+                    aria-label="Open experiment in Expression Atlas"
                     onClick={() =>
                       onDeepLinkClick('expression-atlas', href, {
                         panelId: 'gene-expression',
@@ -1307,24 +1323,25 @@ function GeneExpressionPanel({
                     }
                     className={`${gridAtlas} items-center px-2 py-1.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group`}
                   >
-                    <span
-                      className="text-sm text-slate-100 group-hover:text-cyan-200 truncate"
-                      title={experiment}
-                    >
-                      {experiment}
-                    </span>
-                    <span
-                      className={`text-[10px] text-slate-400 truncate ${emptyDataClass(type === '—')}`}
-                      title={type}
-                    >
-                      {type}
-                    </span>
-                    <span
-                      className={`text-[11px] text-slate-300 truncate ${emptyDataClass(tissueOrCond === '—')}`}
-                      title={tissueOrCond}
-                    >
-                      {tissueOrCond}
-                    </span>
+                    <StyledTooltip content={experiment === '—' ? undefined : experiment}>
+                      <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                        {experiment}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={type === '—' ? undefined : type}>
+                      <span
+                        className={`text-[10px] text-slate-400 truncate ${emptyDataClass(type === '—')}`}
+                      >
+                        {type}
+                      </span>
+                    </StyledTooltip>
+                    <StyledTooltip content={tissueOrCond === '—' ? undefined : tissueOrCond}>
+                      <span
+                        className={`text-[11px] text-slate-300 truncate ${emptyDataClass(tissueOrCond === '—')}`}
+                      >
+                        {tissueOrCond}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-[11px] font-mono tabular-nums text-right text-indigo-300/90 ${emptyDataClass(level === '—')}`}
                     >
@@ -1430,15 +1447,17 @@ function TargetedDrugsPanel({
                 <span className="text-[11px] text-slate-500 text-right tabular-nums">
                   {typeof d.score === 'number' && d.score > 0 ? d.score.toFixed(1) : '—'}
                 </span>
-                <a
-                  href={dgidbUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-xs text-blue-400 hover:text-blue-300 text-right"
-                  title="View in DGIdb"
-                >
-                  ↗
-                </a>
+                <StyledTooltip content="View in DGIdb">
+                  <a
+                    href={dgidbUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-xs text-blue-400 hover:text-blue-300 text-right"
+                    aria-label="View in DGIdb"
+                  >
+                    ↗
+                  </a>
+                </StyledTooltip>
               </div>
             </DataPoint>
           )
@@ -1681,7 +1700,7 @@ function GenePathwaysPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${name} in Reactome`}
+                    aria-label={`Open ${name} in Reactome`}
                     onClick={() =>
                       onDeepLinkClick('reactome', href, {
                         panelId: 'gene-pathways',
@@ -1690,12 +1709,11 @@ function GenePathwaysPanel({
                     }
                     className={`${gridReactome} items-center px-2 py-1.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group`}
                   >
-                    <span
-                      className="text-sm text-slate-100 group-hover:text-cyan-200 truncate"
-                      title={name}
-                    >
-                      {name}
-                    </span>
+                    <StyledTooltip content={name === '—' ? undefined : name}>
+                      <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                        {name}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-[10px] font-mono text-indigo-300/90 truncate ${emptyDataClass(stId === '—')}`}
                     >
@@ -1706,12 +1724,13 @@ function GenePathwaysPanel({
                     >
                       {species}
                     </span>
-                    <span
-                      className={`text-[11px] text-slate-500 truncate ${emptyDataClass(summary === '—')}`}
-                      title={summary}
-                    >
-                      {summary}
-                    </span>
+                    <StyledTooltip content={summary === '—' ? undefined : summary}>
+                      <span
+                        className={`text-[11px] text-slate-500 truncate ${emptyDataClass(summary === '—')}`}
+                      >
+                        {summary}
+                      </span>
+                    </StyledTooltip>
                     <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
                   </a>
                 </div>
@@ -1767,7 +1786,7 @@ function GenePathwaysPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${name} on WikiPathways`}
+                    aria-label={`Open ${name} on WikiPathways`}
                     onClick={() =>
                       onDeepLinkClick('wikipathways', href, {
                         panelId: 'gene-pathways',
@@ -1776,12 +1795,11 @@ function GenePathwaysPanel({
                     }
                     className={`${gridWiki} items-center px-2 py-1.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group`}
                   >
-                    <span
-                      className="text-sm text-slate-100 group-hover:text-cyan-200 truncate"
-                      title={name}
-                    >
-                      {name}
-                    </span>
+                    <StyledTooltip content={name === '—' ? undefined : name}>
+                      <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                        {name}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-[10px] font-mono text-teal-300/90 truncate ${emptyDataClass(id === '—')}`}
                     >
@@ -1792,12 +1810,13 @@ function GenePathwaysPanel({
                     >
                       {species}
                     </span>
-                    <span
-                      className={`text-[11px] text-slate-500 truncate ${emptyDataClass(desc === '—')}`}
-                      title={desc}
-                    >
-                      {desc}
-                    </span>
+                    <StyledTooltip content={desc === '—' ? undefined : desc}>
+                      <span
+                        className={`text-[11px] text-slate-500 truncate ${emptyDataClass(desc === '—')}`}
+                      >
+                        {desc}
+                      </span>
+                    </StyledTooltip>
                     <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
                   </a>
                 </div>
@@ -1846,7 +1865,7 @@ function GenePathwaysPanel({
                     href={t.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={`Open ${id !== '—' ? id : name} in QuickGO`}
+                    aria-label={`Open ${id !== '—' ? id : name} in QuickGO`}
                     onClick={() =>
                       onDeepLinkClick('gene-ontology', t.url, {
                         panelId: 'gene-pathways',
@@ -1860,23 +1879,23 @@ function GenePathwaysPanel({
                     >
                       {id}
                     </span>
-                    <span
-                      className="text-sm text-slate-100 group-hover:text-cyan-200 truncate"
-                      title={name}
-                    >
-                      {name}
-                    </span>
+                    <StyledTooltip content={name === '—' ? undefined : name}>
+                      <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                        {name}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`justify-self-start text-[9px] px-1.5 py-0.5 rounded border truncate max-w-full capitalize ${aspectBadgeClass(aspect)} ${emptyDataClass(aspect === '—')}`}
                     >
                       {aspect}
                     </span>
-                    <span
-                      className={`text-[11px] text-slate-500 truncate ${emptyDataClass(def === '—')}`}
-                      title={def}
-                    >
-                      {def}
-                    </span>
+                    <StyledTooltip content={def === '—' ? undefined : def}>
+                      <span
+                        className={`text-[11px] text-slate-500 truncate ${emptyDataClass(def === '—')}`}
+                      >
+                        {def}
+                      </span>
+                    </StyledTooltip>
                     <span className="text-xs text-cyan-400 group-hover:text-cyan-300 text-right">↗</span>
                   </a>
                 </div>
@@ -2038,9 +2057,11 @@ function GenePathwaysPanel({
                     >
                       {acc}
                     </span>
-                    <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate" title={name}>
-                      {name}
-                    </span>
+                    <StyledTooltip content={name === '—' ? undefined : name}>
+                      <span className="text-sm text-slate-100 group-hover:text-cyan-200 truncate">
+                        {name}
+                      </span>
+                    </StyledTooltip>
                     <span
                       className={`text-[11px] text-slate-400 truncate ${emptyDataClass(genes === '—')}`}
                     >
@@ -2386,24 +2407,27 @@ function GeneDetailPageClientInner({
               <p className="text-base text-slate-400">{displayName}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2 shrink-0">
-              <Link
-                href={buildDiscoverHref({ targets: displaySymbol })}
-                className="text-xs px-3 py-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/40 text-emerald-300 hover:border-emerald-500 hover:bg-emerald-900/60 hover:text-emerald-200 transition-colors"
-                data-testid="gene-page-discover-cta"
-                title={`Pin ${displaySymbol} as a discover target`}
-              >
-                Discover with target →
-              </Link>
-              <button
-                type="button"
-                onClick={() => void loadGeneCategory({ force: true })}
-                disabled={loading}
-                className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-200 transition-colors disabled:opacity-50"
-                data-testid="gene-soft-refresh"
-                title="Re-query gene sources without leaving this page"
-              >
-                {loading && loaded ? 'Refreshing…' : 'Refresh data'}
-              </button>
+              <StyledTooltip content={`Pin ${displaySymbol} as a discover target`}>
+                <Link
+                  href={buildDiscoverHref({ targets: displaySymbol })}
+                  className="text-xs px-3 py-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/40 text-emerald-300 hover:border-emerald-500 hover:bg-emerald-900/60 hover:text-emerald-200 transition-colors"
+                  data-testid="gene-page-discover-cta"
+                >
+                  Discover with target →
+                </Link>
+              </StyledTooltip>
+              <StyledTooltip content="Re-query gene sources without leaving this page">
+                <button
+                  type="button"
+                  onClick={() => void loadGeneCategory({ force: true })}
+                  disabled={loading}
+                  className="text-xs px-3 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-slate-300 hover:border-amber-500/60 hover:text-amber-200 transition-colors disabled:opacity-50"
+                  data-testid="gene-soft-refresh"
+                  aria-label="Re-query gene sources without leaving this page"
+                >
+                  {loading && loaded ? 'Refreshing…' : 'Refresh data'}
+                </button>
+              </StyledTooltip>
               <a
                 href={displayUrl}
                 target="_blank"
@@ -2432,9 +2456,11 @@ function GeneDetailPageClientInner({
               <span className="text-[10px] px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/50">chr {displayChromosome}</span>
             )}
             {displayMapLocation && displayMapLocation !== displayChromosome && (
-              <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700" title="Map location">
-                {displayMapLocation}
-              </span>
+              <StyledTooltip content="Map location">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">
+                  {displayMapLocation}
+                </span>
+              </StyledTooltip>
             )}
             <span className="text-[10px] px-2 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
               Entrez {geneId}
@@ -2456,30 +2482,30 @@ function GeneDetailPageClientInner({
           {glanceTiles.map((tile) => {
             const empty = loaded && tile.count === 0
             return (
-              <button
-                key={tile.id}
-                type="button"
-                onClick={() => setActivePanel(tile.id)}
-                disabled={!loaded && tile.count === null}
-                className={`rounded-xl border px-3 py-2.5 text-left transition-colors ${
-                  activePanel === tile.id
-                    ? 'border-indigo-600/50 bg-indigo-950/40'
-                    : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800/60'
-                } ${empty ? 'opacity-30' : ''} disabled:opacity-60`}
-                title={tile.hint}
-                data-empty={empty ? 'true' : 'false'}
-                data-testid={`gene-glance-${tile.id}`}
-              >
-                <p className="text-[10px] uppercase tracking-wide text-slate-500">{tile.label}</p>
-                <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-100">
-                  {loading && tile.count === null ? (
-                    <span className="inline-block h-5 w-8 animate-pulse rounded bg-slate-700" />
-                  ) : (
-                    tile.count ?? '—'
-                  )}
-                </p>
-                <p className="mt-0.5 text-[9px] text-slate-600 truncate">{tile.hint}</p>
-              </button>
+              <StyledTooltip key={tile.id} content={tile.hint} className="w-full">
+                <button
+                  type="button"
+                  onClick={() => setActivePanel(tile.id)}
+                  disabled={!loaded && tile.count === null}
+                  className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
+                    activePanel === tile.id
+                      ? 'border-indigo-600/50 bg-indigo-950/40'
+                      : 'border-slate-800 bg-slate-900/50 hover:border-slate-600 hover:bg-slate-800/60'
+                  } ${empty ? 'opacity-30' : ''} disabled:opacity-60`}
+                  data-empty={empty ? 'true' : 'false'}
+                  data-testid={`gene-glance-${tile.id}`}
+                >
+                  <p className="text-[10px] uppercase tracking-wide text-slate-500">{tile.label}</p>
+                  <p className="mt-0.5 text-lg font-semibold tabular-nums text-slate-100">
+                    {loading && tile.count === null ? (
+                      <span className="inline-block h-5 w-8 animate-pulse rounded bg-slate-700" />
+                    ) : (
+                      tile.count ?? '—'
+                    )}
+                  </p>
+                  <p className="mt-0.5 text-[9px] text-slate-600 truncate">{tile.hint}</p>
+                </button>
+              </StyledTooltip>
             )
           })}
         </div>

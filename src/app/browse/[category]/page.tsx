@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
 import { getCategoryBySlug, CATEGORIES } from '@/lib/data/categories'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export function generateStaticParams() {
   return Object.keys(CATEGORIES).map((slug) => ({ category: slug }))
@@ -41,15 +42,15 @@ export default function CategoryPage({ params }: { params: { category: string } 
         ) : (
           <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
             {category.starterQueries.map((name) => (
-              <Link
-                key={name}
-                href={`/molecule/name/${encodeURIComponent(name)}`}
-                className="bg-slate-800/50 border border-slate-700 hover:border-indigo-500/50 rounded-lg px-4 py-3 text-center transition-colors"
-                title={`Live PubChem name lookup: ${name}`}
-              >
-                <span className="text-sm text-slate-200 capitalize">{name}</span>
-                <span className="mt-1 block text-[9px] text-slate-600">live lookup</span>
-              </Link>
+              <StyledTooltip key={name} content={`Live PubChem name lookup: ${name}`} className="w-full">
+                <Link
+                  href={`/molecule/name/${encodeURIComponent(name)}`}
+                  className="block bg-slate-800/50 border border-slate-700 hover:border-indigo-500/50 rounded-lg px-4 py-3 text-center transition-colors"
+                >
+                  <span className="text-sm text-slate-200 capitalize">{name}</span>
+                  <span className="mt-1 block text-[9px] text-slate-600">live lookup</span>
+                </Link>
+              </StyledTooltip>
             ))}
           </div>
         )}

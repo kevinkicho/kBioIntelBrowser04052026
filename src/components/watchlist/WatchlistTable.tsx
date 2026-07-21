@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react'
 import type { WatchlistDensitySummary } from '@/lib/watchlistSummary'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface WatchlistMolecule {
   cid: number
@@ -193,16 +194,18 @@ export function WatchlistTable({ molecules, onRemove }: Props) {
                 </td>
               )}
               <td className="text-center py-3 px-2">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    onRemove(mol.cid)
-                  }}
-                  className="text-slate-600 hover:text-red-400 transition-colors p-1"
-                  title="Remove from watchlist"
-                >
-                  ✕
-                </button>
+                <StyledTooltip content="Remove from watchlist">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      onRemove(mol.cid)
+                    }}
+                    className="text-slate-600 hover:text-red-400 transition-colors p-1"
+                    aria-label="Remove from watchlist"
+                  >
+                    ✕
+                  </button>
+                </StyledTooltip>
               </td>
             </tr>
           ))}

@@ -10,6 +10,7 @@ import {
   originSourceDeepLink,
   type OriginLinkContext,
 } from '@/lib/originDeepLinks'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
   pack: EvidencePack
@@ -54,25 +55,28 @@ function DeepChip({
 }) {
   if (href) {
     return (
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        title={title}
-        className={`${className} ${chipLink}`}
-        data-testid={testId}
-      >
-        {children}
-        <span className="ml-0.5 opacity-70" aria-hidden>
-          ↗
-        </span>
-      </a>
+      <StyledTooltip content={title}>
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`${className} ${chipLink}`}
+          data-testid={testId}
+        >
+          {children}
+          <span className="ml-0.5 opacity-70" aria-hidden>
+            ↗
+          </span>
+        </a>
+      </StyledTooltip>
     )
   }
   return (
-    <span title={title} className={className} data-testid={testId}>
-      {children}
-    </span>
+    <StyledTooltip content={title}>
+      <span className={className} data-testid={testId}>
+        {children}
+      </span>
+    </StyledTooltip>
   )
 }
 
@@ -96,9 +100,11 @@ export function PackView({ pack, compact = false, className = '' }: Props) {
             {pack.claimCount}/{MAX_PACK_CLAIMS} claims
           </span>
           <span>{pack.candidates.length} candidates</span>
-          <span className="font-mono text-slate-600" title={pack.contentHash}>
-            hash {pack.contentHash.slice(0, 12)}…
-          </span>
+          <StyledTooltip content={pack.contentHash}>
+            <span className="font-mono text-slate-600">
+              hash {pack.contentHash.slice(0, 12)}…
+            </span>
+          </StyledTooltip>
           <span>{new Date(pack.createdAt).toLocaleString()}</span>
         </div>
         {diseaseLink && (
@@ -159,18 +165,21 @@ export function PackView({ pack, compact = false, className = '' }: Props) {
                     <p className="mt-1 text-sm text-slate-300">{c.statement}</p>
                     <p className="mt-0.5 text-[11px] text-slate-500">
                       {provLink.href ? (
-                        <a
-                          href={provLink.href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={provLink.title}
-                          className="text-indigo-400/90 hover:text-indigo-300 hover:underline"
-                          data-testid="pack-claim-source-url"
-                        >
-                          {provLink.label} ↗
-                        </a>
+                        <StyledTooltip content={provLink.title}>
+                          <a
+                            href={provLink.href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-indigo-400/90 hover:text-indigo-300 hover:underline"
+                            data-testid="pack-claim-source-url"
+                          >
+                            {provLink.label} ↗
+                          </a>
+                        </StyledTooltip>
                       ) : (
-                        <span title={provLink.title}>{provLink.label}</span>
+                        <StyledTooltip content={provLink.title}>
+                          <span>{provLink.label}</span>
+                        </StyledTooltip>
                       )}
                       {c.provenance.retrievedAt
                         ? ` · ${new Date(c.provenance.retrievedAt).toLocaleDateString()}`

@@ -16,6 +16,7 @@ import {
 } from '@/components/profile/ProfilePanelContext'
 import { filterTraceForPanel, loadStatusFromPanelTrace } from '@/lib/panelApiTrace'
 import { PanelApiDetailModal } from './PanelApiDetailModal'
+import { StyledTooltip } from './StyledTooltip'
 
 type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
 
@@ -153,36 +154,38 @@ export function Panel({
       data-source-disabled={sourceDisabled ? 'true' : undefined}
       data-empty={emptyOnly ? 'true' : 'false'}
       data-load-status={effectiveLoadStatus || undefined}
-      title={nextWorkTitle}
     >
       <div className="flex justify-between items-start mb-4 gap-2">
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
           {titleExtra}
           {showTierBadge && tier && (
-            <span
-              className={`text-[9px] px-1.5 py-0.5 rounded tracking-wide ${TIER_BADGE_CLASS[tier]}`}
-              title={`Data tier: ${TIER_LABEL[tier]}`}
-            >
-              {TIER_LABEL[tier]}
-            </span>
+            <StyledTooltip content={`Data tier: ${TIER_LABEL[tier]}`}>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded tracking-wide cursor-help ${TIER_BADGE_CLASS[tier]}`}
+              >
+                {TIER_LABEL[tier]}
+              </span>
+            </StyledTooltip>
           )}
           {sourceDisabled && (
-            <span
-              className="text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide bg-amber-950/50 text-amber-300/90 border border-amber-800/40 cursor-help"
-              title={nextWorkTitle}
-              data-testid={panelId ? `panel-next-work-${panelId}` : 'panel-next-work'}
-            >
-              Next work
-            </span>
+            <StyledTooltip content={nextWorkTitle || 'Source disabled — next work target'}>
+              <span
+                className="text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide bg-amber-950/50 text-amber-300/90 border border-amber-800/40 cursor-help"
+                data-testid={panelId ? `panel-next-work-${panelId}` : 'panel-next-work'}
+              >
+                Next work
+              </span>
+            </StyledTooltip>
           )}
           {statusBadge && (
-            <span
-              className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide ${statusBadge.className}`}
-              title={sourceDisabled ? nextWorkTitle : undefined}
-            >
-              {statusBadge.text}
-            </span>
+            <StyledTooltip content={sourceDisabled ? nextWorkTitle : statusBadge.text}>
+              <span
+                className={`text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wide cursor-help ${statusBadge.className}`}
+              >
+                {statusBadge.text}
+              </span>
+            </StyledTooltip>
           )}
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -191,26 +194,28 @@ export function Panel({
           )}
           {/* Discreet API detail */}
           {(sourceInfo || panelTrace || panelId) && (
-            <button
-              type="button"
-              onClick={() => setDetailOpen(true)}
-              className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-slate-300 transition-colors"
-              title="API request details"
-              aria-label={`API details for ${title}`}
-              data-testid={panelId ? `panel-detail-${panelId}` : 'panel-detail'}
-            >
-              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </button>
+            <StyledTooltip content="API request details">
+              <button
+                type="button"
+                onClick={() => setDetailOpen(true)}
+                className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-slate-300 transition-colors"
+                aria-label={`API details for ${title}`}
+                data-testid={panelId ? `panel-detail-${panelId}` : 'panel-detail'}
+              >
+                <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </button>
+            </StyledTooltip>
           )}
           {/* Optional explicit panel refresh only (category refresh is on CategorySection) */}
           {onRefresh && (
+            <StyledTooltip content="Refresh this panel">
             <button
               type="button"
               onClick={(e) => {
@@ -220,7 +225,6 @@ export function Panel({
               }}
               disabled={Boolean(refreshing)}
               className="rounded p-1 text-slate-600 hover:bg-slate-700/60 hover:text-amber-300 transition-colors disabled:opacity-40"
-              title="Refresh this panel"
               aria-label={`Refresh ${title}`}
               data-testid={panelId ? `panel-refresh-${panelId}` : 'panel-refresh'}
             >
@@ -238,6 +242,7 @@ export function Panel({
                 />
               </svg>
             </button>
+            </StyledTooltip>
           )}
         </div>
       </div>
@@ -249,16 +254,18 @@ export function Panel({
               : emptyText}
           </p>
           {(derivedError || disabledReason) && (
-            <p
-              className={`text-[10px] mt-1.5 leading-relaxed ${
-                isFetchFailure ? 'text-amber-400/90' : 'text-amber-500/80'
-              }`}
-              title={disabledReason || derivedError}
-            >
-              {disabledReason || derivedError}
-            </p>
+            <StyledTooltip content={disabledReason || derivedError || ''}>
+              <p
+                className={`text-[10px] mt-1.5 leading-relaxed cursor-help ${
+                  isFetchFailure ? 'text-amber-400/90' : 'text-amber-500/80'
+                }`}
+              >
+                {disabledReason || derivedError}
+              </p>
+            </StyledTooltip>
           )}
           {canRetryCategory && catId && (
+            <StyledTooltip content="Re-query all sources in this category (shared fetch)">
             <button
               type="button"
               onClick={(e) => {
@@ -269,7 +276,6 @@ export function Panel({
               disabled={Boolean(catRefreshing)}
               className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-700/50 bg-amber-950/40 px-3 py-1.5 text-[11px] font-medium text-amber-200 hover:bg-amber-900/50 disabled:opacity-40 transition-colors"
               data-testid={panelId ? `panel-retry-category-${panelId}` : 'panel-retry-category'}
-              title="Re-query all sources in this category (shared fetch)"
             >
               <svg
                 className={`h-3.5 w-3.5 ${catRefreshing ? 'animate-spin' : ''}`}
@@ -286,6 +292,7 @@ export function Panel({
               </svg>
               {catRefreshing ? 'Retrying category…' : 'Retry category'}
             </button>
+            </StyledTooltip>
           )}
         </div>
       ) : (
@@ -341,22 +348,22 @@ export function Panel({
               <div className="flex items-center gap-1.5">
                 <span className="text-slate-500 w-10 shrink-0">Fetch</span>
                 {sourceInfo.endpoint?.startsWith('http') ? (
-                  <a
-                    href={sourceInfo.endpoint}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="font-mono text-emerald-400/70 hover:text-emerald-300 break-all text-left"
-                    title="Open API endpoint"
-                  >
-                    {sourceInfo.endpoint}
-                  </a>
+                  <StyledTooltip content="Open API endpoint">
+                    <a
+                      href={sourceInfo.endpoint}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="font-mono text-emerald-400/70 hover:text-emerald-300 break-all text-left"
+                    >
+                      {sourceInfo.endpoint}
+                    </a>
+                  </StyledTooltip>
                 ) : sourceInfo.endpoint?.startsWith('join://') ? (
-                  <span
-                    className="font-mono text-slate-500 break-all text-left"
-                    title="Local multi-source join — not a single HTTP endpoint"
-                  >
-                    multi-source join (see Docs)
-                  </span>
+                  <StyledTooltip content="Local multi-source join — not a single HTTP endpoint">
+                    <span className="font-mono text-slate-500 break-all text-left cursor-help">
+                      multi-source join (see Docs)
+                    </span>
+                  </StyledTooltip>
                 ) : (
                   <button
                     type="button"

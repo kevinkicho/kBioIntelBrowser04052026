@@ -34,6 +34,7 @@ import {
 } from '@/lib/discovery/discoverSessions'
 import { AiAnalysisView } from '@/components/discover/AiAnalysisView'
 import type { AiRankResult } from '@/lib/ai/aiRank'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 /** Stable key for discover URL params — used to re-run rank when history changes q/diseaseId/targets. */
 function discoverUrlKey(
@@ -341,24 +342,26 @@ export default function DiscoverPage() {
           </button>
           {sessions.slice(0, 5).map((s) => (
             <span key={s.id} className="inline-flex items-center gap-1 rounded border border-slate-800 bg-slate-900/50 px-2 py-1 text-slate-500">
-              <button
-                type="button"
-                className="hover:text-indigo-300"
-                title="Restore this session (re-ranks from URL / cache)"
-                onClick={() => {
-                  const params = new URLSearchParams()
-                  if (s.q) params.set('q', s.q)
-                  if (s.diseaseId) params.set('diseaseId', s.diseaseId)
-                  if (s.targets.length) params.set('targets', s.targets.join(','))
-                  const qs = params.toString()
-                  // Clear applied key so the URL effect always re-ranks this session
-                  appliedUrlKey.current = null
-                  setTargets(s.targets)
-                  router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
-                }}
-              >
-                {s.label.slice(0, 28)}
-              </button>
+              <StyledTooltip content="Restore this session (re-ranks from URL / cache)">
+                <button
+                  type="button"
+                  className="hover:text-indigo-300"
+                  aria-label="Restore this session (re-ranks from URL / cache)"
+                  onClick={() => {
+                    const params = new URLSearchParams()
+                    if (s.q) params.set('q', s.q)
+                    if (s.diseaseId) params.set('diseaseId', s.diseaseId)
+                    if (s.targets.length) params.set('targets', s.targets.join(','))
+                    const qs = params.toString()
+                    // Clear applied key so the URL effect always re-ranks this session
+                    appliedUrlKey.current = null
+                    setTargets(s.targets)
+                    router.replace(qs ? `/discover?${qs}` : '/discover', { scroll: false })
+                  }}
+                >
+                  {s.label.slice(0, 28)}
+                </button>
+              </StyledTooltip>
               <button
                 type="button"
                 className="text-slate-600 hover:text-red-400"
@@ -434,16 +437,17 @@ export default function DiscoverPage() {
                             state.result.v2.scorePhase === 'cheap' &&
                             ' · safety deferred until promote/harvest'}
                         </span>
-                        <span
-                          className="inline-flex cursor-help rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-500"
-                          title={
+                        <StyledTooltip
+                          content={
                             state.result.v2.scorePhase === 'full'
                               ? 'Full phase: cheap multi-axis score plus safety/novelty harvest for top candidates.'
                               : 'Cheap phase: multi-axis shortlist without rank-time AE harvest. Load safety scores or promote to board to fill safety/novelty.'
                           }
                         >
-                          ?
-                        </span>
+                          <span className="inline-flex cursor-help rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-500">
+                            ?
+                          </span>
+                        </StyledTooltip>
                       </p>
                     )}
                     <p className="mt-1 text-[10px] text-slate-600">

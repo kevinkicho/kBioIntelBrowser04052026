@@ -2,6 +2,7 @@
 
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OpenAlexWork } from '@/lib/types'
 import {
@@ -93,16 +94,17 @@ export const OpenAlexPanel = memo(function OpenAlexPanel({
                       </span>
                     )}
                     {href ? (
-                      <a
-                        href={href}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={`Open work: ${work.title}`}
-                        onClick={() => track(work.title)}
-                        className="font-semibold text-slate-100 text-sm hover:text-cyan-300 leading-snug"
-                      >
-                        {work.title}
-                      </a>
+                      <StyledTooltip content={`Open work: ${work.title}`}>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          onClick={() => track(work.title)}
+                          className="font-semibold text-slate-100 text-sm hover:text-cyan-300 leading-snug"
+                        >
+                          {work.title}
+                        </a>
+                      </StyledTooltip>
                     ) : (
                       <p className="font-semibold text-slate-100 text-sm">{work.title}</p>
                     )}
@@ -111,28 +113,29 @@ export const OpenAlexPanel = memo(function OpenAlexPanel({
                   <div className="flex flex-wrap items-center gap-2 mt-1">
                     {work.type &&
                       (href ? (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          title={`Open this ${typeLabel} for review`}
-                          onClick={() => track(`${typeLabel}:${work.title}`)}
-                          className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/30 px-2 py-0.5 rounded hover:bg-violet-800/50 hover:text-violet-200 hover:border-violet-600/40 transition-colors capitalize"
-                          data-testid="openalex-type-chip"
-                        >
-                          {typeLabel}
-                        </a>
+                        <StyledTooltip content={`Open this ${typeLabel} for review`}>
+                          <a
+                            href={href}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => track(`${typeLabel}:${work.title}`)}
+                            className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/30 px-2 py-0.5 rounded hover:bg-violet-800/50 hover:text-violet-200 hover:border-violet-600/40 transition-colors capitalize"
+                            data-testid="openalex-type-chip"
+                          >
+                            {typeLabel}
+                          </a>
+                        </StyledTooltip>
                       ) : (
                         <span className="text-xs bg-violet-900/40 text-violet-300 border border-violet-700/30 px-2 py-0.5 rounded capitalize">
                           {typeLabel}
                         </span>
                       ))}
                     {work.openAccessUrl && (
+                      <StyledTooltip content="Open access full text">
                       <a
                         href={work.openAccessUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        title="Open access full text"
                         onClick={() =>
                           onDeepLinkClick('openalex', work.openAccessUrl!, {
                             panelId: 'open-alex',
@@ -143,11 +146,14 @@ export const OpenAlexPanel = memo(function OpenAlexPanel({
                       >
                         Open Access
                       </a>
+                      </StyledTooltip>
                     )}
                     {work.journal && (
-                      <span className="text-[10px] text-slate-500 truncate max-w-[14rem]" title={work.journal}>
-                        {work.journal}
-                      </span>
+                      <StyledTooltip content={work.journal}>
+                        <span className="text-[10px] text-slate-500 truncate max-w-[14rem]">
+                          {work.journal}
+                        </span>
+                      </StyledTooltip>
                     )}
                   </div>
 

@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useAI } from '@/lib/ai/useAI'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { AIConfigModal } from './AIConfigModal'
 
 /**
@@ -45,30 +46,31 @@ export function AIStatusIndicator() {
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setModalOpen(true)}
-        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${ring} ${
-          busy ? 'animate-pulse' : ''
-        }`}
-        title={title}
-        aria-label={title}
-        data-testid="ai-config-button"
-      >
-        <span
-          className={`h-1.5 w-1.5 shrink-0 rounded-full ${
-            ready
-              ? 'bg-emerald-400'
-              : busy
-                ? 'bg-amber-400'
-                : failed
-                  ? 'bg-red-400'
-                  : 'bg-slate-500'
+      <StyledTooltip content={title} align="right">
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors ${ring} ${
+            busy ? 'animate-pulse' : ''
           }`}
-          aria-hidden
-        />
-        <span>AI</span>
-      </button>
+          aria-label={title}
+          data-testid="ai-config-button"
+        >
+          <span
+            className={`h-1.5 w-1.5 shrink-0 rounded-full ${
+              ready
+                ? 'bg-emerald-400'
+                : busy
+                  ? 'bg-amber-400'
+                  : failed
+                    ? 'bg-red-400'
+                    : 'bg-slate-500'
+            }`}
+            aria-hidden
+          />
+          <span>AI</span>
+        </button>
+      </StyledTooltip>
       <AIConfigModal isOpen={modalOpen} onClose={() => setModalOpen(false)} />
     </>
   )

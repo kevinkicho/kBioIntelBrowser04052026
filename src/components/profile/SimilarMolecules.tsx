@@ -10,6 +10,7 @@ import {
   profileCacheKey,
   setProfileClientCache,
 } from '@/lib/profileClientCache'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface TargetRelatedMolecule {
   name: string
@@ -142,11 +143,10 @@ export function SimilarMolecules({ cid }: { cid: number }) {
             {structural.map((mol) => {
               const why = structuralReason(mol)
               return (
+                <StyledTooltip key={mol.cid} content={why}>
                 <Link
-                  key={mol.cid}
                   href={`/molecule/${mol.cid}`}
-                  className="flex-shrink-0 w-44 bg-slate-800/50 border border-slate-700 rounded-lg p-3 hover:border-indigo-500/50 transition-colors"
-                  title={why}
+                  className="flex-shrink-0 w-44 bg-slate-800/50 border border-slate-700 rounded-lg p-3 hover:border-indigo-500/50 transition-colors block"
                 >
                   <div className="bg-white rounded-md w-full h-20 flex items-center justify-center mb-2 relative">
                     <Image
@@ -166,6 +166,7 @@ export function SimilarMolecules({ cid }: { cid: number }) {
                     ≥90% 2D fingerprint match (PubChem)
                   </p>
                 </Link>
+                </StyledTooltip>
               )
             })}
           </div>
@@ -201,10 +202,9 @@ export function SimilarMolecules({ cid }: { cid: number }) {
             {targetRelated.map((mol) => {
               const why = targetRelatedReason(mol)
               return (
+                <StyledTooltip key={mol.name} content={why} className="w-full">
                 <div
-                  key={mol.name}
-                  className="py-2 px-3 rounded-lg hover:bg-slate-700/40 transition-colors"
-                  title={why}
+                  className="py-2 px-3 rounded-lg hover:bg-slate-700/40 transition-colors w-full"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
@@ -255,6 +255,7 @@ export function SimilarMolecules({ cid }: { cid: number }) {
                     .
                   </p>
                 </div>
+                </StyledTooltip>
               )
             })}
           </div>

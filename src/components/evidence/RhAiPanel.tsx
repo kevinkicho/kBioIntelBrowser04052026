@@ -16,6 +16,7 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const MODES: { id: RhAiMode; label: string }[] = [
   { id: 'rh_thesis_draft', label: 'Thesis draft' },
@@ -219,15 +220,14 @@ export function RhAiPanel({
 
       <div className="mb-2 flex flex-wrap gap-1">
         {MODES.map((m) => (
+          <StyledTooltip key={m.id} content={rhModeTaskLabel(m.id)}>
           <button
-            key={m.id}
             type="button"
             onClick={() => {
               setMode(m.id)
               setInsight(null)
               setError(null)
             }}
-            title={rhModeTaskLabel(m.id)}
             className={`rounded border px-2 py-1 text-[10px] ${
               mode === m.id
                 ? m.id === 'rh_custom'
@@ -239,6 +239,7 @@ export function RhAiPanel({
           >
             {m.label}
           </button>
+          </StyledTooltip>
         ))}
       </div>
 

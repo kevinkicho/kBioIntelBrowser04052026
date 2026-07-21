@@ -95,7 +95,7 @@ export const DailyMedPanel = memo(function DailyMedPanel({
                     href={href}
                     target="_blank"
                     rel="noopener noreferrer"
-                    title={title}
+                    aria-label={title}
                     data-testid={`dailymed-row-${label.setId || index}`}
                     onClick={() =>
                       onDeepLinkClick('dailymed', href, {

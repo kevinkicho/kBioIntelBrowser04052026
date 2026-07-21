@@ -5,6 +5,7 @@ import { API_METADATA } from '@/lib/analytics/api-meta'
 import type { ApiMeta } from '@/lib/analytics/api-meta'
 import { ProductFunnelPanel } from '@/components/analytics/ProductFunnelPanel'
 import { productEventLabel } from '@/lib/productEvents'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function ApiMetaInfo({ meta }: { meta: ApiMeta }) {
   return (
@@ -267,11 +268,13 @@ function Sparkline({ data, key_ }: { data: number[]; key_: string }) {
   const max = Math.max(...data, 1)
   const w = 4
   return (
-    <div className="flex items-end gap-px" title={`${key_} trend`}>
-      {data.map((v, i) => (
-        <div key={i} className={`rounded-sm ${key_ === 'errors' ? 'bg-red-500/60' : key_ === 'avg_ms' ? 'bg-indigo-400/60' : 'bg-emerald-400/60'}`} style={{ width: w, height: Math.max(2, (v / max) * 28) }} />
-      ))}
-    </div>
+    <StyledTooltip content={`${key_} trend`}>
+      <div className="flex items-end gap-px">
+        {data.map((v, i) => (
+          <div key={i} className={`rounded-sm ${key_ === 'errors' ? 'bg-red-500/60' : key_ === 'avg_ms' ? 'bg-indigo-400/60' : 'bg-emerald-400/60'}`} style={{ width: w, height: Math.max(2, (v / max) * 28) }} />
+        ))}
+      </div>
+    </StyledTooltip>
   )
 }
 
@@ -407,15 +410,17 @@ export default function AnalyticsPage() {
               <option value="90d">Last 90 days</option>
               <option value="all">All time</option>
             </select>
-            <button
-              onClick={fetchData}
-              className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
-              title="Refresh"
-            >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
+            <StyledTooltip content="Refresh">
+              <button
+                onClick={fetchData}
+                className="bg-slate-800 border border-slate-600 rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-700 transition-colors"
+                aria-label="Refresh"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+              </button>
+            </StyledTooltip>
             <a href="/" className="text-indigo-400 hover:text-indigo-300 text-sm">Back to app</a>
           </div>
         </div>
@@ -821,12 +826,11 @@ export default function AnalyticsPage() {
                               <span className={`font-mono shrink-0 ${call.status >= 400 ? 'text-red-400' : 'text-emerald-400'}`}>{call.status}</span>
                               <span className="text-slate-300 shrink-0">{fmtMs(call.duration_ms)}</span>
                               {detailSource && (
-                                <span
-                                  className="truncate text-indigo-300/90"
-                                  title={call.endpoint}
-                                >
-                                  {endpointLabel(detailSource, call.endpoint)}
-                                </span>
+                                <StyledTooltip content={call.endpoint} className="min-w-0">
+                                  <span className="block truncate text-indigo-300/90">
+                                    {endpointLabel(detailSource, call.endpoint)}
+                                  </span>
+                                </StyledTooltip>
                               )}
                               <span className={`px-1 py-px rounded text-[9px] font-medium shrink-0 ${call.has_data ? 'bg-emerald-900/40 text-emerald-400' : 'bg-yellow-900/40 text-yellow-400'}`}>
                                 {call.has_data ? 'data' : 'empty'}

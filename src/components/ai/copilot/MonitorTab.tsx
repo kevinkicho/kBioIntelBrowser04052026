@@ -8,6 +8,7 @@ import {
   type RetrievalGap,
   type RetrievalSnapshot,
 } from '@/lib/ai/retrievalMonitor'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function gapDotClass(reason: RetrievalGap['reason']): string {
   if (reason === 'error') return 'bg-red-400'
@@ -56,9 +57,9 @@ export function MonitorTab({
           <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
             Data retrieval
           </span>
-          <span className="text-[10px] text-slate-500" title="Share of terminal outcomes with data">
-            {pct}% with data
-          </span>
+          <StyledTooltip content="Share of terminal outcomes with data">
+            <span className="text-[10px] text-slate-500">{pct}% with data</span>
+          </StyledTooltip>
         </div>
         <div className="w-full bg-slate-800 rounded-full h-2 mb-3">
           <div
@@ -188,10 +189,9 @@ export function MonitorTab({
         ) : (
           <div className="space-y-1.5 max-h-48 overflow-y-auto">
             {filteredGaps.slice(0, 40).map((gap, i) => (
+              <StyledTooltip key={`${gap.panelKey}-${i}`} content={gap.detail} className="w-full">
               <div
-                key={`${gap.panelKey}-${i}`}
-                className="flex items-start gap-2 group"
-                title={gap.detail}
+                className="flex items-start gap-2 group w-full"
               >
                 <span
                   className={`w-1.5 h-1.5 rounded-full shrink-0 mt-1 ${gapDotClass(gap.reason)}`}
@@ -233,6 +233,7 @@ export function MonitorTab({
                   </button>
                 )}
               </div>
+              </StyledTooltip>
             ))}
           </div>
         )}

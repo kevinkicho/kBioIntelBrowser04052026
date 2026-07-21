@@ -7,6 +7,7 @@ import {
   buildOrderCatalogLinks as buildCatalogLinksFromVars,
   extractCasFromSynonyms,
 } from '@/lib/vendorCatalogLinks'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface ActionCard {
   id: string
@@ -316,27 +317,27 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
           </p>
           <div className="flex flex-wrap gap-2">
             {catalogLinks.map((s) => (
-              <a
-                key={s.name}
-                href={s.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                title={s.hint}
-                onClick={() =>
-                  logAgentActivity(
-                    'profile.order_compound.catalog_click',
-                    { vendor: s.name, moleculeName, cid: cid ?? null },
-                    { source: 'profile' },
-                  )
-                }
-                className="group inline-flex flex-col rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-3 py-2 transition-colors hover:border-cyan-600/50 hover:bg-cyan-900/30"
-                data-testid={`order-catalog-${s.name.replace(/\s+/g, '-').toLowerCase()}`}
-              >
-                <span className="text-xs font-medium text-cyan-200 group-hover:text-cyan-100">
-                  {s.name} ↗
-                </span>
-                <span className="text-[9px] text-slate-500">{s.hint}</span>
-              </a>
+              <StyledTooltip key={s.name} content={s.hint}>
+                <a
+                  href={s.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={() =>
+                    logAgentActivity(
+                      'profile.order_compound.catalog_click',
+                      { vendor: s.name, moleculeName, cid: cid ?? null },
+                      { source: 'profile' },
+                    )
+                  }
+                  className="group inline-flex flex-col rounded-lg border border-cyan-800/40 bg-cyan-950/20 px-3 py-2 transition-colors hover:border-cyan-600/50 hover:bg-cyan-900/30"
+                  data-testid={`order-catalog-${s.name.replace(/\s+/g, '-').toLowerCase()}`}
+                >
+                  <span className="text-xs font-medium text-cyan-200 group-hover:text-cyan-100">
+                    {s.name} ↗
+                  </span>
+                  <span className="text-[9px] text-slate-500">{s.hint}</span>
+                </a>
+              </StyledTooltip>
             ))}
           </div>
 

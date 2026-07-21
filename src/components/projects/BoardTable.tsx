@@ -7,6 +7,7 @@ import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
 import { SignalBadges } from '@/components/projects/SignalBadges'
 import type { CandidateSignalRow } from '@/lib/signals'
 import { originSourceDeepLink } from '@/lib/originDeepLinks'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
 
@@ -171,20 +172,17 @@ export function BoardTable({
                   ) : signalsLoading && !sigRow ? (
                     <span className="text-[10px] text-slate-600 animate-pulse">…</span>
                   ) : sigRow?.status === 'baseline' ? (
-                    <span
-                      className="text-[10px] text-slate-600"
-                      title="Baseline snapshot saved — chips appear when free-API counts change"
-                    >
-                      —
-                    </span>
+                    <StyledTooltip content="Baseline snapshot saved — chips appear when free-API counts change">
+                      <span className="text-[10px] text-slate-600">—</span>
+                    </StyledTooltip>
                   ) : sigRow?.status === 'no_cid' ? (
-                    <span className="text-[10px] text-slate-600" title="No PubChem CID">
-                      n/a
-                    </span>
+                    <StyledTooltip content="No PubChem CID">
+                      <span className="text-[10px] text-slate-600">n/a</span>
+                    </StyledTooltip>
                   ) : sigRow?.status === 'error' ? (
-                    <span className="text-[10px] text-red-500/70" title={sigRow.error}>
-                      err
-                    </span>
+                    <StyledTooltip content={sigRow.error || 'Error'}>
+                      <span className="text-[10px] text-red-500/70">err</span>
+                    </StyledTooltip>
                   ) : signalsLoading ? (
                     <span className="text-[10px] text-slate-600 animate-pulse">…</span>
                   ) : (
@@ -207,28 +205,25 @@ export function BoardTable({
                           'rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[9px] text-slate-400'
                         if (link.href) {
                           return (
-                            <a
-                              key={s}
-                              href={link.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              title={link.title}
-                              className={`${chipClass} hover:border-indigo-600/50 hover:text-indigo-300 transition-colors`}
-                              data-testid="origin-chip-link"
-                            >
-                              {link.label} ↗
-                            </a>
+                            <StyledTooltip key={s} content={link.title}>
+                              <a
+                                href={link.href}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className={`${chipClass} hover:border-indigo-600/50 hover:text-indigo-300 transition-colors`}
+                                data-testid="origin-chip-link"
+                              >
+                                {link.label} ↗
+                              </a>
+                            </StyledTooltip>
                           )
                         }
                         return (
-                          <span
-                            key={s}
-                            title={link.title}
-                            className={chipClass}
-                            data-testid="origin-chip"
-                          >
-                            {link.label}
-                          </span>
+                          <StyledTooltip key={s} content={link.title}>
+                            <span className={chipClass} data-testid="origin-chip">
+                              {link.label}
+                            </span>
+                          </StyledTooltip>
                         )
                       })}
                   </div>
@@ -236,34 +231,35 @@ export function BoardTable({
                 <td className="px-3 py-3 text-center">
                   <div className="flex items-center justify-center gap-1">
                     {harvesting && (
-                      <span
-                        className="text-[9px] text-amber-400 animate-pulse"
-                        title="Harvesting safety…"
-                      >
-                        harvest…
-                      </span>
+                      <StyledTooltip content="Harvesting safety…">
+                        <span className="text-[9px] text-amber-400 animate-pulse">harvest…</span>
+                      </StyledTooltip>
                     )}
                     {(status === 'promote' || status === 'watching') &&
                       c.identity.pubchemCid != null &&
                       onExpandSimilar && (
-                        <button
-                          type="button"
-                          onClick={() => onExpandSimilar(c)}
-                          disabled={expandBusyId === c.candidateId}
-                          className="rounded border border-violet-800/40 px-1.5 py-0.5 text-[9px] text-violet-300 hover:bg-violet-900/30 disabled:opacity-50"
-                          title="Add PubChem 2D-similar neighbors"
-                        >
-                          {expandBusyId === c.candidateId ? '…' : '≈ similar'}
-                        </button>
+                        <StyledTooltip content="Add PubChem 2D-similar neighbors">
+                          <button
+                            type="button"
+                            onClick={() => onExpandSimilar(c)}
+                            disabled={expandBusyId === c.candidateId}
+                            className="rounded border border-violet-800/40 px-1.5 py-0.5 text-[9px] text-violet-300 hover:bg-violet-900/30 disabled:opacity-50"
+                            aria-label="Add PubChem 2D-similar neighbors"
+                          >
+                            {expandBusyId === c.candidateId ? '…' : '≈ similar'}
+                          </button>
+                        </StyledTooltip>
                       )}
-                    <button
-                      type="button"
-                      onClick={() => onRemove(c.candidateId)}
-                      className="p-1 text-slate-600 hover:text-red-400"
-                      title="Remove from board"
-                    >
-                      ✕
-                    </button>
+                    <StyledTooltip content="Remove from board">
+                      <button
+                        type="button"
+                        onClick={() => onRemove(c.candidateId)}
+                        className="p-1 text-slate-600 hover:text-red-400"
+                        aria-label="Remove from board"
+                      >
+                        ✕
+                      </button>
+                    </StyledTooltip>
                   </div>
                 </td>
               </tr>
