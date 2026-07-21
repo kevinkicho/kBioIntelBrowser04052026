@@ -1,9 +1,22 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import type { RorOrganization } from '@/lib/api/ror'
 import type { CmsHospital } from '@/lib/api/cmsHospitals'
 import type { UsCollege } from '@/lib/api/collegeScorecard'
+import {
+  buildOrgAffiliationJoins,
+  parseSponsorHints,
+  type AffiliationEdge,
+} from '@/lib/orgAffiliationJoin'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
+
+const KIND_LABEL: Record<AffiliationEdge['kind'], string> = {
+  'sponsor-ror': 'Sponsor → ROR',
+  'ror-hospital': 'ROR → hospital',
+  'ror-college': 'ROR → college',
+  'hospital-college': 'Hospital → college',
+}
 
 /**
  * Free public org / hospital / college search (ROR + CMS + Scorecard + EU packs).
@@ -19,6 +32,7 @@ export default function OrgsPage() {
   const [hospitals, setHospitals] = useState<CmsHospital[]>([])
   const [colleges, setColleges] = useState<UsCollege[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [sponsorText, setSponsorText] = useState('')
 
   const runSearch = useCallback(async () => {
     const query = q.trim()
@@ -86,6 +100,25 @@ export default function OrgsPage() {
     }
   }, [q, country, euPack])
 
+  const affiliation = useMemo(() => {
+    const sponsors = parseSponsorHints(sponsorText)
+    const rorAll = [...orgs, ...euOrgs]
+    // Dedupe ROR by id
+    const seen = new Set<string>()
+    const rorDeduped: RorOrganization[] = []
+    for (const o of rorAll) {
+      if (seen.has(o.rorId)) continue
+      seen.add(o.rorId)
+      rorDeduped.push(o)
+    }
+    return buildOrgAffiliationJoins({
+      sponsors,
+      rorOrgs: rorDeduped,
+      hospitals,
+      colleges,
+    })
+  }, [sponsorText, orgs, euOrgs, hospitals, colleges])
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
       <div className="mb-6">
@@ -97,8 +130,8 @@ export default function OrgsPage() {
         </h1>
         <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-2xl">
           ROR research organizations (global), EU research org packs, US College Scorecard, and CMS
-          Medicare hospitals. Affiliation / directory context only — not clinical referral or
-          admissions advice.
+          Medicare hospitals — plus deterministic sponsor↔ROR↔site name joins. Affiliation /
+          directory context only — not clinical referral or admissions advice.
         </p>
         <p className="mt-2 text-[11px] text-slate-500">
           <a
@@ -192,6 +225,97 @@ export default function OrgsPage() {
           {error}
         </p>
       )}
+
+      <section
+        className="mb-8 rounded-xl border border-slate-800 bg-slate-950/40 p-4"
+        data-testid="orgs-affiliation-join"
+      >
+        <h2 className="text-sm font-semibold text-slate-100 mb-1">
+          Sponsor ↔ ROR ↔ site joins
+          {affiliation.edges.length ? ` · ${affiliation.edges.length}` : ''}
+        </h2>
+        <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
+          Paste trial sponsor names (one per line). Overlaps are computed against the ROR / hospital
+          / college results below using token matching — not official affiliation graphs.
+        </p>
+        <textarea
+          value={sponsorText}
+          onChange={(e) => setSponsorText(e.target.value)}
+          rows={3}
+          placeholder={'e.g.\nMayo Clinic\nHarvard Medical School\nPfizer'}
+          className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 mb-3"
+          data-testid="orgs-sponsor-input"
+        />
+        {affiliation.notes.map((n) => (
+          <p key={n} className="text-[10px] text-amber-500/80 mb-2">
+            {n}
+          </p>
+        ))}
+        {affiliation.edges.length === 0 ? (
+          <p className="text-xs text-slate-500">
+            Run a search and/or paste sponsors to see affiliation edges.
+          </p>
+        ) : (
+          <ul className="space-y-2 max-h-72 overflow-y-auto">
+            {affiliation.edges.map((e) => (
+              <li
+                key={e.id}
+                className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
+                data-testid="orgs-join-edge"
+              >
+                <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
+                  <span className="text-[9px] uppercase tracking-wide rounded border border-sky-800/40 bg-sky-950/40 px-1.5 py-0.5 text-sky-300">
+                    {KIND_LABEL[e.kind]}
+                  </span>
+                  <span className="text-[10px] font-mono text-slate-500">
+                    score {(e.score * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <p className="text-sm text-slate-100">
+                  {e.leftHref ? (
+                    <a
+                      href={e.leftHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-300 hover:underline"
+                      onClick={() =>
+                        onDeepLinkClick('other', e.leftHref!, {
+                          panelId: 'orgs-join',
+                          label: e.kind,
+                        })
+                      }
+                    >
+                      {e.leftLabel}
+                    </a>
+                  ) : (
+                    e.leftLabel
+                  )}
+                  <span className="text-slate-600 mx-1.5">↔</span>
+                  {e.rightHref ? (
+                    <a
+                      href={e.rightHref}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-indigo-300 hover:underline"
+                      onClick={() =>
+                        onDeepLinkClick('other', e.rightHref!, {
+                          panelId: 'orgs-join',
+                          label: e.kind,
+                        })
+                      }
+                    >
+                      {e.rightLabel}
+                    </a>
+                  ) : (
+                    e.rightLabel
+                  )}
+                </p>
+                {e.detail && <p className="text-[10px] text-slate-500 mt-0.5">{e.detail}</p>}
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
 
       <section className="mb-10">
         <h2 className="text-sm font-semibold text-slate-200 mb-3">

@@ -66,6 +66,7 @@ export default function ProjectBoardPage() {
   const [harvestBusy, setHarvestBusy] = useState(false)
   const [boardPanels, setBoardPanels] = useState<CorePanelEvidenceInput>({})
   const [boardClaims, setBoardClaims] = useState<EvidenceClaim[]>([])
+  const [boardLandscapeClaims, setBoardLandscapeClaims] = useState<EvidenceClaim[]>([])
   const [packWarnings, setPackWarnings] = useState<string[]>([])
   const [panelsLoading, setPanelsLoading] = useState(false)
   const [renaming, setRenaming] = useState(false)
@@ -98,6 +99,7 @@ export default function ProjectBoardPage() {
     if (!project || project.candidates.length === 0) {
       setBoardPanels({})
       setBoardClaims([])
+      setBoardLandscapeClaims([])
       setPackWarnings([])
       return
     }
@@ -108,17 +110,19 @@ export default function ProjectBoardPage() {
     packFetchKey.current = key
     let cancelled = false
     setPanelsLoading(true)
-    buildBoardPackClaims(project, { maxCandidates: 5 })
+    buildBoardPackClaims(project, { maxCandidates: 5, includeLandscape: true })
       .then((res) => {
         if (cancelled) return
         setBoardPanels(res.panels)
         setBoardClaims(res.claims)
+        setBoardLandscapeClaims(res.landscapeClaims)
         setPackWarnings(res.warnings)
       })
       .catch(() => {
         if (!cancelled) {
           setBoardPanels({})
           setBoardClaims([])
+          setBoardLandscapeClaims([])
           setPackWarnings(['Failed to fetch Core panels for board pack'])
         }
       })
@@ -631,6 +635,7 @@ export default function ProjectBoardPage() {
           <PackBuilder
             panels={boardPanels}
             claims={boardClaims}
+            landscapeClaims={boardLandscapeClaims}
             panelsLoading={panelsLoading}
             densityWarnings={packWarnings}
             candidates={project.candidates}
@@ -655,10 +660,11 @@ export default function ProjectBoardPage() {
             onExported={() => refresh()}
           />
           <p className="text-[11px] text-slate-600">
-            Board packs auto-fetch Core panels (mechanisms, activities, trials, AE, Open Targets) for
-            promoted CIDs with parallel budgets. Pre-extracted multi-subject claims (≤200) preserve
-            per-candidate attribution. Enable “Share links when available” in Discover
-            preferences for Share pack.
+            Board packs auto-fetch Core + landscape categories (mechanisms, trials, AE, Open Targets,
+            pharma/biologics, grants/orgs) for promoted CIDs with parallel budgets. Pre-extracted
+            multi-subject claims (≤200) preserve per-candidate attribution. Toggle Landscape pack
+            mode for org · sponsor · biosimilar · jurisdiction claims. Enable “Share links when
+            available” in Discover preferences for Share pack.
           </p>
           {(project.packIndex?.length ?? 0) >= 2 && (
             <MultiPackContrastPicker

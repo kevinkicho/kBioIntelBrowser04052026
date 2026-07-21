@@ -9,6 +9,11 @@ import {
   watchlistDensityToCsv,
   type WatchlistDensitySummary,
 } from '@/lib/watchlistSummary'
+import {
+  detectAndSaveWatchlistDensityChanges,
+  formatDensityChanges,
+  type DensityChangeItem,
+} from '@/lib/watchlistDensitySnapshot'
 import { downloadFile } from '@/lib/exportData'
 
 interface WatchlistEntry {
@@ -16,6 +21,8 @@ interface WatchlistEntry {
   name: string
   summary?: WatchlistDensitySummary
   loading?: boolean
+  changes?: DensityChangeItem[]
+  changeLabel?: string
 }
 
 export default function WatchlistPage() {
@@ -53,9 +60,23 @@ export default function WatchlistPage() {
         if (cancelled) break
         const summary = await fetchSummary(fav.cid)
         if (cancelled) break
+        let changes: DensityChangeItem[] = []
+        let changeLabel = ''
+        if (summary) {
+          changes = detectAndSaveWatchlistDensityChanges(fav.cid, summary)
+          changeLabel = formatDensityChanges(changes)
+        }
         setEntries((prev) =>
           prev.map((e) =>
-            e.cid === fav.cid ? { ...e, summary: summary ?? undefined, loading: false } : e,
+            e.cid === fav.cid
+              ? {
+                  ...e,
+                  summary: summary ?? undefined,
+                  loading: false,
+                  changes,
+                  changeLabel: changeLabel || undefined,
+                }
+              : e,
           ),
         )
       }
@@ -72,6 +93,8 @@ export default function WatchlistPage() {
     downloadFile(csv, `biointel-watchlist-${day}.csv`, 'text/csv')
   }
 
+  const withChanges = entries.filter((e) => (e.changes?.length ?? 0) > 0)
+
   return (
     <div className="min-h-screen bg-[#0f1117]">
       <header className="border-b border-slate-800 px-6 py-4">
@@ -86,8 +109,8 @@ export default function WatchlistPage() {
             <h1 className="text-3xl font-bold text-slate-100 mb-2">Watchlist</h1>
             <p className="text-slate-400 text-sm max-w-2xl">
               Solo local favorites with free-API density: trials, sponsors, BLA / biosimilar rows,
-              ROR orgs, grants, and multi-jurisdiction register counts. Refreshes on each visit —
-              not clinical monitoring.
+              ROR orgs, grants, and multi-jurisdiction register counts. Density deltas vs your last
+              visit are stored in localStorage only — not clinical monitoring.
             </p>
           </div>
           {entries.length > 0 && (
@@ -101,6 +124,28 @@ export default function WatchlistPage() {
             </button>
           )}
         </div>
+
+        {withChanges.length > 0 && (
+          <div
+            className="mb-4 rounded-xl border border-amber-800/40 bg-amber-950/20 px-4 py-3"
+            data-testid="watchlist-density-alerts"
+            role="status"
+          >
+            <h2 className="text-xs font-semibold text-amber-100 mb-1">
+              Density changes since last visit
+            </h2>
+            <ul className="space-y-1">
+              {withChanges.map((e) => (
+                <li key={e.cid} className="text-[11px] text-amber-200/90">
+                  <a href={`/molecule/${e.cid}`} className="font-medium text-amber-100 hover:underline">
+                    {e.name}
+                  </a>
+                  <span className="text-amber-500/80"> · {e.changeLabel}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
 
         <div className="bg-slate-800/30 border border-slate-700 rounded-xl p-4 sm:p-6">
           <WatchlistTable
@@ -116,6 +161,7 @@ export default function WatchlistPage() {
           <div className="mt-4 text-center">
             <p className="text-[10px] text-slate-600">
               {entries.filter((e) => !e.loading).length}/{entries.length} molecules loaded
+              {withChanges.length > 0 ? ` · ${withChanges.length} with density deltas` : ''}
             </p>
           </div>
         )}

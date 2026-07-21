@@ -8,6 +8,8 @@ interface WatchlistMolecule {
   name: string
   summary?: WatchlistDensitySummary
   loading?: boolean
+  /** Formatted density deltas since last visit */
+  changeLabel?: string
 }
 
 interface Props {
@@ -133,6 +135,14 @@ export function WatchlistTable({ molecules, onRemove }: Props) {
                   </span>
                   <span className="text-[10px] text-slate-600 ml-2">CID {mol.cid}</span>
                 </a>
+                {mol.changeLabel ? (
+                  <p
+                    className="text-[10px] text-amber-400/90 mt-0.5"
+                    data-testid="watchlist-row-delta"
+                  >
+                    {mol.changeLabel}
+                  </p>
+                ) : null}
               </td>
               {mol.loading ? (
                 <td colSpan={11} className="text-center py-3 px-2">

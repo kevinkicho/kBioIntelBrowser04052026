@@ -33,6 +33,11 @@ export interface PackBuilderProps {
    * so subjectCandidateId attribution is preserved (design §6.5.4).
    */
   claims?: EvidenceClaim[]
+  /**
+   * Multi-subject landscape-preferring claims (board landscape pack path).
+   * Used when landscapeMode is on and this list is non-empty.
+   */
+  landscapeClaims?: EvidenceClaim[]
   /** Raw profile data — Core panels extracted automatically. */
   profileData?: Record<string, unknown>
   candidates?: MoleculeCandidate[]
@@ -62,6 +67,7 @@ export interface PackBuilderProps {
 export function PackBuilder({
   panels: panelsProp,
   claims: claimsProp,
+  landscapeClaims: landscapeClaimsProp,
   profileData,
   candidates = [],
   disease = null,
@@ -105,6 +111,12 @@ export function PackBuilder({
     [claimsProp],
   )
 
+  const landscapePreClaims = useMemo(
+    () =>
+      landscapeClaimsProp && landscapeClaimsProp.length > 0 ? landscapeClaimsProp : null,
+    [landscapeClaimsProp],
+  )
+
   const preferencesSnapshot = useMemo(() => {
     if (prefsProp) return prefsProp
     try {
@@ -116,10 +128,29 @@ export function PackBuilder({
 
   const build = useCallback((): EvidencePack => {
     const retrievedAt = new Date().toISOString()
-    // Prefer pre-extracted multi-subject claims (board); avoid re-extract from merged panels
-    if (preClaims) {
+    const packTitle = landscapeMode
+      ? `${title.replace(/\s*landscape pack$/i, '')} landscape pack`
+      : title
+
+    // Board landscape path: multi-subject landscape claims keep subjectCandidateId
+    if (landscapeMode && landscapePreClaims) {
       return buildEvidencePack({
-        title,
+        title: packTitle,
+        claims: landscapePreClaims,
+        candidates,
+        disease,
+        targets,
+        preferencesSnapshot,
+        rubric: defaultPackRubric(preferencesSnapshot),
+        projectId: projectId ?? undefined,
+        maxClaims: MAX_PACK_CLAIMS,
+      })
+    }
+
+    // Prefer pre-extracted multi-subject claims (board); avoid re-extract from merged panels
+    if (preClaims && !landscapeMode) {
+      return buildEvidencePack({
+        title: packTitle,
         claims: preClaims,
         candidates,
         disease,
@@ -130,8 +161,10 @@ export function PackBuilder({
         maxClaims: MAX_PACK_CLAIMS,
       })
     }
+
+    // Profile / panel path (or landscapeMode without landscapePreClaims)
     return buildEvidencePack({
-      title: landscapeMode ? `${title.replace(/\s*landscape pack$/i, '')} landscape pack` : title,
+      title: packTitle,
       panels,
       extractOptions: {
         retrievedAt,
@@ -152,6 +185,7 @@ export function PackBuilder({
     title,
     panels,
     preClaims,
+    landscapePreClaims,
     subjectCandidateId,
     moleculeName,
     candidates,
@@ -340,28 +374,32 @@ export function PackBuilder({
         />
       </label>
 
-      {!preClaims && (
-        <label
-          className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"
-          data-testid="pack-landscape-mode"
-        >
-          <input
-            type="checkbox"
-            checked={landscapeMode}
-            onChange={(e) => setLandscapeMode(e.target.checked)}
-            className="mt-0.5 rounded border-slate-600 bg-slate-900 text-sky-600 focus:ring-sky-700"
-          />
-          <span>
-            <span className="block text-[11px] font-medium text-sky-200">
-              Landscape pack mode
-            </span>
-            <span className="block text-[10px] text-slate-500 leading-relaxed">
-              Prefer org · trial site · grant · biosimilar-family claims (~55% of the claim cap),
-              then fill with Core panels. Free public joins only — not competitive or clinical advice.
-            </span>
+      <label
+        className="mb-3 flex cursor-pointer items-start gap-2 rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2"
+        data-testid="pack-landscape-mode"
+      >
+        <input
+          type="checkbox"
+          checked={landscapeMode}
+          onChange={(e) => setLandscapeMode(e.target.checked)}
+          className="mt-0.5 rounded border-slate-600 bg-slate-900 text-sky-600 focus:ring-sky-700"
+        />
+        <span>
+          <span className="block text-[11px] font-medium text-sky-200">
+            Landscape pack mode
+            {landscapePreClaims ? (
+              <span className="ml-1.5 font-normal text-slate-500">
+                · {landscapePreClaims.length} multi-subject landscape claims
+              </span>
+            ) : null}
           </span>
-        </label>
-      )}
+          <span className="block text-[10px] text-slate-500 leading-relaxed">
+            Prefer org · trial site · grant · biosimilar-family · jurisdiction claims (~55% of the
+            claim cap when extracting from panels). Board path preserves per-candidate attribution.
+            Free public joins only — not competitive or clinical advice.
+          </span>
+        </span>
+      </label>
 
       {previewPack && (
         <div className="mb-3">

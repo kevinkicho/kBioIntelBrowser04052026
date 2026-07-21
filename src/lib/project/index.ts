@@ -131,6 +131,8 @@ export {
   PACK_PANEL_CONCURRENCY,
   PACK_PANEL_TIMEOUT_MS,
   PACK_CATEGORIES,
+  PACK_LANDSCAPE_CATEGORIES,
+  BOARD_FETCH_CATEGORIES,
   richnessProxy,
   selectPackCandidates,
   fetchCorePanelsForCid,

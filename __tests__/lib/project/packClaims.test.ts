@@ -103,6 +103,7 @@ describe('buildBoardPackClaims', () => {
       makeProject([makeCand('x', 'promote', null)]),
     )
     expect(res.claims).toEqual([])
+    expect(res.landscapeClaims).toEqual([])
     expect(res.citableCount).toBe(0)
     expect(res.warnings[0]).toMatch(/PubChem CID/)
   })
@@ -169,5 +170,63 @@ describe('buildBoardPackClaims', () => {
     expect(subjects.has('cid:200')).toBe(true)
     expect(res.citableCount).toBe(res.claims.length)
     expect(res.claims.every((c) => c.provenance.source && c.provenance.retrievedAt)).toBe(true)
+    // Landscape extract always returns an array (may be empty without org bags)
+    expect(Array.isArray(res.landscapeClaims)).toBe(true)
+  })
+
+  it('builds multi-subject landscape claims with subject attribution', async () => {
+    ;(fetchCategory.fetchCategoryData as jest.Mock).mockImplementation(
+      async (_cid: number, cat: string) => {
+        if (cat === 'clinical-safety') {
+          return {
+            clinicalTrials: [
+              {
+                nctId: `NCT-${_cid}`,
+                title: 'Trial',
+                status: 'RECRUITING',
+                phase: 'Phase 2',
+                startDate: '',
+                completionDate: '',
+                conditions: [],
+                interventions: [],
+                sponsor: `Sponsor ${_cid}`,
+                facilities: [{ name: `Site ${_cid}`, city: 'Boston', country: 'US' }],
+              },
+            ],
+            researchOrgs: [
+              {
+                rorId: `ror${_cid}`,
+                idUrl: `https://ror.org/ror${_cid}`,
+                name: `Org ${_cid}`,
+                aliases: [],
+                types: ['Education'],
+                city: 'Boston',
+                countryCode: 'US',
+                countryName: 'United States',
+                region: 'MA',
+                website: null,
+                wikipedia: null,
+                established: null,
+                status: 'active',
+              },
+            ],
+          }
+        }
+        return {}
+      },
+    )
+
+    const res = await buildBoardPackClaims(
+      makeProject([makeCand('cid:100', 'promote', 100), makeCand('cid:200', 'promote', 200)]),
+      { includeLandscape: true },
+    )
+
+    expect(res.landscapeClaims.length).toBeGreaterThan(0)
+    const subjects = new Set(res.landscapeClaims.map((c) => c.subjectCandidateId))
+    expect(subjects.has('cid:100')).toBe(true)
+    expect(subjects.has('cid:200')).toBe(true)
+    expect(res.landscapeClaims.some((c) => /neighborhood|sponsor|ROR|landscape/i.test(c.statement))).toBe(
+      true,
+    )
   })
 })
