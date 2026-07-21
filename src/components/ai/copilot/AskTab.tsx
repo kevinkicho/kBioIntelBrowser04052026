@@ -2,6 +2,8 @@
 
 import type { CopilotMessage } from '@/hooks/useAICopilot'
 import { MessageBubble } from './MessageBubble'
+import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { buildAskSuggestionWhy } from '@/lib/ai/aiWhyTooltip'
 
 export function AskTab({
   messages,
@@ -63,14 +65,27 @@ export function AskTab({
           </p>
           <div className="mt-3 space-y-1.5">
             {suggestions.map((s) => (
-              <button
+              <div
                 key={s}
-                onClick={() => onAsk(s)}
-                disabled={!aiAvailable}
-                className="block w-full text-left text-[10px] text-slate-400 hover:text-indigo-300 bg-slate-800/40 hover:bg-indigo-900/30 rounded px-3 py-1.5 border border-slate-700/20 hover:border-indigo-700/40 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="flex items-stretch gap-1 rounded border border-slate-700/20 bg-slate-800/40 hover:border-indigo-700/40"
               >
-                {s}
-              </button>
+                <button
+                  type="button"
+                  onClick={() => onAsk(s)}
+                  disabled={!aiAvailable}
+                  className="flex-1 text-left text-[10px] text-slate-400 hover:text-indigo-300 hover:bg-indigo-900/30 rounded-l px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                >
+                  {s}
+                </button>
+                <div className="flex items-center pr-1.5">
+                  <AiWhyTooltip
+                    why={buildAskSuggestionWhy(s)}
+                    testId="ask-suggest-why"
+                    label="why?"
+                    align="right"
+                  />
+                </div>
+              </div>
             ))}
           </div>
         </div>

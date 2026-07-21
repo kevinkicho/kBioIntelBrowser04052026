@@ -16,6 +16,8 @@ import {
 import { useAI } from '@/lib/ai/useAI'
 import { emitProductEvent } from '@/lib/productEvents'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 
 const LAB_MODES: { id: PackAiMode; label: string; labLabel: string }[] = [
   { id: 'pack_executive_brief', label: 'Affiliation brief', labLabel: 'Affiliation brief' },
@@ -131,20 +133,23 @@ export function ResearchLabAiPanel({
         NIH RePORTER, OpenAIRE). Not admissions ranking or clinical referral. BYOM Ollama.
       </p>
 
-      <div className="mt-3 flex flex-wrap gap-1.5">
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {LAB_MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => setMode(m.id)}
-            className={`rounded-lg border px-2 py-1 text-[11px] ${
-              mode === m.id
-                ? 'border-violet-600 bg-violet-900/50 text-violet-100'
-                : 'border-slate-700 text-slate-400 hover:text-slate-200'
-            }`}
-          >
-            {m.labLabel}
-          </button>
+          <span key={m.id} className="inline-flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => setMode(m.id)}
+              title={packModeTaskLabel(m.id)}
+              className={`rounded-lg border px-2 py-1 text-[11px] ${
+                mode === m.id
+                  ? 'border-violet-600 bg-violet-900/50 text-violet-100'
+                  : 'border-slate-700 text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {m.labLabel}
+            </button>
+            <AiWhyTooltip why={buildPackAiModeWhy(m.id)} testId={`lab-ai-why-${m.id}`} />
+          </span>
         ))}
       </div>
       <p className="mt-1.5 text-[10px] text-slate-500">{packModeTaskLabel(mode)}</p>
@@ -187,9 +192,16 @@ export function ResearchLabAiPanel({
           {insight.nextSteps && insight.nextSteps.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase text-slate-400">Next</p>
-              <ul className="list-disc list-inside text-[11px] text-slate-300">
+              <ul className="space-y-1 text-[11px] text-slate-300">
                 {insight.nextSteps.map((s) => (
-                  <li key={s}>{s}</li>
+                  <li key={s} className="flex items-start gap-1.5">
+                    <span className="flex-1">{s}</span>
+                    <AiWhyTooltip
+                      why={buildInsightNextStepWhy(s, insight.claimIds)}
+                      testId="lab-ai-why-next"
+                      align="right"
+                    />
+                  </li>
                 ))}
               </ul>
             </div>
@@ -197,9 +209,16 @@ export function ResearchLabAiPanel({
           {insight.risks && insight.risks.length > 0 && (
             <div>
               <p className="text-[10px] font-semibold uppercase text-slate-400">Risks / limits</p>
-              <ul className="list-disc list-inside text-[11px] text-amber-200/90">
+              <ul className="space-y-1 text-[11px] text-amber-200/90">
                 {insight.risks.map((s) => (
-                  <li key={s}>{s}</li>
+                  <li key={s} className="flex items-start gap-1.5">
+                    <span className="flex-1">{s}</span>
+                    <AiWhyTooltip
+                      why={buildInsightNextStepWhy(s, insight.claimIds)}
+                      testId="lab-ai-why-risk"
+                      align="right"
+                    />
+                  </li>
                 ))}
               </ul>
             </div>

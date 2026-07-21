@@ -25,6 +25,8 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { buildAiRankWhy } from '@/lib/ai/aiWhyTooltip'
 
 const DISCLAIMER_KEY = 'biointel-ai-analysis-disclaimer-v1'
 
@@ -388,6 +390,17 @@ export function AiAnalysisView({
                       {delta > 0 ? `↑${delta}` : `↓${Math.abs(delta)}`}
                     </span>
                   )}
+                  <AiWhyTooltip
+                    why={buildAiRankWhy({
+                      item,
+                      aiRank,
+                      ofRecordRank: ofRecord,
+                      name: c.name,
+                      mode: 'reorder',
+                    })}
+                    testId={`ai-analysis-why-${key}`}
+                    label="why AI?"
+                  />
                 </div>
                 {item && item.reasons.length > 0 && (
                   <ul className="mb-2 ml-1 list-disc list-inside text-[10px] text-slate-400 space-y-0.5">

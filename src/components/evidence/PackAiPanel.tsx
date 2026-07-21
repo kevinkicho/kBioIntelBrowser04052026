@@ -15,6 +15,8 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 
 const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_executive_brief', label: 'Executive brief' },
@@ -225,29 +227,34 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         </p>
       </div>
 
-      <div className="mb-2 flex flex-wrap gap-1">
+      <div className="mb-2 flex flex-wrap items-center gap-1">
         {MODES.map((m) => (
-          <button
-            key={m.id}
-            type="button"
-            onClick={() => {
-              setMode(m.id)
-              setInsight(null)
-              setError(null)
-
-            }}
-            title={packModeTaskLabel(m.id)}
-            className={`rounded border px-2 py-1 text-[10px] ${
-              mode === m.id
-                ? m.id === 'pack_custom_prompt'
-                  ? 'border-cyan-600 bg-cyan-900/40 text-cyan-200'
-                  : 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
-                : 'border-slate-700 text-slate-500 hover:border-slate-600'
-            }`}
-            data-testid={`pack-ai-mode-${m.id}`}
-          >
-            {m.label}
-          </button>
+          <span key={m.id} className="inline-flex items-center gap-0.5">
+            <button
+              type="button"
+              onClick={() => {
+                setMode(m.id)
+                setInsight(null)
+                setError(null)
+              }}
+              title={packModeTaskLabel(m.id)}
+              className={`rounded border px-2 py-1 text-[10px] ${
+                mode === m.id
+                  ? m.id === 'pack_custom_prompt'
+                    ? 'border-cyan-600 bg-cyan-900/40 text-cyan-200'
+                    : 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
+                  : 'border-slate-700 text-slate-500 hover:border-slate-600'
+              }`}
+              data-testid={`pack-ai-mode-${m.id}`}
+            >
+              {m.label}
+            </button>
+            <AiWhyTooltip
+              why={buildPackAiModeWhy(m.id)}
+              testId={`pack-ai-why-${m.id}`}
+              label="why?"
+            />
+          </span>
         ))}
       </div>
 
@@ -363,9 +370,18 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
                 Next steps
               </p>
-              <ul className="list-inside list-disc text-[11px] text-emerald-300/90">
+              <ul className="space-y-1 text-[11px] text-emerald-300/90">
                 {insight.nextSteps.map((s) => (
-                  <li key={s}>{s}</li>
+                  <li key={s} className="flex items-start gap-1.5">
+                    <span className="mt-0.5 text-emerald-600">•</span>
+                    <span className="flex-1 leading-snug">{s}</span>
+                    <AiWhyTooltip
+                      why={buildInsightNextStepWhy(s, insight.claimIds)}
+                      testId="pack-ai-why-next"
+                      label="why?"
+                      align="right"
+                    />
+                  </li>
                 ))}
               </ul>
             </div>
@@ -375,9 +391,18 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
                 Risks / caveats
               </p>
-              <ul className="list-inside list-disc text-[11px] text-amber-300/90">
+              <ul className="space-y-1 text-[11px] text-amber-300/90">
                 {insight.risks.map((s) => (
-                  <li key={s}>{s}</li>
+                  <li key={s} className="flex items-start gap-1.5">
+                    <span className="mt-0.5 text-amber-600">•</span>
+                    <span className="flex-1 leading-snug">{s}</span>
+                    <AiWhyTooltip
+                      why={buildInsightNextStepWhy(s, insight.claimIds)}
+                      testId="pack-ai-why-risk"
+                      label="why?"
+                      align="right"
+                    />
+                  </li>
                 ))}
               </ul>
             </div>

@@ -19,6 +19,11 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import {
+  buildAiRankWhy,
+  buildBoardStatusSuggestWhy,
+} from '@/lib/ai/aiWhyTooltip'
 
 /** Suggest board status from AI rank position (never auto-applied). */
 export function suggestBoardStatusFromAiRank(
@@ -203,25 +208,51 @@ export function BoardAiRecommend({
               c?.boardStatus,
             )
             const same = c?.boardStatus === suggested
+            const rankWhy = buildAiRankWhy({
+              item,
+              aiRank: idx + 1,
+              ofRecordRank: idx + 1,
+              name: c?.identity.name || item.name,
+              mode: 'board_recommend',
+            })
+            const statusWhy = buildBoardStatusSuggestWhy({
+              suggested,
+              aiRank: idx + 1,
+              total: n,
+              current: c?.boardStatus,
+              item,
+            })
             return (
-              <li key={item.key} className="leading-snug">
-                <span className="font-medium text-slate-100">
-                  {c?.identity.name || item.name}
+              <li key={item.key} className="leading-snug" data-testid="board-ai-suggest-row">
+                <span className="inline-flex flex-wrap items-center gap-1">
+                  <span className="font-medium text-slate-100">
+                    {c?.identity.name || item.name}
+                  </span>
+                  <span className="text-slate-600"> · now {c?.boardStatus ?? 'untriaged'}</span>
+                  <span className="rounded border border-violet-800/40 bg-violet-950/40 px-1 text-[9px] text-violet-200">
+                    suggest {suggested}
+                  </span>
+                  <AiWhyTooltip
+                    why={statusWhy}
+                    testId={`board-ai-why-status-${item.key}`}
+                    label="why?"
+                  />
+                  <AiWhyTooltip
+                    why={rankWhy}
+                    testId={`board-ai-why-rank-${item.key}`}
+                    label="rank"
+                  />
+                  {onApplyStatus && c && !same && (
+                    <button
+                      type="button"
+                      className="rounded border border-emerald-800/50 px-1.5 py-0.5 text-[9px] text-emerald-300 hover:bg-emerald-950/40"
+                      data-testid={`board-ai-apply-${c.candidateId}`}
+                      onClick={() => onApplyStatus(c.candidateId, suggested)}
+                    >
+                      Apply
+                    </button>
+                  )}
                 </span>
-                <span className="text-slate-600"> · now {c?.boardStatus ?? 'untriaged'}</span>
-                <span className="ml-1 rounded border border-violet-800/40 bg-violet-950/40 px-1 text-[9px] text-violet-200">
-                  suggest {suggested}
-                </span>
-                {onApplyStatus && c && !same && (
-                  <button
-                    type="button"
-                    className="ml-1 rounded border border-emerald-800/50 px-1.5 py-0.5 text-[9px] text-emerald-300 hover:bg-emerald-950/40"
-                    data-testid={`board-ai-apply-${c.candidateId}`}
-                    onClick={() => onApplyStatus(c.candidateId, suggested)}
-                  >
-                    Apply
-                  </button>
-                )}
                 {item.reasons[0] && (
                   <span className="block text-[10px] text-slate-500 ml-4">
                     {item.reasons[0]}
