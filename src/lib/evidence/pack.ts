@@ -356,6 +356,10 @@ export function corePanelsFromProfileData(
       purpleBookProducts: asArray(data.purpleBookProducts),
       purpleBookPatents: asArray(data.purpleBookPatents),
       emaBulkMedicines: asArray(data.emaBulkMedicines),
+      healthCanadaProducts: asArray(data.healthCanadaProducts),
+      emaMedicines: asArray(data.emaMedicines),
+      orangeBookEntries: asArray(data.orangeBookEntries),
+      internationalRegulatorLinks: asArray(data.internationalRegulatorLinks),
     },
   }
 }

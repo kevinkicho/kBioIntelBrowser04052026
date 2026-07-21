@@ -6,6 +6,7 @@ import Link from 'next/link'
 import { ViewToggle } from '@/components/profile/ViewToggle'
 import { ProfileModeToggle } from '@/components/profile/ProfileModeToggle'
 import { DecisionStrip } from '@/components/profile/DecisionStrip'
+import { LandscapeDualStrip } from '@/components/profile/LandscapeDualStrip'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
@@ -1638,6 +1639,22 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
               />
             </ErrorBoundary>
           )}
+
+          <ErrorBoundary>
+            <LandscapeDualStrip
+              moleculeName={moleculeName}
+              data={mergedData as Record<string, unknown>}
+              onOpenPanel={(categoryId, panelId) => {
+                const catId = categoryId as CategoryId
+                setView('panels')
+                setQuickViewPanel({ categoryId: catId, panelId })
+                if (categoryStatus[catId] === 'idle') {
+                  loadCategory(catId)
+                }
+                scrollToCategory(catId)
+              }}
+            />
+          </ErrorBoundary>
 
           <ErrorBoundary><DiscoverBreadcrumb disease={diseaseParam ?? ''} rank={rankParam} score={parseFloat(searchParams.get('score') ?? '0') || 0} /></ErrorBoundary>
 
