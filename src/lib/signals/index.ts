@@ -30,6 +30,8 @@ export {
   projectDeepLinkOpts,
   buildCandidateSignalRow,
   loadProjectSignals,
+  projectSignalsMembershipKey,
+  mergeStickySignalRows,
   type CandidateSignalStatus,
   type CandidateSignalRow,
 } from './projectSignals'

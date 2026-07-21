@@ -158,12 +158,16 @@ export function BoardTable({
                   </select>
                 </td>
                 <td className="px-3 py-3 min-w-[8rem]">
-                  {signalsLoading && !sigRow ? (
-                    <span className="text-[10px] text-slate-600 animate-pulse">…</span>
-                  ) : sigRow && sigRow.signals.length > 0 ? (
+                  {/* Prefer sticky chips even while a background re-check runs */}
+                  {sigRow && sigRow.signals.length > 0 ? (
                     <SignalBadges signals={sigRow.signals} compact />
+                  ) : signalsLoading && !sigRow ? (
+                    <span className="text-[10px] text-slate-600 animate-pulse">…</span>
                   ) : sigRow?.status === 'baseline' ? (
-                    <span className="text-[10px] text-slate-600" title="Baseline snapshot saved">
+                    <span
+                      className="text-[10px] text-slate-600"
+                      title="Baseline snapshot saved — chips appear when free-API counts change"
+                    >
                       —
                     </span>
                   ) : sigRow?.status === 'no_cid' ? (
@@ -174,6 +178,8 @@ export function BoardTable({
                     <span className="text-[10px] text-red-500/70" title={sigRow.error}>
                       err
                     </span>
+                  ) : signalsLoading ? (
+                    <span className="text-[10px] text-slate-600 animate-pulse">…</span>
                   ) : (
                     <span className="text-[10px] text-slate-600">—</span>
                   )}

@@ -31,7 +31,12 @@ import {
 import { useAI } from '@/lib/ai/useAI'
 import { emitProductEvent } from '@/lib/productEvents'
 import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
-import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
+import {
+  loadProjectSignals,
+  mergeStickySignalRows,
+  projectSignalsMembershipKey,
+  type CandidateSignalRow,
+} from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
 import { BoardClaimStrip } from '@/components/projects/BoardClaimStrip'
 import { BoardAiRecommend } from '@/components/projects/BoardAiRecommend'
@@ -134,25 +139,33 @@ export default function ProjectBoardPage() {
     }
   }, [project])
 
-  // Project-aware count diffs with panel deep-link badges (PR14)
+  // Project-aware count diffs with panel deep-link badges (PR14).
+  // Re-fetch only when candidate membership / CID changes — not on triage or updatedAt.
+  // Sticky merge keeps chips visible for candidates still on the board after status changes.
   useEffect(() => {
     if (!project) {
       setSignalRows(null)
+      signalsLoadedFor.current = null
       return
     }
-    const key = `${project.id}:${project.updatedAt}:${project.candidates.map((c) => c.candidateId).join(',')}`
+    const key = projectSignalsMembershipKey(project)
     if (signalsLoadedFor.current === key) return
 
     let cancelled = false
     setSignalsLoading(true)
-    loadProjectSignals(project, { concurrency: 3 })
+    // Do not refresh baseline mid-session — that wiped chips on triage re-loads.
+    loadProjectSignals(project, { concurrency: 3, refreshBaseline: false })
       .then((rows) => {
         if (cancelled) return
         signalsLoadedFor.current = key
-        setSignalRows(rows)
+        const present = new Set(project.candidates.map((c) => c.candidateId))
+        setSignalRows((prev) => mergeStickySignalRows(prev, rows, present))
       })
       .catch(() => {
-        if (!cancelled) setSignalRows([])
+        // Keep prior chips on transient failure
+        if (!cancelled) {
+          /* leave signalRows as-is */
+        }
       })
       .finally(() => {
         if (!cancelled) setSignalsLoading(false)
@@ -161,6 +174,23 @@ export default function ProjectBoardPage() {
     return () => {
       cancelled = true
     }
+  }, [project])
+
+  const handleRefreshSignals = useCallback(() => {
+    if (!project) return
+    signalsLoadedFor.current = null
+    setSignalsLoading(true)
+    void loadProjectSignals(project, { concurrency: 3, refreshBaseline: false })
+      .then((rows) => {
+        const present = new Set(project.candidates.map((c) => c.candidateId))
+        // Force re-key so effect does not no-op; apply fresh rows (still sticky-merge)
+        signalsLoadedFor.current = projectSignalsMembershipKey(project)
+        setSignalRows((prev) => mergeStickySignalRows(prev, rows, present))
+      })
+      .catch(() => {
+        /* keep sticky */
+      })
+      .finally(() => setSignalsLoading(false))
   }, [project])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
@@ -469,11 +499,21 @@ export default function ProjectBoardPage() {
               {signalsLoading && (
                 <span className="text-cyan-500/80 animate-pulse">Checking signals…</span>
               )}
-              {!signalsLoading && totalSignals > 0 && (
+              {totalSignals > 0 && (
                 <span className="rounded-full border border-amber-700/40 bg-amber-900/20 px-2 py-0.5 text-amber-300">
                   {totalSignals} signal{totalSignals === 1 ? '' : 's'}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={() => handleRefreshSignals()}
+                disabled={signalsLoading || project.candidates.length === 0}
+                className="rounded-full border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:border-cyan-700/50 hover:text-cyan-300 disabled:opacity-40"
+                title="Re-check free-API count diffs for board candidates"
+                data-testid="board-refresh-signals"
+              >
+                {signalsLoading ? 'Signals…' : 'Refresh signals'}
+              </button>
             </div>
             <div className="mt-2 flex flex-wrap gap-1.5">
               {BOARD_STATUSES.map((s) => (
@@ -485,9 +525,10 @@ export default function ProjectBoardPage() {
                 </span>
               ))}
             </div>
-            {!signalsLoading && totalSignals > 0 && (
+            {totalSignals > 0 && (
               <p className="mt-2 text-[11px] text-slate-500">
-                Signal badges deep-link to the changed data panel on the molecule profile — not badge-only.
+                Signal badges stay while the candidate remains on this board (triage does not clear
+                them). They deep-link to the changed panel on the molecule profile.
               </p>
             )}
           </div>
