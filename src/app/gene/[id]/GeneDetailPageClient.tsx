@@ -27,6 +27,8 @@ import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { buildGeneCrossSource } from '@/lib/crossSource'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -2310,6 +2312,59 @@ function GeneDetailPageClientInner({
     (pathwayBundle?.uniprotProteins?.length ?? 0) +
     (pathwayBundle?.pharmgkbGenes?.length ?? 0)
 
+  const geneDiseases = categoryData?.geneDiseases as
+    | {
+        disgenetAssociations?: unknown[]
+        gwasAssociations?: unknown[]
+        clingenCurations?: unknown[]
+        openTargetsAssociations?: unknown[]
+      }
+    | undefined
+  const geneVariants = categoryData?.geneVariants as
+    | {
+        clinvarVariants?: unknown[]
+        dbsnpVariants?: unknown[]
+        clingenDosage?: unknown[]
+      }
+    | undefined
+
+  const geneCrossBundle = useMemo(
+    () =>
+      buildGeneCrossSource({
+        symbol: displaySymbol,
+        gtexCount: loaded ? gtexCount : 0,
+        bgeeCount: loaded ? bgeeCount : 0,
+        expressionAtlasCount: loaded ? atlasCount : 0,
+        reactomeCount: loaded ? pathwayBundle?.reactomePathways?.length ?? 0 : 0,
+        wikiPathwaysCount: loaded ? pathwayBundle?.wikiPathways?.length ?? 0 : 0,
+        goCount: loaded ? pathwayBundle?.goTerms?.length ?? 0 : 0,
+        clinvarCount: loaded ? clinvarCount : 0,
+        dbsnpCount: loaded ? dbsnpCount : 0,
+        clingenCount: loaded
+          ? (geneVariants?.clingenDosage?.length ?? 0) +
+            (geneDiseases?.clingenCurations?.length ?? 0)
+          : 0,
+        disgenetCount: loaded ? diseaseCount : 0,
+        gwasCount: loaded ? geneDiseases?.gwasAssociations?.length ?? 0 : 0,
+        dgidbDrugCount: loaded ? drugCount : 0,
+        openTargetsCount: loaded ? geneDiseases?.openTargetsAssociations?.length ?? 0 : 0,
+      }),
+    [
+      displaySymbol,
+      loaded,
+      gtexCount,
+      bgeeCount,
+      atlasCount,
+      pathwayBundle,
+      clinvarCount,
+      dbsnpCount,
+      geneVariants,
+      geneDiseases,
+      diseaseCount,
+      drugCount,
+    ],
+  )
+
   const glanceTiles: {
     id: (typeof GENE_PANELS)[number]['id']
     label: string
@@ -2495,6 +2550,15 @@ function GeneDetailPageClientInner({
             )
           })}
         </div>
+
+        {loaded && (
+          <CrossSourceStrip
+            bundle={geneCrossBundle}
+            className="mb-4"
+            testId="gene-cross-source"
+            density="full"
+          />
+        )}
 
         <div
           className="flex gap-1 mb-4 overflow-x-auto no-scrollbar border-b border-slate-800/60 pb-px"

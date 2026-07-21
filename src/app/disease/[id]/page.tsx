@@ -5,6 +5,8 @@ import { DiseaseIntelligencePanel } from '@/components/disease/DiseaseIntelligen
 import { DiseaseDrugsTrialsTable } from '@/components/disease/DiseaseDrugsTrialsTable'
 import { DiseaseRelatedMoleculesTable } from '@/components/disease/DiseaseRelatedMoleculesTable'
 import { WhoGhoContextStrip } from '@/components/disease/WhoGhoContextStrip'
+import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { buildDiseaseCrossSource } from '@/lib/crossSource'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { DataPoint } from '@/components/ui/DataPoint'
 import Link from 'next/link'
@@ -93,6 +95,25 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
     trialSummary,
   }
 
+  const diseaseCrossSource = buildDiseaseCrossSource({
+    diseaseId: id,
+    diseaseName,
+    geneCount: genes.length,
+    geneSource: source || genes[0]?.source || 'Open Targets / DisGeNET',
+    trialDrugCount: drugInterventions.length,
+    moleculeCount: dedupedMolecules.length,
+    moleculeSources: Array.from(
+      new Set(
+        dedupedMolecules
+          .flatMap((m) => [m.relationKind, ...(m.reasons ?? [])])
+          .filter(Boolean)
+          .map(String),
+      ),
+    ).slice(0, 6),
+    orphanetHit: /orphanet/i.test(source) || therapeuticAreas.some((t) => /orphan/i.test(t)),
+    openTargetsHit: /open.?target/i.test(source) || Boolean(id),
+  })
+
   /** Map gene association source label → provenance key */
   const geneSourceKey = (src: string): string => {
     const s = (src || '').toLowerCase()
@@ -157,6 +178,12 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
                   ))}
                 </div>
               )}
+
+              <CrossSourceStrip
+                bundle={diseaseCrossSource}
+                className="mb-4 mt-2"
+                testId="disease-cross-source"
+              />
 
               <div className="flex items-center gap-3 text-xs text-slate-500 mt-4 pt-4 border-t border-slate-800">
                 <span>ID: <span className="text-slate-400 font-mono">{id}</span></span>

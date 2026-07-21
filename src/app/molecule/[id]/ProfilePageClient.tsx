@@ -7,6 +7,8 @@ import { ViewToggle } from '@/components/profile/ViewToggle'
 import { ProfileModeToggle } from '@/components/profile/ProfileModeToggle'
 import { DecisionStrip } from '@/components/profile/DecisionStrip'
 import { LandscapeDualStrip } from '@/components/profile/LandscapeDualStrip'
+import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { buildMoleculeCrossSource } from '@/lib/crossSource'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
@@ -900,6 +902,11 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
   const dataCounts = useMemo(() => getCategoryDataCounts(mergedData), [mergedData])
   const summaryData = useMemo(() => computeMoleculeSummary(mergedData), [mergedData])
+  const moleculeCrossSource = useMemo(
+    () =>
+      buildMoleculeCrossSource(String(cid), moleculeName, mergedData as Record<string, unknown>),
+    [cid, moleculeName, mergedData],
+  )
 
   // Decision strip: scores (project > scores JSON > score composite) + claims from Core extractors
   const urlScores = useMemo(
@@ -1662,6 +1669,23 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
               />
             </ErrorBoundary>
           )}
+
+          <ErrorBoundary>
+            <CrossSourceStrip
+              bundle={moleculeCrossSource}
+              className="mb-4"
+              testId="molecule-cross-source"
+              onOpenPanel={(categoryId, panelId) => {
+                const catId = categoryId as CategoryId
+                setView('panels')
+                setQuickViewPanel({ categoryId: catId, panelId })
+                if (categoryStatus[catId] === 'idle') {
+                  loadCategory(catId)
+                }
+                scrollToCategory(catId)
+              }}
+            />
+          </ErrorBoundary>
 
           <ErrorBoundary>
             <LandscapeDualStrip

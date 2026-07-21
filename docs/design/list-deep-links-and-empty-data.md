@@ -74,12 +74,37 @@ Implemented more strongly for: MyChem, UniChem, ATC, IRIS, CompTox identity, ChE
 - Free-form Discover ranking AI  
 - Regulatory decision support language  
 
+## 7. Cross-source representation (entity strips)
+
+**Problem:** Most panels show **one** free API in the card body (gene §3). Analysis needs multiple sources side-by-side without muddying provenance.
+
+**Rule:** Entity-centric **cross-source strips** may join many free public sources for the same molecule / gene / disease / org / candidate. Each fact/chip keeps:
+
+- `source` (human label)
+- optional `sourceUrl` (policy-safe deep link)
+- optional `panelId` + `categoryId` (scroll to siloed full table)
+
+| Layer | Behavior |
+|-------|----------|
+| **List / panel body** | Still **one API → one card** (gene §3 unchanged) |
+| **Cross-source strip** | Multi-source chips/facts from already-fetched DTO bags |
+| **Claims / packs** | Multi-extractor merge with per-claim `provenance.source` |
+
+**Code:**
+
+- Contract: `src/lib/crossSource/*` (`CrossSourceFact`, `CrossSourceBundle`, builders)
+- UI: `src/components/crossSource/CrossSourceStrip.tsx`
+- Surfaces: molecule profile, Discover `CandidateCard`, gene glance, disease page, research-lab dossier, DecisionStrip claim histogram
+
+**Do not:** merge unrelated API **tables** into one scroll body; invent clinical conclusions; change of-record Discover scores.
+
 ## Related tests
 
 - `__tests__/lib/deepLinkPolicy.test.ts`
 - `__tests__/lib/summaryEmpty.test.ts`
 - `__tests__/lib/trackDeepLink.test.ts` / `source_deep_link_opened` in productEvents tests
 - Panel tests for table columns + non-homepage hrefs
+- `src/lib/crossSource/__tests__/crossSource.test.ts`
 
 ## Soft-refresh / cache bust (operators)
 

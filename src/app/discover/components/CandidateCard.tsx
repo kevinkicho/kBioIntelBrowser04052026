@@ -21,6 +21,9 @@ import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
 import { buildCandidateWhy } from '@/lib/discovery/candidateWhy'
+import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { buildDiscoverCandidateCrossSource } from '@/lib/crossSource'
+import { candidateKey } from '@/lib/ai/aiRank'
 
 /** Map Discover source pill labels → provenance keys */
 function discoverSourceKey(source: string): string {
@@ -187,6 +190,25 @@ export function CandidateCard({
   const scores = domainCandidate.scores
   const compositeScore = scores?.composite ?? candidate.compositeScore
 
+  const crossBundle = useMemo(
+    () =>
+      buildDiscoverCandidateCrossSource({
+        key: candidateKey(candidate),
+        name: candidate.name,
+        sources: candidate.sources,
+        clinicalPhase: candidate.clinicalPhaseRaw,
+        trialCount: candidate.trialCountRaw,
+        targetNames:
+          candidate.sharedTargetCountRaw > 0
+            ? [`${candidate.sharedTargetCountRaw} shared targets`]
+            : undefined,
+        evidenceBreadthSources: domainCandidate.evidenceBreadthSources,
+        geneAssociationScore: candidate.geneAssociationScore,
+        compositeScore,
+      }),
+    [candidate, domainCandidate, compositeScore],
+  )
+
   const identityKeys = useMemo(
     () => ({
       inchiKey: identity.inchiKey,
@@ -308,6 +330,14 @@ export function CandidateCard({
               </span>
             )}
           </div>
+          {!crossBundle.empty && (
+            <CrossSourceStrip
+              bundle={crossBundle}
+              density="compact"
+              className="mt-2 mb-0 border-slate-800/60 bg-slate-950/30 p-2"
+              testId={`candidate-cross-source-${rank}`}
+            />
+          )}
           <StyledTooltip content={buildCandidateWhy(candidate, diseaseName)}>
             <p
               className="mt-2 text-[11px] text-slate-500 leading-snug border-t border-slate-800/80 pt-2"

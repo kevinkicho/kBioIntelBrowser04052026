@@ -1,9 +1,12 @@
 'use client'
 
+import { useMemo } from 'react'
 import Link from 'next/link'
 import type { EvidenceClaim, ScoreAxisKey, ScoreVector } from '@/lib/domain'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import type { CrossSourceBundle, CrossSourceFact } from '@/lib/crossSource'
 
 export interface DecisionStripProps {
   moleculeName: string
@@ -86,6 +89,44 @@ export function DecisionStrip({
     ? `/discover?q=${encodeURIComponent(disease)}`
     : '/discover'
   const projectHref = projectId ? `/projects/${encodeURIComponent(projectId)}` : null
+
+  const claimSourceBundle = useMemo((): CrossSourceBundle | null => {
+    if (!hasClaims) return null
+    const bySource = new Map<string, number>()
+    for (const c of claims) {
+      const s = c.provenance?.source || 'unknown'
+      bySource.set(s, (bySource.get(s) || 0) + 1)
+    }
+    const facts: CrossSourceFact[] = Array.from(bySource.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 12)
+      .map(([source, count]) => ({
+        id: `claim-src-${source}`,
+        label: 'claims',
+        value: count,
+        source,
+        kind: 'claim' as const,
+        tone: 'indigo' as const,
+      }))
+    return {
+      subjectId: String(cid),
+      subjectLabel: moleculeName,
+      surface: 'project',
+      facts,
+      groups: [
+        {
+          id: 'claim-sources',
+          title: 'Claim provenance (multi-source pack density)',
+          factIds: facts.map((f) => f.id),
+        },
+      ],
+      notes: [
+        `${facts.length} free-API sources contribute to decision claims. Not of-record scores.`,
+      ],
+      empty: facts.length === 0,
+      sourceCount: facts.length,
+    }
+  }, [hasClaims, claims, cid, moleculeName])
 
   return (
     <section
@@ -236,6 +277,15 @@ export function DecisionStrip({
               <span className="text-[10px] text-slate-500">{claims.length} shown</span>
             )}
           </div>
+          {claimSourceBundle && !claimSourceBundle.empty && (
+            <CrossSourceStrip
+              bundle={claimSourceBundle}
+              density="compact"
+              className="mb-2 border-slate-800/50 bg-slate-950/40 p-2"
+              testId="decision-strip-claim-sources"
+              title="Sources in these claims"
+            />
+          )}
 
           {claimsLoading && !hasClaims ? (
             <div className="space-y-2" data-testid="decision-strip-claims-loading">

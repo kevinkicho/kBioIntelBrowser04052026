@@ -5,6 +5,8 @@ import type { ResearchLabDossier } from '@/lib/researchLabs'
 import { researchLabDossierToEvidencePack } from '@/lib/researchLabs'
 import { ResearchLabAiPanel } from '@/components/orgs/ResearchLabAiPanel'
 import { ResearchLabDossierBagsList } from '@/components/orgs/ResearchLabDossierBagsList'
+import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { buildOrgDossierCrossSource } from '@/lib/crossSource'
 import { packToJson, packToMarkdown, packExportFilename } from '@/lib/evidence'
 import { downloadFile } from '@/lib/exportData'
 
@@ -20,6 +22,21 @@ const KIND_STYLE: Record<string, string> = {
 
 export function ResearchLabDossierView({ dossier }: { dossier: ResearchLabDossier }) {
   const pack = useMemo(() => researchLabDossierToEvidencePack(dossier), [dossier])
+  const orgCross = useMemo(
+    () =>
+      buildOrgDossierCrossSource({
+        id: dossier.query || dossier.name,
+        name: dossier.name,
+        rorCount: dossier.stats.rorCount,
+        openAlexCount: dossier.stats.openAlexCount,
+        collegeCount: dossier.stats.collegeCount,
+        hospitalCount: dossier.stats.hospitalCount,
+        grantCount: dossier.stats.grantCount,
+        affiliationEdgeCount: dossier.stats.edgeCount,
+        literatureCount: dossier.stats.openAireCount + dossier.stats.totalWorksHint,
+      }),
+    [dossier],
+  )
 
   const exportPack = (format: 'json' | 'md') => {
     const body = format === 'json' ? packToJson(pack) : packToMarkdown(pack)
@@ -102,6 +119,12 @@ export function ResearchLabDossierView({ dossier }: { dossier: ResearchLabDossie
           </p>
         ))}
       </header>
+
+      <CrossSourceStrip
+        bundle={orgCross}
+        testId="research-lab-cross-source"
+        title="Joined from free public registers"
+      />
 
       <ResearchLabAiPanel pack={pack} />
 
