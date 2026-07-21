@@ -2,7 +2,7 @@
 
 /**
  * Accessible “why AI recommended this” tooltip for suggestions / rank chips.
- * Uses focus + hover; also sets native title for quick hover on dense lists.
+ * Custom hover/focus panel only — do not set native `title` (avoids duplicate tooltips).
  */
 
 import { useId, useState, type ReactNode } from 'react'
@@ -44,8 +44,7 @@ export function AiWhyTooltip({
         className="inline-flex items-center gap-0.5 rounded border border-violet-800/50 bg-violet-950/40 px-1 py-0.5 text-[9px] font-medium text-violet-200/90 hover:bg-violet-900/50 hover:text-violet-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-violet-500"
         aria-describedby={open ? panelId : undefined}
         aria-expanded={open}
-        aria-label={why.summary || 'Why AI recommended this'}
-        title={why.fullText}
+        aria-label={why.summary || why.fullText || 'Why AI recommended this'}
         data-testid={`${testId}-trigger`}
         onFocus={() => setOpen(true)}
         onBlur={() => setOpen(false)}

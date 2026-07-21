@@ -59,14 +59,23 @@ function epistemicLabel(status: AxisStatus | undefined): string {
   }
 }
 
-function EpistemicChip({ status, tip }: { status: AxisStatus | undefined; tip: string }) {
+function EpistemicChip({
+  status,
+  tip,
+  useNativeTitle,
+}: {
+  status: AxisStatus | undefined
+  tip: string
+  /** Only when no custom flyout is used (compact boards) */
+  useNativeTitle?: boolean
+}) {
   const label = epistemicLabel(status)
   return (
     <span
       className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-800/60 text-slate-500 font-medium whitespace-nowrap cursor-help"
       data-testid="score-axis-epistemic"
       data-status={label}
-      title={tip}
+      title={useNativeTitle ? tip : undefined}
     >
       {label}
     </span>
@@ -76,7 +85,8 @@ function EpistemicChip({ status, tip }: { status: AxisStatus | undefined; tip: s
 /**
  * Multi-axis ScoreVector bars using shared AXIS_ORDER.
  * Null axes render an epistemic chip — never a zero bar.
- * Each row has a rich tooltip (weight, contribution, sources, status).
+ * Non-compact: styled flyout only (no native title — avoids double tooltips).
+ * Compact: single native title on the row (board density).
  */
 export function ScoreAxisBars({
   scores,
@@ -89,6 +99,8 @@ export function ScoreAxisBars({
   const labelWidth = compact ? 'w-[72px]' : 'w-24'
   const explainerOn = showExplainer ?? !compact
   const [hoverKey, setHoverKey] = useState<ScoreAxisKey | null>(null)
+  /** Native browser title only in compact mode (no flyout). */
+  const nativeTips = compact
 
   return (
     <div
@@ -101,7 +113,6 @@ export function ScoreAxisBars({
           <p
             className="text-[9px] leading-snug text-slate-600 flex-1"
             data-testid="score-trust-footnote"
-            title={formatCompositeTooltip(scores, rubric)}
           >
             Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
             Composite{' '}
@@ -142,6 +153,7 @@ export function ScoreAxisBars({
         const tip = formatAxisTooltip(key, scores, rubric)
         const help = AXIS_HELP[key]
         const showFlyout = hoverKey === key && !compact
+        const rowTip = nativeTips ? tip : undefined
 
         return (
           <div
@@ -150,14 +162,16 @@ export function ScoreAxisBars({
             data-testid={`score-axis-row-${key}`}
             data-axis={key}
             data-missing={missing ? 'true' : 'false'}
+            title={rowTip}
             onMouseEnter={() => setHoverKey(key)}
             onMouseLeave={() => setHoverKey(null)}
             onFocus={() => setHoverKey(key)}
             onBlur={() => setHoverKey(null)}
           >
             <span
-              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate cursor-help`}
-              title={tip}
+              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate ${
+                !nativeTips ? 'cursor-help' : ''
+              }`}
             >
               {AXIS_LABELS[key]}
               {weightPct != null && !compact && (
@@ -166,12 +180,18 @@ export function ScoreAxisBars({
             </span>
             {missing ? (
               <div className="flex-1 flex items-center min-h-[6px]">
-                <EpistemicChip status={status} tip={`${tip}\n${axisStatusHelp(status)}`} />
+                {/* No chip-level title — row already owns the single native tip in compact mode */}
+                <EpistemicChip
+                  status={status}
+                  tip={`${tip}\n${axisStatusHelp(status)}`}
+                  useNativeTitle={false}
+                />
               </div>
             ) : (
               <div
-                className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden cursor-help"
-                title={tip}
+                className={`flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden ${
+                  !nativeTips ? 'cursor-help' : ''
+                }`}
               >
                 <div
                   className={`h-1.5 rounded-full transition-all duration-500 ${axisBarColor(key)}`}
@@ -180,16 +200,15 @@ export function ScoreAxisBars({
               </div>
             )}
             <span
-              className={`text-[10px] w-8 text-right tabular-nums shrink-0 cursor-help ${
+              className={`text-[10px] w-8 text-right tabular-nums shrink-0 ${
                 missing ? 'text-slate-600' : 'text-slate-400'
               }`}
-              title={tip}
             >
               {axisPct(v)}
             </span>
             {showFlyout && (
               <div
-                className="absolute left-0 top-full z-40 mt-1 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-[10px] text-slate-300 leading-snug"
+                className="absolute left-0 top-full z-40 mt-1 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-[10px] text-slate-300 leading-snug pointer-events-none"
                 data-testid={`score-axis-flyout-${key}`}
                 role="tooltip"
               >
@@ -203,7 +222,8 @@ export function ScoreAxisBars({
                 </p>
                 <p className="mt-0.5 text-emerald-400/80">↑ {help.highMeans}</p>
                 <p className="text-amber-400/80">↓ {help.lowMeans}</p>
-                <p className="mt-1 text-slate-600">{axisStatusHelp(status)}</p>
+                <p className="mt-1 text-slate-600 whitespace-pre-wrap">{tip}</p>
+                <p className="mt-0.5 text-slate-600">{axisStatusHelp(status)}</p>
               </div>
             )}
           </div>
@@ -227,10 +247,7 @@ export function ScoreAxisBars({
       {!compact && (scores.scorePhase || onOpenBreakdown) && (
         <div className="flex items-center gap-2 pt-0.5">
           {scores.scorePhase && (
-            <p
-              className="text-[9px] text-slate-600 cursor-help"
-              title={formatCompositeTooltip(scores, rubric)}
-            >
+            <p className="text-[9px] text-slate-600">
               Phase: {scores.scorePhase}
               {scores.rubricId ? ` · ${scores.rubricId}` : ''}
             </p>

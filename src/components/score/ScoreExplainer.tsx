@@ -69,15 +69,14 @@ export function ScoreExplainer({
           }
         }}
         className="text-slate-500 hover:text-slate-300 transition-colors inline-flex items-center gap-1"
-        aria-label="How is this score calculated?"
+        aria-label={
+          scores
+            ? `How is this score calculated? ${formatCompositeTooltip(scores, rubric).slice(0, 120)}`
+            : 'How multi-axis scoring works'
+        }
         aria-expanded={open}
         type="button"
         data-testid="score-explainer-toggle"
-        title={
-          scores
-            ? formatCompositeTooltip(scores, rubric)
-            : 'How multi-axis scoring works'
-        }
       >
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
           <path
@@ -118,7 +117,6 @@ export function ScoreExplainer({
             <p
               className="mb-2 rounded border border-slate-700/80 bg-slate-900/50 px-2 py-1 text-[11px] text-emerald-300/90 tabular-nums"
               data-testid="score-explainer-composite"
-              title={formatCompositeTooltip(scores!, rubric)}
             >
               Composite {Math.round(expl.composite * 100)}%
               {scores?.scorePhase ? ` · ${scores.scorePhase}` : ''}
