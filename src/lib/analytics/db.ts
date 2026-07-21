@@ -421,11 +421,18 @@ export function getCategorizedSummary(since?: string): CategoryGroup[] {
   for (const catId of orderedIds) {
     const catMap = byCategory.get(catId)
     if (!catMap) continue
+    // Prefer stable category chrome (Other / Search) over first source's map entry
+    const fromSource = API_CATEGORY_MAP[catMap.keys().next().value!]
     const sampleMapping =
       CATEGORY_META[catId] ??
-      API_CATEGORY_MAP[catMap.keys().next().value!] ??
+      (fromSource && fromSource.id === catId
+        ? { label: fromSource.label, icon: fromSource.icon }
+        : null) ??
       API_CATEGORY_MAP[`category:${catId}`] ??
-      { label: catId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()), icon: '📄' }
+      {
+        label: catId.replace(/-/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+        icon: '📄',
+      }
 
     const apis: ApiSummary[] = []
     let catTotalReqs = 0, catSuccess = 0, catErrors = 0, catEmpty = 0, catDurationSum = 0

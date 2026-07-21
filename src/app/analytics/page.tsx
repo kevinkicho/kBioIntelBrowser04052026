@@ -287,107 +287,9 @@ function MiniBar({ pct, color }: { pct: number; color: string }) {
 }
 
 /**
- * Shared column template so Search / Other / every category listitem aligns.
- * API | Health | Reqs | OK | Errors | Empty | Avg | p50 | p95 | Last OK | Last Error
+ * Fixed table layout — same col widths for Search, Other, and every category.
+ * (CSS grid arbitrary cols were collapsing in production; table-fixed is reliable.)
  */
-const API_ROW_GRID =
-  'grid grid-cols-[minmax(9rem,1.35fr)_4.75rem_3.25rem_2.75rem_3rem_3rem_3.5rem_3.25rem_3.25rem_4.5rem_minmax(6rem,1.1fr)] gap-x-2 items-center min-w-[52rem]'
-
-function ApiSummaryHeader() {
-  return (
-    <div
-      className={`${API_ROW_GRID} border-b border-slate-800/60 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-slate-500`}
-      role="row"
-    >
-      <span>API</span>
-      <span className="text-center">Health</span>
-      <span className="text-right">Reqs</span>
-      <span className="text-right">OK</span>
-      <span className="text-right">Errors</span>
-      <span className="text-right">Empty</span>
-      <span className="text-right">Avg</span>
-      <span className="text-right">p50</span>
-      <span className="text-right">p95</span>
-      <span className="text-right">Last OK</span>
-      <span className="text-right">Last error</span>
-    </div>
-  )
-}
-
-/** Flat layout inserts category column — use a slightly different grid. */
-const API_ROW_GRID_FLAT =
-  'grid grid-cols-[minmax(9rem,1.2fr)_minmax(6rem,0.9fr)_4.75rem_3.25rem_2.75rem_3rem_3rem_3.5rem_3.25rem_3.25rem_4.5rem_minmax(6rem,1fr)] gap-x-2 items-center min-w-[58rem]'
-
-function ApiSummaryHeaderFlat() {
-  return (
-    <div
-      className={`${API_ROW_GRID_FLAT} border-b border-slate-700 px-3 py-2 text-[10px] font-medium uppercase tracking-wide text-slate-500`}
-      role="row"
-    >
-      <span>API</span>
-      <span>Category</span>
-      <span className="text-center">Health</span>
-      <span className="text-right">Reqs</span>
-      <span className="text-right">OK</span>
-      <span className="text-right">Errors</span>
-      <span className="text-right">Empty</span>
-      <span className="text-right">Avg</span>
-      <span className="text-right">p50</span>
-      <span className="text-right">p95</span>
-      <span className="text-right">Last OK</span>
-      <span className="text-right">Last error</span>
-    </div>
-  )
-}
-
-function ApiSummaryRow({
-  api,
-  onOpen,
-  flat,
-}: {
-  api: ApiSummary
-  onOpen: (source: string) => void
-  flat?: boolean
-}) {
-  const grid = flat ? API_ROW_GRID_FLAT : API_ROW_GRID
-  return (
-    <button
-      type="button"
-      role="row"
-      onClick={() => onOpen(api.source)}
-      className={`${grid} w-full border-b border-slate-800/40 px-3 py-2 text-left text-sm transition-colors hover:bg-slate-800/30 group`}
-      data-testid={`analytics-api-row-${api.source}`}
-    >
-      <span className="min-w-0 truncate font-medium text-slate-200 group-hover:text-indigo-300">
-        {apiName(api.source)}
-      </span>
-      {flat ? (
-        <span className="min-w-0 truncate text-xs text-slate-400">
-          {api.categoryIcon} {api.categoryLabel}
-        </span>
-      ) : null}
-      <span className="text-center tabular-nums text-slate-300">
-        {healthDot(api.success_rate)} {api.success_rate}%
-      </span>
-      <span className="text-right tabular-nums text-slate-400">{api.total_requests}</span>
-      <span className="text-right tabular-nums text-emerald-400">{api.success_count}</span>
-      <span className="text-right tabular-nums text-red-400">{api.error_count}</span>
-      <span className="text-right tabular-nums text-yellow-400/70">{api.empty_count}</span>
-      <span className="text-right tabular-nums text-slate-300">{fmtMs(api.avg_duration_ms)}</span>
-      <span className="text-right tabular-nums text-slate-400">{fmtMs(api.p50_ms)}</span>
-      <span className="text-right tabular-nums text-slate-400">{fmtMs(api.p95_ms)}</span>
-      <span className="text-right text-[11px] tabular-nums text-slate-500">
-        {timeAgo(api.last_success_at)}
-      </span>
-      <span className="min-w-0 truncate text-right text-[11px] text-slate-500" title={api.last_error ?? undefined}>
-        {api.last_error
-          ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 48)}`
-          : '—'}
-      </span>
-    </button>
-  )
-}
-
 function ApiSummaryList({
   apis,
   onOpen,
@@ -400,14 +302,98 @@ function ApiSummaryList({
   if (apis.length === 0) {
     return <p className="px-3 py-4 text-center text-sm text-slate-500">No APIs in this group.</p>
   }
+
   return (
-    <div className="overflow-x-auto" role="table" aria-label="API summary">
-      {flat ? <ApiSummaryHeaderFlat /> : <ApiSummaryHeader />}
-      <div role="rowgroup">
-        {apis.map((api) => (
-          <ApiSummaryRow key={api.source} api={api} onOpen={onOpen} flat={flat} />
-        ))}
-      </div>
+    <div className="w-full overflow-x-auto" data-testid="analytics-api-summary-list">
+      <table className="w-full min-w-[56rem] table-fixed border-collapse text-sm">
+        <colgroup>
+          <col style={{ width: flat ? '18%' : '20%' }} />
+          {flat ? <col style={{ width: '12%' }} /> : null}
+          <col style={{ width: '8%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '6%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '9%' }} />
+          <col style={{ width: flat ? '14%' : '16%' }} />
+        </colgroup>
+        <thead>
+          <tr className="border-b border-slate-700/80 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            <th className="px-3 py-2.5 text-left font-semibold">API</th>
+            {flat ? <th className="px-2 py-2.5 text-left font-semibold">Category</th> : null}
+            <th className="px-2 py-2.5 text-center font-semibold">Health</th>
+            <th className="px-2 py-2.5 text-right font-semibold">Reqs</th>
+            <th className="px-2 py-2.5 text-right font-semibold">OK</th>
+            <th className="px-2 py-2.5 text-right font-semibold">Errors</th>
+            <th className="px-2 py-2.5 text-right font-semibold">Empty</th>
+            <th className="px-2 py-2.5 text-right font-semibold">Avg</th>
+            <th className="px-2 py-2.5 text-right font-semibold">p50</th>
+            <th className="px-2 py-2.5 text-right font-semibold">p95</th>
+            <th className="px-2 py-2.5 text-right font-semibold">Last OK</th>
+            <th className="px-3 py-2.5 text-right font-semibold">Last error</th>
+          </tr>
+        </thead>
+        <tbody>
+          {apis.map((api) => (
+            <tr
+              key={api.source}
+              onClick={() => onOpen(api.source)}
+              className="cursor-pointer border-b border-slate-800/50 hover:bg-slate-800/35"
+              data-testid={`analytics-api-row-${api.source}`}
+            >
+              <td className="truncate px-3 py-2.5 font-medium text-slate-200" title={apiName(api.source)}>
+                {apiName(api.source)}
+              </td>
+              {flat ? (
+                <td className="truncate px-2 py-2.5 text-xs text-slate-400">
+                  {api.categoryIcon} {api.categoryLabel}
+                </td>
+              ) : null}
+              <td className="whitespace-nowrap px-2 py-2.5 text-center tabular-nums text-slate-300">
+                <span className="mr-1" aria-hidden>
+                  {healthDot(api.success_rate)}
+                </span>
+                {api.success_rate}%
+              </td>
+              <td className="px-2 py-2.5 text-right tabular-nums text-slate-400">
+                {api.total_requests}
+              </td>
+              <td className="px-2 py-2.5 text-right tabular-nums text-emerald-400">
+                {api.success_count}
+              </td>
+              <td className="px-2 py-2.5 text-right tabular-nums text-red-400">
+                {api.error_count}
+              </td>
+              <td className="px-2 py-2.5 text-right tabular-nums text-yellow-400/80">
+                {api.empty_count}
+              </td>
+              <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-slate-300">
+                {fmtMs(api.avg_duration_ms)}
+              </td>
+              <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-slate-400">
+                {fmtMs(api.p50_ms)}
+              </td>
+              <td className="whitespace-nowrap px-2 py-2.5 text-right tabular-nums text-slate-400">
+                {fmtMs(api.p95_ms)}
+              </td>
+              <td className="whitespace-nowrap px-2 py-2.5 text-right text-[11px] text-slate-500">
+                {timeAgo(api.last_success_at)}
+              </td>
+              <td
+                className="truncate px-3 py-2.5 text-right text-[11px] text-slate-500"
+                title={api.last_error ?? undefined}
+              >
+                {api.last_error
+                  ? `${timeAgo(api.last_error_at)}: ${api.last_error.slice(0, 40)}`
+                  : '—'}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   )
 }
