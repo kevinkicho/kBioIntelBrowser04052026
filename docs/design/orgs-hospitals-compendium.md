@@ -1,7 +1,7 @@
 # Research orgs & hospitals compendium (free public data)
 
-**Status:** Active — Waves A–C shipped (ROR + CMS + Scorecard + EU packs)  
-**Product law:** Free public APIs only · evidence-first · not clinical referral / “best hospital” language  
+**Status:** Active — Waves A–C + research-lab dossier pipeline + claim-bound AI  
+**Product law:** Free public APIs only · evidence-first · not clinical referral / “best hospital” language · AI only claim-bound (BYOM Ollama)  
 **Role:** Affiliation / site context for trials, grants, literature — not a standalone directory product
 
 ## Fit tiers
@@ -30,6 +30,16 @@
 | Browse UI | `/orgs` |
 | APIs | `/api/ror`, `/api/cms-hospitals`, `/api/us-colleges`, `/api/eu-orgs` |
 | Molecule join | Trials → ROR/CMS; grants → ROR/Scorecard; name → EU pack |
+| Research-lab pipeline | `src/lib/researchLabs/*`, `GET /api/research-labs?q=` |
+| Lab UI + AI | `/orgs` tabs: dossier + claim-bound AI, directory, sponsor joins |
+| OpenAlex labs | `searchOpenAlexResearchLabs` (education + facility + healthcare) |
+
+## Research-lab dossier pipeline
+
+1. **Harvest (parallel free APIs):** ROR · EU ROR pack · OpenAlex institutions · Scorecard · CMS · NIH RePORTER · OpenAIRE projects/pubs  
+2. **Assemble (pure):** `buildResearchLabDossier` + affiliation joins  
+3. **Claims (pure):** `extractClaimsFromResearchLabDossier` → versioned evidence pack  
+4. **AI activities (optional BYOM):** affiliation brief · data gaps · next activities · caveats · custom — via `/api/ai/pack` allowlisted claimIds only  
 
 ## Language rules
 

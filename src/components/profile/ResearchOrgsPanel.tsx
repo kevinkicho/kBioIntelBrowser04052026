@@ -50,6 +50,24 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
           >
             ROR search ↗
           </a>
+          {list[0]?.name ? (
+            <>
+              {' · '}
+              <a
+                href={`/orgs?q=${encodeURIComponent(list[0].name)}`}
+                className="text-violet-400 hover:underline"
+              >
+                Lab dossier + AI ↗
+              </a>
+            </>
+          ) : (
+            <>
+              {' · '}
+              <a href="/orgs" className="text-violet-400 hover:underline">
+                Research-lab module ↗
+              </a>
+            </>
+          )}
         </p>
         {list.length > 0 && (
           <FilterablePaginatedList

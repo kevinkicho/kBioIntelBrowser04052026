@@ -52,19 +52,29 @@ function mapInst(raw: Record<string, unknown>): OpenAlexInstitution | null {
 }
 
 /**
- * Search US education institutions by name (OpenAlex, no key).
+ * Search institutions by name (OpenAlex, no key).
+ * Optional country + type filters (education | facility | healthcare | company | …).
  */
-export async function searchOpenAlexUsEducation(
+export async function searchOpenAlexInstitutions(
   query: string,
-  limit = 15,
+  opts?: {
+    limit?: number
+    countryCode?: string
+    /** OpenAlex type filter, e.g. education, facility, healthcare */
+    type?: string
+  },
 ): Promise<OpenAlexInstitution[]> {
   const q = query.trim()
   if (!q || q.length < 2) return []
+  const limit = opts?.limit ?? 15
+  const filters: string[] = []
+  if (opts?.countryCode) filters.push(`country_code:${opts.countryCode.toUpperCase()}`)
+  if (opts?.type) filters.push(`type:${opts.type}`)
   const params = new URLSearchParams({
     search: q,
-    filter: 'country_code:US,type:education',
     per_page: String(Math.min(50, Math.max(1, limit))),
   })
+  if (filters.length) params.set('filter', filters.join(','))
   try {
     const res = await fetch(`${BASE}?${params.toString()}`, fetchOptions)
     if (!res.ok) return []
@@ -76,4 +86,56 @@ export async function searchOpenAlexUsEducation(
   } catch {
     return []
   }
+}
+
+/**
+ * Search US education institutions by name (OpenAlex, no key).
+ * Scorecard fallback path — keep signature stable.
+ */
+export async function searchOpenAlexUsEducation(
+  query: string,
+  limit = 15,
+): Promise<OpenAlexInstitution[]> {
+  return searchOpenAlexInstitutions(query, {
+    limit,
+    countryCode: 'US',
+    type: 'education',
+  })
+}
+
+/**
+ * Broader research-lab search: education + facility + healthcare (global or country).
+ */
+export async function searchOpenAlexResearchLabs(
+  query: string,
+  opts?: { limit?: number; countryCode?: string },
+): Promise<OpenAlexInstitution[]> {
+  const limit = opts?.limit ?? 18
+  const per = Math.ceil(limit / 3)
+  const [edu, facility, healthcare] = await Promise.all([
+    searchOpenAlexInstitutions(query, {
+      limit: per,
+      countryCode: opts?.countryCode,
+      type: 'education',
+    }),
+    searchOpenAlexInstitutions(query, {
+      limit: per,
+      countryCode: opts?.countryCode,
+      type: 'facility',
+    }),
+    searchOpenAlexInstitutions(query, {
+      limit: per,
+      countryCode: opts?.countryCode,
+      type: 'healthcare',
+    }),
+  ])
+  const seen = new Set<string>()
+  const out: OpenAlexInstitution[] = []
+  for (const i of [...edu, ...facility, ...healthcare]) {
+    if (seen.has(i.openAlexId)) continue
+    seen.add(i.openAlexId)
+    out.push(i)
+    if (out.length >= limit) break
+  }
+  return out
 }

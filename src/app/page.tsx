@@ -40,6 +40,7 @@ const NAV_LINKS = [
   { href: '/batch', label: 'Batch Lookup', color: 'slate' },
   { href: '/analytics', label: 'API Analytics', color: 'emerald' },
   { href: '/watchlist', label: 'Watchlist', color: 'amber' },
+  { href: '/orgs', label: 'Research labs & orgs', color: 'violet' },
 ]
 
 function LinkChip({
