@@ -5,12 +5,34 @@ export interface BriefSection {
   emoji: string
   bullets: string[]
   sentiment: 'positive' | 'neutral' | 'caution' | 'warning'
+  /** Profile field keys that fed this section (transparency) */
+  sourceFields?: string[]
+}
+
+/** Full transparency for Research Intelligence Brief consumers. */
+export interface BriefProvenance {
+  /** Why this card appears on the profile */
+  whyAvailable: string
+  /** How structured bullets are produced (deterministic) */
+  structuredMethod: string
+  /** How optional AI prose is produced when user runs Generate */
+  aiMethod: string
+  /** Free-API / panel bags used with counts */
+  dataUsed: Array<{ field: string; count: number; usedIn: string }>
+  /** Short free-source disclaimer */
+  freeSourcesNote: string
+  /** Scientific honesty caveats */
+  caveats: string[]
+  /** What AI is allowed to use if generated */
+  aiInputDescription: string
 }
 
 export interface StructuredBrief {
   headline: string
   sections: BriefSection[]
   generatedAt: string
+  provenance: BriefProvenance
+  moleculeName: string
 }
 
 function safeLen(val: unknown): number {
@@ -93,6 +115,13 @@ export function buildStructuredBrief(
     emoji: '🎯',
     bullets: mechBullets,
     sentiment: 'positive',
+    sourceFields: [
+      'chemblMechanisms',
+      'chemblActivities',
+      'pathwayNames',
+      'geneDetails',
+      'diseaseAssociations',
+    ],
   })
 
   const regBullets: string[] = []
@@ -122,6 +151,14 @@ export function buildStructuredBrief(
     emoji: '📋',
     bullets: regBullets,
     sentiment: companies > 0 ? 'positive' : 'neutral',
+    sourceFields: [
+      'companies',
+      'ndcProducts',
+      'orangeBookEntries',
+      'drugLabels',
+      'chemblIndications',
+      'atcClassifications',
+    ],
   })
 
   if (trials > 0) {
@@ -149,6 +186,7 @@ export function buildStructuredBrief(
       emoji: '🔬',
       bullets: clinBullets,
       sentiment: 'positive',
+      sourceFields: ['clinicalTrials'],
     })
   }
 
@@ -165,6 +203,13 @@ export function buildStructuredBrief(
       emoji: '🛡️',
       bullets: safeBullets,
       sentiment: recalls > 0 ? 'warning' : seriousEvents > 100 ? 'caution' : 'neutral',
+      sourceFields: [
+        'adverseEvents',
+        'drugRecalls',
+        'drugInteractions',
+        'pharmacogenomicGenes',
+        'siderSideEffects',
+      ],
     })
   }
 
@@ -193,6 +238,7 @@ export function buildStructuredBrief(
       emoji: '📊',
       bullets: resBullets,
       sentiment: 'positive',
+      sourceFields: ['literature', 'semanticPapers', 'openAlexWorks', 'patents', 'nihGrants'],
     })
   }
 
@@ -206,13 +252,63 @@ export function buildStructuredBrief(
       emoji: '🧬',
       bullets: strBullets,
       sentiment: 'positive',
+      sourceFields: ['uniprotEntries', 'pdbStructures', 'proteinDetails'],
     })
+  }
+
+  const fieldCatalog: Array<{ field: string; count: number; usedIn: string }> = [
+    { field: 'companies', count: companies, usedIn: 'Regulatory Status' },
+    { field: 'ndcProducts', count: ndcProducts, usedIn: 'Regulatory Status' },
+    { field: 'orangeBookEntries', count: orangeBook, usedIn: 'Regulatory Status' },
+    { field: 'drugLabels', count: drugLabels, usedIn: 'Regulatory Status' },
+    { field: 'clinicalTrials', count: trials, usedIn: 'Clinical Pipeline' },
+    { field: 'adverseEvents', count: adverseEvents, usedIn: 'Safety Profile' },
+    { field: 'drugRecalls', count: recalls, usedIn: 'Safety Profile' },
+    { field: 'drugInteractions', count: drugInteractions, usedIn: 'Safety Profile' },
+    { field: 'literature/openAlex/semantic', count: literature, usedIn: 'Research Landscape' },
+    { field: 'patents', count: patents, usedIn: 'Research Landscape' },
+    { field: 'nihGrants', count: nihGrants, usedIn: 'Research Landscape' },
+    { field: 'pdbStructures', count: pdbStructures, usedIn: 'Structural Biology' },
+    { field: 'uniprotEntries', count: uniprotEntries, usedIn: 'Structural Biology' },
+    {
+      field: 'chemblMechanisms (rich)',
+      count: rich.mechanismDetails.length,
+      usedIn: 'Mechanism & Biology',
+    },
+    {
+      field: 'chemblActivities (rich)',
+      count: rich.topTargetActivities.length,
+      usedIn: 'Mechanism & Biology',
+    },
+  ].filter((r) => r.count > 0)
+
+  const provenance: BriefProvenance = {
+    whyAvailable:
+      `This brief is shown because free-public profile panels for ${moleculeName} already returned structured lists (trials, labels, AEs, literature, etc.). BioIntel summarizes only what is loaded in this browser session — empty panels contribute nothing.`,
+    structuredMethod:
+      'Deterministic rules in buildStructuredBrief: count array lengths, pick top N names/phases/reactions from extractRichData, assign sentiment from simple thresholds (e.g. recalls → warning). No LLM in this path. Headline is a template from company/trial/literature presence.',
+    aiMethod:
+      'Optional “Generate AI Brief” sends only the structured bullets (not raw multi-MB API JSON) to your connected Ollama model via /api/ai-brief. The model is instructed to synthesize mechanism, niche, risk, and a research next step without inventing counts. Temperature 0.3, capped tokens. Not of-record Discover ranking.',
+    dataUsed: fieldCatalog,
+    freeSourcesNote:
+      'All underlying rows come from free public APIs already fetched for this molecule (openFDA, ClinicalTrials.gov, ChEMBL, PubChem ecosystem, Europe PMC / OpenAlex, PatentsView, NIH RePORTER, UniProt/PDB, etc.). No paid commercial DBs are required.',
+    caveats: [
+      'Not clinical, regulatory, or investment advice.',
+      'Counts reflect what loaded successfully — timeouts/empty panels understate the real public record.',
+      'AE “serious” totals are from retrieved FAERS-shaped rows, not a curated safety assessment.',
+      'AI prose can mis-summarize; always open the cited panels for primary evidence.',
+      'Of-record candidate ranking elsewhere remains deterministic free-API scores, not this brief.',
+    ],
+    aiInputDescription:
+      'When AI runs, it receives only: molecule name + the structured section titles and bullet strings below (already derived from free-API counts and sample names). It does not receive full claim packs, board status, or private notes unless you paste them elsewhere.',
   }
 
   return {
     headline,
     sections,
     generatedAt: new Date().toISOString(),
+    provenance,
+    moleculeName,
   }
 }
 
@@ -221,10 +317,32 @@ export function buildOllamaPrompt(brief: StructuredBrief, moleculeName: string):
     .map(s => `${s.title}:\n${s.bullets.map(b => `  - ${b}`).join('\n')}`)
     .join('\n\n')
 
-  return `You are a pharmaceutical research analyst. Given the following data about the molecule "${moleculeName}", write a concise 3-4 sentence executive summary that provides genuine scientific insight. Do NOT just repeat the counts — synthesize the mechanism, therapeutic niche, key risk, and most important next research step. Connect the mechanism to the safety profile where possible. Name specific targets, genes, and adverse events.
+  const fields = brief.provenance.dataUsed
+    .map((d) => `${d.field}=${d.count}`)
+    .join(', ')
+
+  return `You are a pharmaceutical research analyst helping a scientist understand free-public evidence already loaded in BioIntel. Given the following structured facts about the molecule "${moleculeName}", write a concise 3-4 sentence executive summary that provides genuine scientific insight.
+
+Rules:
+- Do NOT invent trials, targets, AEs, or approvals not listed below.
+- Do NOT just repeat raw counts — synthesize mechanism, therapeutic niche, key risk, and one research next step.
+- Connect mechanism to safety where the data supports it.
+- Name specific targets, genes, and adverse events only if they appear in the data.
+- This is research triage language only — not clinical or regulatory decision support.
+
+Provenance of numbers (free public APIs, session-loaded): ${fields || 'see bullets'}
 
 Data:
 ${bulletText}
 
 Executive Summary:`
+}
+
+/** System message for transparency UI (pairs with buildOllamaPrompt). */
+export function buildOllamaBriefSystemPrompt(): string {
+  return [
+    'You write short executive research briefs from structured free-public BioIntel facts only.',
+    'Never invent evidence. Never claim regulatory approval beyond listed marketed products.',
+    'Not clinical decision support. Prefer cautious language when safety data is sparse.',
+  ].join(' ')
 }

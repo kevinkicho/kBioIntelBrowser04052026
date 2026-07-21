@@ -1686,7 +1686,9 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
                 />
               </ErrorBoundary>
 
-              <ErrorBoundary><ResearchBrief data={mergedData} moleculeName={moleculeName} /></ErrorBoundary>
+              <ErrorBoundary>
+                <ResearchBrief data={mergedData} moleculeName={moleculeName} cid={cid} />
+              </ErrorBoundary>
 
               <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
 
