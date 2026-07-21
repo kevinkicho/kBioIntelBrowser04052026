@@ -3,6 +3,7 @@
  * Presentation only — does not change of-record scores.
  */
 
+import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import {
   countActiveSources,
   emptyCrossSourceBundle,
@@ -13,6 +14,9 @@ import {
 export interface DiscoverCandidateCrossInput {
   key: string
   name: string
+  cid?: number | null
+  chemblId?: string | null
+  diseaseName?: string | null
   sources?: string[] | null
   clinicalPhase?: number | null
   trialCount?: number | null
@@ -39,38 +43,52 @@ export function buildDiscoverCandidateCrossSource(
 ): CrossSourceBundle {
   const sources = (input.sources ?? []).filter(Boolean)
   const facts: CrossSourceFact[] = []
+  const linkCtx = {
+    name: input.name,
+    cid: input.cid,
+    chemblId: input.chemblId,
+    diseaseName: input.diseaseName,
+  }
 
   for (const s of sources.slice(0, 8)) {
+    const link = originSourceDeepLink(s, linkCtx)
     facts.push({
       id: `src-${s}`,
-      label: s,
-      value: 'seen',
+      label: 'origin',
+      value: s,
       source: s,
+      sourceUrl: link.href ?? undefined,
       kind: 'status',
       tone: 'slate',
-      detail: 'Gather hit this free public source for the candidate name',
+      detail: link.title || 'Gather hit this free public source — open for registry search',
     })
   }
 
   if (input.trialCount != null && input.trialCount > 0) {
+    const link = originSourceDeepLink('ClinicalTrials', linkCtx)
     facts.push({
       id: 'trials',
       label: 'Trials (gather)',
       value: input.trialCount,
       source: 'ClinicalTrials.gov',
+      sourceUrl: link.href ?? undefined,
       kind: 'count',
       tone: 'sky',
+      detail: link.title,
     })
   }
 
   if (input.clinicalPhase != null && input.clinicalPhase > 0) {
+    const src = sources.includes('ClinicalTrials')
+      ? 'ClinicalTrials.gov'
+      : sources[0] || 'Gather'
+    const link = originSourceDeepLink(src, linkCtx)
     facts.push({
       id: 'phase',
       label: 'Stage signal',
       value: phaseLabel(input.clinicalPhase),
-      source: sources.includes('ClinicalTrials')
-        ? 'ClinicalTrials.gov'
-        : sources[0] || 'Gather',
+      source: src,
+      sourceUrl: link.href ?? undefined,
       kind: 'axis',
       tone: 'sky',
     })
@@ -78,11 +96,17 @@ export function buildDiscoverCandidateCrossSource(
 
   const targets = (input.targetNames ?? []).filter(Boolean).slice(0, 3)
   if (targets.length) {
+    const src = sources.find((s) => /dgidb|chembl|open targets/i.test(s)) || 'DGIdb'
+    const link = originSourceDeepLink(src, {
+      ...linkCtx,
+      geneSymbol: targets[0]?.includes(' ') ? undefined : targets[0],
+    })
     facts.push({
       id: 'targets',
       label: 'Targets',
       value: targets.join(', '),
-      source: sources.find((s) => /dgidb|chembl|open targets/i.test(s)) || 'Gather',
+      source: src,
+      sourceUrl: link.href ?? undefined,
       kind: 'entity',
       tone: 'violet',
     })
@@ -90,22 +114,26 @@ export function buildDiscoverCandidateCrossSource(
 
   for (const s of (input.evidenceBreadthSources ?? []).slice(0, 4)) {
     if (facts.some((f) => f.source === s || f.id === `eb-${s}`)) continue
+    const link = originSourceDeepLink(s, linkCtx)
     facts.push({
       id: `eb-${s}`,
-      label: s,
-      value: 'breadth',
+      label: 'breadth',
+      value: s,
       source: s,
+      sourceUrl: link.href ?? undefined,
       kind: 'status',
       tone: 'cyan',
     })
   }
 
   if (input.safetyLoaded) {
+    const link = originSourceDeepLink('openFDA', linkCtx)
     facts.push({
       id: 'safety',
       label: 'Safety harvest',
       value: 'loaded',
       source: 'openFDA / literature',
+      sourceUrl: link.href ?? undefined,
       kind: 'status',
       tone: 'amber',
       detail: 'Post-shortlist harvest; not of-record until scores merge',

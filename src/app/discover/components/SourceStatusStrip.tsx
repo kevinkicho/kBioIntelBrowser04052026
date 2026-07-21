@@ -4,6 +4,9 @@ import { useEffect, useMemo, useRef } from 'react'
 import type { DataLoadStatus, SourceFetchStatus } from '@/lib/dataStatus'
 import { emitProductEvent } from '@/lib/productEvents'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { originSourceDeepLink } from '@/lib/originDeepLinks'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { emptyDataClass } from '@/lib/summaryEmpty'
 
 export type SourceStatusBucket = 'ok' | 'empty' | 'issue'
 
@@ -18,28 +21,33 @@ export interface SourceStatusStripProps {
   sourceStatuses: SourceFetchStatus[]
   /** When false, skip analytics emit (tests / SSR). Default true. */
   emitEvent?: boolean
+  /** Disease context for registry deep links on source names */
+  diseaseName?: string | null
 }
 
 const BUCKET_ORDER: SourceStatusBucket[] = ['ok', 'empty', 'issue']
 
 const BUCKET_META: Record<
   SourceStatusBucket,
-  { label: string; className: string; dotClass: string }
+  { label: string; className: string; dotClass: string; meaning: string }
 > = {
   ok: {
     label: 'Loaded',
     className: 'bg-emerald-900/30 text-emerald-300 border-emerald-700/40',
     dotClass: 'bg-emerald-400',
+    meaning: 'Free public API returned usable data for this rank step.',
   },
   empty: {
     label: 'Empty',
     className: 'bg-slate-800/50 text-slate-400 border-slate-600/40',
     dotClass: 'bg-slate-400',
+    meaning: 'API responded but no rows for this disease/query — not proof of “no biology”.',
   },
   issue: {
     label: 'Error / timeout / disabled',
     className: 'bg-amber-900/25 text-amber-300 border-amber-700/40',
     dotClass: 'bg-amber-400',
+    meaning: 'Upstream failed, timed out, or is disabled — shortlist may be thinner.',
   },
 }
 
@@ -74,12 +82,21 @@ function statusDetailLabel(s: SourceFetchStatus): string {
   return `${base} (${s.status})`
 }
 
+function formatMs(ms: number | undefined): string | null {
+  if (ms == null || Number.isNaN(ms)) return null
+  return ms < 1000 ? `${Math.round(ms)}ms` : `${(ms / 1000).toFixed(1)}s`
+}
+
 /**
  * Epistemic honesty strip for Discover results.
  * Surfaces engine sourceStatuses as ternary ok / empty / issue counts + disclaimers.
  * @see docs/design/discovery-workbench-v2.md §6.8, KD-V2-10, PR-V2-07
  */
-export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceStatusStripProps) {
+export function SourceStatusStrip({
+  sourceStatuses,
+  emitEvent = true,
+  diseaseName = null,
+}: SourceStatusStripProps) {
   const counts = useMemo(() => countSourceStatuses(sourceStatuses), [sourceStatuses])
   const byBucket = useMemo(() => {
     const map: Record<SourceStatusBucket, SourceFetchStatus[]> = {
@@ -93,6 +110,15 @@ export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceSt
     return map
   }, [sourceStatuses])
   const emittedKey = useRef<string | null>(null)
+
+  const sorted = useMemo(() => {
+    const order: Record<SourceStatusBucket, number> = { issue: 0, empty: 1, ok: 2 }
+    return [...sourceStatuses].sort(
+      (a, b) =>
+        order[bucketForStatus(a.status)] - order[bucketForStatus(b.status)] ||
+        a.source.localeCompare(b.source),
+    )
+  }, [sourceStatuses])
 
   useEffect(() => {
     if (!emitEvent || sourceStatuses.length === 0) return
@@ -116,11 +142,18 @@ export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceSt
       data-testid="source-status-strip"
       aria-label="Upstream source status"
     >
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
-          Source status
-        </h3>
-        <span className="text-[10px] text-slate-600" data-testid="source-status-total">
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
+        <div className="min-w-0">
+          <h3 className="text-[11px] font-semibold text-slate-200">
+            Upstream APIs for this rank
+          </h3>
+          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
+            Did each free public gather step load, return empty, or fail? Open a source name for its
+            registry. Molecule-level hits are in <strong className="font-medium text-slate-400">Source honesty</strong>{' '}
+            below.
+          </p>
+        </div>
+        <span className="text-[10px] text-slate-600 tabular-nums" data-testid="source-status-total">
           {counts.total} source{counts.total !== 1 ? 's' : ''}
         </span>
       </div>
@@ -129,19 +162,19 @@ export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceSt
         {BUCKET_ORDER.map((bucket) => {
           const n = counts[bucket]
           const meta = BUCKET_META[bucket]
-          // Dim zero counts so real load/empty/issue signal stands out (summary empty-data contract)
           const dim = n === 0
           const tip =
-            byBucket[bucket].length > 0
+            `${meta.meaning}\n` +
+            (byBucket[bucket].length > 0
               ? byBucket[bucket].map(statusDetailLabel).join('\n')
-              : undefined
+              : '(none)')
           return (
             <StyledTooltip key={bucket} content={tip}>
               <span
                 data-testid={`source-status-count-${bucket}`}
                 data-count={n}
                 data-empty={dim ? 'true' : 'false'}
-                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${meta.className} ${dim ? 'opacity-20' : ''}`}
+                className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-0.5 text-[11px] ${meta.className} ${emptyDataClass(dim)}`}
               >
                 <span className={`h-1.5 w-1.5 rounded-full ${meta.dotClass}`} aria-hidden />
                 {meta.label}: {n}
@@ -151,41 +184,66 @@ export function SourceStatusStrip({ sourceStatuses, emitEvent = true }: SourceSt
         })}
       </div>
 
-      {(counts.empty > 0 || counts.issue > 0) && (
-        <details className="mb-2 group" data-testid="source-status-details">
-          <summary className="cursor-pointer text-[11px] text-slate-500 hover:text-slate-400">
-            View sources
-          </summary>
-          <ul className="mt-1.5 max-h-32 space-y-0.5 overflow-y-auto pl-1">
-            {sourceStatuses.map((s) => {
-              const bucket = bucketForStatus(s.status)
-              const meta = BUCKET_META[bucket]
-              return (
-                <li
-                  key={`${s.source}-${s.status}`}
-                  className="flex items-start gap-1.5 text-[10px] text-slate-400"
-                  data-testid="source-status-row"
-                  data-source={s.source}
-                  data-status={s.status}
-                  data-bucket={bucket}
-                >
-                  <span
-                    className={`mt-1 h-1.5 w-1.5 shrink-0 rounded-full ${meta.dotClass}`}
-                    aria-hidden
-                  />
-                  <span className="font-mono text-slate-300">{s.source}</span>
-                  <span className="text-slate-600">·</span>
-                  <span>{s.status}</span>
-                  {s.duration_ms != null && (
-                    <span className="text-slate-600">({s.duration_ms}ms)</span>
-                  )}
-                  {s.error && <span className="truncate text-amber-500/80">— {s.error}</span>}
-                </li>
-              )
-            })}
-          </ul>
-        </details>
-      )}
+      <details className="mb-2 group" data-testid="source-status-details" open={counts.issue > 0 || counts.empty > 0}>
+        <summary className="cursor-pointer text-[11px] text-slate-400 hover:text-slate-300">
+          {counts.issue > 0 || counts.empty > 0
+            ? 'Sources (issues & empties expanded)'
+            : 'All sources'}
+        </summary>
+        <ul className="mt-1.5 max-h-40 space-y-1 overflow-y-auto pl-0.5">
+          {sorted.map((s) => {
+            const bucket = bucketForStatus(s.status)
+            const meta = BUCKET_META[bucket]
+            const link = originSourceDeepLink(s.source, {
+              diseaseName: diseaseName ?? undefined,
+              name: diseaseName ?? undefined,
+            })
+            const ms = formatMs(s.duration_ms)
+            return (
+              <li
+                key={`${s.source}-${s.status}-${s.duration_ms ?? ''}`}
+                className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 text-[10px] text-slate-400"
+                data-testid="source-status-row"
+                data-source={s.source}
+                data-status={s.status}
+                data-bucket={bucket}
+              >
+                <span
+                  className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dotClass}`}
+                  aria-hidden
+                />
+                {link.href ? (
+                  <a
+                    href={link.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="font-medium text-indigo-300 hover:underline"
+                    title={link.title}
+                    onClick={() =>
+                      onDeepLinkClick(s.source, link.href, {
+                        label: s.source,
+                        panelId: 'discover-source-status',
+                      })
+                    }
+                  >
+                    {s.source}
+                  </a>
+                ) : (
+                  <span className="font-medium text-slate-300">{s.source}</span>
+                )}
+                <span className="text-slate-600">·</span>
+                <span className={bucket === 'ok' ? 'text-emerald-400/90' : bucket === 'issue' ? 'text-amber-300/90' : 'text-slate-500'}>
+                  {s.status}
+                </span>
+                {ms && <span className="tabular-nums text-slate-600">({ms})</span>}
+                {s.error && (
+                  <span className="max-w-full truncate text-amber-500/80">— {s.error}</span>
+                )}
+              </li>
+            )
+          })}
+        </ul>
+      </details>
 
       <p
         className="text-[11px] leading-relaxed text-slate-500"

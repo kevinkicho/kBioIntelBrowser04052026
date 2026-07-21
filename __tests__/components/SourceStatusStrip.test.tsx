@@ -107,9 +107,14 @@ describe('SourceStatusStrip', () => {
     expect(screen.getByTestId('source-status-details')).toBeInTheDocument()
     const rows = screen.getAllByTestId('source-status-row')
     expect(rows).toHaveLength(3)
-    expect(rows[0]).toHaveAttribute('data-source', 'DGIdb')
-    expect(rows[0]).toHaveAttribute('data-bucket', 'ok')
-    expect(rows[2]).toHaveAttribute('data-status', 'error')
+    const bySource = Object.fromEntries(
+      rows.map((r) => [r.getAttribute('data-source'), r.getAttribute('data-bucket')]),
+    )
+    expect(bySource.DGIdb).toBe('ok')
+    expect(bySource.DisGeNET).toBe('empty')
+    expect(bySource.ChEMBL).toBe('issue')
+    // Issues/empties sort first so problems are visible without scrolling
+    expect(rows[0].getAttribute('data-bucket')).not.toBe('ok')
   })
 
   it('emits source_status_shown once per status set', () => {

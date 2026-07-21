@@ -486,15 +486,20 @@ export default function DiscoverPage() {
                 <DiscoverRunTelemetry
                   result={state.result}
                   harvestStatus={state.harvestStatus}
+                  onOpenPreferences={() => setSettingsOpen(true)}
                 />
 
                 {(state.result.sourceStatuses?.length ?? 0) > 0 && (
-                  <SourceStatusStrip sourceStatuses={state.result.sourceStatuses ?? []} />
+                  <SourceStatusStrip
+                    sourceStatuses={state.result.sourceStatuses ?? []}
+                    diseaseName={state.result.diseaseName}
+                  />
                 )}
 
                 <SourceHonestyHeatmap
                   candidates={state.result.candidates}
                   sourceStatuses={state.result.sourceStatuses ?? []}
+                  diseaseName={state.result.diseaseName}
                 />
 
                 <OrphanetPinProvenanceStrip

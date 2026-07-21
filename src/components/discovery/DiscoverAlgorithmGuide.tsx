@@ -136,7 +136,8 @@ function PipelineSteps() {
         {DISCOVER_PIPELINE_STAGES.map((stage, i) => (
           <li
             key={stage.id}
-            className="group relative flex gap-2 rounded-lg border border-slate-800/80 bg-slate-950/40 px-2.5 py-2"
+            id={`discover-pipeline-${stage.id}`}
+            className="group relative flex gap-2 rounded-lg border border-slate-800/80 bg-slate-950/40 px-2.5 py-2 scroll-mt-24"
           >
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-800 text-[10px] font-mono text-indigo-300">
               {i + 1}

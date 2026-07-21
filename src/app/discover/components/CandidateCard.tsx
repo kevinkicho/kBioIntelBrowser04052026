@@ -24,6 +24,7 @@ import { buildCandidateWhy } from '@/lib/discovery/candidateWhy'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { buildDiscoverCandidateCrossSource } from '@/lib/crossSource'
 import { candidateKey } from '@/lib/ai/aiRank'
+import { discoverCandidateAnchorId } from '@/lib/discovery/sourceHonesty'
 
 /** Map Discover source pill labels → provenance keys */
 function discoverSourceKey(source: string): string {
@@ -195,6 +196,9 @@ export function CandidateCard({
       buildDiscoverCandidateCrossSource({
         key: candidateKey(candidate),
         name: candidate.name,
+        cid: candidate.cid,
+        chemblId: domainCandidate.identity.chemblId,
+        diseaseName,
         sources: candidate.sources,
         clinicalPhase: candidate.clinicalPhaseRaw,
         trialCount: candidate.trialCountRaw,
@@ -206,8 +210,10 @@ export function CandidateCard({
         geneAssociationScore: candidate.geneAssociationScore,
         compositeScore,
       }),
-    [candidate, domainCandidate, compositeScore],
+    [candidate, domainCandidate, compositeScore, diseaseName],
   )
+
+  const cardAnchorId = discoverCandidateAnchorId(rank, candidate.name)
 
   const identityKeys = useMemo(
     () => ({
@@ -354,10 +360,12 @@ export function CandidateCard({
 
   return (
     <div
-      className={`bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 transition-colors ${
+      id={cardAnchorId}
+      className={`scroll-mt-24 bg-slate-900/60 border border-slate-700/40 rounded-xl p-4 transition-colors ${
         hasCid ? 'hover:border-indigo-600/50' : 'opacity-80'
       }`}
       data-testid="candidate-card"
+      data-rank={rank}
     >
       {cardContent}
       {profileHref ? (
