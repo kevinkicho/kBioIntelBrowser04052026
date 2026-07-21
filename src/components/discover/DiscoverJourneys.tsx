@@ -84,18 +84,18 @@ export function DiscoverJourneys({ onRun, disabled }: Props) {
   }
 
   return (
-    <div className="mt-4" data-testid="discover-journeys">
+    <div className="mt-4 text-center" data-testid="discover-journeys">
       <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">
         Guided journeys (sets rubric + harvest, then ranks)
       </p>
-      <div className="flex flex-wrap justify-center gap-2">
+      <div className="flex flex-wrap items-stretch justify-center gap-2">
         {DISCOVER_JOURNEYS.map((j) => (
           <StyledTooltip key={j.id} content={j.description}>
             <button
               type="button"
               disabled={disabled}
               onClick={() => run(j)}
-              className="max-w-[14rem] rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-left transition-colors hover:border-indigo-600/50 hover:bg-slate-800/50 disabled:opacity-40"
+              className="max-w-[14rem] rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-center transition-colors hover:border-indigo-600/50 hover:bg-slate-800/50 disabled:opacity-40"
             >
               <span className="block text-[11px] font-medium text-slate-200">{j.label}</span>
               <span className="mt-0.5 block text-[9px] text-slate-500 leading-snug line-clamp-2">
