@@ -27,13 +27,34 @@ import { PropertiesCompare } from '@/components/compare/PropertiesCompare'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
 import { ComparisonInsights } from './ComparisonInsights'
 import { DiseaseCompareHeaderWrapper } from './DiseaseCompareHeaderWrapper'
-import { computeDelta, computePhaseDistribution, type PhaseDistribution, type DeltaResult } from './comparisonUtils'
+import {
+  computeDelta,
+  computePhaseDistribution,
+  type PhaseDistribution,
+  type DeltaResult,
+} from './comparisonUtils'
 import type {
-  Molecule, CompanyProduct, Patent, ClinicalTrial, AdverseEvent,
-  ComputedProperties, GhsHazardData, DrugLabel, OrangeBookEntry,
-  DrugInteraction, DrugRecall, NdcProduct, ChemblActivity,
-  ChemblMechanism, ChemblIndication, UniprotEntry, LiteratureResult,
-  NihGrant, SemanticPaper, PdbStructure, ReactomePathway,
+  Molecule,
+  CompanyProduct,
+  Patent,
+  ClinicalTrial,
+  AdverseEvent,
+  ComputedProperties,
+  GhsHazardData,
+  DrugLabel,
+  OrangeBookEntry,
+  DrugInteraction,
+  DrugRecall,
+  NdcProduct,
+  ChemblActivity,
+  ChemblMechanism,
+  ChemblIndication,
+  UniprotEntry,
+  LiteratureResult,
+  NihGrant,
+  SemanticPaper,
+  PdbStructure,
+  ReactomePathway,
 } from '@/lib/types'
 
 export interface MoleculeData {
@@ -91,60 +112,66 @@ async function fetchMoleculeData(cid: number): Promise<MoleculeData | null> {
     getReactomePathwaysByName(molecule.name),
   ])
 
-  const companies = settled(results[0], [] as CompanyProduct[])
-  const patents = settled(results[1], [] as Patent[])
-  const trials = settled(results[2], [] as ClinicalTrial[])
-  const adverseEvents = settled(results[3], [] as AdverseEvent[])
-  const computedProperties = settled(results[4], null as ComputedProperties | null)
-  const ghsHazards = settled(results[5], null as GhsHazardData | null)
-  const drugLabels = settled(results[6], [] as DrugLabel[])
-  const orangeBookEntries = settled(results[7], [] as OrangeBookEntry[])
-  const drugInteractions = settled(results[8], [] as DrugInteraction[])
-  const drugRecalls = settled(results[9], [] as DrugRecall[])
-  const ndcProducts = settled(results[10], [] as NdcProduct[])
-  const chemblActivities = settled(results[11], [] as ChemblActivity[])
-  const chemblMechanisms = settled(results[12], [] as ChemblMechanism[])
-  const chemblIndications = settled(results[13], [] as ChemblIndication[])
-  const uniprotEntries = settled(results[14], [] as UniprotEntry[])
-  const literature = settled(results[15], [] as LiteratureResult[])
-  const nihGrants = settled(results[16], [] as NihGrant[])
-  const semanticPapers = settled(results[17], [] as SemanticPaper[])
-  const pdbStructures = settled(results[18], [] as PdbStructure[])
-  const reactomePathways = settled(results[19], [] as ReactomePathway[])
-
   return {
-    molecule, companies, patents, trials, adverseEvents,
-    computedProperties, ghsHazards,
-    drugLabels, orangeBookEntries, drugInteractions, drugRecalls, ndcProducts,
-    chemblActivities, chemblMechanisms, chemblIndications, uniprotEntries,
-    literature, nihGrants, semanticPapers,
-    pdbStructures, reactomePathways,
+    molecule,
+    companies: settled(results[0], [] as CompanyProduct[]),
+    patents: settled(results[1], [] as Patent[]),
+    trials: settled(results[2], [] as ClinicalTrial[]),
+    adverseEvents: settled(results[3], [] as AdverseEvent[]),
+    computedProperties: settled(results[4], null as ComputedProperties | null),
+    ghsHazards: settled(results[5], null as GhsHazardData | null),
+    drugLabels: settled(results[6], [] as DrugLabel[]),
+    orangeBookEntries: settled(results[7], [] as OrangeBookEntry[]),
+    drugInteractions: settled(results[8], [] as DrugInteraction[]),
+    drugRecalls: settled(results[9], [] as DrugRecall[]),
+    ndcProducts: settled(results[10], [] as NdcProduct[]),
+    chemblActivities: settled(results[11], [] as ChemblActivity[]),
+    chemblMechanisms: settled(results[12], [] as ChemblMechanism[]),
+    chemblIndications: settled(results[13], [] as ChemblIndication[]),
+    uniprotEntries: settled(results[14], [] as UniprotEntry[]),
+    literature: settled(results[15], [] as LiteratureResult[]),
+    nihGrants: settled(results[16], [] as NihGrant[]),
+    semanticPapers: settled(results[17], [] as SemanticPaper[]),
+    pdbStructures: settled(results[18], [] as PdbStructure[]),
+    reactomePathways: settled(results[19], [] as ReactomePathway[]),
   }
 }
 
 function DeltaBadge({ delta }: { delta: DeltaResult }) {
   if (delta.direction === 'neutral') {
-    return <span className="text-[10px] text-slate-600 ml-1.5">equal</span>
+    return <span className="ml-1.5 text-[10px] text-slate-600">equal</span>
   }
-  const color = delta.direction === 'positive'
-    ? 'text-emerald-400 bg-emerald-900/30 border-emerald-800/40'
-    : 'text-red-400 bg-red-900/30 border-red-800/40'
+  const color =
+    delta.direction === 'positive'
+      ? 'text-emerald-400 bg-emerald-900/30 border-emerald-800/40'
+      : 'text-red-400 bg-red-900/30 border-red-800/40'
   const sign = delta.direction === 'positive' ? '+' : ''
   return (
-    <span className={`text-[10px] px-1.5 py-0.5 rounded-full border ${color} ml-1.5`}>
-      {sign}{delta.diff}
+    <span className={`ml-1.5 rounded-full border px-1.5 py-0.5 text-[10px] ${color}`}>
+      {sign}
+      {delta.diff}
     </span>
   )
 }
 
-function StatValueWithDelta({ label, value, delta }: { label: string; value: string | number; delta: DeltaResult }) {
+function StatCell({
+  label,
+  value,
+  delta,
+  showDelta,
+}: {
+  label: string
+  value: string | number
+  delta?: DeltaResult
+  showDelta?: boolean
+}) {
   return (
-    <div>
-      <p className="text-2xl font-bold text-slate-100">
+    <div className="min-w-0">
+      <p className="text-xl font-bold tabular-nums text-slate-100 sm:text-2xl">
         {value}
-        <DeltaBadge delta={delta} />
+        {showDelta && delta ? <DeltaBadge delta={delta} /> : null}
       </p>
-      <p className="text-xs text-slate-500">{label}</p>
+      <p className="text-[11px] text-slate-500">{label}</p>
     </div>
   )
 }
@@ -153,8 +180,10 @@ function TopList({ items, emptyText }: { items: string[]; emptyText: string }) {
   if (items.length === 0) return <p className="text-xs text-slate-500">{emptyText}</p>
   return (
     <ul className="space-y-1">
-      {items.slice(0, 5).map((item, i) => (
-        <li key={i} className="text-sm text-slate-300">{item}</li>
+      {items.slice(0, 5).map((item) => (
+        <li key={item} className="text-sm leading-snug text-slate-300">
+          {item}
+        </li>
       ))}
     </ul>
   )
@@ -162,37 +191,43 @@ function TopList({ items, emptyText }: { items: string[]; emptyText: string }) {
 
 function CategoryHeader({ icon, title }: { icon: string; title: string }) {
   return (
-    <div className="flex items-center gap-2 pt-6 pb-2">
-      <span>{icon}</span>
-      <h2 className="text-sm font-bold uppercase tracking-wider text-indigo-400">{title}</h2>
+    <div className="flex items-center gap-2 pb-1 pt-4">
+      <span aria-hidden>{icon}</span>
+      <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-400">{title}</h2>
     </div>
   )
 }
 
-function PhaseBarChart({ distribution, totalTrials }: { distribution: PhaseDistribution; totalTrials: number }) {
+function PhaseBarChart({
+  distribution,
+  totalTrials,
+}: {
+  distribution: PhaseDistribution
+  totalTrials: number
+}) {
   if (totalTrials === 0) return <p className="text-xs text-slate-500">No trials</p>
-
   const phases = [
     { label: 'P1', count: distribution.phase1, color: 'bg-blue-500' },
     { label: 'P2', count: distribution.phase2, color: 'bg-indigo-500' },
     { label: 'P3', count: distribution.phase3, color: 'bg-violet-500' },
     { label: 'P4', count: distribution.phase4, color: 'bg-emerald-500' },
   ]
-
-  const barHeight = 'h-4'
-
   return (
-    <div className="space-y-1.5 mt-2">
-      {phases.map(phase => (
+    <div className="mt-2 space-y-1.5">
+      {phases.map((phase) => (
         <div key={phase.label} className="flex items-center gap-2">
-          <span className="text-[10px] text-slate-500 w-5 text-right">{phase.label}</span>
-          <div className="flex-1 bg-slate-800 rounded-sm overflow-hidden">
+          <span className="w-5 text-right text-[10px] text-slate-500">{phase.label}</span>
+          <div className="h-3 flex-1 overflow-hidden rounded-sm bg-slate-800">
             <div
-              className={`${barHeight} ${phase.color} rounded-sm transition-all`}
-              style={{ width: totalTrials > 0 ? `${(phase.count / totalTrials) * 100}%` : '0%' }}
+              className={`h-3 rounded-sm ${phase.color}`}
+              style={{
+                width: totalTrials > 0 ? `${(phase.count / totalTrials) * 100}%` : '0%',
+              }}
             />
           </div>
-          <span className="text-[10px] text-slate-400 w-5 text-right">{phase.count}</span>
+          <span className="w-5 text-right text-[10px] tabular-nums text-slate-400">
+            {phase.count}
+          </span>
         </div>
       ))}
     </div>
@@ -200,236 +235,442 @@ function PhaseBarChart({ distribution, totalTrials }: { distribution: PhaseDistr
 }
 
 function uniqueTargets(activities: ChemblActivity[]): number {
-  return new Set(activities.map(a => a.targetName).filter(Boolean)).size
+  return new Set(activities.map((a) => a.targetName).filter(Boolean)).size
+}
+
+/** Parse compare CIDs from searchParams (a/b/c/d or cids=). */
+function parsePageCids(searchParams: Record<string, string | string[] | undefined>): number[] {
+  const get = (k: string) => {
+    const v = searchParams[k]
+    return Array.isArray(v) ? v[0] : v
+  }
+  const cidsRaw = get('cids')
+  if (cidsRaw) {
+    return Array.from(
+      new Set(
+        cidsRaw
+          .split(/[,+\s]+/)
+          .map((s) => parseInt(s.trim(), 10))
+          .filter((n) => Number.isInteger(n) && n > 0),
+      ),
+    ).slice(0, 4)
+  }
+  const out: number[] = []
+  for (const key of ['a', 'b', 'c', 'd']) {
+    const raw = get(key)
+    if (!raw) continue
+    const n = parseInt(raw, 10)
+    if (Number.isInteger(n) && n > 0 && !out.includes(n)) out.push(n)
+  }
+  return out.slice(0, 4)
 }
 
 export default async function ComparePage({
   searchParams,
 }: {
-  searchParams: { a?: string; b?: string; disease?: string; scoreA?: string; scoreB?: string; confidenceA?: string; confidenceB?: string; nameA?: string; nameB?: string }
+  searchParams: Record<string, string | string[] | undefined>
 }) {
-  const cidARaw = searchParams.a ? parseInt(searchParams.a, 10) : NaN
-  const cidBRaw = searchParams.b ? parseInt(searchParams.b, 10) : NaN
-  const cidAValid = !isNaN(cidARaw) && cidARaw > 0 && Number.isInteger(cidARaw)
-  const cidBValid = !isNaN(cidBRaw) && cidBRaw > 0 && Number.isInteger(cidBRaw)
-  const hasValidCids = cidAValid && cidBValid
+  const cids = parsePageCids(searchParams)
+  const disease =
+    typeof searchParams.disease === 'string'
+      ? searchParams.disease
+      : Array.isArray(searchParams.disease)
+        ? searchParams.disease[0]
+        : undefined
 
-  let dataA: MoleculeData | null = null
-  let dataB: MoleculeData | null = null
+  const settledList =
+    cids.length >= 1
+      ? await Promise.allSettled(cids.map((cid) => fetchMoleculeData(cid)))
+      : []
 
-  if (hasValidCids) {
-    const [settledA, settledB] = await Promise.allSettled([
-      fetchMoleculeData(cidARaw),
-      fetchMoleculeData(cidBRaw),
-    ])
-    dataA = settledA.status === 'fulfilled' ? settledA.value : null
-    dataB = settledB.status === 'fulfilled' ? settledB.value : null
-  }
+  const datasets: { cid: number; data: MoleculeData }[] = []
+  const failed: number[] = []
+  settledList.forEach((s, i) => {
+    const cid = cids[i]!
+    if (s.status === 'fulfilled' && s.value) {
+      datasets.push({ cid, data: s.value })
+    } else {
+      failed.push(cid)
+    }
+  })
+
+  const n = datasets.length
+  const pairwise = n === 2
+  const d0 = datasets[0]?.data
+  const d1 = datasets[1]?.data
 
   return (
-    <div className="min-h-screen bg-[#0f1117]">
-      <header className="border-b border-slate-800 px-6 py-4">
-        <Link href="/" className="text-slate-400 hover:text-slate-200 text-sm">← BioIntel Explorer</Link>
-      </header>
-
-      <main className="max-w-5xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-3xl font-bold text-slate-100 mb-6">Compare Molecules</h1>
-
-        <ComparePageClient />
-
-        {!cidAValid && searchParams.a && (
-          <p className="text-red-400 text-center py-4">Invalid CID for molecule A. Please provide a positive integer.</p>
-        )}
-        {!cidBValid && searchParams.b && (
-          <p className="text-red-400 text-center py-4">Invalid CID for molecule B. Please provide a positive integer.</p>
-        )}
-
-        {hasValidCids && !dataA && !dataB && (
-          <p className="text-red-400 text-center py-8">Neither molecule could be found. Please check the CIDs and try again.</p>
-        )}
-        {hasValidCids && dataA && !dataB && (
-          <p className="text-amber-400 text-center py-4">Molecule A ({dataA.molecule.name}) was found, but molecule B (CID {cidBRaw}) could not be loaded. Please try a different CID for molecule B.</p>
-        )}
-        {hasValidCids && !dataA && dataB && (
-          <p className="text-amber-400 text-center py-4">Molecule B ({dataB.molecule.name}) was found, but molecule A (CID {cidARaw}) could not be loaded. Please try a different CID for molecule A.</p>
-        )}
-
-        {dataA && dataB && (
-          <div>
-            {searchParams.disease && (
-              <Suspense fallback={<div className="h-4" />}>
-                <DiseaseCompareHeaderWrapper
-                  dataA={dataA as unknown as Record<string, unknown>}
-                  dataB={dataB as unknown as Record<string, unknown>}
-                  cidA={cidARaw}
-                  cidB={cidBRaw}
-                />
-              </Suspense>
-            )}
-
-            <ComparisonInsights
-              dataA={dataA}
-              dataB={dataB}
-              nameA={dataA.molecule.name}
-              nameB={dataB.molecule.name}
-            />
-
-            {/* Molecule Identity */}
-            <CompareSection title="Molecule">
-              <div><ProfileHeader molecule={dataA.molecule} /></div>
-              <div><ProfileHeader molecule={dataB.molecule} /></div>
-            </CompareSection>
-
-            {/* Molecular & Chemical */}
-            <CategoryHeader icon="🧪" title="Molecular & Chemical" />
-
-            <CompareSection title="Computed Properties" fullWidth>
-              <PropertiesCompare
-                a={dataA.computedProperties}
-                b={dataB.computedProperties}
-                mwA={dataA.molecule.molecularWeight}
-                mwB={dataB.molecule.molecularWeight}
-              />
-            </CompareSection>
-
-            <CompareSection title="GHS Hazards">
-              <StatValueWithDelta label="hazard pictograms" value={dataA.ghsHazards?.pictogramUrls?.length ?? 0} delta={computeDelta(dataA.ghsHazards?.pictogramUrls?.length ?? 0, dataB.ghsHazards?.pictogramUrls?.length ?? 0, false)} />
-              <StatValueWithDelta label="hazard pictograms" value={dataB.ghsHazards?.pictogramUrls?.length ?? 0} delta={computeDelta(dataB.ghsHazards?.pictogramUrls?.length ?? 0, dataA.ghsHazards?.pictogramUrls?.length ?? 0, false)} />
-            </CompareSection>
-
-            {/* Pharmaceutical */}
-            <CategoryHeader icon="💊" title="Pharmaceutical" />
-
-            <CompareSection title="Manufacturers">
-              <StatValueWithDelta label="manufacturers" value={dataA.companies.length} delta={computeDelta(dataA.companies.length, dataB.companies.length, true)} />
-              <StatValueWithDelta label="manufacturers" value={dataB.companies.length} delta={computeDelta(dataB.companies.length, dataA.companies.length, true)} />
-            </CompareSection>
-
-            <CompareSection title="Top Manufacturers">
-              <TopList items={Array.from(new Set(dataA.companies.map(c => c.company)))} emptyText="None found" />
-              <TopList items={Array.from(new Set(dataB.companies.map(c => c.company)))} emptyText="None found" />
-            </CompareSection>
-
-            <CompareSection title="NDC Products">
-              <StatValueWithDelta label="NDC codes" value={dataA.ndcProducts.length} delta={computeDelta(dataA.ndcProducts.length, dataB.ndcProducts.length, true)} />
-              <StatValueWithDelta label="NDC codes" value={dataB.ndcProducts.length} delta={computeDelta(dataB.ndcProducts.length, dataA.ndcProducts.length, true)} />
-            </CompareSection>
-
-            <CompareSection title="Orange Book Entries">
-              <StatValueWithDelta label="entries" value={dataA.orangeBookEntries.length} delta={computeDelta(dataA.orangeBookEntries.length, dataB.orangeBookEntries.length, true)} />
-              <StatValueWithDelta label="entries" value={dataB.orangeBookEntries.length} delta={computeDelta(dataB.orangeBookEntries.length, dataA.orangeBookEntries.length, true)} />
-            </CompareSection>
-
-            <CompareSection title="Drug Labels">
-              <StatValueWithDelta label="labels" value={dataA.drugLabels.length} delta={computeDelta(dataA.drugLabels.length, dataB.drugLabels.length, true)} />
-              <StatValueWithDelta label="labels" value={dataB.drugLabels.length} delta={computeDelta(dataB.drugLabels.length, dataA.drugLabels.length, true)} />
-            </CompareSection>
-
-            <CompareSection title="Drug Interactions">
-              <StatValueWithDelta label="interactions" value={dataA.drugInteractions.length} delta={computeDelta(dataA.drugInteractions.length, dataB.drugInteractions.length, false)} />
-              <StatValueWithDelta label="interactions" value={dataB.drugInteractions.length} delta={computeDelta(dataB.drugInteractions.length, dataA.drugInteractions.length, false)} />
-            </CompareSection>
-
-            {/* Clinical & Safety */}
-            <CategoryHeader icon="🏥" title="Clinical & Safety" />
-
-            <CompareSection title="Clinical Trials">
-              <div>
-                <StatValueWithDelta label="trials" value={dataA.trials.length} delta={computeDelta(dataA.trials.length, dataB.trials.length, true)} />
-                <PhaseBarChart distribution={computePhaseDistribution(dataA.trials)} totalTrials={dataA.trials.length} />
-              </div>
-              <div>
-                <StatValueWithDelta label="trials" value={dataB.trials.length} delta={computeDelta(dataB.trials.length, dataA.trials.length, true)} />
-                <PhaseBarChart distribution={computePhaseDistribution(dataB.trials)} totalTrials={dataB.trials.length} />
-              </div>
-            </CompareSection>
-
-            <CompareSection title="Indications (ChEMBL)">
-              <StatValueWithDelta label="indications" value={dataA.chemblIndications.length} delta={computeDelta(dataA.chemblIndications.length, dataB.chemblIndications.length, true)} />
-              <StatValueWithDelta label="indications" value={dataB.chemblIndications.length} delta={computeDelta(dataB.chemblIndications.length, dataA.chemblIndications.length, true)} />
-            </CompareSection>
-
-            <CompareSection title="Adverse Events (Top 5)">
-              <TopList items={dataA.adverseEvents.slice(0, 5).map(e => `${e.reactionName} (${e.count})`)} emptyText="None reported" />
-              <TopList items={dataB.adverseEvents.slice(0, 5).map(e => `${e.reactionName} (${e.count})`)} emptyText="None reported" />
-            </CompareSection>
-
-            <CompareSection title="Drug Recalls">
-              <StatValueWithDelta label="recalls" value={dataA.drugRecalls.length} delta={computeDelta(dataA.drugRecalls.length, dataB.drugRecalls.length, false)} />
-              <StatValueWithDelta label="recalls" value={dataB.drugRecalls.length} delta={computeDelta(dataB.drugRecalls.length, dataA.drugRecalls.length, false)} />
-            </CompareSection>
-
-            {/* Bioactivity & Targets */}
-            <CategoryHeader icon="🎯" title="Bioactivity & Targets" />
-
-            <CompareSection title="ChEMBL Bioactivity">
-              <div>
-                <StatValueWithDelta label="activities" value={dataA.chemblActivities.length} delta={computeDelta(dataA.chemblActivities.length, dataB.chemblActivities.length, true)} />
-                <p className="text-xs text-slate-400 mt-1">{uniqueTargets(dataA.chemblActivities)} unique targets</p>
-              </div>
-              <div>
-                <StatValueWithDelta label="activities" value={dataB.chemblActivities.length} delta={computeDelta(dataB.chemblActivities.length, dataA.chemblActivities.length, true)} />
-                <p className="text-xs text-slate-400 mt-1">{uniqueTargets(dataB.chemblActivities)} unique targets</p>
-              </div>
-            </CompareSection>
-
-            <CompareSection title="Mechanisms of Action">
-              <TopList items={dataA.chemblMechanisms.map(m => `${m.actionType}: ${m.mechanismOfAction}`)} emptyText="None found" />
-              <TopList items={dataB.chemblMechanisms.map(m => `${m.actionType}: ${m.mechanismOfAction}`)} emptyText="None found" />
-            </CompareSection>
-
-            <CompareSection title="Protein Targets (UniProt)">
-              <TopList items={dataA.uniprotEntries.map(u => `${u.geneName} — ${u.proteinName}`)} emptyText="None found" />
-              <TopList items={dataB.uniprotEntries.map(u => `${u.geneName} — ${u.proteinName}`)} emptyText="None found" />
-            </CompareSection>
-
-            {/* Protein & Structure */}
-            <CategoryHeader icon="🧬" title="Protein & Structure" />
-
-            <CompareSection title="PDB Structures">
-              <StatValueWithDelta label="crystal structures" value={dataA.pdbStructures.length} delta={computeDelta(dataA.pdbStructures.length, dataB.pdbStructures.length, true)} />
-              <StatValueWithDelta label="crystal structures" value={dataB.pdbStructures.length} delta={computeDelta(dataB.pdbStructures.length, dataA.pdbStructures.length, true)} />
-            </CompareSection>
-
-            {/* Interactions & Pathways */}
-            <CategoryHeader icon="🔗" title="Interactions & Pathways" />
-
-            <CompareSection title="Reactome Pathways">
-              <StatValueWithDelta label="pathways" value={dataA.reactomePathways.length} delta={computeDelta(dataA.reactomePathways.length, dataB.reactomePathways.length, true)} />
-              <StatValueWithDelta label="pathways" value={dataB.reactomePathways.length} delta={computeDelta(dataB.reactomePathways.length, dataA.reactomePathways.length, true)} />
-            </CompareSection>
-
-            {/* Research & Literature */}
-            <CategoryHeader icon="📚" title="Research & Literature" />
-
-            <CompareSection title="Publications">
-              <StatValueWithDelta label="papers" value={Math.max(dataA.literature.length, dataA.semanticPapers.length)} delta={computeDelta(Math.max(dataA.literature.length, dataA.semanticPapers.length), Math.max(dataB.literature.length, dataB.semanticPapers.length), true)} />
-              <StatValueWithDelta label="papers" value={Math.max(dataB.literature.length, dataB.semanticPapers.length)} delta={computeDelta(Math.max(dataB.literature.length, dataB.semanticPapers.length), Math.max(dataA.literature.length, dataA.semanticPapers.length), true)} />
-            </CompareSection>
-
-            <CompareSection title="Patents">
-              <StatValueWithDelta label="patents" value={dataA.patents.length} delta={computeDelta(dataA.patents.length, dataB.patents.length, true)} />
-              <StatValueWithDelta label="patents" value={dataB.patents.length} delta={computeDelta(dataB.patents.length, dataA.patents.length, true)} />
-            </CompareSection>
-
-            <CompareSection title="Top Patent Assignees">
-              <TopList items={Array.from(new Set(dataA.patents.map(p => p.assignee)))} emptyText="None found" />
-              <TopList items={Array.from(new Set(dataB.patents.map(p => p.assignee)))} emptyText="None found" />
-            </CompareSection>
-
-            <CompareSection title="NIH Grants">
-              <StatValueWithDelta label="active grants" value={dataA.nihGrants.length} delta={computeDelta(dataA.nihGrants.length, dataB.nihGrants.length, true)} />
-              <StatValueWithDelta label="active grants" value={dataB.nihGrants.length} delta={computeDelta(dataB.nihGrants.length, dataA.nihGrants.length, true)} />
-            </CompareSection>
-          </div>
-        )}
-
-        {!hasValidCids && !searchParams.a && !searchParams.b && (
-          <p className="text-slate-500 text-center py-12">
-            Search for two molecules above to compare them side by side.
+    <div className="page-canvas" data-testid="compare-page">
+      <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-slate-800/80 pb-3">
+        <div className="min-w-0">
+          <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">Compare molecules</h1>
+          <p className="mt-0.5 max-w-3xl text-[12px] leading-snug text-slate-500">
+            Side-by-side free-public-API evidence (trials, safety, targets, literature). Not clinical
+            predictions.
           </p>
-        )}
-      </main>
+        </div>
+        <Link
+          href="/discover"
+          className="shrink-0 text-[11px] text-indigo-400 hover:underline"
+        >
+          Discover shortlist →
+        </Link>
+      </div>
+
+      <Suspense fallback={<div className="mb-4 h-24 animate-pulse rounded-xl bg-slate-900/50" />}>
+        <ComparePageClient />
+      </Suspense>
+
+      {failed.length > 0 && (
+        <p className="mb-3 text-sm text-amber-400/90">
+          Could not load CID{failed.length > 1 ? 's' : ''}: {failed.join(', ')}.
+        </p>
+      )}
+
+      {cids.length > 0 && n === 0 && (
+        <p className="py-8 text-center text-red-400">
+          No molecules could be loaded. Check CIDs and try again.
+        </p>
+      )}
+
+      {cids.length === 0 && (
+        <p className="py-10 text-center text-sm text-slate-500">
+          Add at least two molecules above to compare them across free public evidence sources.
+        </p>
+      )}
+
+      {n >= 2 && (
+        <div className="min-w-0">
+          {disease && pairwise && d0 && d1 && (
+            <Suspense fallback={<div className="h-4" />}>
+              <DiseaseCompareHeaderWrapper
+                dataA={d0 as unknown as Record<string, unknown>}
+                dataB={d1 as unknown as Record<string, unknown>}
+                cidA={datasets[0]!.cid}
+                cidB={datasets[1]!.cid}
+              />
+            </Suspense>
+          )}
+
+          {pairwise && d0 && d1 && (
+            <ComparisonInsights
+              dataA={d0}
+              dataB={d1}
+              nameA={d0.molecule.name}
+              nameB={d1.molecule.name}
+            />
+          )}
+
+          {n > 2 && (
+            <div className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2 text-[11px] text-slate-500">
+              Comparing {n} molecules — metric columns use absolute counts (pairwise deltas shown
+              only for 2-way compares).
+            </div>
+          )}
+
+          <CompareSection title="Molecule" columns={n}>
+            {datasets.map(({ data, cid }) => (
+              <div key={cid} className="min-w-0 overflow-hidden">
+                <ProfileHeader molecule={data.molecule} />
+              </div>
+            ))}
+          </CompareSection>
+
+          <CategoryHeader icon="🧪" title="Molecular & Chemical" />
+
+          <CompareSection title="Computed Properties" fullWidth>
+            <PropertiesCompare
+              columns={datasets.map(({ data }) => ({
+                label: data.molecule.name,
+                props: data.computedProperties,
+                mw: data.molecule.molecularWeight,
+              }))}
+            />
+          </CompareSection>
+
+          <CompareSection title="GHS Hazards" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.ghsHazards?.pictogramUrls?.length ?? 0
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.ghsHazards?.pictogramUrls?.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="hazard pictograms"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={
+                    pairwise ? computeDelta(v, ov, false) : undefined
+                  }
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CategoryHeader icon="💊" title="Pharmaceutical" />
+
+          {(
+            [
+              ['Manufacturers', (d: MoleculeData) => d.companies.length, true],
+              ['NDC Products', (d: MoleculeData) => d.ndcProducts.length, true],
+              ['Orange Book', (d: MoleculeData) => d.orangeBookEntries.length, true],
+              ['Drug Labels', (d: MoleculeData) => d.drugLabels.length, true],
+              ['Drug Interactions', (d: MoleculeData) => d.drugInteractions.length, false],
+            ] as const
+          ).map(([title, pick, higherBetter]) => (
+            <CompareSection key={title} title={title} columns={n}>
+              {datasets.map(({ data, cid }, i) => {
+                const v = pick(data)
+                const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+                const ov = other ? pick(other) : 0
+                return (
+                  <StatCell
+                    key={cid}
+                    label={title.toLowerCase()}
+                    value={v}
+                    showDelta={pairwise}
+                    delta={pairwise ? computeDelta(v, ov, higherBetter) : undefined}
+                  />
+                )
+              })}
+            </CompareSection>
+          ))}
+
+          <CompareSection title="Top Manufacturers" columns={n}>
+            {datasets.map(({ data, cid }) => (
+              <TopList
+                key={cid}
+                items={Array.from(new Set(data.companies.map((c) => c.company)))}
+                emptyText="None found"
+              />
+            ))}
+          </CompareSection>
+
+          <CategoryHeader icon="🏥" title="Clinical & Safety" />
+
+          <CompareSection title="Clinical Trials" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.trials.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.trials.length ?? 0
+              return (
+                <div key={cid}>
+                  <StatCell
+                    label="trials"
+                    value={v}
+                    showDelta={pairwise}
+                    delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                  />
+                  <PhaseBarChart
+                    distribution={computePhaseDistribution(data.trials)}
+                    totalTrials={data.trials.length}
+                  />
+                </div>
+              )
+            })}
+          </CompareSection>
+
+          <CompareSection title="Indications (ChEMBL)" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.chemblIndications.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.chemblIndications.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="indications"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CompareSection title="Adverse Events (Top 5)" columns={n}>
+            {datasets.map(({ data, cid }) => (
+              <TopList
+                key={cid}
+                items={data.adverseEvents
+                  .slice(0, 5)
+                  .map((e) => `${e.reactionName} (${e.count})`)}
+                emptyText="None reported"
+              />
+            ))}
+          </CompareSection>
+
+          <CompareSection title="Drug Recalls" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.drugRecalls.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.drugRecalls.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="recalls"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, false) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CategoryHeader icon="🎯" title="Bioactivity & Targets" />
+
+          <CompareSection title="ChEMBL Bioactivity" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.chemblActivities.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.chemblActivities.length ?? 0
+              return (
+                <div key={cid}>
+                  <StatCell
+                    label="activities"
+                    value={v}
+                    showDelta={pairwise}
+                    delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                  />
+                  <p className="mt-1 text-xs text-slate-400">
+                    {uniqueTargets(data.chemblActivities)} unique targets
+                  </p>
+                </div>
+              )
+            })}
+          </CompareSection>
+
+          <CompareSection title="Mechanisms of Action" columns={n}>
+            {datasets.map(({ data, cid }) => (
+              <TopList
+                key={cid}
+                items={data.chemblMechanisms.map(
+                  (m) => `${m.actionType}: ${m.mechanismOfAction}`,
+                )}
+                emptyText="None found"
+              />
+            ))}
+          </CompareSection>
+
+          <CompareSection title="Protein Targets (UniProt)" columns={n}>
+            {datasets.map(({ data, cid }) => (
+              <TopList
+                key={cid}
+                items={data.uniprotEntries.map((u) => `${u.geneName} — ${u.proteinName}`)}
+                emptyText="None found"
+              />
+            ))}
+          </CompareSection>
+
+          <CategoryHeader icon="🧬" title="Protein & Structure" />
+
+          <CompareSection title="PDB Structures" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.pdbStructures.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.pdbStructures.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="crystal structures"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CategoryHeader icon="🔗" title="Interactions & Pathways" />
+
+          <CompareSection title="Reactome Pathways" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.reactomePathways.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.reactomePathways.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="pathways"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CategoryHeader icon="📚" title="Research & Literature" />
+
+          <CompareSection title="Publications" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = Math.max(data.literature.length, data.semanticPapers.length)
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other
+                ? Math.max(other.literature.length, other.semanticPapers.length)
+                : 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="papers"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CompareSection title="Patents" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.patents.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.patents.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="patents"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+
+          <CompareSection title="Top Patent Assignees" columns={n}>
+            {datasets.map(({ data, cid }) => (
+              <TopList
+                key={cid}
+                items={Array.from(new Set(data.patents.map((p) => p.assignee)))}
+                emptyText="None found"
+              />
+            ))}
+          </CompareSection>
+
+          <CompareSection title="NIH Grants" columns={n}>
+            {datasets.map(({ data, cid }, i) => {
+              const v = data.nihGrants.length
+              const other = pairwise && i === 0 ? d1 : pairwise && i === 1 ? d0 : null
+              const ov = other?.nihGrants.length ?? 0
+              return (
+                <StatCell
+                  key={cid}
+                  label="active grants"
+                  value={v}
+                  showDelta={pairwise}
+                  delta={pairwise ? computeDelta(v, ov, true) : undefined}
+                />
+              )
+            })}
+          </CompareSection>
+        </div>
+      )}
+
+      {n === 1 && (
+        <p className="py-6 text-center text-sm text-slate-500">
+          Loaded {datasets[0]!.data.molecule.name}. Select one more molecule to compare.
+        </p>
+      )}
     </div>
   )
 }
