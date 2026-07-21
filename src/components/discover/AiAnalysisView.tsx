@@ -169,12 +169,16 @@ export function AiAnalysisView({
 
   function restoreFromHistory(entry: AiGeneratedRecord) {
     try {
-      const parsed = entry.task
-        ? (entry.task as AiRankResult)
-        : (JSON.parse(entry.content) as AiRankResult)
-      if (parsed?.ordering) {
+      let parsed: AiRankResult | null = null
+      if (entry.task && typeof entry.task === 'object') {
+        parsed = entry.task as AiRankResult
+      } else if (entry.content?.trim()) {
+        parsed = JSON.parse(entry.content) as AiRankResult
+      }
+      if (parsed?.ordering?.length) {
         setResult(parsed)
         onResult?.(parsed)
+        setError(null)
         setActiveGenId(entry.id)
         if (entry.promptSystem || entry.promptUser) {
           setLastPrompt({
@@ -183,7 +187,9 @@ export function AiAnalysisView({
           })
         }
         setEnabled(true)
+        return
       }
+      setError('Could not restore that generation')
     } catch {
       setError('Could not restore that generation')
     }
@@ -393,9 +399,20 @@ export function AiAnalysisView({
             return (
               <div key={key} className="relative">
                 <div className="mb-1 flex flex-wrap items-center gap-2 text-[10px]">
-                  <span className="rounded bg-violet-900/50 border border-violet-700/40 px-1.5 py-0.5 text-violet-200">
-                    AI #{aiRank}
-                  </span>
+                  <AiWhyTooltip
+                    why={buildAiRankWhy({
+                      item,
+                      aiRank,
+                      ofRecordRank: ofRecord,
+                      name: c.name,
+                      mode: 'reorder',
+                    })}
+                    testId={`ai-analysis-why-${key}`}
+                  >
+                    <span className="cursor-help rounded bg-violet-900/50 border border-violet-700/40 px-1.5 py-0.5 text-violet-200">
+                      AI #{aiRank}
+                    </span>
+                  </AiWhyTooltip>
                   <span className="text-slate-500">of-record #{ofRecord}</span>
                   {delta !== 0 && (
                     <span
@@ -406,17 +423,6 @@ export function AiAnalysisView({
                       {delta > 0 ? `↑${delta}` : `↓${Math.abs(delta)}`}
                     </span>
                   )}
-                  <AiWhyTooltip
-                    why={buildAiRankWhy({
-                      item,
-                      aiRank,
-                      ofRecordRank: ofRecord,
-                      name: c.name,
-                      mode: 'reorder',
-                    })}
-                    testId={`ai-analysis-why-${key}`}
-                    label="why AI?"
-                  />
                 </div>
                 {item && item.reasons.length > 0 && (
                   <ul className="mb-2 ml-1 list-disc list-inside text-[10px] text-slate-400 space-y-0.5">

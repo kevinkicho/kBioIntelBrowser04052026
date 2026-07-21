@@ -2,11 +2,10 @@
 
 /**
  * Paginated navigator for prior AI runs on a surface.
- * User re-runs many times → flip through different responses, inspect prompts, add notes.
- * Live free-API evidence only — no mock generations.
+ * Compact actions: Load · Prompt (styled tooltips, opacity 0.3) — no “Show prompt” noise.
  */
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import {
   listAiHistoryPage,
@@ -51,9 +50,13 @@ export function AiRunNavigator({
   const [error, setError] = useState<string | null>(null)
   /** Index into loaded items (0 = newest). */
   const [index, setIndex] = useState(0)
-  const [showPrompt, setShowPrompt] = useState(false)
+  const [loadFlash, setLoadFlash] = useState(false)
+  const [loadMsg, setLoadMsg] = useState<string | null>(null)
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const onSelectRef = useRef(onSelect)
+  onSelectRef.current = onSelect
 
-  const load = useCallback(
+  const fetchPage = useCallback(
     async (append: boolean, pageCursor: { createdAt: string; id: string } | null) => {
       setLoading(true)
       setError(null)
@@ -86,8 +89,8 @@ export function AiRunNavigator({
 
   useEffect(() => {
     setCursor(null)
-    void load(false, null)
-  }, [kind, mode, contextKey, refreshKey, load])
+    void fetchPage(false, null)
+  }, [kind, mode, contextKey, refreshKey, fetchPage])
 
   // Focus activeId when it appears in the list
   useEffect(() => {
@@ -96,20 +99,65 @@ export function AiRunNavigator({
     if (i >= 0) setIndex(i)
   }, [activeId, items])
 
+  useEffect(() => {
+    return () => {
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+    }
+  }, [])
+
   const current = items[index] ?? null
   const totalLoaded = items.length
   const displayN = totalLoaded === 0 ? 0 : index + 1
+  const hasPrompt = Boolean(current?.promptSystem || current?.promptUser)
+  const canLoad = Boolean(onSelect && current)
+
+  function applyLoad(entry: AiGeneratedRecord, opts?: { silent?: boolean }) {
+    if (!onSelectRef.current) {
+      if (!opts?.silent) {
+        setLoadMsg('No load handler on this surface')
+        setLoadFlash(true)
+        if (flashTimer.current) clearTimeout(flashTimer.current)
+        flashTimer.current = setTimeout(() => {
+          setLoadFlash(false)
+          setLoadMsg(null)
+        }, 1600)
+      }
+      return
+    }
+    try {
+      onSelectRef.current(entry)
+      if (!opts?.silent) {
+        setLoadMsg('Loaded')
+        setLoadFlash(true)
+        if (flashTimer.current) clearTimeout(flashTimer.current)
+        flashTimer.current = setTimeout(() => {
+          setLoadFlash(false)
+          setLoadMsg(null)
+        }, 1200)
+      }
+    } catch (e) {
+      setLoadMsg(e instanceof Error ? e.message : 'Load failed')
+      setLoadFlash(true)
+      if (flashTimer.current) clearTimeout(flashTimer.current)
+      flashTimer.current = setTimeout(() => {
+        setLoadFlash(false)
+        setLoadMsg(null)
+      }, 2000)
+    }
+  }
 
   function go(delta: number) {
     const next = Math.max(0, Math.min(totalLoaded - 1, index + delta))
     if (next === index) return
     setIndex(next)
     const entry = items[next]
-    if (entry) onSelect?.(entry)
+    // Preview only — explicit Load applies into the main panel (avoids surprise overwrite)
+    void entry
   }
 
   function selectCurrent() {
-    if (current) onSelect?.(current)
+    if (!current) return
+    applyLoad(current)
   }
 
   return (
@@ -126,7 +174,7 @@ export function AiRunNavigator({
             ) : null}
           </p>
           <p className="text-[9px] text-slate-600">
-            {source === 'cloud' ? 'cloud + local' : 'this browser'} · live generations only ·{' '}
+            {source === 'cloud' ? 'cloud + local' : 'this browser'} ·{' '}
             <Link href="/ai-history" className="text-indigo-500 hover:underline">
               full history
             </Link>
@@ -169,64 +217,66 @@ export function AiRunNavigator({
       <div className="space-y-2 px-2.5 py-2">
         {error && <p className="text-[10px] text-red-400">{error}</p>}
         {!loading && totalLoaded === 0 && (
-          <p className="text-[10px] text-slate-600">
+          <p className="text-[10px] text-slate-600 opacity-30">
             No saved runs yet. Generate once — each re-run is recorded so you can compare
             responses.
           </p>
         )}
         {current && (
           <>
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div className="min-w-0">
-                <p className="text-[10px] text-slate-500">
-                  {current.createdAt
-                    ? new Date(current.createdAt).toLocaleString()
-                    : '—'}
-                  {current.model ? ` · ${current.model}` : ''}
-                  {current.error ? ' · error' : ''}
-                </p>
-                {current.userComment?.trim() && (
-                  <p className="mt-1 text-[10px] text-amber-200/80 line-clamp-2">
-                    Note: {current.userComment.trim()}
-                  </p>
-                )}
-              </div>
-              <div className="flex flex-col gap-1 shrink-0">
-                {onSelect && (
-                  <button
-                    type="button"
-                    onClick={selectCurrent}
-                    className="rounded border border-emerald-800/50 px-2 py-0.5 text-[10px] text-emerald-300 hover:bg-emerald-950/40"
-                    data-testid={`${testId}-load`}
-                  >
-                    Load this run
-                  </button>
-                )}
+            {/* Single compact action row: meta | Load · Prompt */}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <p className="min-w-0 flex-1 text-[10px] text-slate-500">
+                {current.createdAt
+                  ? new Date(current.createdAt).toLocaleString()
+                  : '—'}
+                {current.model ? ` · ${current.model}` : ''}
+                {current.error ? ' · error' : ''}
+              </p>
+              <div className="flex items-center gap-1.5 shrink-0">
                 <button
                   type="button"
-                  onClick={() => setShowPrompt((v) => !v)}
-                  className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:text-indigo-300"
-                  data-testid={`${testId}-toggle-prompt`}
+                  disabled={!canLoad}
+                  onClick={selectCurrent}
+                  className={`rounded border px-1.5 py-0.5 text-[10px] transition-opacity focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-30 ${
+                    loadFlash
+                      ? 'border-emerald-600/60 bg-emerald-950/40 text-emerald-200 opacity-100'
+                      : 'border-emerald-800/40 text-emerald-300/90 opacity-30 hover:opacity-100 hover:bg-emerald-950/30'
+                  }`}
+                  data-testid={`${testId}-load`}
                 >
-                  {showPrompt ? 'Hide prompt' : 'Show prompt'}
+                  {loadFlash && loadMsg ? loadMsg : 'Load'}
                 </button>
+                {hasPrompt ? (
+                  <AiPromptReveal
+                    system={current.promptSystem}
+                    user={current.promptUser}
+                    mode={current.mode}
+                    align="right"
+                    testId={`${testId}-prompt`}
+                  />
+                ) : (
+                  <span
+                    className="rounded border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-600 opacity-30"
+                    data-testid={`${testId}-prompt-empty`}
+                  >
+                    Prompt
+                  </span>
+                )}
               </div>
             </div>
-            <div className="mt-2 max-h-48 overflow-y-auto rounded border border-slate-800/60 bg-slate-950/40 p-2">
+            {current.userComment?.trim() && (
+              <p className="text-[10px] text-amber-200/80 line-clamp-2">
+                Note: {current.userComment.trim()}
+              </p>
+            )}
+            <div className="max-h-48 overflow-y-auto rounded border border-slate-800/60 bg-slate-950/40 p-2">
               <AiGenerationView
                 entry={current}
                 density="full"
                 testId={`${testId}-body`}
               />
             </div>
-            {showPrompt && (
-              <AiPromptReveal
-                system={current.promptSystem}
-                user={current.promptUser}
-                mode={current.mode}
-                testId={`${testId}-prompt`}
-              />
-            )}
             <AiUserComment
               generationId={current.id}
               initialComment={current.userComment}
@@ -252,11 +302,11 @@ export function AiRunNavigator({
           <button
             type="button"
             disabled={loading}
-            onClick={() => void load(true, cursor)}
-            className="w-full rounded border border-slate-700 py-1 text-[10px] text-slate-400 hover:text-indigo-300 disabled:opacity-40"
+            onClick={() => void fetchPage(true, cursor)}
+            className="w-full rounded border border-slate-700 py-1 text-[10px] text-slate-400 opacity-30 hover:opacity-100 hover:text-indigo-300 disabled:opacity-30"
             data-testid={`${testId}-more`}
           >
-            {loading ? 'Loading…' : 'Load older runs'}
+            {loading ? 'Loading…' : 'Older'}
           </button>
         )}
       </div>

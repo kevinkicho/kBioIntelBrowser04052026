@@ -179,7 +179,7 @@ export default function AiHistoryPage() {
           e.context?.geneSymbol,
           String(e.context?.cid ?? ''),
           e.context?.packId,
-          e.projectId,
+          e.context?.projectId,
         ]
           .filter(Boolean)
           .join(' ')

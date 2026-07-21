@@ -6,12 +6,12 @@ import { useAI } from '@/lib/ai/useAI'
 import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import {
   type DiseaseDetailContext,
   type DiseaseIntelligenceMode,
   DISEASE_INTELLIGENCE_MODES,
   buildDiseaseIntelligencePrompt,
-  diseasePromptParameters,
 } from '@/lib/ai/diseasePrompts'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { renderInsightMarkdown } from '@/lib/sanitize'
@@ -45,7 +45,6 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
     connections: emptyMode(),
     custom: emptyMode(),
   }))
-  const [showPrompt, setShowPrompt] = useState(false)
   const [regenOpen, setRegenOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [followUp, setFollowUp] = useState('')
@@ -72,8 +71,6 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
     diseaseId: context.diseaseId,
     targets: topTargets.length > 0 ? topTargets : undefined,
   })
-
-  const params = useMemo(() => diseasePromptParameters(context), [context])
 
   useEffect(() => {
     mountedRef.current = true
@@ -316,14 +313,22 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                 <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">{meta.description}</p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
-                <button
-                  type="button"
-                  onClick={() => setShowPrompt((s) => !s)}
-                  className="rounded-lg border border-slate-700 px-2.5 py-1 text-[10px] text-slate-400 hover:text-indigo-300 hover:border-indigo-700/50"
-                  data-testid="disease-intel-show-prompt"
-                >
-                  {showPrompt ? 'Hide prompt' : 'Show prompt'}
-                </button>
+                {active.prompt && (active.prompt.system || active.prompt.user) ? (
+                  <AiPromptReveal
+                    system={active.prompt.system}
+                    user={active.prompt.user}
+                    mode={`disease_${activeTab}`}
+                    align="right"
+                    testId="disease-intel-prompt"
+                  />
+                ) : (
+                  <span
+                    className="rounded border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-600 opacity-30"
+                    data-testid="disease-intel-prompt-empty"
+                  >
+                    Prompt
+                  </span>
+                )}
                 {active.isStreaming ? (
                   <button
                     type="button"
@@ -374,24 +379,6 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                   className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:border-indigo-600 focus:outline-none"
                 />
               </div>
-            )}
-
-            {showPrompt && (
-              <PromptTransparency
-                mode={activeTab}
-                prompt={
-                  active.prompt ??
-                  buildDiseaseIntelligencePrompt(
-                    activeTab,
-                    context,
-                    activeTab === 'custom' ? customDraft : undefined,
-                  )
-                }
-                params={params}
-                customQuestion={
-                  activeTab === 'custom' ? customDraft || active.customQuestion : undefined
-                }
-              />
             )}
 
             {(() => {
@@ -643,63 +630,6 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
         }}
       />
     </section>
-  )
-}
-
-function PromptTransparency({
-  mode,
-  prompt,
-  params,
-  customQuestion,
-}: {
-  mode: DiseaseIntelligenceMode
-  prompt: { system: string; user: string }
-  params: Record<string, string | number>
-  customQuestion?: string
-}) {
-  return (
-    <div
-      className="mb-4 rounded-lg border border-slate-800 bg-slate-950/70 p-3 space-y-2"
-      data-testid="disease-intel-prompt"
-    >
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-        Prompt used · mode={mode}
-        {customQuestion ? ` · question set` : ''}
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {Object.entries(params).map(([k, v]) => (
-          <span
-            key={k}
-            className="rounded border border-slate-800 bg-slate-900 px-1.5 py-0.5 font-mono text-[9px] text-slate-500"
-            title={`${k}=${v}`}
-          >
-            <span className="text-slate-600">{k}=</span>
-            {String(v).length > 28 ? `${String(v).slice(0, 26)}…` : String(v)}
-          </span>
-        ))}
-      </div>
-      <details className="text-[10px] text-slate-500">
-        <summary className="cursor-pointer text-indigo-400/90 hover:text-indigo-300">
-          System prompt ({prompt.system.length} chars)
-        </summary>
-        <pre className="mt-1 max-h-36 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-black/40 p-2 text-[9px] text-slate-500">
-          {prompt.system.slice(0, 5000)}
-          {prompt.system.length > 5000 ? '\n…' : ''}
-        </pre>
-      </details>
-      <details className="text-[10px] text-slate-500">
-        <summary className="cursor-pointer text-indigo-400/90 hover:text-indigo-300">
-          User prompt + data block ({prompt.user.length} chars)
-        </summary>
-        <pre className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-black/40 p-2 text-[9px] text-slate-500">
-          {prompt.user.slice(0, 8000)}
-          {prompt.user.length > 8000 ? '\n…' : ''}
-        </pre>
-      </details>
-      <Link href="/how-it-works" className="inline-block text-[10px] text-indigo-400 hover:underline">
-        How AI is wired →
-      </Link>
-    </div>
   )
 }
 

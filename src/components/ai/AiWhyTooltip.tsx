@@ -1,8 +1,9 @@
 'use client'
 
 /**
- * Accessible “why AI recommended this” tooltip for suggestions / rank chips.
- * Custom hover/focus panel only — do not set native `title` (avoids duplicate tooltips).
+ * Styled “why AI recommended this” tooltip attached to the *actual* target.
+ * - Wraps children (button, badge, list row text, …) — never a separate “why?” chip
+ * - Custom hover/focus panel only — never set native `title` (no duplicate tooltips)
  */
 
 import { useId, useState, type ReactNode } from 'react'
@@ -10,10 +11,8 @@ import type { AiWhyParts } from '@/lib/ai/aiWhyTooltip'
 
 export interface AiWhyTooltipProps {
   why: AiWhyParts
-  /** Visible trigger content (badge, icon, etc.) */
-  children?: ReactNode
-  /** Default: small “why?” chip */
-  label?: string
+  /** The real UI control that owns the explanation (required). */
+  children: ReactNode
   className?: string
   /** Prefer left/right placement in tight rows */
   align?: 'left' | 'right'
@@ -23,7 +22,6 @@ export interface AiWhyTooltipProps {
 export function AiWhyTooltip({
   why,
   children,
-  label = 'why?',
   className = '',
   align = 'left',
   testId = 'ai-why-tooltip',
@@ -34,52 +32,41 @@ export function AiWhyTooltip({
 
   return (
     <span
-      className={`relative inline-flex items-center ${className}`}
+      className={`relative inline-flex max-w-full items-center ${className}`}
       data-testid={testId}
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(e) => {
+        // Keep open while focus moves inside the wrapper
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setOpen(false)
+        }
+      }}
     >
-      <button
-        type="button"
-        className="inline-flex items-center gap-0.5 rounded border border-violet-800/50 bg-violet-950/40 px-1 py-0.5 text-[9px] font-medium text-violet-200/90 hover:bg-violet-900/50 hover:text-violet-100 focus:outline-none focus-visible:ring-1 focus-visible:ring-violet-500"
+      <span
+        className="inline-flex max-w-full min-w-0"
         aria-describedby={open ? panelId : undefined}
-        aria-expanded={open}
-        aria-label={why.summary || why.fullText || 'Why AI recommended this'}
-        data-testid={`${testId}-trigger`}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        onClick={(e) => {
-          e.preventDefault()
-          e.stopPropagation()
-          setOpen((v) => !v)
-        }}
       >
-        {children ?? (
-          <>
-            <span aria-hidden className="opacity-80">
-              ?
-            </span>
-            <span>{label}</span>
-          </>
-        )}
-      </button>
+        {children}
+      </span>
       {open && (
         <span
           id={panelId}
           role="tooltip"
           data-testid={`${testId}-panel`}
-          className={`absolute z-50 mt-1 w-64 max-w-[min(18rem,80vw)] rounded-lg border border-violet-800/50 bg-slate-950 px-2.5 py-2 text-left shadow-xl shadow-black/40 ${
+          className={`pointer-events-none absolute z-[60] mt-1 w-64 max-w-[min(18rem,80vw)] rounded-lg border border-violet-800/50 bg-slate-950 px-2.5 py-2 text-left shadow-xl shadow-black/40 ${
             align === 'right' ? 'right-0 top-full' : 'left-0 top-full'
           }`}
         >
-          <span className="block text-[10px] font-semibold text-violet-200 mb-1">
+          <span className="mb-1 block text-[10px] font-semibold text-violet-200">
             Why this AI suggestion
           </span>
           <span className="block space-y-0.5">
             {why.lines.map((line) => (
               <span
                 key={line}
-                className="block text-[10px] leading-snug text-slate-300 whitespace-pre-wrap"
+                className="block whitespace-pre-wrap text-[10px] leading-snug text-slate-300"
               >
                 {line}
               </span>
@@ -90,6 +77,7 @@ export function AiWhyTooltip({
           </span>
         </span>
       )}
+      <span className="sr-only">{why.fullText || why.summary}</span>
     </span>
   )
 }

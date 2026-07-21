@@ -1,9 +1,9 @@
 'use client'
 
 /**
- * Debounced dropdown typeahead for universities / colleges / research labs.
- * Live free APIs only (via /api/orgs/suggest) — never mock rows.
- * Dropdown is portaled to document.body so parent overflow / stacking cannot clip it.
+ * Debounced gene symbol/name typeahead for /gene.
+ * Live free API only (via /api/search/gene · MyGene.info) — never mock rows.
+ * Dropdown is portaled so parent overflow cannot clip it.
  */
 
 import {
@@ -16,23 +16,29 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
-import {
-  orgSuggestSourceLabel,
-  type OrgSuggestion,
-} from '@/lib/orgs/orgSuggest'
 
-export interface OrgSearchSuggestProps {
+export interface GeneSuggestion {
+  geneId: string
+  symbol: string
+  name: string
+  summary: string
+  chromosome: string
+  typeOfGene: string
+  aliases: string[]
+}
+
+export interface GeneSearchSuggestProps {
   value: string
   onChange: (value: string) => void
-  /** Country filter forwarded to suggest API (ISO2). */
-  country?: string
   placeholder?: string
   disabled?: boolean
   className?: string
   inputClassName?: string
   testId?: string
-  /** Called when user picks a suggestion (fills field; parent may run pipeline). */
-  onSelectSuggestion?: (suggestion: OrgSuggestion) => void
+  /** Pick a suggestion (navigate or run full search). */
+  onSelectSuggestion?: (suggestion: GeneSuggestion) => void
+  /** Submit free-text (Enter when no highlight / empty list). */
+  onSubmitQuery?: (query: string) => void
   autoFocus?: boolean
 }
 
@@ -42,18 +48,18 @@ interface DropdownRect {
   width: number
 }
 
-export function OrgSearchSuggest({
+export function GeneSearchSuggest({
   value,
   onChange,
-  country = '',
-  placeholder = 'e.g. Harvard, Karolinska, Pasteur, Mayo…',
+  placeholder = 'Search a gene (e.g. BRCA1, TP53, EGFR)…',
   disabled = false,
   className = '',
   inputClassName = '',
-  testId = 'orgs-search-input',
+  testId = 'gene-search-input',
   onSelectSuggestion,
+  onSubmitQuery,
   autoFocus = false,
-}: OrgSearchSuggestProps) {
+}: GeneSearchSuggestProps) {
   const listId = useId()
   const containerRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -62,12 +68,11 @@ export function OrgSearchSuggest({
   const abortRef = useRef<AbortController | null>(null)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const [suggestions, setSuggestions] = useState<OrgSuggestion[]>([])
+  const [suggestions, setSuggestions] = useState<GeneSuggestion[]>([])
   const [highlight, setHighlight] = useState(0)
   const [fetchError, setFetchError] = useState<string | null>(null)
   const [menuRect, setMenuRect] = useState<DropdownRect | null>(null)
   const [mounted, setMounted] = useState(false)
-  /** Skip fetch right after programmatic select */
   const skipFetchRef = useRef(false)
 
   const close = useCallback(() => {
@@ -134,19 +139,16 @@ export function OrgSearchSuggest({
       abortRef.current = ac
       setLoading(true)
       setFetchError(null)
-      // Open panel while loading so the user sees activity
       setOpen(true)
       try {
         const params = new URLSearchParams({ q, limit: '12' })
-        if (country) params.set('country', country)
-        const res = await fetch(`/api/orgs/suggest?${params.toString()}`, {
+        const res = await fetch(`/api/search/gene?${params.toString()}`, {
           signal: ac.signal,
           headers: { Accept: 'application/json' },
           cache: 'no-store',
         })
         const data = (await res.json().catch(() => ({}))) as {
-          ok?: boolean
-          suggestions?: OrgSuggestion[]
+          results?: GeneSuggestion[]
           error?: string
         }
         if (ac.signal.aborted) return
@@ -156,7 +158,7 @@ export function OrgSearchSuggest({
           setOpen(true)
           return
         }
-        const rows = Array.isArray(data.suggestions) ? data.suggestions : []
+        const rows = Array.isArray(data.results) ? data.results : []
         setSuggestions(rows)
         setOpen(true)
         setHighlight(0)
@@ -173,11 +175,11 @@ export function OrgSearchSuggest({
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
     }
-  }, [value, country])
+  }, [value])
 
-  function pick(s: OrgSuggestion) {
+  function pick(s: GeneSuggestion) {
     skipFetchRef.current = true
-    onChange(s.name)
+    onChange(s.symbol || s.name)
     setSuggestions([])
     setFetchError(null)
     close()
@@ -190,19 +192,28 @@ export function OrgSearchSuggest({
       close()
       return
     }
-    if (!open) return
-    if (suggestions.length === 0) return
+    if (e.key === 'Enter') {
+      if (open && suggestions.length > 0 && suggestions[highlight]) {
+        e.preventDefault()
+        e.stopPropagation()
+        pick(suggestions[highlight]!)
+        return
+      }
+      e.preventDefault()
+      const q = value.trim()
+      if (q.length >= 2) {
+        close()
+        onSubmitQuery?.(q)
+      }
+      return
+    }
+    if (!open || suggestions.length === 0) return
     if (e.key === 'ArrowDown') {
       e.preventDefault()
       setHighlight((i) => Math.min(suggestions.length - 1, i + 1))
     } else if (e.key === 'ArrowUp') {
       e.preventDefault()
       setHighlight((i) => Math.max(0, i - 1))
-    } else if (e.key === 'Enter') {
-      e.preventDefault()
-      e.stopPropagation()
-      const s = suggestions[highlight]
-      if (s) pick(s)
     }
   }
 
@@ -226,7 +237,7 @@ export function OrgSearchSuggest({
         data-testid={`${testId}-dropdown`}
       >
         <li className="sticky top-0 z-[1] border-b border-slate-800 bg-slate-900 px-3 py-1.5 text-[9px] uppercase tracking-wide text-slate-500">
-          Live suggestions · ROR · Scorecard · OpenAlex
+          Live suggestions · MyGene.info
           {loading ? ' · loading…' : suggestions.length ? ` · ${suggestions.length}` : ''}
         </li>
         {fetchError && (
@@ -236,13 +247,16 @@ export function OrgSearchSuggest({
         )}
         {!loading && !fetchError && suggestions.length === 0 && (
           <li className="px-3 py-3 text-[11px] text-slate-500" role="status">
-            No matches for “{value.trim()}”. Try a shorter name or another country filter.
+            No gene matches for “{value.trim()}”. Try a symbol (BRCA1) or name.
           </li>
         )}
         {suggestions.map((s, i) => {
           const active = i === highlight
+          const meta = [s.typeOfGene, s.chromosome ? `chr ${s.chromosome}` : '', s.name]
+            .filter(Boolean)
+            .join(' · ')
           return (
-            <li key={s.id} role="presentation">
+            <li key={`${s.geneId}-${s.symbol}`} role="presentation">
               <button
                 type="button"
                 id={`${listId}-opt-${i}`}
@@ -250,33 +264,32 @@ export function OrgSearchSuggest({
                 aria-selected={active}
                 className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors ${
                   active
-                    ? 'bg-emerald-900/50 text-slate-50'
+                    ? 'bg-violet-900/50 text-slate-50'
                     : 'text-slate-200 hover:bg-slate-800'
                 }`}
                 onMouseEnter={() => setHighlight(i)}
                 onMouseDown={(ev) => {
-                  // Prevent input blur before click registers
                   ev.preventDefault()
                 }}
                 onClick={() => pick(s)}
                 data-testid={`${testId}-option`}
               >
                 <span className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-medium">{s.name}</span>
-                  <span
-                    className={`rounded border px-1 py-px text-[9px] font-semibold uppercase ${
-                      s.source === 'ror'
-                        ? 'border-violet-800/50 text-violet-300'
-                        : s.source === 'college'
-                          ? 'border-sky-800/50 text-sky-300'
-                          : 'border-amber-800/50 text-amber-300'
-                    }`}
-                  >
-                    {orgSuggestSourceLabel(s.source)}
-                  </span>
+                  <span className="font-semibold text-violet-200">{s.symbol || s.geneId}</span>
+                  {s.geneId && (
+                    <span className="font-mono text-[9px] text-slate-500">Entrez {s.geneId}</span>
+                  )}
+                  {s.typeOfGene && (
+                    <span className="rounded border border-slate-700 px-1 py-px text-[9px] text-slate-500">
+                      {s.typeOfGene}
+                    </span>
+                  )}
                 </span>
-                {s.meta && (
-                  <span className="text-[10px] text-slate-500 line-clamp-1">{s.meta}</span>
+                {meta && (
+                  <span className="text-[10px] text-slate-500 line-clamp-1">{meta}</span>
+                )}
+                {s.summary && (
+                  <span className="text-[10px] text-slate-600 line-clamp-1">{s.summary}</span>
                 )}
               </button>
             </li>
@@ -306,9 +319,7 @@ export function OrgSearchSuggest({
         value={value}
         disabled={disabled}
         autoFocus={autoFocus}
-        onChange={(e) => {
-          onChange(e.target.value)
-        }}
+        onChange={(e) => onChange(e.target.value)}
         onFocus={() => {
           if (value.trim().length >= 2) {
             updateMenuRect()
@@ -319,7 +330,7 @@ export function OrgSearchSuggest({
         placeholder={placeholder}
         className={
           inputClassName ||
-          'w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 pr-16 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-600 focus:outline-none'
+          'w-full rounded-xl border border-slate-600 bg-slate-800 px-5 py-3 pr-16 text-slate-100 placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500'
         }
         data-testid={testId}
         autoComplete="off"

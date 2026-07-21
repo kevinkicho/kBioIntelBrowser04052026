@@ -18,6 +18,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
+import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 
 const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_executive_brief', label: 'Executive brief' },
@@ -185,16 +186,14 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   }
 
   function restorePackEntry(entry: AiGeneratedRecord) {
-    try {
-      const next = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
-      if (next?.summary || next?.claimIds) {
-        setInsight(next)
-        setError(null)
-        setActiveGenId(entry.id)
-      }
-    } catch {
-      setError('Could not load that generation')
+    const next = parseAiGenerationInsight(entry)
+    if (next) {
+      setInsight(next)
+      setError(entry.error || null)
+      setActiveGenId(entry.id)
+      return
     }
+    setError('Could not load that generation')
   }
 
   return (
@@ -249,7 +248,11 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
 
       <div className="mb-2 flex flex-wrap items-center gap-1">
         {MODES.map((m) => (
-          <span key={m.id} className="inline-flex items-center gap-0.5">
+          <AiWhyTooltip
+            key={m.id}
+            why={buildPackAiModeWhy(m.id)}
+            testId={`pack-ai-why-${m.id}`}
+          >
             <button
               type="button"
               onClick={() => {
@@ -257,7 +260,6 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
                 setInsight(null)
                 setError(null)
               }}
-              title={packModeTaskLabel(m.id)}
               className={`rounded border px-2 py-1 text-[10px] ${
                 mode === m.id
                   ? m.id === 'pack_custom_prompt'
@@ -269,12 +271,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
             >
               {m.label}
             </button>
-            <AiWhyTooltip
-              why={buildPackAiModeWhy(m.id)}
-              testId={`pack-ai-why-${m.id}`}
-              label="why?"
-            />
-          </span>
+          </AiWhyTooltip>
         ))}
       </div>
 
@@ -399,13 +396,15 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
                 {insight.nextSteps.map((s) => (
                   <li key={s} className="flex items-start gap-1.5">
                     <span className="mt-0.5 text-emerald-600">•</span>
-                    <span className="flex-1 leading-snug">{s}</span>
                     <AiWhyTooltip
                       why={buildInsightNextStepWhy(s, insight.claimIds)}
                       testId="pack-ai-why-next"
-                      label="why?"
-                      align="right"
-                    />
+                      className="min-w-0 flex-1"
+                    >
+                      <span className="block cursor-help leading-snug underline decoration-dotted decoration-emerald-800/50 underline-offset-2">
+                        {s}
+                      </span>
+                    </AiWhyTooltip>
                   </li>
                 ))}
               </ul>
@@ -420,13 +419,15 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
                 {insight.risks.map((s) => (
                   <li key={s} className="flex items-start gap-1.5">
                     <span className="mt-0.5 text-amber-600">•</span>
-                    <span className="flex-1 leading-snug">{s}</span>
                     <AiWhyTooltip
                       why={buildInsightNextStepWhy(s, insight.claimIds)}
                       testId="pack-ai-why-risk"
-                      label="why?"
-                      align="right"
-                    />
+                      className="min-w-0 flex-1"
+                    >
+                      <span className="block cursor-help leading-snug underline decoration-dotted decoration-amber-800/50 underline-offset-2">
+                        {s}
+                      </span>
+                    </AiWhyTooltip>
                   </li>
                 ))}
               </ul>

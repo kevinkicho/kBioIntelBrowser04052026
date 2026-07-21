@@ -24,6 +24,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
+import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 
 const LAB_MODES: { id: PackAiMode; label: string; labLabel: string }[] = [
   { id: 'pack_executive_brief', label: 'Affiliation brief', labLabel: 'Affiliation brief' },
@@ -162,16 +163,14 @@ export function ResearchLabAiPanel({
   }
 
   function restoreEntry(entry: AiGeneratedRecord) {
-    try {
-      const next = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
-      if (next?.summary || next?.claimIds) {
-        setInsight(next)
-        setError(null)
-        setActiveGenId(entry.id)
-      }
-    } catch {
-      setError('Could not load that generation')
+    const next = parseAiGenerationInsight(entry)
+    if (next) {
+      setInsight(next)
+      setError(entry.error || null)
+      setActiveGenId(entry.id)
+      return
     }
+    setError('Could not load that generation')
   }
 
   if (!pack) return null
@@ -190,7 +189,7 @@ export function ResearchLabAiPanel({
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
         {LAB_MODES.map((m) => (
-          <span key={m.id} className="inline-flex items-center gap-0.5">
+          <AiWhyTooltip key={m.id} why={buildPackAiModeWhy(m.id)} testId={`lab-ai-why-${m.id}`}>
             <button
               type="button"
               onClick={() => {
@@ -198,7 +197,6 @@ export function ResearchLabAiPanel({
                 setInsight(null)
                 setError(null)
               }}
-              title={packModeTaskLabel(m.id)}
               className={`rounded-lg border px-2 py-1 text-[11px] ${
                 mode === m.id
                   ? 'border-violet-600 bg-violet-900/50 text-violet-100'
@@ -207,8 +205,7 @@ export function ResearchLabAiPanel({
             >
               {m.labLabel}
             </button>
-            <AiWhyTooltip why={buildPackAiModeWhy(m.id)} testId={`lab-ai-why-${m.id}`} />
-          </span>
+          </AiWhyTooltip>
         ))}
       </div>
       <p className="mt-1.5 text-[10px] text-slate-500">{packModeTaskLabel(mode)}</p>
@@ -307,13 +304,16 @@ export function ResearchLabAiPanel({
               <p className="text-[10px] font-semibold uppercase text-slate-400">Next</p>
               <ul className="space-y-1 text-[11px] text-slate-300">
                 {insight.nextSteps.map((s) => (
-                  <li key={s} className="flex items-start gap-1.5">
-                    <span className="flex-1">{s}</span>
+                  <li key={s}>
                     <AiWhyTooltip
                       why={buildInsightNextStepWhy(s, insight.claimIds)}
                       testId="lab-ai-why-next"
-                      align="right"
-                    />
+                      className="w-full"
+                    >
+                      <span className="block cursor-help leading-snug underline decoration-dotted decoration-slate-600 underline-offset-2">
+                        {s}
+                      </span>
+                    </AiWhyTooltip>
                   </li>
                 ))}
               </ul>
@@ -324,13 +324,16 @@ export function ResearchLabAiPanel({
               <p className="text-[10px] font-semibold uppercase text-slate-400">Risks / limits</p>
               <ul className="space-y-1 text-[11px] text-amber-200/90">
                 {insight.risks.map((s) => (
-                  <li key={s} className="flex items-start gap-1.5">
-                    <span className="flex-1">{s}</span>
+                  <li key={s}>
                     <AiWhyTooltip
                       why={buildInsightNextStepWhy(s, insight.claimIds)}
                       testId="lab-ai-why-risk"
-                      align="right"
-                    />
+                      className="w-full"
+                    >
+                      <span className="block cursor-help leading-snug underline decoration-dotted decoration-amber-800/60 underline-offset-2">
+                        {s}
+                      </span>
+                    </AiWhyTooltip>
                   </li>
                 ))}
               </ul>

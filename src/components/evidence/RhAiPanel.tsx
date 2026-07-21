@@ -181,12 +181,27 @@ export function RhAiPanel({
 
   function restoreRhEntry(entry: AiGeneratedRecord) {
     try {
-      const next = (entry.task ?? JSON.parse(entry.content)) as RhStructuredInsight
-      if (next?.summary || next?.claimIds) {
-        setInsight(next)
-        setError(null)
-        setActiveGenId(entry.id)
+      let next: RhStructuredInsight | null = null
+      if (entry.task && typeof entry.task === 'object') {
+        next = entry.task as RhStructuredInsight
+      } else if (entry.content?.trim()) {
+        try {
+          next = JSON.parse(entry.content) as RhStructuredInsight
+        } catch {
+          next = {
+            summary: entry.content,
+            claimIds: [],
+            confidence: 'low',
+          }
+        }
       }
+      if (next && (next.summary || next.claimIds?.length || next.sections)) {
+        setInsight(next)
+        setError(entry.error || null)
+        setActiveGenId(entry.id)
+        return
+      }
+      setError('Could not load that generation')
     } catch {
       setError('Could not load that generation')
     }

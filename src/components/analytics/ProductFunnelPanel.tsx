@@ -157,7 +157,7 @@ export function ProductFunnelPanel() {
         </div>
       </div>
 
-      {/* M1 north-star strip with completedLoops */}
+      {/* M1 north-star strip with completedLoops — empty tiles at opacity 0.3 */}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {(
           [
@@ -166,29 +166,47 @@ export function ProductFunnelPanel() {
             ['Board added', funnel.boardedCount, 'M1'],
             ['Completed loops', funnel.completedLoops, 'M1'],
           ] as const
-        ).map(([label, count, metric]) => (
-          <div
-            key={label}
-            className="rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2"
-          >
-            <div className="text-[10px] font-medium uppercase tracking-wide text-indigo-400/80">
-              {metric}
+        ).map(([label, count, metric]) => {
+          const empty = count == null || count === 0
+          return (
+            <div
+              key={label}
+              className={`rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 ${
+                empty ? 'opacity-30' : ''
+              }`}
+              data-empty={empty ? 'true' : undefined}
+            >
+              <div className="text-[10px] font-medium uppercase tracking-wide text-indigo-400/80">
+                {metric}
+              </div>
+              <div className="text-2xl font-bold text-slate-100">
+                {count == null ? '—' : count}
+              </div>
+              <div className="text-[11px] text-slate-500">{label}</div>
             </div>
-            <div className="text-2xl font-bold text-slate-100">{count}</div>
-            <div className="text-[11px] text-slate-500">{label}</div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs">
+        <div
+          className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
+            !funnel.packOrRhCount ? 'opacity-30' : ''
+          }`}
+          data-empty={!funnel.packOrRhCount ? 'true' : undefined}
+        >
           <div className="text-[10px] uppercase text-slate-500">Pack / RH events</div>
           <div className="text-lg font-semibold text-slate-100">{funnel.packOrRhCount}</div>
           <div className="text-[10px] text-slate-600">
             includes pack_exported · rate {(funnel.packOrRhRate * 100).toFixed(0)}% of board
           </div>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs">
+        <div
+          className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
+            funnel.medianCitable == null ? 'opacity-30' : ''
+          }`}
+          data-empty={funnel.medianCitable == null ? 'true' : undefined}
+        >
           <div className="text-[10px] uppercase text-slate-500">M3 median citable</div>
           <div className="text-lg font-semibold text-slate-100">
             {funnel.medianCitable != null ? funnel.medianCitable : '—'}
@@ -198,7 +216,12 @@ export function ProductFunnelPanel() {
             {funnel.meanClaimCount != null ? funnel.meanClaimCount.toFixed(1) : '—'}
           </div>
         </div>
-        <div className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs">
+        <div
+          className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
+            funnel.m7.p50 == null && funnel.m7.p95 == null ? 'opacity-30' : ''
+          }`}
+          data-empty={funnel.m7.p50 == null && funnel.m7.p95 == null ? 'true' : undefined}
+        >
           <div className="text-[10px] uppercase text-slate-500">M7 shortlist (rank ms)</div>
           <div className="text-lg font-semibold text-slate-100">
             P50 {funnel.m7.p50 != null ? `${Math.round(funnel.m7.p50)}ms` : '—'} · P95{' '}

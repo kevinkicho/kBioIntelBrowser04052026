@@ -65,27 +65,21 @@ export function AskTab({
           </p>
           <div className="mt-3 space-y-1.5">
             {suggestions.map((s) => (
-              <div
+              <AiWhyTooltip
                 key={s}
-                className="flex items-stretch gap-1 rounded border border-slate-700/20 bg-slate-800/40 hover:border-indigo-700/40"
+                why={buildAskSuggestionWhy(s)}
+                testId="ask-suggest-why"
+                className="w-full"
               >
                 <button
                   type="button"
                   onClick={() => onAsk(s)}
                   disabled={!aiAvailable}
-                  className="flex-1 text-left text-[10px] text-slate-400 hover:text-indigo-300 hover:bg-indigo-900/30 rounded-l px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  className="w-full rounded border border-slate-700/20 bg-slate-800/40 text-left text-[10px] text-slate-400 hover:border-indigo-700/40 hover:text-indigo-300 hover:bg-indigo-900/30 px-3 py-1.5 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                 >
                   {s}
                 </button>
-                <div className="flex items-center pr-1.5">
-                  <AiWhyTooltip
-                    why={buildAskSuggestionWhy(s)}
-                    testId="ask-suggest-why"
-                    label="why?"
-                    align="right"
-                  />
-                </div>
-              </div>
+              </AiWhyTooltip>
             ))}
           </div>
         </div>

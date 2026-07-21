@@ -164,6 +164,26 @@ const ENTRIES: Record<string, PanelSourceEntry> = {
     docs: 'https://purplebooksearch.fda.gov/',
     endpoint: 'https://api.fda.gov/drug/drugsfda.json',
   },
+  /**
+   * Portal-first deep-link panels (no free product→plant / multi-regulator JSON join).
+   * Bottom-bar provenance still required so users know which official registries open.
+   */
+  'establishment-links': {
+    source: 'U.S. FDA',
+    api: 'DRLS · FEI · Data Dashboard',
+    description:
+      'Portal-first manufacturing / establishment deep links: Drug Establishments Current Registration (DRLS), FEI Portal, FDA inspections dashboard, and FDA.gov firm search. There is no free public API that joins every product to certified plants — search official registries by firm name. Not GMP advice or a certification graph.',
+    docs: 'https://www.accessdata.fda.gov/scripts/cder/drls/default.cfm',
+    endpoint: 'https://www.accessdata.fda.gov/scripts/cder/drls/default.cfm',
+  },
+  'international-regulators': {
+    source: 'EMA · MHRA · TGA · PMDA · Health Canada · FDA',
+    api: 'Regulator public portals',
+    description:
+      'Portal-first international medicines regulator deep links (UK MHRA, AU TGA, JP PMDA, EU EMA, Health Canada, US FDA). Official public search / download URLs only — no scrape. Not clinical decision support.',
+    docs: 'https://www.ema.europa.eu/en/medicines/download-medicine-data',
+    endpoint: 'https://www.ema.europa.eu/en/search',
+  },
 }
 
 const PANEL_SOURCE_MAP: Record<string, PanelSourceInfo> = {}

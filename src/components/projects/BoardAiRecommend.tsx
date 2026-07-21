@@ -133,11 +133,15 @@ export function BoardAiRecommend({
 
   function restoreFromHistory(entry: AiGeneratedRecord) {
     try {
-      const parsed = entry.task
-        ? (entry.task as AiRankResult)
-        : (JSON.parse(entry.content) as AiRankResult)
-      if (parsed?.ordering) {
+      let parsed: AiRankResult | null = null
+      if (entry.task && typeof entry.task === 'object') {
+        parsed = entry.task as AiRankResult
+      } else if (entry.content?.trim()) {
+        parsed = JSON.parse(entry.content) as AiRankResult
+      }
+      if (parsed?.ordering?.length) {
         setResult(parsed)
+        setError(null)
         setActiveGenId(entry.id)
         if (entry.promptSystem || entry.promptUser) {
           setLastPrompt({
@@ -145,7 +149,9 @@ export function BoardAiRecommend({
             user: entry.promptUser || '',
           })
         }
+        return
       }
+      setError('Could not restore that generation')
     } catch {
       setError('Could not restore that generation')
     }
@@ -231,23 +237,23 @@ export function BoardAiRecommend({
             return (
               <li key={item.key} className="leading-snug" data-testid="board-ai-suggest-row">
                 <span className="inline-flex flex-wrap items-center gap-1">
-                  <span className="font-medium text-slate-100">
-                    {c?.identity.name || item.name}
-                  </span>
-                  <span className="text-slate-600"> · now {c?.boardStatus ?? 'untriaged'}</span>
-                  <span className="rounded border border-violet-800/40 bg-violet-950/40 px-1 text-[9px] text-violet-200">
-                    suggest {suggested}
-                  </span>
-                  <AiWhyTooltip
-                    why={statusWhy}
-                    testId={`board-ai-why-status-${item.key}`}
-                    label="why?"
-                  />
                   <AiWhyTooltip
                     why={rankWhy}
                     testId={`board-ai-why-rank-${item.key}`}
-                    label="rank"
-                  />
+                  >
+                    <span className="cursor-help font-medium text-slate-100 underline decoration-dotted decoration-slate-600 underline-offset-2">
+                      {c?.identity.name || item.name}
+                    </span>
+                  </AiWhyTooltip>
+                  <span className="text-slate-600"> · now {c?.boardStatus ?? 'untriaged'}</span>
+                  <AiWhyTooltip
+                    why={statusWhy}
+                    testId={`board-ai-why-status-${item.key}`}
+                  >
+                    <span className="cursor-help rounded border border-violet-800/40 bg-violet-950/40 px-1 text-[9px] text-violet-200">
+                      suggest {suggested}
+                    </span>
+                  </AiWhyTooltip>
                   {onApplyStatus && c && !same && (
                     <button
                       type="button"

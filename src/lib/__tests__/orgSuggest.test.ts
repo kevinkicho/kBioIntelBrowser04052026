@@ -48,22 +48,23 @@ jest.mock('@/lib/api/collegeScorecard', () => ({
   }),
 }))
 
+const openAlexHarvard = {
+  openAlexId: 'I136199984',
+  name: 'Harvard Medical School',
+  countryCode: 'US',
+  city: 'Boston',
+  type: 'education',
+  homepage: null,
+  openAlexUrl: 'https://openalex.org/I136199984',
+  region: '',
+  rorId: null,
+  worksCount: null,
+  unitid: null,
+}
+
 jest.mock('@/lib/api/openAlexInstitutions', () => ({
-  searchOpenAlexResearchLabs: jest.fn(async () => [
-    {
-      openAlexId: 'I136199984',
-      name: 'Harvard Medical School',
-      countryCode: 'US',
-      city: 'Boston',
-      type: 'education',
-      homepage: null,
-      openAlexUrl: 'https://openalex.org/I136199984',
-      region: '',
-      rorId: null,
-      worksCount: null,
-      unitid: null,
-    },
-  ]),
+  searchOpenAlexInstitutions: jest.fn(async () => [openAlexHarvard]),
+  searchOpenAlexResearchLabs: jest.fn(async () => [openAlexHarvard]),
 }))
 
 describe('orgSuggest', () => {

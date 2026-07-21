@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
@@ -27,6 +27,25 @@ import { MissionControlStrip } from '@/components/projects/MissionControlStrip'
 
 const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
 
+type ProjectSort = 'opened' | 'updated' | 'name' | 'candidates' | 'promote'
+type ProjectFilter = 'all' | 'has_promote' | 'empty' | 'has_disease' | 'has_targets'
+
+const SORT_OPTIONS: { id: ProjectSort; label: string }[] = [
+  { id: 'opened', label: 'Opened' },
+  { id: 'updated', label: 'Updated' },
+  { id: 'name', label: 'Name' },
+  { id: 'candidates', label: 'Candidates' },
+  { id: 'promote', label: 'Promote' },
+]
+
+const FILTER_OPTIONS: { id: ProjectFilter; label: string }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'has_promote', label: 'Has promote' },
+  { id: 'empty', label: 'Empty board' },
+  { id: 'has_disease', label: 'Has disease' },
+  { id: 'has_targets', label: 'Has targets' },
+]
+
 function loadLastOpened(): Record<string, string> {
   try {
     const raw = localStorage.getItem(LAST_OPENED_KEY)
@@ -40,6 +59,26 @@ function promoteCount(p: Project): number {
   return p.candidates.filter((c) => c.boardStatus === 'promote').length
 }
 
+function watchingCount(p: Project): number {
+  return p.candidates.filter((c) => c.boardStatus === 'watching').length
+}
+
+function holdCount(p: Project): number {
+  return p.candidates.filter((c) => c.boardStatus === 'hold').length
+}
+
+function killCount(p: Project): number {
+  return p.candidates.filter((c) => c.boardStatus === 'kill').length
+}
+
+function diseaseLabel(p: Project): string {
+  return (
+    p.disease?.name ||
+    (p.preferencesSnapshot as { diseaseName?: string } | undefined)?.diseaseName ||
+    ''
+  )
+}
+
 export default function ProjectsPage() {
   const auth = useFirebaseAuth()
   const [projects, setProjects] = useState<Project[]>([])
@@ -49,21 +88,17 @@ export default function ProjectsPage() {
   const [cloudBusy, setCloudBusy] = useState(false)
   const [cloudExports, setCloudExports] = useState<CloudExportItem[]>([])
   const [showArchives, setShowArchives] = useState(false)
+  const [query, setQuery] = useState('')
+  const [sort, setSort] = useState<ProjectSort>('opened')
+  const [filter, setFilter] = useState<ProjectFilter>('all')
+  const [expandedId, setExpandedId] = useState<string | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
 
   const refresh = useCallback(() => {
     const list = listProjects()
     const opened = loadLastOpened()
     setLastOpened(opened)
-    // Sort: recently opened first, then updatedAt
-    setProjects(
-      [...list].sort((a, b) => {
-        const ao = opened[a.id] ?? ''
-        const bo = opened[b.id] ?? ''
-        if (ao || bo) return (bo || '').localeCompare(ao || '')
-        return b.updatedAt.localeCompare(a.updatedAt)
-      }),
-    )
+    setProjects(list)
   }, [])
 
   const refreshCloudExports = useCallback(async () => {
@@ -87,6 +122,68 @@ export default function ProjectsPage() {
   useEffect(() => {
     if (showArchives && auth.user?.uid) void refreshCloudExports()
   }, [showArchives, auth.user?.uid, refreshCloudExports])
+
+  const filterCounts = useMemo(() => {
+    const m: Record<ProjectFilter, number> = {
+      all: projects.length,
+      has_promote: 0,
+      empty: 0,
+      has_disease: 0,
+      has_targets: 0,
+    }
+    for (const p of projects) {
+      if (promoteCount(p) > 0) m.has_promote += 1
+      if (p.candidates.length === 0) m.empty += 1
+      if (diseaseLabel(p)) m.has_disease += 1
+      if ((p.targetIds?.length ?? 0) > 0) m.has_targets += 1
+    }
+    return m
+  }, [projects])
+
+  const filteredSorted = useMemo(() => {
+    const needle = query.trim().toLowerCase()
+    let list = [...projects]
+
+    if (filter === 'has_promote') list = list.filter((p) => promoteCount(p) > 0)
+    else if (filter === 'empty') list = list.filter((p) => p.candidates.length === 0)
+    else if (filter === 'has_disease') list = list.filter((p) => Boolean(diseaseLabel(p)))
+    else if (filter === 'has_targets') list = list.filter((p) => (p.targetIds?.length ?? 0) > 0)
+
+    if (needle) {
+      list = list.filter((p) => {
+        const hay = [
+          p.name,
+          p.description ?? '',
+          diseaseLabel(p),
+          p.id,
+          ...(p.targetIds ?? []),
+          ...p.candidates.map((c) => c.identity?.name ?? ''),
+        ]
+          .join(' ')
+          .toLowerCase()
+        return hay.includes(needle)
+      })
+    }
+
+    list.sort((a, b) => {
+      if (sort === 'name') return a.name.localeCompare(b.name)
+      if (sort === 'candidates') {
+        const d = b.candidates.length - a.candidates.length
+        return d !== 0 ? d : a.name.localeCompare(b.name)
+      }
+      if (sort === 'promote') {
+        const d = promoteCount(b) - promoteCount(a)
+        return d !== 0 ? d : a.name.localeCompare(b.name)
+      }
+      if (sort === 'updated') return b.updatedAt.localeCompare(a.updatedAt)
+      // opened: last opened first, then updated
+      const ao = lastOpened[a.id] ?? ''
+      const bo = lastOpened[b.id] ?? ''
+      if (ao || bo) return (bo || '').localeCompare(ao || '')
+      return b.updatedAt.localeCompare(a.updatedAt)
+    })
+    return list
+  }, [projects, query, sort, filter, lastOpened])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })
@@ -116,6 +213,7 @@ export default function ProjectsPage() {
     if (auth.user?.uid) {
       void deleteCloudProjectSafe(auth.user.uid, id)
     }
+    if (expandedId === id) setExpandedId(null)
     refresh()
     showBanner('ok', 'Project deleted')
   }
@@ -212,7 +310,6 @@ export default function ProjectsPage() {
         return
       }
       refresh()
-      // Write-through will push restored boards when signed in
       showBanner('ok', `Restored ${result.imported.length} project(s) from cloud archive`)
     } finally {
       setCloudBusy(false)
@@ -236,6 +333,24 @@ export default function ProjectsPage() {
     } finally {
       if (fileRef.current) fileRef.current.value = ''
     }
+  }
+
+  const markOpened = (p: Project) => {
+    try {
+      const map = loadLastOpened()
+      map[p.id] = new Date().toISOString()
+      localStorage.setItem(LAST_OPENED_KEY, JSON.stringify(map))
+      setLastOpened(map)
+    } catch {
+      /* ignore */
+    }
+    recordSearch({
+      kind: 'project',
+      query: p.name,
+      title: p.name,
+      href: `/projects/${p.id}`,
+      meta: { projectId: p.id },
+    })
   }
 
   return (
@@ -320,7 +435,7 @@ export default function ProjectsPage() {
 
         <MissionControlStrip projects={projects} lastOpened={lastOpened} />
 
-        <div className="mb-8 flex flex-wrap gap-2 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+        <div className="mb-4 flex flex-wrap gap-2">
           <input
             type="text"
             value={name}
@@ -331,11 +446,13 @@ export default function ProjectsPage() {
             placeholder="New project name"
             className="min-w-[200px] flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 focus:border-emerald-700 focus:outline-none"
             maxLength={200}
+            data-testid="projects-create-input"
           />
           <button
             type="button"
             onClick={handleCreate}
             className="rounded-lg bg-emerald-700 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-600"
+            data-testid="projects-create-btn"
           >
             Create project
           </button>
@@ -343,7 +460,7 @@ export default function ProjectsPage() {
 
         {auth.user && showArchives && (
           <div
-            className="mb-8 rounded-xl border border-sky-900/40 bg-sky-950/20 p-4"
+            className="mb-4 rounded-xl border border-sky-900/40 bg-sky-950/20 p-3"
             data-testid="projects-cloud-archive-list"
           >
             <div className="mb-2 flex items-center justify-between gap-2">
@@ -357,21 +474,21 @@ export default function ProjectsPage() {
                 Refresh
               </button>
             </div>
-            <p className="mb-3 text-[11px] text-slate-500">
+            <p className="mb-2 text-[11px] text-slate-500">
               JSON exports under <code className="text-slate-400">users/…/exports</code>. Restore
-              merges into local boards (does not replace your cloud Firestore sync).
+              merges into local boards.
             </p>
             {cloudExports.length === 0 ? (
-              <p className="text-xs text-slate-500">No cloud archives yet. Use Cloud backup.</p>
+              <p className="text-xs text-slate-500 opacity-30">No cloud archives yet.</p>
             ) : (
-              <ul className="space-y-2">
+              <ul className="divide-y divide-slate-800/80 overflow-hidden rounded-lg border border-slate-800">
                 {cloudExports.map((item) => (
                   <li
                     key={item.fullPath}
-                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
+                    className="flex flex-wrap items-center justify-between gap-2 bg-slate-950/40 px-2.5 py-1.5"
                   >
                     <div className="min-w-0">
-                      <p className="truncate font-mono text-xs text-slate-200">{item.name}</p>
+                      <p className="truncate font-mono text-[11px] text-slate-200">{item.name}</p>
                       <p className="text-[10px] text-slate-600">
                         {item.updated
                           ? new Date(item.updated).toLocaleString()
@@ -383,7 +500,7 @@ export default function ProjectsPage() {
                       type="button"
                       disabled={cloudBusy}
                       onClick={() => void handleRestoreCloudExport(item.name)}
-                      className="rounded-lg border border-sky-800/50 bg-sky-950/40 px-2.5 py-1 text-[11px] text-sky-300 hover:bg-sky-900/40 disabled:opacity-50"
+                      className="rounded border border-sky-800/50 px-2 py-0.5 text-[10px] text-sky-300 hover:bg-sky-900/40 disabled:opacity-50"
                     >
                       Restore
                     </button>
@@ -394,97 +511,265 @@ export default function ProjectsPage() {
           </div>
         )}
 
+        {/* List controls: search · filter · sort */}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <input
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search name, disease, targets, candidates…"
+            className="w-full min-w-[14rem] rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-1.5 text-[12px] text-slate-200 placeholder:text-slate-600 sm:w-64"
+            data-testid="projects-search"
+            aria-label="Search projects"
+          />
+          <span className="ml-auto tabular-nums text-[10px] text-slate-500">
+            {filteredSorted.length} of {projects.length}
+          </span>
+        </div>
+
+        <div className="mb-1.5 flex flex-wrap items-center gap-1">
+          {FILTER_OPTIONS.map((f) => {
+            const n = filterCounts[f.id]
+            const dim = f.id !== 'all' && n === 0
+            return (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => setFilter(f.id)}
+                className={`rounded-full border px-2.5 py-0.5 text-[10px] ${
+                  filter === f.id
+                    ? 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
+                    : 'border-slate-800 text-slate-500 hover:border-slate-600'
+                } ${dim && filter !== f.id ? 'opacity-30' : ''}`}
+                data-testid={`projects-filter-${f.id}`}
+              >
+                {f.label}
+                {f.id !== 'all' ? ` · ${n}` : ''}
+              </button>
+            )
+          })}
+        </div>
+
+        <div className="mb-3 flex flex-wrap items-center gap-1.5 text-[11px]">
+          <span className="text-[10px] font-semibold uppercase text-slate-600">Sort</span>
+          {SORT_OPTIONS.map((s) => (
+            <button
+              key={s.id}
+              type="button"
+              onClick={() => setSort(s.id)}
+              className={`rounded-full border px-2 py-0.5 text-[10px] ${
+                sort === s.id
+                  ? 'border-slate-500 bg-slate-800 text-slate-200'
+                  : 'border-slate-800 text-slate-500 hover:border-slate-600'
+              }`}
+              data-testid={`projects-sort-${s.id}`}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+
         {projects.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-700 px-6 py-16 text-center">
-            <p className="text-4xl mb-3">📋</p>
-            <h2 className="text-lg font-semibold text-slate-300 mb-2">No projects yet</h2>
-            <p className="text-sm text-slate-500 mb-4">
-              Create a board, or save candidates from{' '}
+          <div className="rounded-xl border border-dashed border-slate-700 px-6 py-12 text-center opacity-30">
+            <h2 className="text-sm font-semibold text-slate-300 mb-1">No projects yet</h2>
+            <p className="text-xs text-slate-500">
+              Create a board above, or save candidates from{' '}
               <Link href="/discover" className="text-emerald-400 hover:text-emerald-300">
                 Discover
               </Link>
               .
             </p>
           </div>
+        ) : filteredSorted.length === 0 ? (
+          <p
+            className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-4 text-center text-[12px] text-slate-500 opacity-30"
+            data-testid="projects-empty-filter"
+          >
+            No projects match this search / filter.
+          </p>
         ) : (
-          <ul className="space-y-3">
-            {projects.map((p) => (
-              <li
-                key={p.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-800 bg-slate-900/50 px-4 py-3 hover:border-slate-700"
-              >
-                <div className="min-w-0">
-                  <Link
-                    href={`/projects/${p.id}`}
-                    className="text-base font-semibold text-slate-100 hover:text-emerald-300"
-                  >
-                    {p.name}
-                  </Link>
-                  <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-slate-500">
-                    <span>
-                      {p.candidates.length}/{50} candidates
-                    </span>
-                    {promoteCount(p) > 0 && (
-                      <span className="text-emerald-400/90">
-                        {promoteCount(p)} promoted
+          <ul
+            className="divide-y divide-slate-800/80 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40"
+            data-testid="projects-list"
+          >
+            {filteredSorted.map((p) => {
+              const open = expandedId === p.id
+              const promote = promoteCount(p)
+              const watching = watchingCount(p)
+              const hold = holdCount(p)
+              const kill = killCount(p)
+              const disease = diseaseLabel(p)
+              const emptyBoard = p.candidates.length === 0
+              return (
+                <li
+                  key={p.id}
+                  className={`bg-slate-900/30 ${emptyBoard ? 'opacity-80' : ''}`}
+                  data-testid={`project-row-${p.id}`}
+                >
+                  <div className="flex w-full items-stretch gap-0">
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(open ? null : p.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 px-2.5 py-1.5 text-left hover:bg-slate-800/40 sm:px-3 sm:py-2"
+                      aria-expanded={open}
+                    >
+                      <span
+                        className={`shrink-0 text-[10px] text-slate-600 transition-transform ${
+                          open ? 'rotate-90' : ''
+                        }`}
+                        aria-hidden
+                      >
+                        ▸
                       </span>
-                    )}
-                    {p.disease?.name && <span>Disease: {p.disease.name}</span>}
-                    {(p.targetIds?.length ?? 0) > 0 && (
-                      <span className="font-mono text-slate-600">
-                        {p.targetIds!.slice(0, 3).join(', ')}
-                        {p.targetIds!.length > 3 ? '…' : ''}
+                      <span className="min-w-0 flex-1">
+                        <span className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                          <span className="text-[13px] font-medium text-slate-100">{p.name}</span>
+                          {emptyBoard && (
+                            <span className="text-[9px] text-slate-600 opacity-30">empty</span>
+                          )}
+                          {promote > 0 && (
+                            <span className="rounded border border-emerald-800/40 px-1 py-px text-[9px] text-emerald-300/90">
+                              {promote} promote
+                            </span>
+                          )}
+                          {watching > 0 && (
+                            <span className="rounded border border-sky-800/40 px-1 py-px text-[9px] text-sky-300/80">
+                              {watching} watching
+                            </span>
+                          )}
+                        </span>
+                        <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0 text-[10px] text-slate-500">
+                          <span className="tabular-nums">
+                            {p.candidates.length}/50 candidates
+                          </span>
+                          {disease ? (
+                            <span className="truncate max-w-[14rem]">{disease}</span>
+                          ) : (
+                            <span className="opacity-30">no disease</span>
+                          )}
+                          {(p.targetIds?.length ?? 0) > 0 && (
+                            <span className="font-mono text-slate-600">
+                              {p.targetIds!.slice(0, 2).join(', ')}
+                              {p.targetIds!.length > 2 ? '…' : ''}
+                            </span>
+                          )}
+                          <span className="text-slate-600">
+                            upd {new Date(p.updatedAt).toLocaleDateString()}
+                          </span>
+                          {lastOpened[p.id] && (
+                            <span className="text-slate-600">
+                              open {new Date(lastOpened[p.id]).toLocaleDateString()}
+                            </span>
+                          )}
+                        </span>
                       </span>
-                    )}
-                    <span>Updated {new Date(p.updatedAt).toLocaleString()}</span>
-                    {lastOpened[p.id] && (
-                      <span className="text-slate-600">
-                        Opened {new Date(lastOpened[p.id]).toLocaleString()}
-                      </span>
-                    )}
+                    </button>
+                    <div className="flex shrink-0 items-center gap-1 px-2">
+                      <Link
+                        href={`/projects/${p.id}`}
+                        onClick={() => markOpened(p)}
+                        className="rounded border border-emerald-800/40 px-2 py-0.5 text-[10px] text-emerald-300 hover:bg-emerald-950/40"
+                        data-testid={`project-open-${p.id}`}
+                      >
+                        Open
+                      </Link>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/projects/${p.id}`}
-                    onClick={() => {
-                      try {
-                        const map = loadLastOpened()
-                        map[p.id] = new Date().toISOString()
-                        localStorage.setItem(LAST_OPENED_KEY, JSON.stringify(map))
-                      } catch {
-                        /* ignore */
-                      }
-                      recordSearch({
-                        kind: 'project',
-                        query: p.name,
-                        title: p.name,
-                        href: `/projects/${p.id}`,
-                        meta: { projectId: p.id },
-                      })
-                    }}
-                    className="rounded-lg border border-emerald-800/40 bg-emerald-900/20 px-3 py-1.5 text-xs text-emerald-300 hover:bg-emerald-900/40"
-                  >
-                    Open board
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => handleRename(p.id, p.name)}
-                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:border-slate-500 hover:text-slate-200"
-                    data-testid={`project-rename-${p.id}`}
-                  >
-                    Rename
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => handleDelete(p.id, p.name)}
-                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-500 hover:border-red-800 hover:text-red-300"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
-            ))}
+                  {open && (
+                    <div className="space-y-2 border-t border-slate-800/80 bg-slate-950/50 px-3 py-2.5 sm:px-4">
+                      <dl className="grid gap-1 text-[11px] sm:grid-cols-2">
+                        <div className="flex gap-2 min-w-0">
+                          <dt className="shrink-0 text-slate-600">id</dt>
+                          <dd className="font-mono text-slate-400 truncate">{p.id}</dd>
+                        </div>
+                        <div className="flex gap-2 min-w-0">
+                          <dt className="shrink-0 text-slate-600">disease</dt>
+                          <dd className={disease ? 'text-slate-300' : 'text-slate-600 opacity-30'}>
+                            {disease || '—'}
+                          </dd>
+                        </div>
+                        <div className="flex gap-2 min-w-0">
+                          <dt className="shrink-0 text-slate-600">targets</dt>
+                          <dd className="font-mono text-slate-400 break-all">
+                            {(p.targetIds?.length ?? 0) > 0 ? p.targetIds!.join(', ') : '—'}
+                          </dd>
+                        </div>
+                        <div className="flex gap-2 min-w-0">
+                          <dt className="shrink-0 text-slate-600">triage</dt>
+                          <dd className="text-slate-400">
+                            <span className={promote ? '' : 'opacity-30'}>{promote} promote</span>
+                            {' · '}
+                            <span className={watching ? '' : 'opacity-30'}>
+                              {watching} watching
+                            </span>
+                            {' · '}
+                            <span className={hold ? '' : 'opacity-30'}>{hold} hold</span>
+                            {' · '}
+                            <span className={kill ? '' : 'opacity-30'}>{kill} kill</span>
+                          </dd>
+                        </div>
+                        <div className="flex gap-2 min-w-0">
+                          <dt className="shrink-0 text-slate-600">packs</dt>
+                          <dd className={p.packIndex?.length ? 'text-slate-400' : 'opacity-30'}>
+                            {p.packIndex?.length ?? 0}
+                          </dd>
+                        </div>
+                        <div className="flex gap-2 min-w-0">
+                          <dt className="shrink-0 text-slate-600">RH</dt>
+                          <dd
+                            className={
+                              p.researchHypothesisIds?.length ? 'text-slate-400' : 'opacity-30'
+                            }
+                          >
+                            {p.researchHypothesisIds?.length ?? 0}
+                          </dd>
+                        </div>
+                        <div className="flex gap-2 min-w-0 sm:col-span-2">
+                          <dt className="shrink-0 text-slate-600">updated</dt>
+                          <dd className="text-slate-400">
+                            {new Date(p.updatedAt).toLocaleString()}
+                            {lastOpened[p.id]
+                              ? ` · opened ${new Date(lastOpened[p.id]).toLocaleString()}`
+                              : ''}
+                          </dd>
+                        </div>
+                        {p.description?.trim() && (
+                          <div className="flex gap-2 min-w-0 sm:col-span-2">
+                            <dt className="shrink-0 text-slate-600">notes</dt>
+                            <dd className="text-slate-400">{p.description.trim()}</dd>
+                          </div>
+                        )}
+                      </dl>
+                      <div className="flex flex-wrap gap-1.5">
+                        <Link
+                          href={`/projects/${p.id}`}
+                          onClick={() => markOpened(p)}
+                          className="rounded border border-emerald-800/50 bg-emerald-950/30 px-2.5 py-1 text-[11px] text-emerald-300 hover:bg-emerald-900/40"
+                        >
+                          Open board
+                        </Link>
+                        <button
+                          type="button"
+                          onClick={() => handleRename(p.id, p.name)}
+                          className="rounded border border-slate-700 px-2.5 py-1 text-[11px] text-slate-400 hover:border-slate-500 hover:text-slate-200"
+                          data-testid={`project-rename-${p.id}`}
+                        >
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(p.id, p.name)}
+                          className="rounded border border-slate-700 px-2.5 py-1 text-[11px] text-slate-500 hover:border-red-800 hover:text-red-300"
+                          data-testid={`project-delete-${p.id}`}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </li>
+              )
+            })}
           </ul>
         )}
       </div>

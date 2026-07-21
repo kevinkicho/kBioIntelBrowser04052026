@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState, Suspense, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import type { RorOrganization } from '@/lib/api/ror'
 import type { CmsHospital } from '@/lib/api/cmsHospitals'
@@ -9,19 +9,12 @@ import type { ResearchLabDossier } from '@/lib/researchLabs'
 import {
   buildOrgAffiliationJoins,
   parseSponsorHints,
-  type AffiliationEdge,
 } from '@/lib/orgAffiliationJoin'
-import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { ResearchLabDossierView } from '@/components/orgs/ResearchLabDossierView'
 import { OrgSearchSuggest } from '@/components/orgs/OrgSearchSuggest'
+import { OrgDirectoryList } from '@/components/orgs/OrgDirectoryList'
+import { OrgAffiliationJoinList } from '@/components/orgs/OrgAffiliationJoinList'
 import type { OrgSuggestion } from '@/lib/orgs/orgSuggest'
-
-const KIND_LABEL: Record<AffiliationEdge['kind'], string> = {
-  'sponsor-ror': 'Sponsor → ROR',
-  'ror-hospital': 'ROR → hospital',
-  'ror-college': 'ROR → college',
-  'hospital-college': 'Hospital → college',
-}
 
 type TabId = 'dossier' | 'directory' | 'joins'
 
@@ -208,18 +201,17 @@ function OrgsPageInner() {
       </div>
 
       <form
-        className="relative z-30 mb-4 flex flex-col gap-2 overflow-visible"
+        className="relative z-50 mb-4 flex flex-col gap-2 overflow-visible"
         onSubmit={(e) => {
           e.preventDefault()
           void runAll()
         }}
       >
-        <div className="relative z-30 flex flex-col gap-2 overflow-visible sm:flex-row">
+        <div className="relative z-50 flex flex-col gap-2 overflow-visible sm:flex-row sm:items-start">
           <OrgSearchSuggest
             value={q}
             onChange={setQ}
             country={country}
-            disabled={loading || dossierLoading}
             onSelectSuggestion={(s: OrgSuggestion) => {
               setQ(s.name)
               if (!country && s.source === 'college' && s.countryCode === 'US') {
@@ -232,7 +224,7 @@ function OrgsPageInner() {
           <select
             value={country}
             onChange={(e) => setCountry(e.target.value)}
-            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300"
+            className="shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300"
             aria-label="Country filter"
           >
             <option value="">All countries</option>
@@ -251,14 +243,14 @@ function OrgsPageInner() {
           <button
             type="submit"
             disabled={loading || dossierLoading}
-            className="rounded-lg bg-emerald-700/80 hover:bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="shrink-0 rounded-lg bg-emerald-700/80 hover:bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
             data-testid="orgs-run-pipeline"
           >
             {loading || dossierLoading ? 'Running pipeline…' : 'Build dossier + search'}
           </button>
         </div>
         <p className="text-[10px] text-slate-600">
-          Type 2+ characters for live suggestions (ROR · US College Scorecard · OpenAlex). Arrow
+          Type 2+ characters for a live dropdown (ROR · US College Scorecard · OpenAlex). Arrow
           keys + Enter to pick; free public registries only — no mock data.
         </p>
         <label className="flex items-center gap-2 text-[11px] text-slate-400">
@@ -330,186 +322,48 @@ function OrgsPageInner() {
       )}
 
       {tab === 'directory' && (
-        <div className="space-y-8">
-          <DirectorySection title="Research organizations (ROR)" count={orgs.length} loading={loading}>
-            {orgs.map((o) => (
-              <OrgRow
-                key={o.rorId}
-                name={o.name}
-                meta={[o.city, o.countryName, o.types.join(', ')].filter(Boolean).join(' · ')}
-                href={`https://ror.org/${o.rorId}`}
-                testId="orgs-ror-row"
-              />
-            ))}
-          </DirectorySection>
-          <DirectorySection title="EU research orgs pack" count={euOrgs.length} loading={loading}>
-            {euOrgs.map((o) => (
-              <OrgRow
-                key={`eu-${o.rorId}`}
-                name={o.name}
-                meta={[o.city, o.countryName, o.matchSource].filter(Boolean).join(' · ')}
-                href={`https://ror.org/${o.rorId}`}
-                testId="orgs-eu-row"
-              />
-            ))}
-          </DirectorySection>
-          <DirectorySection title="US colleges (Scorecard)" count={colleges.length} loading={loading}>
-            {colleges.map((c) => (
-              <OrgRow
-                key={c.id}
-                name={c.name}
-                meta={[c.city, c.state, c.ownership, c.source].filter(Boolean).join(' · ')}
-                href={c.scorecardUrl}
-                testId="orgs-college-row"
-              />
-            ))}
-          </DirectorySection>
-          <DirectorySection
-            title="US hospitals (CMS Medicare)"
-            count={hospitals.length}
+        <div data-testid="orgs-directory-tab">
+          <p className="mb-3 text-[11px] text-slate-500 leading-relaxed">
+            Unified free-API directory: ROR, EU research pack, US College Scorecard, CMS hospitals.
+            Affiliation context only — not admissions or clinical referral.
+          </p>
+          <OrgDirectoryList
+            orgs={orgs}
+            euOrgs={euOrgs}
+            colleges={colleges}
+            hospitals={hospitals}
             loading={loading}
-          >
-            {hospitals.map((h) => (
-              <OrgRow
-                key={h.facilityId}
-                name={h.facilityName}
-                meta={[h.city, h.state, h.hospitalType].filter(Boolean).join(' · ')}
-                href={h.careCompareUrl}
-                testId="orgs-cms-row"
-              />
-            ))}
-          </DirectorySection>
+          />
         </div>
       )}
 
       {tab === 'joins' && (
-        <section
-          className="rounded-xl border border-slate-800 bg-slate-950/40 p-4"
-          data-testid="orgs-affiliation-join"
-        >
-          <h2 className="text-sm font-semibold text-slate-100 mb-1">
+        <div data-testid="orgs-joins-tab">
+          <h2 className="mb-1 text-sm font-semibold text-slate-100">
             Sponsor ↔ ROR ↔ site joins
-            {affiliation.edges.length ? ` · ${affiliation.edges.length}` : ''}
+            {affiliation.edges.length ? (
+              <span className="ml-1 font-normal text-slate-500">
+                · {affiliation.edges.length}
+              </span>
+            ) : null}
           </h2>
-          <p className="text-[10px] text-slate-500 mb-3 leading-relaxed">
-            Paste trial sponsors or use NIH grant institutes from the dossier. Token-overlap only —
-            not official affiliation graphs.
+          <p className="mb-3 text-[11px] text-slate-500 leading-relaxed">
+            Paste trial sponsors or use NIH grant institutes from the dossier. Edges are
+            deterministic token overlap only — not official affiliation graphs or clinical
+            referral.
           </p>
           <textarea
             value={sponsorText}
             onChange={(e) => setSponsorText(e.target.value)}
             rows={3}
             placeholder={'e.g.\nMayo Clinic\nHarvard Medical School\nPfizer'}
-            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 mb-3"
+            className="mb-3 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
             data-testid="orgs-sponsor-input"
           />
-          {affiliation.notes.map((n) => (
-            <p key={n} className="text-[10px] text-amber-500/80 mb-2">
-              {n}
-            </p>
-          ))}
-          {affiliation.edges.length === 0 ? (
-            <p className="text-xs text-slate-500">
-              Run the pipeline and/or paste sponsors to see affiliation edges.
-            </p>
-          ) : (
-            <ul className="space-y-2 max-h-96 overflow-y-auto">
-              {affiliation.edges.map((e) => (
-                <li
-                  key={e.id}
-                  className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
-                  data-testid="orgs-join-edge"
-                >
-                  <div className="flex flex-wrap items-center gap-1.5 mb-0.5">
-                    <span className="text-[9px] uppercase tracking-wide rounded border border-sky-800/40 bg-sky-950/40 px-1.5 py-0.5 text-sky-300">
-                      {KIND_LABEL[e.kind]}
-                    </span>
-                    <span className="text-[10px] font-mono text-slate-500">
-                      score {(e.score * 100).toFixed(0)}%
-                    </span>
-                  </div>
-                  <p className="text-sm text-slate-100">
-                    {e.leftLabel}
-                    <span className="text-slate-600 mx-1.5">↔</span>
-                    {e.rightHref ? (
-                      <a
-                        href={e.rightHref}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-indigo-300 hover:underline"
-                        onClick={() =>
-                          onDeepLinkClick('other', e.rightHref!, {
-                            panelId: 'orgs-join',
-                            label: e.kind,
-                          })
-                        }
-                      >
-                        {e.rightLabel}
-                      </a>
-                    ) : (
-                      e.rightLabel
-                    )}
-                  </p>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+          <OrgAffiliationJoinList edges={affiliation.edges} notes={affiliation.notes} />
+        </div>
       )}
     </div>
-  )
-}
-
-function DirectorySection({
-  title,
-  count,
-  loading,
-  children,
-}: {
-  title: string
-  count: number
-  loading: boolean
-  children: ReactNode
-}) {
-  return (
-    <section>
-      <h2 className="text-sm font-semibold text-slate-200 mb-3">
-        {title}
-        {count ? ` · ${count}` : ''}
-      </h2>
-      {count === 0 && !loading ? (
-        <p className="text-xs text-slate-500">No hits yet — run search.</p>
-      ) : (
-        <ul className="space-y-2">{children}</ul>
-      )}
-    </section>
-  )
-}
-
-function OrgRow({
-  name,
-  meta,
-  href,
-  testId,
-}: {
-  name: string
-  meta: string
-  href: string
-  testId: string
-}) {
-  return (
-    <li className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2" data-testid={testId}>
-      <p className="text-sm text-slate-100 font-medium">{name}</p>
-      {meta && <p className="text-[11px] text-slate-500">{meta}</p>}
-      <a
-        href={href}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-[10px] text-indigo-400 hover:underline"
-      >
-        Open ↗
-      </a>
-    </li>
   )
 }
 

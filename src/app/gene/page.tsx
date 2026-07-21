@@ -1,9 +1,14 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { clientFetch } from '@/lib/clientFetch'
+import {
+  GeneSearchSuggest,
+  type GeneSuggestion,
+} from '@/components/search/GeneSearchSuggest'
+import { recordSearch } from '@/lib/searchHistory'
 
 interface GeneResult {
   geneId: string
@@ -15,7 +20,13 @@ interface GeneResult {
   aliases: string[]
 }
 
-export default function GeneSearchPage() {
+function geneHref(g: { geneId: string; symbol: string }) {
+  const id = g.geneId || g.symbol
+  const sym = g.symbol || g.geneId
+  return `/gene/${encodeURIComponent(`${id}-${sym}`)}`
+}
+
+function GeneSearchInner() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const q = searchParams.get('q') ?? ''
@@ -30,13 +41,21 @@ export default function GeneSearchPage() {
     setLoading(true)
     setError(null)
     try {
-      const res = await clientFetch(`/api/search/gene?q=${encodeURIComponent(term.trim())}&limit=20`)
+      const res = await clientFetch(
+        `/api/search/gene?q=${encodeURIComponent(term.trim())}&limit=20`,
+      )
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? 'Search failed')
+        throw new Error((data as { error?: string }).error ?? 'Search failed')
       }
-      const data = await res.json()
+      const data = (await res.json()) as { results?: GeneResult[] }
       setResults(data.results ?? [])
+      recordSearch({
+        kind: 'gene',
+        query: term.trim(),
+        title: term.trim(),
+        href: `/gene?q=${encodeURIComponent(term.trim())}`,
+      })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Search failed')
       setResults([])
@@ -49,136 +68,189 @@ export default function GeneSearchPage() {
   useEffect(() => {
     if (q) {
       setQuery(q)
-      doSearch(q)
+      void doSearch(q)
     }
   }, [q, doSearch])
 
-  function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (query.trim().length >= 2) {
-      router.push(`/gene?q=${encodeURIComponent(query.trim())}`)
-    }
+  function runQuery(term: string) {
+    const t = term.trim()
+    if (t.length < 2) return
+    router.push(`/gene?q=${encodeURIComponent(t)}`)
+  }
+
+  function pickSuggestion(s: GeneSuggestion) {
+    recordSearch({
+      kind: 'gene',
+      query: s.symbol || s.name,
+      title: s.symbol || s.name,
+      href: geneHref(s),
+    })
+    router.push(geneHref(s))
   }
 
   return (
     <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-2">Gene Search</h1>
-        <p className="text-slate-400 mb-6">Search for genes by symbol, name, or alias. Data from MyGene.info.</p>
+      <div className="page-canvas max-w-4xl">
+        <h1 className="text-2xl font-bold mb-1 sm:text-3xl">Gene Search</h1>
+        <p className="text-[13px] text-slate-400 mb-6">
+          Search by symbol, name, or alias. Typeahead uses free MyGene.info — not clinical
+          decision support.
+        </p>
 
-        <form onSubmit={handleSubmit} className="flex gap-3 mb-8">
-          <input
-            type="text"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            runQuery(query)
+          }}
+          className="relative z-30 mb-8 flex flex-col gap-2 overflow-visible sm:flex-row sm:items-start"
+        >
+          <GeneSearchSuggest
             value={query}
-            onChange={e => setQuery(e.target.value)}
-            placeholder="Search a gene (e.g. BRCA1, TP53, EGFR)..."
-            className="flex-1 bg-slate-800 border border-slate-600 rounded-xl px-5 py-3 text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500"
+            onChange={setQuery}
+            disabled={loading}
+            onSelectSuggestion={pickSuggestion}
+            onSubmitQuery={runQuery}
           />
           <button
             type="submit"
             disabled={loading || query.trim().length < 2}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 rounded-xl font-medium transition-colors"
+            className="shrink-0 rounded-xl bg-indigo-600 px-6 py-3 font-medium transition-colors hover:bg-indigo-500 disabled:opacity-50"
+            data-testid="gene-search-submit"
           >
-            {loading ? 'Searching...' : 'Search'}
+            {loading ? 'Searching…' : 'Search'}
           </button>
         </form>
+        <p className="mb-6 -mt-4 text-[10px] text-slate-600">
+          Type 2+ characters for live suggestions. Arrow keys + Enter to open a gene; free text
+          Search for a full result list.
+        </p>
 
         {error && (
-          <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 mb-6 text-red-300">
+          <div
+            className="mb-6 rounded-xl border border-red-700 bg-red-900/30 p-4 text-red-300"
+            role="alert"
+          >
             {error}
           </div>
         )}
 
         {loading && (
-          <div className="space-y-4">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 animate-pulse">
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="h-5 bg-slate-700 rounded w-1/4" />
-                  <div className="h-5 bg-slate-700 rounded w-16" />
-                </div>
-                <div className="h-4 bg-slate-700 rounded w-3/4 mb-2" />
-                <div className="h-4 bg-slate-700 rounded w-1/2" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="animate-pulse rounded-xl border border-slate-700 bg-slate-800/80 p-4"
+              >
+                <div className="mb-2 h-4 w-1/4 rounded bg-slate-700" />
+                <div className="h-3 w-3/4 rounded bg-slate-700" />
               </div>
             ))}
           </div>
         )}
 
         {searched && !loading && results.length === 0 && (
-          <div className="text-center py-12 text-slate-500">
-            <p className="text-lg mb-2">No genes found for &quot;{q}&quot;</p>
-            <p className="text-sm">Try a different gene symbol or keyword.</p>
+          <div className="py-12 text-center text-slate-500 opacity-30">
+            <p className="mb-1 text-base">No genes found for “{q || query}”</p>
+            <p className="text-sm">Try a different symbol or keyword.</p>
           </div>
         )}
 
         {!loading && results.length > 0 && (
-          <div className="space-y-4">
-            <p className="text-sm text-slate-400">{results.length} result{results.length !== 1 ? 's' : ''}</p>
-            {results.map(g => (
-              <Link
-                key={g.geneId}
-                href={`/gene/${g.geneId}-${g.symbol}`}
-                className="block bg-slate-800/80 border border-slate-700 rounded-xl p-5 hover:border-indigo-600 transition-colors"
-              >
-                <div className="flex items-start justify-between gap-3 mb-2">
-                  <div>
-                    <span className="text-lg font-semibold text-indigo-300">{g.symbol}</span>
-                    <span className="ml-2 text-sm text-slate-400">{g.name}</span>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    {g.typeOfGene && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300">{g.typeOfGene}</span>
-                    )}
-                    {g.chromosome && (
-                      <span className="text-xs px-2 py-0.5 rounded bg-emerald-900/40 text-emerald-300 border border-emerald-800/50">chr {g.chromosome}</span>
-                    )}
-                  </div>
-                </div>
-
-                {g.summary && (
-                  <p className="text-sm text-slate-400 mb-2 line-clamp-2">{g.summary}</p>
-                )}
-
-                {(() => {
-                  const aliasList = Array.isArray(g.aliases)
-                    ? g.aliases
-                    : typeof g.aliases === 'string' && g.aliases
-                      ? [g.aliases]
-                      : []
-                  if (aliasList.length === 0) return null
-                  return (
-                  <div className="flex flex-wrap gap-1">
-                    {aliasList.map((a) => (
-                      <span
-                        key={a}
-                        role="link"
-                        tabIndex={0}
-                        title={`Search genes for “${a}”`}
-                        className="text-xs px-1.5 py-0.5 rounded border border-slate-600/50 bg-slate-700/80 text-slate-400 transition-colors hover:border-indigo-600/50 hover:bg-indigo-950/50 hover:text-indigo-300 cursor-pointer"
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          router.push(`/gene?q=${encodeURIComponent(a)}`)
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            router.push(`/gene?q=${encodeURIComponent(a)}`)
-                          }
-                        }}
-                      >
-                        {a}
+          <div>
+            <p className="mb-2 text-[11px] text-slate-500">
+              {results.length} result{results.length !== 1 ? 's' : ''}
+            </p>
+            <ul
+              className="divide-y divide-slate-800/80 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40"
+              data-testid="gene-search-results"
+            >
+              {results.map((g) => (
+                <li key={g.geneId || g.symbol}>
+                  <Link
+                    href={geneHref(g)}
+                    className="block px-3 py-2.5 hover:bg-slate-800/50 sm:px-4"
+                  >
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="text-[13px] font-semibold text-violet-300">
+                        {g.symbol}
                       </span>
-                    ))}
-                  </div>
-                  )
-                })()}
-              </Link>
-            ))}
+                      <span className="text-[12px] text-slate-400">{g.name}</span>
+                      {g.typeOfGene && (
+                        <span className="rounded border border-slate-700 px-1 py-px text-[9px] text-slate-500">
+                          {g.typeOfGene}
+                        </span>
+                      )}
+                      {g.chromosome && (
+                        <span className="rounded border border-emerald-800/40 px-1 py-px text-[9px] text-emerald-400/90">
+                          chr {g.chromosome}
+                        </span>
+                      )}
+                      {g.geneId && (
+                        <span className="font-mono text-[9px] text-slate-600">
+                          Entrez {g.geneId}
+                        </span>
+                      )}
+                    </div>
+                    {g.summary && (
+                      <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">
+                        {g.summary}
+                      </p>
+                    )}
+                    {(() => {
+                      const aliasList = Array.isArray(g.aliases)
+                        ? g.aliases
+                        : typeof g.aliases === 'string' && g.aliases
+                          ? [g.aliases]
+                          : []
+                      if (aliasList.length === 0) return null
+                      return (
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {aliasList.map((a) => (
+                            <span
+                              key={a}
+                              role="link"
+                              tabIndex={0}
+                              className="cursor-pointer rounded border border-slate-700/50 bg-slate-800/60 px-1.5 py-px text-[10px] text-slate-500 hover:border-violet-700/50 hover:text-violet-300"
+                              onClick={(e) => {
+                                e.preventDefault()
+                                e.stopPropagation()
+                                router.push(`/gene?q=${encodeURIComponent(a)}`)
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  router.push(`/gene?q=${encodeURIComponent(a)}`)
+                                }
+                              }}
+                            >
+                              {a}
+                            </span>
+                          ))}
+                        </div>
+                      )
+                    })()}
+                  </Link>
+                </li>
+              ))}
+            </ul>
           </div>
         )}
       </div>
     </main>
+  )
+}
+
+export default function GeneSearchPage() {
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 px-4 py-8 text-sm text-slate-400">
+          <div className="page-canvas max-w-4xl">Loading gene search…</div>
+        </main>
+      }
+    >
+      <GeneSearchInner />
+    </Suspense>
   )
 }

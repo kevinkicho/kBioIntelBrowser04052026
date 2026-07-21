@@ -1,21 +1,24 @@
 'use client'
 
 /**
- * Prompt transparency for learning — shows system + user messages sent to the model.
- * Never claims of-record ranking.
+ * Prompt transparency — compact “Prompt” control with a styled hover/focus panel.
+ * Never uses native title or long “Show prompt…” labels (space + distraction).
+ * Opacity 0.3 at rest so it stays secondary to the main content.
  */
 
-import { useState } from 'react'
+import { useId, useState } from 'react'
 
 export interface AiPromptRevealProps {
   system?: string | null
   user?: string | null
   mode?: string
   version?: string
-  /** Compact toggle label */
+  /** @deprecated Always renders as “Prompt” — kept for call-site compat */
   label?: string
   className?: string
   testId?: string
+  /** left | right placement for the panel */
+  align?: 'left' | 'right'
 }
 
 export function AiPromptReveal({
@@ -23,67 +26,89 @@ export function AiPromptReveal({
   user,
   mode,
   version,
-  label = 'Show prompt (learn how this was asked)',
   className = '',
   testId = 'ai-prompt-reveal',
+  align = 'left',
 }: AiPromptRevealProps) {
+  const uid = useId()
+  const panelId = `${uid}-panel`
   const [open, setOpen] = useState(false)
+
   if (!system && !user) return null
 
+  const meta = [mode, version].filter(Boolean).join(' · ')
+
   return (
-    <div className={`rounded-lg border border-slate-800/80 bg-slate-950/40 ${className}`} data-testid={testId}>
+    <span
+      className={`relative inline-flex items-center ${className}`}
+      data-testid={testId}
+      onMouseEnter={() => setOpen(true)}
+      onMouseLeave={() => setOpen(false)}
+      onFocusCapture={() => setOpen(true)}
+      onBlurCapture={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+          setOpen(false)
+        }
+      }}
+    >
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left text-[10px] text-indigo-400/90 hover:text-indigo-300"
+        className="rounded border border-slate-700/60 bg-transparent px-1.5 py-0.5 text-[10px] text-slate-400 opacity-30 transition-opacity hover:opacity-100 hover:text-indigo-300 focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-indigo-500/50"
+        aria-expanded={open}
+        aria-describedby={open ? panelId : undefined}
         data-testid={`${testId}-toggle`}
+        onClick={(e) => {
+          e.preventDefault()
+          e.stopPropagation()
+          setOpen((v) => !v)
+        }}
       >
-        <span>
-          {open ? 'Hide prompt' : label}
-          {mode ? (
-            <span className="ml-1.5 font-mono text-slate-600">
-              {mode}
-              {version ? ` · ${version}` : ''}
-            </span>
-          ) : null}
-        </span>
-        <span className="text-slate-600">{open ? '▴' : '▾'}</span>
+        Prompt
       </button>
       {open && (
-        <div className="space-y-2 border-t border-slate-800/60 px-2.5 py-2">
-          <p className="text-[9px] text-slate-600 leading-relaxed">
-            For your learning: this is the exact system + user text sent to your connected model.
-            It is not a regulatory record. Of-record Discover ranks stay deterministic free-API
-            scores.
-          </p>
+        <span
+          id={panelId}
+          role="tooltip"
+          data-testid={`${testId}-panel`}
+          className={`absolute z-[70] mt-1 w-[min(22rem,calc(100vw-1.5rem))] max-h-72 overflow-y-auto rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-2 text-left shadow-xl shadow-black/50 ${
+            align === 'right' ? 'right-0 top-full' : 'left-0 top-full'
+          }`}
+        >
+          <span className="mb-1 block text-[10px] font-semibold text-indigo-200">
+            Prompt{meta ? ` · ${meta}` : ''}
+          </span>
+          <span className="mb-1.5 block text-[9px] leading-relaxed text-slate-600">
+            Exact system + user text sent to your model. Not a regulatory record. Of-record ranks
+            stay deterministic free-API scores.
+          </span>
           {system && (
-            <details open className="text-[10px] text-slate-500">
-              <summary className="cursor-pointer text-slate-400">
+            <span className="mb-2 block">
+              <span className="block text-[9px] uppercase tracking-wide text-slate-500">
                 System ({system.length.toLocaleString()} chars)
-              </summary>
+              </span>
               <pre
-                className="mt-1 max-h-40 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-2 text-[9px] text-slate-500"
+                className="mt-0.5 max-h-28 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-900/80 p-1.5 font-mono text-[9px] leading-snug text-slate-400"
                 data-testid={`${testId}-system`}
               >
                 {system}
               </pre>
-            </details>
+            </span>
           )}
           {user && (
-            <details open className="text-[10px] text-slate-500">
-              <summary className="cursor-pointer text-slate-400">
+            <span className="block">
+              <span className="block text-[9px] uppercase tracking-wide text-slate-500">
                 User ({user.length.toLocaleString()} chars)
-              </summary>
+              </span>
               <pre
-                className="mt-1 max-h-48 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-950 p-2 text-[9px] text-slate-500"
+                className="mt-0.5 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-900/80 p-1.5 font-mono text-[9px] leading-snug text-slate-400"
                 data-testid={`${testId}-user`}
               >
                 {user}
               </pre>
-            </details>
+            </span>
           )}
-        </div>
+        </span>
       )}
-    </div>
+    </span>
   )
 }

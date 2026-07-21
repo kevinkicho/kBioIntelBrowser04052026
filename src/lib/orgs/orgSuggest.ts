@@ -6,7 +6,7 @@
 import { searchRorOrganizations, type RorOrganization } from '@/lib/api/ror'
 import { searchUsCollegesByName, type UsCollege } from '@/lib/api/collegeScorecard'
 import {
-  searchOpenAlexResearchLabs,
+  searchOpenAlexInstitutions,
   type OpenAlexInstitution,
 } from '@/lib/api/openAlexInstitutions'
 
@@ -89,6 +89,8 @@ const SOURCE_RANK: Record<OrgSuggestSource, number> = {
 
 /**
  * Parallel free-API typeahead. Prefer ROR rows; fill with colleges + OpenAlex.
+ * Tuned for interactive latency: no IPEDS enrich, no multi-type AND filters,
+ * single OpenAlex search (not 3 parallel type splits).
  */
 export async function searchOrgSuggestions(
   query: string,
@@ -100,32 +102,22 @@ export async function searchOrgSuggestions(
   const country = opts?.countryCode?.trim().toUpperCase() || undefined
 
   const wantColleges = !country || country === 'US'
-  const rorTypes =
-    country === 'US'
-      ? ['education', 'healthcare', 'facility']
-      : ['education', 'facility', 'healthcare']
-
-  const [ror, colleges, openAlex] = await Promise.all([
+  // ROR comma-joined types:N filters are AND — empty for typeahead; rank by name match instead.
+  const [rorRows, colleges, openAlex] = await Promise.all([
     searchRorOrganizations(q, {
       countryCode: country,
-      types: rorTypes,
     }).catch(() => [] as RorOrganization[]),
     wantColleges
-      ? searchUsCollegesByName(q, Math.min(10, limit)).catch(() => [] as UsCollege[])
+      ? searchUsCollegesByName(q, Math.min(10, limit), { enrichIpeds: false }).catch(
+          () => [] as UsCollege[],
+        )
       : Promise.resolve([] as UsCollege[]),
-    searchOpenAlexResearchLabs(q, {
+    // Single untyped search is enough for typeahead (faster than edu+facility+healthcare)
+    searchOpenAlexInstitutions(q, {
       limit: Math.min(10, limit),
       countryCode: country,
     }).catch(() => [] as OpenAlexInstitution[]),
   ])
-
-  // If ROR typed filter is empty, retry untyped (some facilities omit education)
-  let rorRows = ror
-  if (rorRows.length === 0) {
-    rorRows = await searchRorOrganizations(q, { countryCode: country }).catch(
-      () => [] as RorOrganization[],
-    )
-  }
 
   const ranked: OrgSuggestion[] = [
     ...rorRows.map(rorToSuggestion),
@@ -133,29 +125,81 @@ export async function searchOrgSuggestions(
     ...openAlex.map(openAlexToSuggestion),
   ]
 
-  // Prefer names that start with / contain query; then source rank
+  // Prefer exact match → starts-with → contains; then shorter names (University
+  // before long “Club/Institute” rows); education-ish types; then source rank.
   const qn = normName(q)
+  const matchTier = (name: string): number => {
+    const n = normName(name)
+    if (n === qn) return 0
+    if (n.startsWith(qn + ' ')) return 1
+    if (n.startsWith(qn)) return 2
+    if (n.includes(qn)) return 3
+    return 4
+  }
+  const educationBoost = (s: OrgSuggestion): number => {
+    const types = (s.types ?? []).map((t) => t.toLowerCase())
+    if (types.some((t) => t.includes('education') || t === 'university' || t === 'college')) {
+      return 0
+    }
+    if (s.source === 'college') return 0
+    if (types.some((t) => t.includes('healthcare') || t.includes('facility'))) return 1
+    return 2
+  }
   ranked.sort((a, b) => {
-    const an = normName(a.name)
-    const bn = normName(b.name)
-    const aStarts = an.startsWith(qn) ? 0 : an.includes(qn) ? 1 : 2
-    const bStarts = bn.startsWith(qn) ? 0 : bn.includes(qn) ? 1 : 2
-    if (aStarts !== bStarts) return aStarts - bStarts
+    const ta = matchTier(a.name)
+    const tb = matchTier(b.name)
+    if (ta !== tb) return ta - tb
+    const ea = educationBoost(a)
+    const eb = educationBoost(b)
+    if (ea !== eb) return ea - eb
+    // Shorter display names first within same tier (Harvard University before Harvard Club…)
+    const lenDiff = a.name.length - b.name.length
+    if (Math.abs(lenDiff) > 4) return lenDiff
     if (SOURCE_RANK[a.source] !== SOURCE_RANK[b.source]) {
       return SOURCE_RANK[a.source] - SOURCE_RANK[b.source]
     }
-    return an.localeCompare(bn)
+    return normName(a.name).localeCompare(normName(b.name))
   })
 
-  const seen = new Set<string>()
-  const out: OrgSuggestion[] = []
+  // Round-robin fill so Scorecard / OpenAlex appear even when ROR has many hits
+  const bySource: Record<OrgSuggestSource, OrgSuggestion[]> = {
+    ror: [],
+    college: [],
+    openalex: [],
+  }
+  const seenGlobal = new Set<string>()
   for (const s of ranked) {
     const key = normName(s.name)
-    if (!key || seen.has(key)) continue
-    seen.add(key)
-    out.push(s)
-    if (out.length >= limit) break
+    if (!key || seenGlobal.has(key)) continue
+    seenGlobal.add(key)
+    bySource[s.source].push(s)
   }
+  const out: OrgSuggestion[] = []
+  const seenOut = new Set<string>()
+  const order: OrgSuggestSource[] = ['ror', 'college', 'openalex']
+  let guard = 0
+  while (out.length < limit && guard < limit * 4) {
+    guard += 1
+    let added = false
+    for (const src of order) {
+      const next = bySource[src].shift()
+      if (!next) continue
+      const key = normName(next.name)
+      if (seenOut.has(key)) continue
+      seenOut.add(key)
+      out.push(next)
+      added = true
+      if (out.length >= limit) break
+    }
+    if (!added) break
+  }
+  // Final sort of the mixed list by match quality (keep diversity of sources)
+  out.sort((a, b) => {
+    const ta = matchTier(a.name)
+    const tb = matchTier(b.name)
+    if (ta !== tb) return ta - tb
+    return educationBoost(a) - educationBoost(b)
+  })
   return out
 }
 
