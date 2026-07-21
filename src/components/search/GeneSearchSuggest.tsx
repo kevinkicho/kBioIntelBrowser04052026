@@ -88,10 +88,11 @@ export function GeneSearchSuggest({
     const el = inputRef.current
     if (!el) return
     const r = el.getBoundingClientRect()
+    // Wide enough for symbol | name | chip columns to align across rows
     setMenuRect({
       top: r.bottom + 4,
       left: r.left,
-      width: Math.max(r.width, 280),
+      width: Math.max(r.width, Math.min(520, window.innerWidth - 24)),
     })
   }, [])
 
@@ -241,39 +242,56 @@ export function GeneSearchSuggest({
           width: menuRect.width,
           zIndex: 10000,
         }}
-        className="max-h-80 overflow-y-auto rounded-lg border border-slate-600 bg-slate-900 shadow-2xl shadow-black/60"
+        className="max-h-[22rem] overflow-y-auto rounded-lg border border-slate-600 bg-slate-900 shadow-2xl shadow-black/60"
         data-testid={`${testId}-dropdown`}
       >
-        <li className="sticky top-0 z-[1] border-b border-slate-800 bg-slate-900 px-3 py-1.5 text-[9px] uppercase tracking-wide text-slate-500">
-          Live suggestions · MyGene.info
-          {loading ? ' · loading…' : suggestions.length ? ` · ${suggestions.length}` : ''}
+        <li className="sticky top-0 z-[1] border-b border-slate-800 bg-slate-900 px-3 py-2">
+          <div className="mb-1.5 text-[9px] uppercase tracking-wide text-slate-500">
+            Live suggestions · MyGene.info
+            {loading ? ' · loading…' : suggestions.length ? ` · ${suggestions.length}` : ''}
+          </div>
+          {/* Column guide — same grid as rows so symbols/chips line up */}
+          <div
+            className="hidden grid-cols-[5.25rem_minmax(0,1fr)_auto] items-center gap-x-3 text-[9px] font-medium uppercase tracking-wide text-slate-600 sm:grid"
+            aria-hidden
+          >
+            <span>Symbol</span>
+            <span>Name</span>
+            <span className="text-right">Type · loc · id</span>
+          </div>
         </li>
         {fetchError && (
-          <li className="px-3 py-2 text-[11px] text-amber-300/90" role="status">
+          <li className="px-3 py-2.5 text-[11px] text-amber-300/90" role="status">
             {fetchError}
           </li>
         )}
         {!loading && !fetchError && suggestions.length === 0 && (
-          <li className="px-3 py-3 text-[11px] text-slate-500" role="status">
+          <li className="px-3 py-3.5 text-[11px] text-slate-500" role="status">
             No gene matches for “{value.trim()}”. Try a symbol (BRCA1) or name.
           </li>
         )}
         {suggestions.map((s, i) => {
           const active = i === highlight
-          const meta = [s.typeOfGene, s.chromosome ? `chr ${s.chromosome}` : '', s.name]
-            .filter(Boolean)
-            .join(' · ')
+          const symbol = (s.symbol || s.geneId || '—').trim()
+          const name = (s.name || '').trim()
+          const typeLabel = (s.typeOfGene || '').trim()
+          const chrLabel = s.chromosome ? `chr ${s.chromosome}` : ''
+          const aliases = (s.aliases ?? []).filter(Boolean).slice(0, 4)
           return (
-            <li key={`${s.geneId}-${s.symbol}`} role="presentation">
+            <li
+              key={`${s.geneId}-${s.symbol}`}
+              role="presentation"
+              className="border-b border-slate-800/70 last:border-b-0"
+            >
               <button
                 type="button"
                 id={`${listId}-opt-${i}`}
                 role="option"
                 aria-selected={active}
-                className={`flex w-full flex-col gap-0.5 px-3 py-2 text-left text-sm transition-colors ${
+                className={`w-full px-3 py-2.5 text-left transition-colors ${
                   active
-                    ? 'bg-violet-900/50 text-slate-50'
-                    : 'text-slate-200 hover:bg-slate-800'
+                    ? 'bg-violet-900/45 text-slate-50'
+                    : 'text-slate-200 hover:bg-slate-800/90'
                 }`}
                 onMouseEnter={() => setHighlight(i)}
                 onMouseDown={(ev) => {
@@ -282,23 +300,61 @@ export function GeneSearchSuggest({
                 onClick={() => pick(s)}
                 data-testid={`${testId}-option`}
               >
-                <span className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-semibold text-violet-200">{s.symbol || s.geneId}</span>
-                  {s.geneId && (
-                    <span className="font-mono text-[9px] text-slate-500">Entrez {s.geneId}</span>
-                  )}
-                  {s.typeOfGene && (
-                    <span className="rounded border border-slate-700 px-1 py-px text-[9px] text-slate-500">
-                      {s.typeOfGene}
+                {/* Row 1: fixed symbol col · name · chips — aligned listitem to listitem */}
+                <span className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1 sm:grid-cols-[5.25rem_minmax(0,1fr)_auto]">
+                  <span
+                    className="truncate font-mono text-[13px] font-semibold tracking-tight text-violet-200"
+                    title={symbol}
+                  >
+                    {symbol}
+                  </span>
+                  <span className="min-w-0">
+                    <span
+                      className="block truncate text-[12px] font-medium leading-snug text-slate-100"
+                      title={name || undefined}
+                    >
+                      {name || '—'}
                     </span>
-                  )}
+                  </span>
+                  <span className="col-span-2 flex flex-wrap items-center justify-start gap-1 sm:col-span-1 sm:max-w-[14rem] sm:justify-end">
+                    {typeLabel ? (
+                      <span className="inline-flex max-w-[9rem] shrink-0 truncate rounded border border-violet-800/40 bg-violet-950/40 px-1.5 py-0.5 text-[9px] font-medium text-violet-200/90">
+                        {typeLabel}
+                      </span>
+                    ) : null}
+                    {chrLabel ? (
+                      <span className="inline-flex shrink-0 rounded border border-slate-700 bg-slate-950/60 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-slate-400">
+                        {chrLabel}
+                      </span>
+                    ) : null}
+                    {s.geneId ? (
+                      <span className="inline-flex shrink-0 rounded border border-slate-700 bg-slate-950/60 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-slate-500">
+                        Entrez {s.geneId}
+                      </span>
+                    ) : null}
+                  </span>
                 </span>
-                {meta && (
-                  <span className="text-[10px] text-slate-500 line-clamp-1">{meta}</span>
-                )}
-                {s.summary && (
-                  <span className="text-[10px] text-slate-600 line-clamp-1">{s.summary}</span>
-                )}
+                {/* Secondary rows share left inset = symbol column + gap (list-aligned) */}
+                {s.summary ? (
+                  <span className="mt-1.5 block pl-0 text-[10px] leading-relaxed text-slate-500 line-clamp-2 sm:pl-[calc(5.25rem+0.75rem)]">
+                    {s.summary}
+                  </span>
+                ) : null}
+                {aliases.length > 0 ? (
+                  <span className="mt-1.5 flex flex-wrap items-center gap-1 pl-0 sm:pl-[calc(5.25rem+0.75rem)]">
+                    <span className="mr-0.5 text-[8px] uppercase tracking-wide text-slate-600">
+                      also
+                    </span>
+                    {aliases.map((a) => (
+                      <span
+                        key={a}
+                        className="rounded border border-slate-800 bg-slate-950/50 px-1.5 py-0.5 font-mono text-[9px] text-slate-500"
+                      >
+                        {a}
+                      </span>
+                    ))}
+                  </span>
+                ) : null}
               </button>
             </li>
           )
