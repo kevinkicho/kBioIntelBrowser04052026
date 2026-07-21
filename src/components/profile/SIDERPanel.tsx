@@ -5,6 +5,9 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SIDERSideEffect } from '@/lib/types'
 import { alphaSortOptions, compareText } from '@/lib/listControls'
+import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
+import { siderSideEffectDeepLink } from '@/lib/api/sider'
+import { onDeepLinkClick } from '@/lib/trackDeepLink'
 
 interface SIDERPanelProps {
   sideEffects?: SIDERSideEffect[]
@@ -39,15 +42,20 @@ const BUCKET_RANK: Record<string, number> = {
 }
 
 function SideEffectItem({ effect }: { effect: SIDERSideEffect }) {
+  // Strict: only real http deep links (SIDER SE / MedGen). Never API-docs shells.
+  const candidate = effect.url?.trim() || siderSideEffectDeepLink(effect) || ''
   const href =
-    effect.url ||
-    (effect.sideEffectName
-      ? `https://www.ncbi.nlm.nih.gov/medgen/?term=${encodeURIComponent(effect.sideEffectName)}`
-      : undefined)
+    candidate && !isBrokenSourceShellUrl(candidate) && /^https?:\/\//i.test(candidate)
+      ? candidate
+      : null
   const bucket = frequencyBucket(effect.frequency)
 
   return (
-    <div className="py-1.5 border-b border-slate-700/50 last:border-0 flex items-start justify-between gap-2">
+    <div
+      className="py-1.5 border-b border-slate-700/50 last:border-0 flex items-start justify-between gap-2"
+      data-testid="sider-side-effect-item"
+      data-clickable={href ? 'true' : 'false'}
+    >
       <div className="min-w-0">
         {href ? (
           <a
@@ -55,14 +63,26 @@ function SideEffectItem({ effect }: { effect: SIDERSideEffect }) {
             target="_blank"
             rel="noopener noreferrer"
             className="text-sm text-slate-200 hover:text-indigo-300 hover:underline"
+            data-testid="sider-side-effect-link"
+            onClick={() =>
+              onDeepLinkClick('other', href, {
+                panelId: 'sider',
+                label: effect.sideEffectName,
+              })
+            }
           >
             {effect.sideEffectName}
           </a>
         ) : (
-          <span className="text-sm text-slate-200">{effect.sideEffectName}</span>
+          <span className="text-sm text-slate-200" data-testid="sider-side-effect-plain">
+            {effect.sideEffectName}
+          </span>
         )}
         {effect.frequency && (
           <p className="text-[10px] text-slate-600 mt-0.5">{effect.frequency}</p>
+        )}
+        {effect.source && (
+          <p className="text-[9px] text-slate-600 mt-0.5">{effect.source}</p>
         )}
       </div>
       <span className="text-[10px] shrink-0 px-1.5 py-0.5 rounded bg-slate-800 text-slate-400 border border-slate-700">

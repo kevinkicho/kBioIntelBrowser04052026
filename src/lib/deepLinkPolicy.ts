@@ -23,6 +23,14 @@ export function isBrokenSourceShellUrl(url: string | null | undefined): boolean 
   const dgidbGene = u.match(/dgidb\.org\/genes\/([^/?#]+)/i)
   if (dgidbGene && !dgidbGene[1].includes(':')) return true
 
+  // openFDA API documentation / root — not a drug or reaction record
+  if (/open\.fda\.gov\/apis?(\/|$)/i.test(u)) return true
+  if (/open\.fda\.gov\/?$/i.test(u.replace(/[?#].*$/, ''))) return true
+
+  // SIDER project homepage without a side-effect id
+  if (/sideeffects\.embl\.de\/?$/i.test(u.replace(/[?#].*$/, ''))) return true
+  if (/sideeffects\.embl\.de\/(index|download|api)/i.test(u)) return true
+
   return false
 }
 
