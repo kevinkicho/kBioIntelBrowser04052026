@@ -208,13 +208,13 @@ function OrgsPageInner() {
       </div>
 
       <form
-        className="flex flex-col gap-2 mb-4"
+        className="relative z-30 mb-4 flex flex-col gap-2 overflow-visible"
         onSubmit={(e) => {
           e.preventDefault()
           void runAll()
         }}
       >
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="relative z-30 flex flex-col gap-2 overflow-visible sm:flex-row">
           <OrgSearchSuggest
             value={q}
             onChange={setQ}
