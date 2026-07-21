@@ -371,21 +371,22 @@ export default function ResearchHypothesisEditorPage() {
 
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      {/* Full canvas dense list layout — not a card grid */}
+      <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 lg:px-6">
         <Link
           href={`/projects/${hyp.projectId}`}
-          className="text-xs text-slate-500 hover:text-slate-300"
+          className="text-[11px] text-slate-500 hover:text-slate-300"
         >
           ← Project board
         </Link>
-        <div className="mt-3 flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-100">Research hypothesis</h1>
-            <p className="mt-1 text-[11px] text-slate-500">
-              Narrative thesis under a project (not set-ops filters). v{hyp.version} ·{' '}
-              {hyp.claimIds.length} claim ids
+        <div className="mt-2 flex flex-wrap items-end justify-between gap-2 border-b border-slate-800 pb-3">
+          <div className="min-w-0">
+            <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">Research hypothesis</h1>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Claim-bound narrative thesis (not set-ops). v{hyp.version} · {hyp.claimIds.length}{' '}
+              claims · {linkedCandidates.length} candidates
               {hyp.role ? ` · ${hyp.role}` : ''}
-              {hyp.packId ? ` · pack ${hyp.packId.slice(0, 12)}…` : ''}
+              {hyp.packId ? ` · pack ${hyp.packId.slice(0, 10)}…` : ''}
             </p>
           </div>
           <span
@@ -397,32 +398,26 @@ export default function ResearchHypothesisEditorPage() {
         </div>
 
         {banner && (
-          <div className="mt-3 rounded-lg border border-emerald-800/40 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-200">
+          <div className="mt-2 rounded border border-emerald-800/40 bg-emerald-950/30 px-3 py-1.5 text-xs text-emerald-200">
             {banner}
           </div>
         )}
 
-        {/* Live: board signals that touch this thesis */}
+        {/* Live signals — dense list */}
         {!signalBannerDismissed && touches.length > 0 && (
           <div
-            className="mt-3 rounded-xl border border-amber-800/50 bg-amber-950/25 px-3 py-3"
+            className="mt-2 overflow-hidden rounded-lg border border-amber-800/50 bg-amber-950/20"
             data-testid="rh-signal-touch-banner"
             role="status"
           >
-            <div className="flex flex-wrap items-start justify-between gap-2">
-              <div>
-                <p className="text-xs font-semibold text-amber-200">
-                  Live signals touch this thesis ({touches.length})
-                </p>
-                <p className="mt-0.5 text-[10px] text-amber-200/70">
-                  Count changes on linked candidates since last snapshot — review kill criteria and
-                  experiments. Not auto-appended until you confirm.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-amber-900/40 px-2 py-1.5">
+              <p className="text-[11px] font-semibold text-amber-200">
+                Live signals touch thesis · {touches.length}
+              </p>
+              <div className="flex gap-1">
                 <button
                   type="button"
-                  className="rounded border border-amber-700/50 px-2 py-1 text-[10px] text-amber-100 hover:bg-amber-900/40"
+                  className="rounded border border-amber-700/50 px-2 py-0.5 text-[10px] text-amber-100 hover:bg-amber-900/40"
                   data-testid="rh-signal-append-notes"
                   onClick={() => {
                     if (!hyp) return
@@ -433,11 +428,11 @@ export default function ResearchHypothesisEditorPage() {
                     setSignalBannerDismissed(true)
                   }}
                 >
-                  Append review notes
+                  Append notes
                 </button>
                 <button
                   type="button"
-                  className="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-slate-200"
+                  className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400"
                   data-testid="rh-signal-dismiss"
                   onClick={() => setSignalBannerDismissed(true)}
                 >
@@ -445,137 +440,122 @@ export default function ResearchHypothesisEditorPage() {
                 </button>
               </div>
             </div>
-            <ul className="mt-2 max-h-40 space-y-1.5 overflow-y-auto">
+            <ul className="max-h-36 divide-y divide-amber-900/30 overflow-y-auto">
               {touches.map((t) => (
                 <li
                   key={`${t.candidateId}-${t.signal.panelId}-${t.signal.type}`}
-                  className="rounded border border-amber-900/40 bg-slate-950/40 px-2 py-1.5 text-[11px] text-slate-300"
+                  className="grid grid-cols-1 gap-0.5 px-2 py-1.5 text-[11px] sm:grid-cols-[minmax(0,8rem)_minmax(0,6rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-2"
                 >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-medium text-amber-100/90">{t.name}</span>
-                    <span className="rounded border border-slate-700 px-1 text-[9px] uppercase text-slate-500">
-                      {t.relevance}
-                    </span>
-                    <span className="text-slate-500">
-                      {t.signal.type} · {t.signal.label}
-                      {t.signal.count != null ? ` (n≈${t.signal.count})` : ''}
-                    </span>
+                  <span className="font-medium text-amber-100/90 truncate">{t.name}</span>
+                  <span className="text-[9px] uppercase text-slate-500">{t.relevance}</span>
+                  <span className="text-slate-400 truncate">
+                    {t.signal.type} · {t.signal.label}
+                    {t.signal.count != null ? ` (n≈${t.signal.count})` : ''}
+                    {t.reason ? ` — ${t.reason}` : ''}
+                  </span>
+                  {t.signal.href?.startsWith('/') ? (
                     <a
                       href={t.signal.href}
-                      className="text-[10px] text-indigo-400 hover:underline"
+                      className="text-[10px] text-indigo-400 hover:underline justify-self-end"
                       data-testid="rh-signal-panel-link"
                     >
-                      Open panel →
+                      Panel
                     </a>
-                  </div>
-                  <p className="mt-0.5 text-[10px] text-slate-500">{t.reason}</p>
+                  ) : null}
                 </li>
               ))}
             </ul>
           </div>
         )}
         {signalsLoading && (
-          <p className="mt-2 text-[10px] text-slate-600 animate-pulse" data-testid="rh-signals-loading">
-            Checking board signals for linked candidates…
+          <p className="mt-1 text-[10px] text-slate-600 animate-pulse" data-testid="rh-signals-loading">
+            Checking board signals…
           </p>
         )}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-[1fr_280px]">
-          <div className="min-w-0 space-y-6">
-            {/* Portfolio status */}
-            <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-3">
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Portfolio status
-              </h2>
-              <div className="mt-2 flex flex-wrap gap-1">
-                {STATUSES.map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => handleStatus(s)}
-                    className={`rounded border px-2 py-1 text-[10px] ${
-                      status === s
-                        ? RH_STATUS_STYLES[s]
-                        : 'border-slate-700 text-slate-500 hover:border-slate-600'
-                    }`}
-                    data-testid={`rh-status-${s}`}
-                  >
-                    {RH_STATUS_LABELS[s]}
-                  </button>
-                ))}
-              </div>
-              {status === 'killed' && (
-                <input
-                  type="text"
-                  value={killedReason}
-                  onChange={(e) => setKilledReason(e.target.value)}
-                  placeholder="Kill reason (falsified / abandoned)…"
-                  className="mt-2 w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-200"
-                />
-              )}
-            </section>
-
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-slate-400">Title</span>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={200}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 focus:border-emerald-700 focus:outline-none"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-[11px] font-medium text-slate-400">
-                Thesis (claim-bound narrative)
-              </span>
-              <textarea
-                value={thesis}
-                onChange={(e) => setThesis(e.target.value)}
-                rows={14}
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm leading-relaxed text-slate-100 focus:border-emerald-700 focus:outline-none"
-                data-testid="rh-thesis"
-              />
-            </label>
-
-            {hyp.sections && (
-              <section
-                className="rounded-xl border border-slate-800 bg-slate-900/30 p-3 text-xs"
-                data-testid="rh-sections"
+        {/* Status + title/thesis — compact editor band */}
+        <div className="mt-3 space-y-2">
+          <div className="flex flex-wrap items-center gap-1">
+            <span className="mr-1 text-[10px] font-semibold uppercase text-slate-500">Status</span>
+            {STATUSES.map((s) => (
+              <button
+                key={s}
+                type="button"
+                onClick={() => handleStatus(s)}
+                className={`rounded border px-2 py-0.5 text-[10px] ${
+                  status === s
+                    ? RH_STATUS_STYLES[s]
+                    : 'border-slate-800 text-slate-500 hover:border-slate-600'
+                }`}
+                data-testid={`rh-status-${s}`}
               >
-                <h2 className="text-[11px] font-semibold text-slate-300">Structured sections</h2>
-                {hyp.sections.workingClaim && (
-                  <p className="mt-2 text-emerald-300/90">{hyp.sections.workingClaim}</p>
-                )}
-                {hyp.sections.killCriteria?.length ? (
-                  <div className="mt-2">
-                    <p className="text-[10px] uppercase text-slate-500">Kill criteria</p>
-                    <ul className="list-inside list-disc text-amber-200/80">
-                      {hyp.sections.killCriteria.map((k) => (
-                        <li key={k}>{k}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-                {hyp.sections.falsifiers?.length ? (
-                  <div className="mt-2">
-                    <p className="text-[10px] uppercase text-slate-500">Falsifiers</p>
-                    <ul className="list-inside list-disc text-rose-200/80">
-                      {hyp.sections.falsifiers.map((k) => (
-                        <li key={k}>{k}</li>
-                      ))}
-                    </ul>
-                  </div>
-                ) : null}
-              </section>
-            )}
+                {RH_STATUS_LABELS[s]}
+              </button>
+            ))}
+          </div>
+          {status === 'killed' && (
+            <input
+              type="text"
+              value={killedReason}
+              onChange={(e) => setKilledReason(e.target.value)}
+              placeholder="Kill reason…"
+              className="w-full rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-200"
+            />
+          )}
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            maxLength={200}
+            placeholder="Title"
+            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-1.5 text-sm text-slate-100 focus:border-emerald-700 focus:outline-none"
+          />
+          <textarea
+            value={thesis}
+            onChange={(e) => setThesis(e.target.value)}
+            rows={8}
+            placeholder="Thesis (claim-bound narrative)"
+            className="w-full rounded border border-slate-700 bg-slate-950 px-3 py-2 text-sm leading-relaxed text-slate-100 focus:border-emerald-700 focus:outline-none"
+            data-testid="rh-thesis"
+          />
+        </div>
 
-            <div className="flex flex-wrap gap-2">
+        {hyp.sections && (
+          <section
+            className="mt-2 overflow-hidden rounded-lg border border-slate-800"
+            data-testid="rh-sections"
+          >
+            <div className="border-b border-slate-800 bg-slate-900/60 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+              Structured sections
+            </div>
+            <ul className="divide-y divide-slate-800/80 text-[11px]">
+              {hyp.sections.workingClaim && (
+                <li className="px-2 py-1.5">
+                  <span className="text-[9px] uppercase text-slate-600">Working claim · </span>
+                  <span className="text-emerald-300/90">{hyp.sections.workingClaim}</span>
+                </li>
+              )}
+              {hyp.sections.killCriteria?.map((k) => (
+                <li key={k} className="px-2 py-1 text-amber-200/80">
+                  <span className="text-[9px] uppercase text-slate-600">Kill · </span>
+                  {k}
+                </li>
+              ))}
+              {hyp.sections.falsifiers?.map((k) => (
+                <li key={k} className="px-2 py-1 text-rose-200/80">
+                  <span className="text-[9px] uppercase text-slate-600">Falsifier · </span>
+                  {k}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+
+        <div className="mt-2 flex flex-wrap gap-1.5">
               <button
                 type="button"
                 onClick={handleSave}
-                className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-medium text-white hover:bg-emerald-600"
+                className="rounded-lg bg-emerald-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-emerald-600"
                 data-testid="rh-save"
               >
                 Save
@@ -664,309 +644,326 @@ export default function ResearchHypothesisEditorPage() {
               </div>
             )}
 
-            {/* Claims */}
-            <section>
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <h2 className="text-sm font-semibold text-slate-200">Linked evidence claims</h2>
+        {/* —— Dense list sections (full width) —— */}
+        <div className="mt-4 space-y-3">
+          {/* Board coupling list */}
+          <section
+            className="overflow-hidden rounded-lg border border-slate-800"
+            data-testid="rh-board-sidebar"
+          >
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/70 px-2 py-1.5">
+              <h2 className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Board coupling · {project?.name ?? 'Project'}
+                {project?.disease?.name ? ` · ${project.disease.name}` : ''}
+              </h2>
+              {project?.targetIds?.length ? (
+                <div className="flex flex-wrap gap-1">
+                  {project.targetIds.map((t) => (
+                    <Link
+                      key={t}
+                      href={`/gene/${encodeURIComponent(t)}`}
+                      className="rounded border border-slate-700 px-1.5 py-0.5 text-[9px] text-cyan-300"
+                    >
+                      {t}
+                    </Link>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {linkedCandidates.length === 0 ? (
+              <p className="px-2 py-2 text-[11px] text-slate-600">No candidates linked.</p>
+            ) : (
+              <ul className="divide-y divide-slate-800/80" data-testid="rh-board-list">
+                {linkedCandidates.map((c) => {
+                  const cid = c.identity.pubchemCid
+                  const row = signalRows?.find((r) => r.candidateId === c.candidateId)
+                  return (
+                    <li
+                      key={c.candidateId}
+                      className="grid grid-cols-1 gap-1 px-2 py-1.5 sm:grid-cols-[minmax(0,12rem)_minmax(0,7rem)_minmax(0,1fr)_auto] sm:items-center sm:gap-2 text-[11px]"
+                    >
+                      <span className="font-medium text-slate-200 truncate">{c.identity.name}</span>
+                      <span className="text-[10px] text-slate-500">
+                        {c.boardStatus ?? 'untriaged'}
+                        {cid != null ? ` · ${cid}` : ''}
+                      </span>
+                      <span className="min-w-0">
+                        {c.scores ? (
+                          <ScoreAxisBars
+                            scores={c.scores}
+                            rubric={project?.rubric}
+                            compact
+                            showExplainer={false}
+                          />
+                        ) : (
+                          <span className="text-[10px] text-slate-600">
+                            {row && row.signals.length > 0
+                              ? `${row.signals.length} signal(s)`
+                              : '—'}
+                          </span>
+                        )}
+                      </span>
+                      {cid != null ? (
+                        <Link
+                          href={`/molecule/${cid}?project=${hyp.projectId}`}
+                          className="text-[10px] text-indigo-400 hover:underline justify-self-end"
+                        >
+                          Profile
+                        </Link>
+                      ) : (
+                        <span />
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
+
+          {/* Claims list */}
+          <section className="overflow-hidden rounded-lg border border-slate-800">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800 bg-slate-900/70 px-2 py-1.5">
+              <h2 className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                Linked evidence claims
+                {claims.length > 0 ? ` · ${claims.length}` : hyp.claimIds.length ? ` · ${hyp.claimIds.length} ids` : ''}
+              </h2>
+              <div className="flex items-center gap-2">
+                {rehydrateSource && claims.length > 0 && (
+                  <span className="text-[9px] text-slate-600">
+                    {rehydrateSource === 'idb' ? 'IDB pack cache' : 'Core panels'}
+                  </span>
+                )}
                 {hyp.claimIds.length > 0 && (
                   <button
                     type="button"
                     onClick={() => void runRehydrate(hyp)}
                     disabled={rehydrateBusy}
-                    className="rounded border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-slate-200 disabled:opacity-50"
+                    className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:text-slate-200 disabled:opacity-50"
                   >
-                    {rehydrateBusy ? 'Rebuilding…' : 'Rebuild evidence'}
+                    {rehydrateBusy ? 'Rebuilding…' : 'Rebuild'}
                   </button>
                 )}
               </div>
-              {rehydrateSource && claims.length > 0 && (
-                <p className="mt-1 text-[10px] text-slate-600">
-                  Source:{' '}
-                  {rehydrateSource === 'idb'
-                    ? 'pack cache (IndexedDB)'
-                    : 'rebuilt from Core panels'}
-                </p>
-              )}
-              {rehydrateError && (
-                <p className="mt-1 text-[11px] text-amber-400/90" role="status">
-                  {rehydrateError}
-                </p>
-              )}
-              {hyp.claimIds.length === 0 ? (
-                <p className="mt-2 text-xs text-slate-600">
-                  No claim ids — seed from a pack export on the project board.
-                </p>
-              ) : rehydrateBusy && claims.length === 0 ? (
-                <p className="mt-2 animate-pulse text-xs text-slate-500">
-                  Loading claim statements…
-                </p>
-              ) : claims.length > 0 ? (
-                <ul
-                  className="mt-2 max-h-72 space-y-2 overflow-y-auto"
-                  data-testid="rehydrated-claims"
-                >
-                  {claims.map((c) => {
-                    const prov = claimProvenanceDeepLink(c.provenance, {
-                      name: linkedCandidates[0]?.identity.name,
-                      cid: linkedCandidates[0]?.identity.pubchemCid,
-                      chemblId: linkedCandidates[0]?.identity.chemblId,
-                      diseaseName: project?.disease?.name,
-                    })
-                    return (
-                      <li
-                        key={c.id}
-                        className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs"
-                      >
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <span className="rounded border border-emerald-800/40 bg-emerald-900/20 px-1.5 py-0.5 text-[9px] uppercase text-emerald-300">
-                            {c.claimType}
-                          </span>
-                          {prov.href ? (
-                            <a
-                              href={prov.href}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[9px] text-indigo-400 hover:underline"
-                            >
-                              {c.provenance?.source ?? 'source'} ↗
-                            </a>
-                          ) : (
-                            <span className="text-[9px] text-slate-500">
-                              {c.provenance?.source ?? 'unknown'}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-0.5 leading-relaxed text-slate-200">{c.statement}</p>
-                        <p className="mt-1 font-mono text-[9px] text-slate-600">{c.id}</p>
-                      </li>
-                    )
-                  })}
-                </ul>
-              ) : (
-                <ul className="mt-2 max-h-32 space-y-0.5 overflow-y-auto font-mono text-[10px] text-slate-600">
-                  {hyp.claimIds.map((id) => (
-                    <li key={id}>{id}</li>
-                  ))}
-                </ul>
-              )}
-            </section>
-
-            {/* Experiments */}
-            <section>
-              <h2 className="text-sm font-semibold text-slate-200">Next experiments (Monday plan)</h2>
-              {experiments.length === 0 ? (
-                <p className="mt-1 text-xs text-slate-600">
-                  None yet — add manually or run RH AI → Experiments.
-                </p>
-              ) : (
-                <ul className="mt-2 space-y-2" data-testid="rh-experiments">
-                  {experiments.map((e) => (
+            </div>
+            {rehydrateError && (
+              <p className="border-b border-slate-800 px-2 py-1 text-[11px] text-amber-400/90">
+                {rehydrateError}
+              </p>
+            )}
+            {hyp.claimIds.length === 0 ? (
+              <p className="px-2 py-2 text-xs text-slate-600">
+                No claim ids — seed from a pack export on the project board.
+              </p>
+            ) : rehydrateBusy && claims.length === 0 ? (
+              <p className="animate-pulse px-2 py-2 text-xs text-slate-500">Loading claims…</p>
+            ) : claims.length > 0 ? (
+              <ul className="max-h-80 divide-y divide-slate-800/80 overflow-y-auto" data-testid="rehydrated-claims">
+                {claims.map((c) => {
+                  const prov = claimProvenanceDeepLink(c.provenance, {
+                    name: linkedCandidates[0]?.identity.name,
+                    cid: linkedCandidates[0]?.identity.pubchemCid,
+                    chemblId: linkedCandidates[0]?.identity.chemblId,
+                    diseaseName: project?.disease?.name,
+                  })
+                  const href =
+                    prov.href && /^https?:\/\//i.test(prov.href) ? prov.href : null
+                  return (
                     <li
-                      key={e.id}
-                      className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-sm"
+                      key={c.id}
+                      className="grid grid-cols-1 gap-0.5 px-2 py-1.5 text-[11px] sm:grid-cols-[minmax(0,5.5rem)_minmax(0,1fr)_minmax(0,7rem)_auto] sm:items-start sm:gap-2"
                     >
-                      <div className="flex flex-wrap gap-2 text-[10px] uppercase text-slate-500">
-                        <span>{e.priority ?? 'medium'}</span>
-                        {e.costTier && <span>cost:{e.costTier}</span>}
-                        {e.experimentType && <span>{e.experimentType}</span>}
-                      </div>
+                      <span className="rounded border border-emerald-900/40 bg-emerald-950/20 px-1 py-0.5 text-[9px] uppercase text-emerald-300/90 w-fit">
+                        {c.claimType}
+                      </span>
+                      <p className="leading-snug text-slate-200">{c.statement}</p>
+                      <span className="font-mono text-[9px] text-slate-600 truncate" title={c.id}>
+                        {c.id}
+                      </span>
+                      {href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-indigo-400 hover:underline justify-self-end"
+                        >
+                          {c.provenance?.source ?? 'source'}
+                        </a>
+                      ) : (
+                        <span className="text-[9px] text-slate-600 justify-self-end">
+                          {c.provenance?.source ?? '—'}
+                        </span>
+                      )}
+                    </li>
+                  )
+                })}
+              </ul>
+            ) : (
+              <ul className="max-h-32 divide-y divide-slate-800/80 overflow-y-auto font-mono text-[10px] text-slate-600">
+                {hyp.claimIds.map((id) => (
+                  <li key={id} className="px-2 py-1">
+                    {id}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          {/* Experiments list */}
+          <section className="overflow-hidden rounded-lg border border-slate-800">
+            <div className="border-b border-slate-800 bg-slate-900/70 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Next experiments · Monday plan
+              {experiments.length ? ` · ${experiments.length}` : ''}
+            </div>
+            {experiments.length === 0 ? (
+              <p className="px-2 py-2 text-xs text-slate-600">
+                None yet — add below or run RH AI → Experiments.
+              </p>
+            ) : (
+              <ul className="divide-y divide-slate-800/80" data-testid="rh-experiments">
+                {experiments.map((e) => (
+                  <li
+                    key={e.id}
+                    className="grid grid-cols-1 gap-0.5 px-2 py-1.5 text-[11px] sm:grid-cols-[minmax(0,5rem)_minmax(0,1fr)_minmax(0,10rem)] sm:gap-2"
+                  >
+                    <span className="text-[9px] uppercase text-slate-500">
+                      {e.priority ?? 'medium'}
+                      {e.costTier ? ` · ${e.costTier}` : ''}
+                    </span>
+                    <div>
                       <p className="text-slate-200">{e.description}</p>
                       {e.rationale && (
-                        <p className="mt-1 text-[11px] text-slate-500">{e.rationale}</p>
+                        <p className="mt-0.5 text-[10px] text-slate-500">{e.rationale}</p>
                       )}
                       {(e.successCriteria || e.failCriteria) && (
-                        <p className="mt-1 text-[10px] text-slate-600">
+                        <p className="mt-0.5 text-[9px] text-slate-600">
                           {e.successCriteria && <>OK: {e.successCriteria} </>}
                           {e.failCriteria && <>· Kill: {e.failCriteria}</>}
                         </p>
                       )}
-                      {e.relatedClaimIds && e.relatedClaimIds.length > 0 && (
-                        <p className="mt-1 font-mono text-[9px] text-slate-600">
-                          {e.relatedClaimIds.join(', ')}
-                        </p>
+                    </div>
+                    <span className="font-mono text-[9px] text-slate-600 truncate">
+                      {e.experimentType ?? ''}
+                      {e.relatedClaimIds?.length
+                        ? ` · ${e.relatedClaimIds.slice(0, 2).join(',')}`
+                        : ''}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2 border-t border-slate-800 px-2 py-2">
+              <input
+                type="text"
+                value={expText}
+                onChange={(e) => setExpText(e.target.value)}
+                placeholder="e.g. Orthogonal binding assay…"
+                className="min-w-0 flex-1 rounded border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-slate-100 focus:border-emerald-700 focus:outline-none"
+              />
+              <button
+                type="button"
+                onClick={handleAddExperiment}
+                disabled={!expText.trim()}
+                className="rounded border border-indigo-800/50 bg-indigo-950/40 px-3 py-1.5 text-xs text-indigo-200 disabled:opacity-50"
+              >
+                Add
+              </button>
+            </div>
+          </section>
+
+          {/* Storyboard list */}
+          <section className="overflow-hidden rounded-lg border border-slate-800" data-testid="rh-storyboard">
+            <div className="border-b border-slate-800 bg-slate-900/70 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Mechanism storyboard · disease → target → candidate → readout
+            </div>
+            {storyboard.nodes.length === 0 ? (
+              <p className="px-2 py-2 text-xs text-slate-600">No storyboard nodes yet.</p>
+            ) : (
+              <ol className="divide-y divide-slate-800/80">
+                {storyboard.nodes.map((n, i) => (
+                  <li
+                    key={n.id}
+                    className="grid grid-cols-[2rem_minmax(0,5rem)_minmax(0,1fr)_4rem] items-center gap-2 px-2 py-1.5 text-[11px]"
+                  >
+                    <span className="font-mono text-[10px] text-slate-600">{i + 1}</span>
+                    <span className="text-[9px] uppercase text-slate-500">{n.kind}</span>
+                    <span className="truncate text-slate-200" title={n.label}>
+                      {n.label}
+                    </span>
+                    <span className="text-right text-[9px] text-slate-600">
+                      {n.claimIds.length} cl.
+                    </span>
+                  </li>
+                ))}
+              </ol>
+            )}
+          </section>
+
+          {/* Gap map list */}
+          <section className="overflow-hidden rounded-lg border border-slate-800" data-testid="rh-gap-map">
+            <div className="border-b border-slate-800 bg-slate-900/70 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              Evidence gap map · deterministic
+              {gapMap.length ? ` · ${gapMap.length}` : ''}
+            </div>
+            {gapMap.length === 0 ? (
+              <p className="px-2 py-2 text-xs text-emerald-400/80">No major facet gaps detected.</p>
+            ) : (
+              <ul className="divide-y divide-slate-800/80">
+                {gapMap.map((g) => {
+                  const link = g.sourceHint
+                    ? originSourceDeepLink(g.sourceHint, {
+                        name: linkedCandidates[0]?.identity.name,
+                        cid: linkedCandidates[0]?.identity.pubchemCid,
+                        diseaseName: project?.disease?.name,
+                        geneSymbol: project?.targetIds?.[0],
+                      })
+                    : null
+                  const href =
+                    link?.href && /^https?:\/\//i.test(link.href) ? link.href : null
+                  return (
+                    <li
+                      key={g.id}
+                      className="grid grid-cols-1 gap-0.5 px-2 py-1.5 text-[11px] sm:grid-cols-[minmax(0,6rem)_minmax(0,1fr)_auto] sm:gap-2"
+                    >
+                      <span
+                        className={`text-[9px] uppercase ${
+                          g.severity === 'high'
+                            ? 'text-rose-400'
+                            : g.severity === 'medium'
+                              ? 'text-amber-400'
+                              : 'text-slate-500'
+                        }`}
+                      >
+                        {g.severity} · {g.facet}
+                      </span>
+                      <div>
+                        <p className="text-slate-300">{g.message}</p>
+                        <p className="text-[10px] text-slate-500">{g.suggestedAction}</p>
+                      </div>
+                      {href ? (
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-indigo-400 hover:underline justify-self-end"
+                        >
+                          {g.sourceHint}
+                        </a>
+                      ) : (
+                        <span className="text-[9px] text-slate-600 justify-self-end">
+                          {g.sourceHint ?? '—'}
+                        </span>
                       )}
                     </li>
-                  ))}
-                </ul>
-              )}
-              <div className="mt-3 flex gap-2">
-                <input
-                  type="text"
-                  value={expText}
-                  onChange={(e) => setExpText(e.target.value)}
-                  placeholder="e.g. Orthogonal binding assay on T…"
-                  className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-xs text-slate-100 focus:border-emerald-700 focus:outline-none"
-                />
-                <button
-                  type="button"
-                  onClick={handleAddExperiment}
-                  disabled={!expText.trim()}
-                  className="rounded-lg border border-indigo-800/50 bg-indigo-950/40 px-3 py-2 text-xs text-indigo-200 hover:bg-indigo-900/40 disabled:opacity-50"
-                >
-                  Add
-                </button>
-              </div>
-            </section>
+                  )
+                })}
+              </ul>
+            )}
+          </section>
 
-            {/* Mechanism storyboard */}
-            <section data-testid="rh-storyboard">
-              <h2 className="text-sm font-semibold text-slate-200">Mechanism storyboard</h2>
-              <p className="mt-1 text-[10px] text-slate-600">
-                Disease → target → candidate → readout (claim-linked, not generative biology).
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                {storyboard.nodes.map((n, i) => (
-                  <div key={n.id} className="flex items-center gap-2">
-                    <div className="max-w-[10rem] rounded-lg border border-slate-700 bg-slate-900/60 px-2 py-1.5 text-[10px]">
-                      <div className="uppercase text-[8px] text-slate-500">{n.kind}</div>
-                      <div className="truncate text-slate-200" title={n.label}>
-                        {n.label}
-                      </div>
-                      <div className="text-[8px] text-slate-600">{n.claimIds.length} claims</div>
-                    </div>
-                    {i < storyboard.nodes.length - 1 && (
-                      <span className="text-slate-600">→</span>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </section>
-
-            {/* Deterministic gap map */}
-            <section data-testid="rh-gap-map">
-              <h2 className="text-sm font-semibold text-slate-200">Evidence gap map</h2>
-              <p className="mt-1 text-[10px] text-slate-600">
-                Deterministic coverage check (also run AI Gap map for narrative suggestions).
-              </p>
-              {gapMap.length === 0 ? (
-                <p className="mt-2 text-xs text-emerald-400/80">No major facet gaps detected.</p>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {gapMap.map((g) => {
-                    const link = g.sourceHint
-                      ? originSourceDeepLink(g.sourceHint, {
-                          name: linkedCandidates[0]?.identity.name,
-                          cid: linkedCandidates[0]?.identity.pubchemCid,
-                          diseaseName: project?.disease?.name,
-                          geneSymbol: project?.targetIds?.[0],
-                        })
-                      : null
-                    return (
-                      <li
-                        key={g.id}
-                        className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs"
-                      >
-                        <span
-                          className={`text-[9px] uppercase ${
-                            g.severity === 'high'
-                              ? 'text-rose-400'
-                              : g.severity === 'medium'
-                                ? 'text-amber-400'
-                                : 'text-slate-500'
-                          }`}
-                        >
-                          {g.severity} · {g.facet}
-                        </span>
-                        <p className="text-slate-300">{g.message}</p>
-                        <p className="mt-0.5 text-slate-500">{g.suggestedAction}</p>
-                        {link?.href && (
-                          <a
-                            href={link.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="mt-1 inline-block text-[10px] text-indigo-400 hover:underline"
-                          >
-                            Open {g.sourceHint} ↗
-                          </a>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-            </section>
-          </div>
-
-          {/* Board coupling sidebar */}
-          <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
-            <div
-              className="rounded-xl border border-slate-800 bg-slate-900/50 p-3"
-              data-testid="rh-board-sidebar"
-            >
-              <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                Board coupling
-              </h2>
-              <p className="mt-1 text-[10px] text-slate-600">
-                {project?.name ?? 'Project'} · {project?.disease?.name ?? 'no disease'}
-              </p>
-              {linkedCandidates.length === 0 ? (
-                <p className="mt-2 text-[11px] text-slate-600">No candidates linked to this RH.</p>
-              ) : (
-                <ul className="mt-2 space-y-2">
-                  {linkedCandidates.map((c) => {
-                    const cid = c.identity.pubchemCid
-                    const row = signalRows?.find((r) => r.candidateId === c.candidateId)
-                    return (
-                      <li
-                        key={c.candidateId}
-                        className="rounded border border-slate-800 bg-slate-950/40 px-2 py-1.5 text-[11px]"
-                      >
-                        <div className="font-medium text-slate-200">{c.identity.name}</div>
-                        <div className="text-[9px] text-slate-500">
-                          {c.boardStatus ?? 'untriaged'}
-                          {cid != null ? ` · CID ${cid}` : ''}
-                          {c.identity.chemblId ? ` · ${c.identity.chemblId}` : ''}
-                          {row && row.signals.length > 0
-                            ? ` · ${row.signals.length} signal(s)`
-                            : row?.status === 'baseline'
-                              ? ' · baseline set'
-                              : ''}
-                        </div>
-                        {c.scores && (
-                          <div className="mt-1.5">
-                            <ScoreAxisBars
-                              scores={c.scores}
-                              rubric={project?.rubric}
-                              compact
-                              showExplainer
-                            />
-                          </div>
-                        )}
-                        {cid != null && (
-                          <Link
-                            href={`/molecule/${cid}?project=${hyp.projectId}`}
-                            className="text-[10px] text-indigo-400 hover:underline"
-                          >
-                            Profile →
-                          </Link>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
-              {project?.targetIds?.length ? (
-                <div className="mt-3">
-                  <p className="text-[9px] uppercase text-slate-600">Targets</p>
-                  <div className="mt-1 flex flex-wrap gap-1">
-                    {project.targetIds.map((t) => (
-                      <Link
-                        key={t}
-                        href={`/gene/${encodeURIComponent(t)}`}
-                        className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-cyan-300 hover:border-cyan-700"
-                      >
-                        {t}
-                      </Link>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-            <p className="text-[10px] leading-relaxed text-slate-600">
-              Investigation priority only. AI is claim-bound to rehydrated evidence — never free-form
-              Discover ranking rationales. Free public sources only.
-            </p>
-          </aside>
+          <p className="pb-4 text-[10px] leading-relaxed text-slate-600">
+            Investigation priority only. AI is claim-bound to rehydrated evidence — never free-form
+            Discover ranking. Free public sources only.
+          </p>
         </div>
       </div>
     </main>
