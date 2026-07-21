@@ -7,6 +7,8 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
+import { aiSurfaceIntro } from '@/lib/ai/aiUiCopy'
 import {
   type DiseaseDetailContext,
   type DiseaseIntelligenceMode,
@@ -216,28 +218,31 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
     })
   }
 
+  const intro = aiSurfaceIntro('disease')
+  const diseaseStatus = !aiAvailable
+    ? { label: 'Connect AI first', tone: 'warn' as const }
+    : !hasSomeData
+      ? { label: 'Need page data', tone: 'warn' as const }
+      : { label: 'Ready to generate', tone: 'ready' as const }
+
   return (
     <section className="mb-8" data-testid="disease-intelligence-panel">
-      <div className="flex flex-wrap items-center gap-3 mb-1">
-        <h2 className="text-xl font-semibold text-slate-100">Disease Intelligence</h2>
-        {aiAvailable && (
-          <span className="text-[10px] px-2 py-0.5 rounded bg-indigo-900/40 text-indigo-300 border border-indigo-800/50">
-            AI-Powered
-          </span>
-        )}
+      <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
+        <AiPanelIntro
+          intro={intro}
+          status={diseaseStatus}
+          className="mb-0 flex-1 min-w-0"
+          testId="disease-ai-intro"
+        />
         <Link
           href={discoverHref}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-300 transition-colors hover:border-emerald-500 hover:bg-emerald-900/50 hover:text-emerald-200"
+          className="shrink-0 inline-flex items-center gap-1.5 rounded-lg border border-emerald-700/50 bg-emerald-900/30 px-3 py-1.5 text-xs font-medium text-emerald-300 transition-colors hover:border-emerald-500 hover:bg-emerald-900/50 hover:text-emerald-200"
           data-testid="disease-intelligence-discover-cta"
         >
           Rank candidates in Discover
           <span aria-hidden>→</span>
         </Link>
       </div>
-      <p className="text-sm text-slate-400 mb-4">
-        Evidence-bound synthesis over genes, trial drugs, and molecules for this disease — not a
-        clinical prediction.
-      </p>
 
       {!aiAvailable && (
         <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5 mb-4">
@@ -251,11 +256,11 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
               />
             </svg>
             <span className="text-sm text-slate-400">
-              Connect Ollama to enable AI-powered disease analysis
+              Connect Ollama (top-bar AI) to generate disease intelligence
             </span>
           </div>
           <p className="text-xs text-slate-500">
-            Connect Ollama or Cloud via the AI button in the top bar to unlock intelligence features.
+            Add your Ollama Cloud key, connect, and pick a model. Tabs below stay locked until then.
           </p>
         </div>
       )}
@@ -263,14 +268,17 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
       {aiAvailable && !hasSomeData && (
         <div className="bg-slate-900/60 border border-slate-700/50 rounded-xl p-5">
           <p className="text-sm text-slate-500">
-            No gene, drug, or molecule data available to analyze. AI insights will appear when data
-            is present.
+            No gene, drug, or molecule data on this page yet. Load disease evidence first, then
+            return here to generate briefs.
           </p>
         </div>
       )}
 
       {aiAvailable && hasSomeData && (
         <div className="rounded-xl border border-slate-700/60 bg-slate-900/50 overflow-hidden">
+          <p className="px-3 pt-2.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            1. Pick a brief type
+          </p>
           {/* Tabs */}
           <div
             className="flex flex-wrap gap-1 border-b border-slate-800 bg-slate-950/40 p-1.5"
@@ -311,7 +319,12 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                   {meta.title}
                   {active.isStreaming && <StreamingDots />}
                 </h3>
-                <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">{meta.description}</p>
+                <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
+                  {meta.description}
+                </p>
+                <p className="mt-1 text-[10px] text-indigo-300/80">
+                  You get: a written analysis for this tab only (saved under Past results).
+                </p>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {active.prompt && (active.prompt.system || active.prompt.user) ? (

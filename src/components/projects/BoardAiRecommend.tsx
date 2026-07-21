@@ -20,11 +20,13 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import {
   buildAiRankWhy,
   buildBoardStatusSuggestWhy,
 } from '@/lib/ai/aiWhyTooltip'
+import { aiRunButtonLabel, aiSurfaceIntro } from '@/lib/ai/aiUiCopy'
 
 /** Suggest board status from AI rank position (never auto-applied). */
 export function suggestBoardStatusFromAiRank(
@@ -161,20 +163,32 @@ export function BoardAiRecommend({
 
   const n = result?.ordering.length ?? candidates.length
 
+  const intro = aiSurfaceIntro('board_recommend')
+  const status = !aiAvailable
+    ? { label: 'Connect AI first', tone: 'warn' as const }
+    : { label: 'Ready to generate', tone: 'ready' as const }
+
   return (
     <div
       className="mb-4 rounded-xl border border-violet-900/40 bg-violet-950/20 p-3"
       data-testid="board-ai-recommend"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div>
-          <p className="text-xs font-semibold text-violet-200">AI board recommend</p>
-          <p className="text-[10px] text-slate-500">
-            Non-of-record triage order using free-API board evidence. Suggestions never auto-apply —
-            you confirm promote / hold / watching.
-          </p>
+      <AiPanelIntro intro={intro} status={status} density="compact" testId="board-ai-intro" />
+
+      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
+        <div className="min-w-0 flex-1">
+          <label className="block text-[10px] font-medium text-slate-400 mb-1">
+            Optional goal for triage
+          </label>
+          <input
+            type="text"
+            value={goal}
+            onChange={(e) => setGoal(e.target.value)}
+            placeholder="e.g. prioritize safety gaps this week"
+            className="w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-200"
+          />
         </div>
-        <div className="flex flex-wrap gap-1.5">
+        <div className="flex flex-wrap gap-1.5 shrink-0">
           <button
             type="button"
             onClick={() => void run()}
@@ -182,7 +196,11 @@ export function BoardAiRecommend({
             className="rounded-lg bg-violet-700/90 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-violet-600 disabled:opacity-40"
             data-testid="board-ai-recommend-run"
           >
-            {running ? 'Analyzing…' : result ? 'Quick re-run' : 'Recommend review order'}
+            {aiRunButtonLabel({
+              busy: running,
+              hasResult: Boolean(result),
+              surface: 'board_recommend',
+            })}
           </button>
           {result && (
             <button
@@ -192,24 +210,24 @@ export function BoardAiRecommend({
               className="rounded-lg border border-violet-700/50 px-3 py-1.5 text-[11px] text-violet-200 hover:bg-violet-950/50 disabled:opacity-40"
               data-testid="board-ai-regenerate"
             >
-              Regenerate…
+              Edit prompt &amp; regenerate…
             </button>
           )}
         </div>
       </div>
-      <input
-        type="text"
-        value={goal}
-        onChange={(e) => setGoal(e.target.value)}
-        placeholder="Optional goal (e.g. prioritize safety gaps)"
-        className="mb-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-[11px] text-slate-200"
-      />
       {!aiAvailable && (
-        <p className="text-[10px] text-amber-400/90">Connect Ollama Cloud to run.</p>
+        <p className="text-[10px] text-amber-400/90">
+          Connect Ollama Cloud via the top-bar AI button, then pick a model.
+        </p>
       )}
       {error && <p className="text-[10px] text-red-400">{error}</p>}
       {result && (
-        <ol className="mt-2 space-y-1.5 text-[11px] text-slate-300 list-decimal list-inside">
+        <p className="mt-2 mb-1 text-[10px] font-semibold uppercase tracking-wide text-violet-300/80">
+          Suggested review order (apply each status yourself)
+        </p>
+      )}
+      {result && (
+        <ol className="mt-1 space-y-1.5 text-[11px] text-slate-300 list-decimal list-inside">
           {result.ordering.slice(0, 12).map((item, idx) => {
             const c = candidates.find((x) => x.candidateId === item.key) as
               | MoleculeCandidate

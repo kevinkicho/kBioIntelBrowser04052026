@@ -52,10 +52,17 @@ export function AiGenerationView({
       data-format={f.kind}
     >
       {f.kind === 'error' && (
-        <p className="text-red-400/90 whitespace-pre-wrap">{f.summary || f.preview}</p>
+        <div>
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-red-400/80 mb-1">
+            Generation failed
+          </p>
+          <p className="text-red-400/90 whitespace-pre-wrap">{f.summary || f.preview}</p>
+        </div>
       )}
 
-      {f.kind === 'empty' && <p className="text-slate-600">{f.preview}</p>}
+      {f.kind === 'empty' && (
+        <p className="text-slate-600">No content stored for this run.</p>
+      )}
 
       {f.refused && (
         <p className="rounded border border-amber-800/40 bg-amber-950/30 px-2 py-1.5 text-amber-200/90">

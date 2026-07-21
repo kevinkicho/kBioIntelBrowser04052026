@@ -2,12 +2,13 @@
 
 /**
  * Prompt transparency — compact “Prompt” control with a styled hover/focus panel.
- * Never uses native title or long “Show prompt…” labels (space + distraction).
- * Opacity 0.3 at rest so it stays secondary to the main content.
+ * Shows exact system + user text sent to the model (audit / trust).
+ * Slightly dim at rest; clearer first-look copy in the panel.
  */
 
 import { useId, useState } from 'react'
 import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { humanModeLabel } from '@/lib/ai/aiUiCopy'
 
 export interface AiPromptRevealProps {
   system?: string | null
@@ -37,7 +38,8 @@ export function AiPromptReveal({
 
   if (!system && !user) return null
 
-  const meta = [mode, version].filter(Boolean).join(' · ')
+  const modeHuman = humanModeLabel(mode)
+  const meta = [modeHuman || mode, version].filter(Boolean).join(' · ')
 
   return (
     <span
@@ -54,9 +56,10 @@ export function AiPromptReveal({
     >
       <button
         type="button"
-        className="rounded border border-slate-700/60 bg-transparent px-1.5 py-0.5 text-[10px] text-slate-400 opacity-30 transition-opacity hover:opacity-100 hover:text-indigo-300 focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-indigo-500/50"
+        className="rounded border border-slate-700/60 bg-slate-950/40 px-1.5 py-0.5 text-[10px] text-slate-400 opacity-70 transition-opacity hover:opacity-100 hover:text-indigo-300 focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-indigo-500/50"
         aria-expanded={open}
         aria-describedby={open ? panelId : undefined}
+        aria-label="View exact prompt sent to the model"
         data-testid={`${testId}-toggle`}
         onClick={(e) => {
           e.preventDefault()
@@ -77,11 +80,11 @@ export function AiPromptReveal({
           }`}
         >
           <span className="mb-1 block text-[10px] font-semibold text-indigo-200">
-            Prompt{meta ? ` · ${meta}` : ''}
+            What was sent to the model{meta ? ` · ${meta}` : ''}
           </span>
-          <span className="mb-1.5 block text-[9px] leading-relaxed text-slate-600">
-            Exact system + user text sent to your model. Not a regulatory record. Of-record ranks
-            stay deterministic free-API scores.
+          <span className="mb-1.5 block text-[9px] leading-relaxed text-slate-500">
+            Exact system rules + user context your Ollama model receives. Use this to audit
+            grounding. Not a regulatory record — of-record ranks stay free-API scores.
           </span>
           {system && (
             <span className="mb-2 block">

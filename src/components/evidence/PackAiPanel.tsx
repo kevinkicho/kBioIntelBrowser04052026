@@ -16,9 +16,15 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
+import {
+  aiRunButtonLabel,
+  aiSurfaceIntro,
+  packModeExpectLine,
+} from '@/lib/ai/aiUiCopy'
 
 const MODES: { id: PackAiMode; label: string }[] = [
   { id: 'pack_executive_brief', label: 'Executive brief' },
@@ -196,17 +202,20 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
     setError('Could not load that generation')
   }
 
+  const intro = aiSurfaceIntro('pack')
+  const status =
+    !ai.hasUserApiKey || !ai.model
+      ? { label: 'Connect AI first', tone: 'warn' as const }
+      : gated
+        ? { label: `Need ≥${minClaims} claims`, tone: 'warn' as const }
+        : { label: 'Ready to generate', tone: 'ready' as const }
+
   return (
     <div
       className={`mt-3 rounded-lg border border-slate-800 bg-slate-950/40 p-3 ${className}`}
       data-testid="pack-ai-panel"
     >
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-slate-300">Pack AI</span>
-        <span className="text-[10px] text-slate-600">
-          grounded in pack evidence · Ollama Cloud
-        </span>
-      </div>
+      <AiPanelIntro intro={intro} status={status} testId="pack-ai-intro" />
 
       {/* Claim coverage — honesty before AI */}
       <div
@@ -215,20 +224,18 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       >
         <div className="flex flex-wrap items-center justify-between gap-2 text-[10px]">
           <span className="text-slate-400">
-            Claims{' '}
+            Evidence in this pack:{' '}
             <span className="font-mono tabular-nums text-slate-200">{claimCount}</span>
-            <span className="text-slate-600"> · citable </span>
+            <span className="text-slate-600"> claims</span>
+            <span className="text-slate-600"> · </span>
             <span className="font-mono tabular-nums text-slate-200">{citableCount}</span>
-            <span className="text-slate-600"> · mode needs ≥{minClaims}</span>
-          </span>
-          <span
-            className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold ${
-              gated
-                ? 'border-amber-800/50 text-amber-300'
-                : 'border-emerald-800/50 text-emerald-300'
-            }`}
-          >
-            {gated ? 'thin evidence' : 'ready'}
+            <span className="text-slate-600"> with source links</span>
+            {minClaims > 0 && (
+              <span className="text-slate-600">
+                {' '}
+                · this mode needs at least {minClaims}
+              </span>
+            )}
           </span>
         </div>
         <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
@@ -237,15 +244,19 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               gated ? 'bg-amber-600/70' : 'bg-emerald-600/80'
             }`}
             style={{
-              width: `${Math.min(100, minClaims > 0 ? (claimCount / Math.max(minClaims, 1)) * 100 : 0)}%`,
+              width: `${Math.min(100, minClaims > 0 ? (claimCount / Math.max(minClaims, 1)) * 100 : claimCount > 0 ? 100 : 0)}%`,
             }}
           />
         </div>
         <p className="mt-1 text-[9px] text-slate-600">
-          AI answers only from allowlisted claim ids — empty Core panels mean thinner packs.
+          The model may only use allowlisted claim ids from this pack. Empty Core panels → thinner
+          answers.
         </p>
       </div>
 
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        1. Pick what to generate
+      </p>
       <div className="mb-2 flex flex-wrap items-center gap-1">
         {MODES.map((m) => (
           <AiWhyTooltip
@@ -275,37 +286,46 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         ))}
       </div>
 
-      <p className="mb-2 text-[11px] text-slate-500 leading-relaxed">{packModeTaskLabel(mode)}</p>
+      <div className="mb-2 rounded border border-slate-800/70 bg-slate-950/30 px-2.5 py-1.5">
+        <p className="text-[11px] leading-relaxed text-slate-400">{packModeTaskLabel(mode)}</p>
+        <p className="mt-0.5 text-[10px] leading-relaxed text-indigo-300/80">
+          {packModeExpectLine(mode)}
+        </p>
+      </div>
 
       {isCustom && (
         <div className="mb-2 space-y-1.5" data-testid="pack-ai-custom-prompt">
-          <label className="block text-[10px] font-medium text-slate-400">Your prompt</label>
+          <label className="block text-[10px] font-medium text-slate-400">Your question</label>
           <textarea
             value={customQuestion}
             onChange={(e) => setCustomQuestion(e.target.value)}
             rows={3}
-            placeholder="Ask anything about this pack’s evidence (e.g. compare safety signals, list trial gaps…)"
+            placeholder="e.g. Compare safety signals across candidates, or list trial gaps…"
             className="w-full rounded-lg border border-slate-700 bg-slate-900/80 px-2.5 py-2 text-xs text-slate-200 placeholder:text-slate-600 focus:border-cyan-600 focus:outline-none resize-y min-h-[4rem]"
             data-testid="pack-ai-custom-input"
           />
         </div>
       )}
 
-      {promptPreview && (
-        <AiPromptReveal
-          system={promptPreview.system}
-          user={promptPreview.user}
-          mode={mode}
-          version="packAi@v1"
-          className="mb-2"
-          testId="pack-ai-prompt"
-        />
-      )}
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          2. Generate
+        </p>
+        {promptPreview && (
+          <AiPromptReveal
+            system={promptPreview.system}
+            user={promptPreview.user}
+            mode={mode}
+            version="packAi@v1"
+            testId="pack-ai-prompt"
+          />
+        )}
+      </div>
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90">
-          Need ≥{minClaims} claims in pack for {mode.replace(/_/g, ' ')} (have {claimCount}).
-          Download after Core panels load, or load more molecule evidence.
+          Add at least {minClaims} claims to the pack for this mode (you have {claimCount}).
+          Download the pack after Core panels finish loading, or open more molecule evidence first.
         </p>
       ) : (
         <div className="mb-2 flex flex-wrap gap-2">
@@ -316,15 +336,12 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
             className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
             data-testid="pack-ai-run"
           >
-            {busy
-              ? isCustom
-                ? 'Thinking…'
-                : 'Running…'
-              : insight
-                ? 'Quick re-run'
-                : isCustom
-                  ? 'Send prompt'
-                  : 'Run analysis'}
+            {aiRunButtonLabel({
+              busy,
+              hasResult: Boolean(insight),
+              isCustom,
+              surface: 'pack',
+            })}
           </button>
           {(insight || promptPreview) && (
             <button
@@ -334,7 +351,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               className="rounded-lg border border-indigo-700/50 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-950/40 disabled:opacity-50"
               data-testid="pack-ai-regenerate"
             >
-              Regenerate…
+              Edit prompt &amp; regenerate…
             </button>
           )}
         </div>
@@ -362,26 +379,16 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         />
       )}
 
-      {pack && (
-        <AiRunNavigator
-          kind="pack"
-          mode={mode}
-          contextKey={pack.id}
-          refreshKey={histRefresh}
-          activeId={activeGenId}
-          onSelect={restorePackEntry}
-          className="mb-2 mt-2"
-          testId="pack-ai-runs"
-        />
-      )}
-
       {error && <p className="mt-2 text-[11px] text-red-400">{error}</p>}
 
       {insight && (
         <div
-          className="mt-3 space-y-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300"
+          className="mt-3 space-y-2 rounded border border-indigo-900/40 bg-slate-900/50 p-2 text-xs text-slate-300"
           data-testid="pack-ai-insight"
         >
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300/80">
+            Latest result
+          </p>
           {!isStructuredPackMode(mode) ? (
             <div className="leading-relaxed whitespace-pre-wrap">{insight.summary}</div>
           ) : (
@@ -466,6 +473,23 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               pack statements (stale pack or invalid ids).
             </p>
           )}
+        </div>
+      )}
+
+      {pack && (
+        <div className="mt-3">
+          <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+            3. Past results for this mode
+          </p>
+          <AiRunNavigator
+            kind="pack"
+            mode={mode}
+            contextKey={pack.id}
+            refreshKey={histRefresh}
+            activeId={activeGenId}
+            onSelect={restorePackEntry}
+            testId="pack-ai-runs"
+          />
         </div>
       )}
     </div>

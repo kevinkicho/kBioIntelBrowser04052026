@@ -233,12 +233,31 @@ export default function AiHistoryPage() {
             <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">
               AI generation history
             </h1>
-            <p className="mt-0.5 max-w-4xl text-[12px] leading-snug text-slate-500">
-              Filter, sort, and page through live model runs. Click a row to expand structured
-              output, prompts, and notes. Of-record Discover ranks stay free-API scores.
+            <p className="mt-0.5 max-w-4xl text-[12px] leading-snug text-slate-400">
+              Every Pack, Discover, board, disease, hypothesis, and lab AI run is saved here so you
+              can reopen answers, inspect the exact prompt, and add notes. This is a log of model
+              outputs — not of-record ranking.
             </p>
-            <p className="mt-1 text-[10px] text-slate-600">
-              Source: {source === 'cloud' ? 'Firestore' : 'local IndexedDB'}
+            <dl className="mt-2 grid max-w-3xl gap-1.5 text-[10px] leading-snug sm:grid-cols-3">
+              <div className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5">
+                <dt className="font-semibold uppercase tracking-wide text-slate-500">What</dt>
+                <dd className="mt-0.5 text-slate-400">Past model answers by product surface</dd>
+              </div>
+              <div className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5">
+                <dt className="font-semibold uppercase tracking-wide text-slate-500">How to use</dt>
+                <dd className="mt-0.5 text-slate-400">
+                  Filter by kind → search → expand a row for structured output + Prompt
+                </dd>
+              </div>
+              <div className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5">
+                <dt className="font-semibold uppercase tracking-wide text-slate-500">Not</dt>
+                <dd className="mt-0.5 text-slate-400">
+                  Not Discover of-record ranks (those stay free-API scores)
+                </dd>
+              </div>
+            </dl>
+            <p className="mt-1.5 text-[10px] text-slate-600">
+              Source: {source === 'cloud' ? 'cloud + local' : 'this browser (local)'}
               {auth.user ? ' · signed in' : ' · sign in to sync cloud'} ·{' '}
               <Link href="/discover" className="text-indigo-400 hover:underline">
                 Discover

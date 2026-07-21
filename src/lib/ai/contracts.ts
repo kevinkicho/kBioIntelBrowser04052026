@@ -125,19 +125,19 @@ export function buildPackAiContext(
   }
 }
 
-/** Short UI description for each mode chip. */
+/** Short UI description for each mode chip (task purpose). */
 export function packModeTaskLabel(mode: PackAiMode): string {
   switch (mode) {
     case 'pack_executive_brief':
-      return 'Short decision-oriented brief grounded in pack claims.'
+      return 'Decision-oriented brief: what the pack supports, what is thin, what to do next.'
     case 'pack_gap_analysis':
-      return 'Evidence gaps and what public data would close them.'
+      return 'Map missing evidence and which free public sources could close each gap.'
     case 'pack_next_experiment':
-      return '1–3 concrete next experiments with claim-tied rationale.'
+      return 'Propose 1–3 concrete next experiments with rationale tied to claim ids.'
     case 'pack_red_team':
-      return 'Why leading candidates may fail (safety/trial claims only).'
+      return 'Argue why leaders may fail using safety and trial claims only (not efficacy fiction).'
     case 'pack_custom_prompt':
-      return 'Ask your own question about this pack (claim-bound free-form chat).'
+      return 'Your own question about this pack — still limited to allowlisted claims.'
     default:
       return ''
   }

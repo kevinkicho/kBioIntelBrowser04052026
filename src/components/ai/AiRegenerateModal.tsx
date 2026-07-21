@@ -2,9 +2,9 @@
 
 /**
  * Regenerate modal at the generation surface:
- * - Review system + user prompts (learning)
+ * - Review system + user prompts
  * - Override user prompt (and optionally system)
- * - Paginated prior generations with Load
+ * - Paginated prior generations with Restore
  * - Confirm regenerate with chosen prompt
  */
 
@@ -15,6 +15,7 @@ import {
   type AiDataKind,
   type AiGeneratedRecord,
 } from '@/lib/ai/aiHistoryStore'
+import { humanModeLabel } from '@/lib/ai/aiUiCopy'
 import { AiUserComment } from './AiUserComment'
 import { AiGenerationView } from './AiGenerationView'
 import { formatAiGenerationPreview } from '@/lib/ai/formatAiGeneration'
@@ -129,9 +130,10 @@ export function AiRegenerateModal({
             <h2 id={`${testId}-title`} className="text-sm font-semibold text-slate-100">
               {title}
             </h2>
-            <p className="mt-0.5 text-[10px] text-slate-500">
-              {aiKindLabel(kind)} · <span className="font-mono">{mode}</span> · Review prompt, load a
-              prior run, or override before regenerate. Not of-record for Discover ranks.
+            <p className="mt-0.5 text-[10px] leading-snug text-slate-500">
+              {aiKindLabel(kind)} · {humanModeLabel(mode) || mode}. Edit the prompt the model will
+              see, restore a past answer into the panel, then generate again. Not of-record for
+              Discover ranks.
             </p>
           </div>
           <button
@@ -148,10 +150,14 @@ export function AiRegenerateModal({
           {/* Prompt editor */}
           <div className="min-h-0 space-y-2 overflow-y-auto border-b border-slate-800 p-4 lg:border-b-0 lg:border-r">
             <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-              Prompt (for learning)
+              What will be sent to the model
+            </p>
+            <p className="text-[9px] leading-snug text-slate-600">
+              Left column = next run. Right column = past runs you can restore or copy into the
+              editor.
             </p>
             <label className="block text-[10px] text-slate-400">
-              System{allowOverrideSystem ? ' (editable)' : ' (read-only)'}
+              System rules{allowOverrideSystem ? ' (editable)' : ' (read-only for this mode)'}
             </label>
             <textarea
               value={systemDraft}
@@ -164,7 +170,7 @@ export function AiRegenerateModal({
               data-testid={`${testId}-system`}
             />
             <label className="block text-[10px] text-slate-400">
-              User message (you may override before regenerate)
+              User context / question (edit freely before regenerate)
             </label>
             <textarea
               value={userDraft}
@@ -213,19 +219,19 @@ export function AiRegenerateModal({
           <div className="flex min-h-0 flex-col overflow-hidden p-4">
             <div className="mb-2 flex items-center justify-between gap-2">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Prior generations
+                Past results
               </p>
               <span className="text-[9px] text-slate-600">
-                {source === 'cloud' ? 'cloud' : 'this browser'} · paginated
+                {source === 'cloud' ? 'cloud' : 'this browser'}
               </span>
             </div>
             {histError && <p className="text-[10px] text-red-400 mb-1">{histError}</p>}
             {loadingHist && items.length === 0 && (
-              <p className="text-[10px] text-slate-500">Loading history…</p>
+              <p className="text-[10px] text-slate-500">Loading past results…</p>
             )}
             {!loadingHist && items.length === 0 && (
               <p className="text-[10px] text-slate-600">
-                No prior generations yet for this filter. Run once to start history.
+                No past results for this mode yet. Generate once to start a history you can restore.
               </p>
             )}
             <ul className="min-h-0 flex-1 space-y-1.5 overflow-y-auto">
@@ -240,7 +246,7 @@ export function AiRegenerateModal({
                   >
                     <div className="flex flex-wrap items-start justify-between gap-1">
                       <div className="min-w-0 text-slate-500">
-                        <span className="font-mono">{entry.mode}</span>
+                        <span>{humanModeLabel(entry.mode) || entry.mode}</span>
                         <span>
                           {' '}
                           ·{' '}
@@ -255,7 +261,7 @@ export function AiRegenerateModal({
                           className="rounded border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-400 hover:text-indigo-300"
                           onClick={() => setExpandedId(expanded ? null : entry.id)}
                         >
-                          {expanded ? 'Less' : 'View'}
+                          {expanded ? 'Less' : 'Preview'}
                         </button>
                         <button
                           type="button"
@@ -268,7 +274,7 @@ export function AiRegenerateModal({
                             if (entry.promptUser) setUserDraft(entry.promptUser)
                           }}
                         >
-                          Load message
+                          Restore into panel
                         </button>
                       </div>
                     </div>

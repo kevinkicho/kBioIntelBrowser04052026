@@ -22,9 +22,15 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
+import {
+  aiRunButtonLabel,
+  aiSurfaceIntro,
+  packModeExpectLine,
+} from '@/lib/ai/aiUiCopy'
 
 const LAB_MODES: { id: PackAiMode; label: string; labLabel: string }[] = [
   { id: 'pack_executive_brief', label: 'Affiliation brief', labLabel: 'Affiliation brief' },
@@ -175,19 +181,25 @@ export function ResearchLabAiPanel({
 
   if (!pack) return null
 
+  const intro = aiSurfaceIntro('research_lab')
+  const status =
+    !ai.hasUserApiKey || !ai.model
+      ? { label: 'Connect AI first', tone: 'warn' as const }
+      : gated
+        ? { label: `Need ≥${minClaims} claims`, tone: 'warn' as const }
+        : { label: 'Ready to generate', tone: 'ready' as const }
+
   return (
     <section
       className={`rounded-xl border border-violet-900/40 bg-violet-950/20 p-4 ${className}`}
       data-testid="research-lab-ai-panel"
     >
-      <h3 className="text-sm font-semibold text-violet-100">AI activities (claim-bound)</h3>
-      <p className="mt-1 text-[10px] text-slate-500 leading-relaxed">
-        Uses only dossier claims built from free public registers (ROR, OpenAlex, Scorecard, CMS,
-        NIH RePORTER, OpenAIRE). Not admissions ranking or clinical referral. BYOM Ollama — live
-        only, no mock outputs. Each run is saved so you can page through regenerations.
-      </p>
+      <AiPanelIntro intro={intro} status={status} testId="research-lab-ai-intro" />
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        1. Pick what to generate
+      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
         {LAB_MODES.map((m) => (
           <AiWhyTooltip key={m.id} why={buildPackAiModeWhy(m.id)} testId={`lab-ai-why-${m.id}`}>
             <button
@@ -208,7 +220,10 @@ export function ResearchLabAiPanel({
           </AiWhyTooltip>
         ))}
       </div>
-      <p className="mt-1.5 text-[10px] text-slate-500">{packModeTaskLabel(mode)}</p>
+      <div className="mt-1.5 rounded border border-slate-800/70 bg-slate-950/30 px-2.5 py-1.5">
+        <p className="text-[10px] text-slate-500">{packModeTaskLabel(mode)}</p>
+        <p className="mt-0.5 text-[10px] text-violet-300/80">{packModeExpectLine(mode)}</p>
+      </div>
 
       {isCustom && (
         <textarea
@@ -221,18 +236,22 @@ export function ResearchLabAiPanel({
         />
       )}
 
-      {promptPreview && (
-        <AiPromptReveal
-          system={promptPreview.system}
-          user={promptPreview.user}
-          mode={mode}
-          version="labAi@v1"
-          className="mt-2"
-          testId="research-lab-ai-prompt"
-        />
-      )}
-
       <div className="mt-3 flex flex-wrap items-center gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          2. Generate
+        </p>
+        {promptPreview && (
+          <AiPromptReveal
+            system={promptPreview.system}
+            user={promptPreview.user}
+            mode={mode}
+            version="labAi@v1"
+            testId="research-lab-ai-prompt"
+          />
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={busy || gated || !pack.claims.length || (isCustom && !customQuestion.trim())}
@@ -240,7 +259,12 @@ export function ResearchLabAiPanel({
           className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-50"
           data-testid="research-lab-ai-run"
         >
-          {busy ? 'Running…' : insight ? 'Quick re-run' : 'Run AI activity'}
+          {aiRunButtonLabel({
+            busy,
+            hasResult: Boolean(insight),
+            isCustom,
+            surface: 'research_lab',
+          })}
         </button>
         {(insight || promptPreview) && (
           <button
@@ -250,12 +274,12 @@ export function ResearchLabAiPanel({
             className="rounded-lg border border-violet-700/50 px-3 py-1.5 text-xs text-violet-200 hover:bg-violet-950/40 disabled:opacity-50"
             data-testid="research-lab-ai-regenerate"
           >
-            Regenerate…
+            Edit prompt &amp; regenerate…
           </button>
         )}
         <span className="text-[10px] text-slate-500">
-          {claimCount} claims
-          {gated ? ` · need ≥${minClaims} for this mode` : ''}
+          {claimCount} claims in dossier
+          {gated ? ` · need at least ${minClaims} for this mode` : ''}
         </span>
       </div>
 
@@ -279,17 +303,6 @@ export function ResearchLabAiPanel({
         />
       )}
 
-      <AiRunNavigator
-        kind="research_lab"
-        mode={mode}
-        contextKey={pack.id}
-        refreshKey={histRefresh}
-        activeId={activeGenId}
-        onSelect={restoreEntry}
-        className="mt-3"
-        testId="research-lab-ai-runs"
-      />
-
       {error && (
         <p className="mt-2 text-xs text-red-300" role="alert">
           {error}
@@ -297,7 +310,10 @@ export function ResearchLabAiPanel({
       )}
 
       {insight && (
-        <div className="mt-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3 space-y-2">
+        <div className="mt-3 rounded-lg border border-violet-900/40 bg-slate-950/50 p-3 space-y-2">
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-violet-300/80">
+            Latest result
+          </p>
           <p className="text-sm text-slate-100 whitespace-pre-wrap">{insight.summary}</p>
           {insight.nextSteps && insight.nextSteps.length > 0 && (
             <div>
@@ -354,6 +370,21 @@ export function ResearchLabAiPanel({
           )}
         </div>
       )}
+
+      <div className="mt-3">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          3. Past results for this mode
+        </p>
+        <AiRunNavigator
+          kind="research_lab"
+          mode={mode}
+          contextKey={pack.id}
+          refreshKey={histRefresh}
+          activeId={activeGenId}
+          onSelect={restoreEntry}
+          testId="research-lab-ai-runs"
+        />
+      </div>
     </section>
   )
 }

@@ -26,8 +26,10 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildAiRankWhy } from '@/lib/ai/aiWhyTooltip'
+import { aiRunButtonLabel, aiSurfaceIntro } from '@/lib/ai/aiUiCopy'
 
 const DISCLAIMER_KEY = 'biointel-ai-analysis-disclaimer-v1'
 
@@ -218,19 +220,24 @@ export function AiAnalysisView({
     setDisclaimerAck(true)
   }
 
+  const intro = aiSurfaceIntro('discover_rank')
+  const status = !disclaimerAck
+    ? { label: 'Read disclaimer first', tone: 'warn' as const }
+    : !aiAvailable
+      ? { label: 'Connect AI first', tone: 'warn' as const }
+      : enabled
+        ? { label: 'AI view active', tone: 'ready' as const }
+        : { label: 'Of-record scores', tone: 'muted' as const }
+
   return (
     <div className="mb-4 space-y-3" data-testid="ai-analysis-view">
       <div className="rounded-xl border border-slate-700/80 bg-slate-900/50 p-3">
+        <AiPanelIntro intro={intro} status={status} density="compact" testId="discover-ai-intro" />
+
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <p className="text-xs font-semibold text-slate-200">
-              Ranking view
-            </p>
-            <p className="text-[10px] text-slate-500 mt-0.5">
-              Of-record is always deterministic free-API scores. AI analysis is optional and
-              non-of-record — you verify.
-            </p>
-          </div>
+          <p className="text-[10px] text-slate-500">
+            Toggle which shortlist order you see below. Of-record never changes.
+          </p>
           <div className="flex rounded-lg border border-slate-700 p-0.5 text-[11px]">
             <button
               type="button"
@@ -242,7 +249,7 @@ export function AiAnalysisView({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              Of-record
+              Of-record scores
             </button>
             <button
               type="button"
@@ -255,7 +262,7 @@ export function AiAnalysisView({
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
-              AI analysis
+              AI suggested order
             </button>
           </div>
         </div>
@@ -278,7 +285,7 @@ export function AiAnalysisView({
               className="rounded-lg bg-amber-800/60 px-3 py-1.5 text-[11px] font-medium text-amber-50 hover:bg-amber-700/60"
               data-testid="ai-analysis-disclaimer-ack"
             >
-              I understand — enable AI analysis option
+              I understand — show AI analysis option
             </button>
           </div>
         )}
@@ -289,9 +296,12 @@ export function AiAnalysisView({
               className="rounded-lg border border-violet-800/40 bg-violet-950/30 px-3 py-2 text-[11px] text-violet-100"
               data-testid="ai-analysis-banner"
             >
-              <strong className="font-semibold">Analysis view · not of-record.</strong> Model:{' '}
-              {ai.model || '—'} · Deterministic scores unchanged.
+              <strong className="font-semibold">AI suggested order · not of-record.</strong> Model:{' '}
+              {ai.model || '—'} · Free-API scores and ranks stay unchanged.
             </div>
+            <p className="text-[10px] text-slate-500">
+              Optional: tell the model what to prioritize, then generate a reorder with reasons.
+            </p>
             <div className="flex flex-col sm:flex-row gap-2">
               <input
                 type="text"
@@ -308,7 +318,11 @@ export function AiAnalysisView({
                 className="rounded-lg bg-violet-700 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-600 disabled:opacity-40"
                 data-testid="ai-analysis-run"
               >
-                {running ? 'Analyzing…' : result ? 'Quick re-run' : 'Run AI analysis'}
+                {aiRunButtonLabel({
+                  busy: running,
+                  hasResult: Boolean(result),
+                  surface: 'discover_rank',
+                })}
               </button>
               {result && (
                 <button
@@ -318,7 +332,7 @@ export function AiAnalysisView({
                   className="rounded-lg border border-violet-700/60 px-3 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-950/50 disabled:opacity-40"
                   data-testid="ai-analysis-regenerate"
                 >
-                  Regenerate…
+                  Edit prompt &amp; regenerate…
                 </button>
               )}
             </div>

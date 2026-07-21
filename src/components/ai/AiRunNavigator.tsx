@@ -2,7 +2,7 @@
 
 /**
  * Paginated navigator for prior AI runs on a surface.
- * Compact actions: Load · Prompt (styled tooltips, opacity 0.3) — no “Show prompt” noise.
+ * First-look: “Past results” + Load restores the answer above; Prompt shows what was sent.
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -13,9 +13,11 @@ import {
   type AiDataKind,
   type AiGeneratedRecord,
 } from '@/lib/ai/aiHistoryStore'
+import { humanModeLabel } from '@/lib/ai/aiUiCopy'
 import { AiPromptReveal } from './AiPromptReveal'
 import { AiUserComment } from './AiUserComment'
 import { AiGenerationView } from './AiGenerationView'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface AiRunNavigatorProps {
   kind: AiDataKind
@@ -110,11 +112,12 @@ export function AiRunNavigator({
   const displayN = totalLoaded === 0 ? 0 : index + 1
   const hasPrompt = Boolean(current?.promptSystem || current?.promptUser)
   const canLoad = Boolean(onSelect && current)
+  const modeHuman = humanModeLabel(mode)
 
   function applyLoad(entry: AiGeneratedRecord, opts?: { silent?: boolean }) {
     if (!onSelectRef.current) {
       if (!opts?.silent) {
-        setLoadMsg('No load handler on this surface')
+        setLoadMsg('Cannot restore here')
         setLoadFlash(true)
         if (flashTimer.current) clearTimeout(flashTimer.current)
         flashTimer.current = setTimeout(() => {
@@ -127,7 +130,7 @@ export function AiRunNavigator({
     try {
       onSelectRef.current(entry)
       if (!opts?.silent) {
-        setLoadMsg('Loaded')
+        setLoadMsg('Restored above')
         setLoadFlash(true)
         if (flashTimer.current) clearTimeout(flashTimer.current)
         flashTimer.current = setTimeout(() => {
@@ -136,7 +139,7 @@ export function AiRunNavigator({
         }, 1200)
       }
     } catch (e) {
-      setLoadMsg(e instanceof Error ? e.message : 'Load failed')
+      setLoadMsg(e instanceof Error ? e.message : 'Restore failed')
       setLoadFlash(true)
       if (flashTimer.current) clearTimeout(flashTimer.current)
       flashTimer.current = setTimeout(() => {
@@ -150,9 +153,6 @@ export function AiRunNavigator({
     const next = Math.max(0, Math.min(totalLoaded - 1, index + delta))
     if (next === index) return
     setIndex(next)
-    const entry = items[next]
-    // Preview only — explicit Load applies into the main panel (avoids surprise overwrite)
-    void entry
   }
 
   function selectCurrent() {
@@ -167,30 +167,36 @@ export function AiRunNavigator({
     >
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/60 px-2.5 py-1.5">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold text-slate-300">
-            Saved runs · {aiKindLabel(kind)}
-            {mode ? (
-              <span className="ml-1 font-mono font-normal text-slate-500">{mode}</span>
-            ) : null}
+          <p className="text-[10px] font-semibold text-slate-200">
+            Past results
+            <span className="ml-1 font-normal text-slate-500">
+              · {aiKindLabel(kind)}
+              {modeHuman ? ` · ${modeHuman}` : ''}
+            </span>
           </p>
-          <p className="text-[9px] text-slate-600">
-            {source === 'cloud' ? 'cloud + local' : 'this browser'} ·{' '}
+          <p className="text-[9px] leading-snug text-slate-600">
+            Browse prior outputs. <strong className="font-medium text-slate-500">Restore</strong>{' '}
+            puts the answer in the panel above ·{' '}
+            <strong className="font-medium text-slate-500">Prompt</strong> shows what the model
+            saw · stored in {source === 'cloud' ? 'cloud + this browser' : 'this browser'} ·{' '}
             <Link href="/ai-history" className="text-indigo-500 hover:underline">
-              full history
+              all history
             </Link>
           </p>
         </div>
         <div className="flex items-center gap-1" data-testid={`${testId}-pager`}>
-          <button
-            type="button"
-            disabled={loading || index <= 0}
-            onClick={() => go(-1)}
-            className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 hover:text-indigo-300 disabled:opacity-30"
-            data-testid={`${testId}-prev`}
-            aria-label="Newer generation"
-          >
-            ◀
-          </button>
+          <StyledTooltip content="Newer result">
+            <button
+              type="button"
+              disabled={loading || index <= 0}
+              onClick={() => go(-1)}
+              className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 hover:text-indigo-300 disabled:opacity-30"
+              data-testid={`${testId}-prev`}
+              aria-label="Newer generation"
+            >
+              ◀
+            </button>
+          </StyledTooltip>
           <span
             className="min-w-[4.5rem] text-center font-mono text-[10px] tabular-nums text-slate-400"
             data-testid={`${testId}-position`}
@@ -198,55 +204,64 @@ export function AiRunNavigator({
             {loading && totalLoaded === 0
               ? '…'
               : totalLoaded === 0
-                ? '0 / 0'
-                : `${displayN} / ${totalLoaded}${hasMore ? '+' : ''}`}
+                ? '0 of 0'
+                : `${displayN} of ${totalLoaded}${hasMore ? '+' : ''}`}
           </span>
-          <button
-            type="button"
-            disabled={loading || index >= totalLoaded - 1}
-            onClick={() => go(1)}
-            className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 hover:text-indigo-300 disabled:opacity-30"
-            data-testid={`${testId}-next`}
-            aria-label="Older generation"
-          >
-            ▶
-          </button>
+          <StyledTooltip content="Older result">
+            <button
+              type="button"
+              disabled={loading || index >= totalLoaded - 1}
+              onClick={() => go(1)}
+              className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-300 hover:text-indigo-300 disabled:opacity-30"
+              data-testid={`${testId}-next`}
+              aria-label="Older generation"
+            >
+              ▶
+            </button>
+          </StyledTooltip>
         </div>
       </div>
 
       <div className="space-y-2 px-2.5 py-2">
         {error && <p className="text-[10px] text-red-400">{error}</p>}
         {!loading && totalLoaded === 0 && (
-          <p className="text-[10px] text-slate-600 opacity-30">
-            No saved runs yet. Generate once — each re-run is recorded so you can compare
-            responses.
+          <p className="text-[10px] leading-relaxed text-slate-500">
+            No results yet for this mode. Generate above — each run is saved here so you can
+            compare answers without losing earlier ones.
           </p>
         )}
         {current && (
           <>
-            {/* Single compact action row: meta | Load · Prompt */}
             <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
               <p className="min-w-0 flex-1 text-[10px] text-slate-500">
                 {current.createdAt
                   ? new Date(current.createdAt).toLocaleString()
                   : '—'}
                 {current.model ? ` · ${current.model}` : ''}
-                {current.error ? ' · error' : ''}
+                {current.error ? ' · failed' : ''}
               </p>
               <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  type="button"
-                  disabled={!canLoad}
-                  onClick={selectCurrent}
-                  className={`rounded border px-1.5 py-0.5 text-[10px] transition-opacity focus:outline-none focus-visible:opacity-100 focus-visible:ring-1 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-30 ${
-                    loadFlash
-                      ? 'border-emerald-600/60 bg-emerald-950/40 text-emerald-200 opacity-100'
-                      : 'border-emerald-800/40 text-emerald-300/90 opacity-30 hover:opacity-100 hover:bg-emerald-950/30'
-                  }`}
-                  data-testid={`${testId}-load`}
+                <StyledTooltip
+                  content={
+                    canLoad
+                      ? 'Put this answer into the main result area above'
+                      : 'This surface cannot restore into the panel'
+                  }
                 >
-                  {loadFlash && loadMsg ? loadMsg : 'Load'}
-                </button>
+                  <button
+                    type="button"
+                    disabled={!canLoad}
+                    onClick={selectCurrent}
+                    className={`rounded border px-2 py-0.5 text-[10px] font-medium transition-opacity focus:outline-none focus-visible:ring-1 focus-visible:ring-emerald-500/50 disabled:cursor-not-allowed disabled:opacity-40 ${
+                      loadFlash
+                        ? 'border-emerald-600/60 bg-emerald-950/40 text-emerald-200 opacity-100'
+                        : 'border-emerald-700/50 bg-emerald-950/20 text-emerald-200/90 opacity-80 hover:opacity-100 hover:bg-emerald-950/40'
+                    }`}
+                    data-testid={`${testId}-load`}
+                  >
+                    {loadFlash && loadMsg ? loadMsg : 'Restore'}
+                  </button>
+                </StyledTooltip>
                 {hasPrompt ? (
                   <AiPromptReveal
                     system={current.promptSystem}
@@ -257,7 +272,7 @@ export function AiRunNavigator({
                   />
                 ) : (
                   <span
-                    className="rounded border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-600 opacity-30"
+                    className="rounded border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-600 opacity-40"
                     data-testid={`${testId}-prompt-empty`}
                   >
                     Prompt
@@ -267,10 +282,13 @@ export function AiRunNavigator({
             </div>
             {current.userComment?.trim() && (
               <p className="text-[10px] text-amber-200/80 line-clamp-2">
-                Note: {current.userComment.trim()}
+                Your note: {current.userComment.trim()}
               </p>
             )}
             <div className="max-h-48 overflow-y-auto rounded border border-slate-800/60 bg-slate-950/40 p-2">
+              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-600">
+                Preview of this run
+              </p>
               <AiGenerationView
                 entry={current}
                 density="full"
@@ -303,10 +321,10 @@ export function AiRunNavigator({
             type="button"
             disabled={loading}
             onClick={() => void fetchPage(true, cursor)}
-            className="w-full rounded border border-slate-700 py-1 text-[10px] text-slate-400 opacity-30 hover:opacity-100 hover:text-indigo-300 disabled:opacity-30"
+            className="w-full rounded border border-slate-700 py-1 text-[10px] text-slate-400 hover:text-indigo-300 disabled:opacity-30"
             data-testid={`${testId}-more`}
           >
-            {loading ? 'Loading…' : 'Older'}
+            {loading ? 'Loading…' : 'Load older results'}
           </button>
         )}
       </div>

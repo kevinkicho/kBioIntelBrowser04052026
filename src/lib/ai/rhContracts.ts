@@ -97,21 +97,21 @@ export function buildRhAiContext(input: {
 export function rhModeTaskLabel(mode: RhAiMode): string {
   switch (mode) {
     case 'rh_thesis_draft':
-      return 'Structured claim-bound thesis (working claim, support, kill criteria, falsifiers).'
+      return 'Draft a structured thesis: working claim, support, kill criteria, falsifiers.'
     case 'rh_rival_hypotheses':
-      return 'Primary vs rival vs null explanations from the same claims.'
+      return 'Compare primary vs rival vs null explanations from the same claims.'
     case 'rh_next_experiments':
-      return '1–3 Monday experiments with claim ids, priority, and kill criteria.'
+      return 'Propose 1–3 Monday experiments with claim ids, priority, and kill criteria.'
     case 'rh_gap_map':
-      return 'Evidence gaps and free-public actions to close them.'
+      return 'List evidence gaps and free-public actions that would close them.'
     case 'rh_adversarial_review':
-      return 'Stress-test the thesis: overclaims, missing counters, rewrites (claim-bound).'
+      return 'Stress-test the thesis: overclaims, missing counters, safer rewrites.'
     case 'rh_lab_meeting':
-      return '5-minute lab-meeting script grounded in claims.'
+      return 'Draft a 5-minute lab-meeting script grounded only in claims.'
     case 'rh_specific_aims':
-      return 'Grant-style Aim 1–3 draft from thesis + experiments + claims.'
+      return 'Draft grant-style Aim 1–3 from thesis + experiments + claims.'
     case 'rh_custom':
-      return 'Ask your own question about this hypothesis (claim-bound).'
+      return 'Ask your own question about this hypothesis (still claim-bound).'
     default:
       return ''
   }

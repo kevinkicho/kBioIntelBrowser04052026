@@ -252,34 +252,35 @@ export const DISEASE_INTELLIGENCE_MODES: {
     title: 'Quick Summary',
     shortLabel: 'Summary',
     description:
-      '2–3 paragraphs: dominant mechanism, non-obvious gene–drug finding, and a concrete next step.',
+      'Best first look: 2–3 paragraphs on mechanism, a non-obvious gene–drug finding, and one next step.',
   },
   {
     id: 'repurposing',
     title: 'Drug Repurposing Opportunities',
     shortLabel: 'Repurposing',
     description:
-      'Approved drugs for other conditions that hit disease-associated genes but are not yet in trials here.',
+      'Approved drugs for other conditions that hit disease genes but are not yet in trials here.',
   },
   {
     id: 'gap',
     title: 'Therapeutic Gap Analysis',
     shortLabel: 'Gaps',
     description:
-      'Undrugged or hard-to-drug genes, modality suggestions, and validation experiments.',
+      'Undrugged or hard-to-drug genes, modality ideas, and validation experiments you could run.',
   },
   {
     id: 'connections',
     title: 'Disease–Drug Connection Map',
     shortLabel: 'Connections',
     description:
-      'Wiring diagram of gene ↔ drug links, missing links, and over/under-invested pathways.',
+      'How genes and drugs link (and where links are missing or over/under-invested).',
   },
   {
     id: 'custom',
     title: 'Ask a question',
     shortLabel: 'Ask',
-    description: 'Your own research question with the same disease evidence block and system rules.',
+    description:
+      'Type your own research question; same disease evidence block and claim-bound rules apply.',
   },
 ]
 

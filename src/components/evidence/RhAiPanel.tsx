@@ -16,7 +16,13 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import {
+  aiRunButtonLabel,
+  aiSurfaceIntro,
+  rhModeExpectLine,
+} from '@/lib/ai/aiUiCopy'
 
 const MODES: { id: RhAiMode; label: string }[] = [
   { id: 'rh_thesis_draft', label: 'Thesis draft' },
@@ -208,16 +214,29 @@ export function RhAiPanel({
     }
   }
 
+  const intro = aiSurfaceIntro('rh')
+  const status =
+    !ai.hasUserApiKey || !ai.model
+      ? { label: 'Connect AI first', tone: 'warn' as const }
+      : gated
+        ? { label: `Need ≥${minClaims} claims`, tone: 'warn' as const }
+        : { label: 'Ready to generate', tone: 'ready' as const }
+
   return (
     <div
       className={`rounded-xl border border-indigo-900/40 bg-slate-950/50 p-3 ${className}`}
       data-testid="rh-ai-panel"
     >
-      <div className="mb-2 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-semibold text-indigo-200">Research Hypothesis AI</span>
-        <span className="text-[10px] text-slate-600">claim-bound · Ollama Cloud</span>
-      </div>
+      <AiPanelIntro intro={intro} status={status} testId="rh-ai-intro" />
 
+      <p className="mb-1 text-[10px] text-slate-500">
+        Evidence available: <span className="font-mono text-slate-300">{claimCount}</span> claims
+        {minClaims > 0 ? ` · this mode needs at least ${minClaims}` : ''}
+      </p>
+
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+        1. Pick what to generate
+      </p>
       <div className="mb-2 flex flex-wrap gap-1">
         {MODES.map((m) => (
           <StyledTooltip key={m.id} content={rhModeTaskLabel(m.id)}>
@@ -243,7 +262,12 @@ export function RhAiPanel({
         ))}
       </div>
 
-      <p className="mb-2 text-[11px] text-slate-500 leading-relaxed">{rhModeTaskLabel(mode)}</p>
+      <div className="mb-2 rounded border border-slate-800/70 bg-slate-950/30 px-2.5 py-1.5">
+        <p className="text-[11px] leading-relaxed text-slate-400">{rhModeTaskLabel(mode)}</p>
+        <p className="mt-0.5 text-[10px] leading-relaxed text-indigo-300/80">
+          {rhModeExpectLine(mode)}
+        </p>
+      </div>
 
       {isCustom && (
         <textarea
@@ -256,19 +280,23 @@ export function RhAiPanel({
         />
       )}
 
-      <AiPromptReveal
-        system={promptPreview.system}
-        user={promptPreview.user}
-        mode={mode}
-        version="rhAi@v1"
-        className="mb-2"
-        testId="rh-ai-prompt"
-      />
+      <div className="mb-2 flex flex-wrap items-center gap-2">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          2. Generate
+        </p>
+        <AiPromptReveal
+          system={promptPreview.system}
+          user={promptPreview.user}
+          mode={mode}
+          version="rhAi@v1"
+          testId="rh-ai-prompt"
+        />
+      </div>
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90" data-testid="rh-ai-gated">
-          Need ≥{minClaims} rehydrated claims for {mode.replace(/_/g, ' ')} (have {claimCount}).
-          Seed from a pack and rebuild evidence.
+          Need at least {minClaims} rehydrated claims for this mode (you have {claimCount}).
+          Seed from a pack and rebuild evidence first.
         </p>
       ) : (
         <div className="mb-2 flex flex-wrap gap-2">
@@ -279,7 +307,12 @@ export function RhAiPanel({
             className="rounded-lg bg-indigo-700 px-3 py-1.5 text-xs text-white hover:bg-indigo-600 disabled:opacity-50"
             data-testid="rh-ai-run"
           >
-            {busy ? 'Running…' : insight ? 'Quick re-run' : isCustom ? 'Send prompt' : 'Run claim-bound AI'}
+            {aiRunButtonLabel({
+              busy,
+              hasResult: Boolean(insight),
+              isCustom,
+              surface: 'rh',
+            })}
           </button>
           <button
             type="button"
@@ -288,7 +321,7 @@ export function RhAiPanel({
             className="rounded-lg border border-indigo-700/50 px-3 py-1.5 text-xs text-indigo-200 hover:bg-indigo-950/40 disabled:opacity-50"
             data-testid="rh-ai-regenerate"
           >
-            Regenerate…
+            Edit prompt &amp; regenerate…
           </button>
         </div>
       )}
@@ -311,17 +344,6 @@ export function RhAiPanel({
         testId="rh-ai-regen-modal"
       />
 
-      <AiRunNavigator
-        kind="rh"
-        mode={mode}
-        contextKey={hyp.id}
-        refreshKey={histRefresh}
-        activeId={activeGenId}
-        onSelect={restoreRhEntry}
-        className="mb-2 mt-2"
-        testId="rh-ai-runs"
-      />
-
       {error && (
         <p className="mt-2 text-[11px] text-red-400" role="alert">
           {error}
@@ -330,9 +352,12 @@ export function RhAiPanel({
 
       {insight && (
         <div
-          className="mt-3 space-y-2 rounded border border-slate-800 bg-slate-900/50 p-2 text-xs text-slate-300"
+          className="mt-3 space-y-2 rounded border border-indigo-900/40 bg-slate-900/50 p-2 text-xs text-slate-300"
           data-testid="rh-ai-insight"
         >
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300/80">
+            Latest result
+          </p>
           <p className="leading-relaxed whitespace-pre-wrap">{insight.summary}</p>
           {insight.sections?.workingClaim && (
             <p className="text-[11px] text-emerald-300/90">
@@ -402,6 +427,21 @@ export function RhAiPanel({
           )}
         </div>
       )}
+
+      <div className="mt-3">
+        <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          3. Past results for this mode
+        </p>
+        <AiRunNavigator
+          kind="rh"
+          mode={mode}
+          contextKey={hyp.id}
+          refreshKey={histRefresh}
+          activeId={activeGenId}
+          onSelect={restoreRhEntry}
+          testId="rh-ai-runs"
+        />
+      </div>
     </div>
   )
 }
