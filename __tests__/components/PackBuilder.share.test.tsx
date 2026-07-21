@@ -72,7 +72,11 @@ describe('PackBuilder share failure UX', () => {
       />,
     )
 
-    const shareBtn = await screen.findByRole('button', { name: /share pack/i })
+    // Accessible name is aria-label (StyledTooltip wrapper); match by label or visible text
+    const shareBtn =
+      (await screen.findByRole('button', {
+        name: /content-hashed snapshot|share pack/i,
+      })) as HTMLElement
     fireEvent.click(shareBtn)
     await waitFor(() => {
       expect(screen.getByText(/Snapshot store unavailable|downloadable|Share failed/i)).toBeTruthy()
