@@ -9,6 +9,25 @@
   --app-header-height: 3rem;
   /* Search history sidebar (expanded). Collapsed uses 2.5rem via utility pl-10. */
   --search-history-sidebar-width: 18rem;
+  /* Main content width — prefer information density over large gutters */
+  --page-canvas-max: 1800px;
+}
+
+@layer components {
+  /**
+   * Full main-canvas shell for product pages (projects, discover, orgs, AI history, …).
+   * Tight horizontal padding; wide max-width so lists/tables can use the screen.
+   */
+  .page-canvas {
+    @apply mx-auto w-full px-2 py-3 sm:px-3 lg:px-4;
+    max-width: var(--page-canvas-max);
+  }
+
+  /** Slightly denser vertical padding for secondary pages */
+  .page-canvas-tight {
+    @apply mx-auto w-full px-2 py-2 sm:px-3 lg:px-4;
+    max-width: var(--page-canvas-max);
+  }
 }
 
 html {

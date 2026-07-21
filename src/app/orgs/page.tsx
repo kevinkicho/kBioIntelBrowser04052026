@@ -191,15 +191,15 @@ function OrgsPageInner() {
   }, [sponsorText, orgs, euOrgs, hospitals, colleges, dossier])
 
   return (
-    <div className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
-      <div className="mb-6">
-        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+    <div className="page-canvas">
+      <div className="mb-3">
+        <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-0.5">
           Free public registries · research-lab pipeline
         </p>
-        <h1 className="text-2xl font-semibold text-slate-100">
+        <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">
           Universities, colleges &amp; research labs
         </h1>
-        <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-3xl">
+        <p className="mt-1 text-[13px] text-slate-400 leading-relaxed max-w-4xl">
           Parallel free-API pipeline: ROR, OpenAlex institutions, College Scorecard, CMS hospitals,
           NIH RePORTER, OpenAIRE — assembled into a claim-bound lab dossier with optional AI
           activities (BYOM Ollama). Affiliation / directory context only — not admissions or
@@ -517,7 +517,7 @@ export default function OrgsPage() {
   return (
     <Suspense
       fallback={
-        <div className="mx-auto max-w-5xl px-4 py-8 text-sm text-slate-400">Loading orgs…</div>
+        <div className="page-canvas text-sm text-slate-400">Loading orgs…</div>
       }
     >
       <OrgsPageInner />

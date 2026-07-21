@@ -69,9 +69,9 @@ export default function HowItWorksPage() {
   }, [promptFilter])
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8">
-      <div className="mx-auto max-w-3xl">
-        <p className="mb-2 text-[11px] font-mono text-slate-600">
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="page-canvas">
+        <p className="mb-1 text-[11px] font-mono text-slate-600">
           <Link href="/" className="hover:text-slate-400">
             Home
           </Link>
@@ -79,10 +79,10 @@ export default function HowItWorksPage() {
           <span className="text-slate-500">How it works</span>
         </p>
 
-        <h1 className="text-3xl font-bold tracking-tight text-slate-50 mb-2">
+        <h1 className="text-2xl font-bold tracking-tight text-slate-50 mb-1 sm:text-3xl">
           How BioIntel is wired
         </h1>
-        <p className="text-sm text-slate-400 leading-relaxed mb-6 max-w-2xl">
+        <p className="text-[13px] text-slate-400 leading-relaxed mb-4 max-w-4xl">
           Transparent view of <strong className="text-slate-300 font-medium">algorithms</strong>{' '}
           (deterministic, free public APIs) and <strong className="text-slate-300 font-medium">AI
           prompts</strong> (claim-bound / evidence-gated). Nothing here invents Discover ranks.

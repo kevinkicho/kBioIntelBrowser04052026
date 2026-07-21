@@ -27,7 +27,7 @@ export function DiscoveryProgress({ state }: Props) {
     : undefined
 
   return (
-    <div className="w-full max-w-2xl mx-auto mb-6" data-testid="discover-progress">
+    <div className="w-full max-w-4xl mx-auto mb-4" data-testid="discover-progress">
       <div className="bg-slate-900/60 border border-slate-700/40 rounded-xl p-5">
         <div className="flex items-center gap-3 mb-1">
           <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" />
@@ -102,7 +102,7 @@ export function EmptyState() {
 
 export function ErrorState({ error, onRetry }: { error: string; onRetry: () => void }) {
   return (
-    <div className="w-full max-w-3xl mx-auto">
+    <div className="w-full max-w-4xl mx-auto">
       <div className="bg-red-900/20 border border-red-800/40 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-red-400 mb-1">Search Failed</h3>
         <p className="text-sm text-red-300/70 mb-3">{error}</p>

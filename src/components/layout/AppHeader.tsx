@@ -37,7 +37,7 @@ export function AppHeader() {
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0f1117]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-[var(--app-header-height)] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6">
+      <div className="mx-auto flex h-[var(--app-header-height)] w-full max-w-[var(--page-canvas-max)] items-center justify-between gap-2 px-2 sm:gap-3 sm:px-3 lg:px-4">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <Link
             href="/"

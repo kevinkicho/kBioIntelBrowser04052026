@@ -388,7 +388,7 @@ export default function ProjectBoardPage() {
 
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
-      <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6">
+      <div className="page-canvas">
         <div className="mb-2">
           <Link href="/projects" className="text-xs text-slate-500 hover:text-slate-300">
             ← All projects

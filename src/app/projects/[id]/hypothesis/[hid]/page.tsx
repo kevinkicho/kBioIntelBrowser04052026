@@ -372,7 +372,7 @@ export default function ResearchHypothesisEditorPage() {
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
       {/* Full canvas dense list layout — not a card grid */}
-      <div className="mx-auto w-full max-w-[1400px] px-3 py-4 sm:px-5 lg:px-6">
+      <div className="page-canvas">
         <Link
           href={`/projects/${hyp.projectId}`}
           className="text-[11px] text-slate-500 hover:text-slate-300"

@@ -268,8 +268,8 @@ export default function DiscoverPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-100 px-4 py-8">
-      <div className="max-w-5xl mx-auto">
+    <main className="min-h-screen bg-slate-950 text-slate-100">
+      <div className="page-canvas">
         <div className="mb-2 flex justify-end">
           <button
             type="button"

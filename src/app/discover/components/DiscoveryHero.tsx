@@ -181,7 +181,7 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
       <h1 className="text-4xl font-bold text-slate-100 mb-3 tracking-tight">
         Discover Candidate Molecules
       </h1>
-      <p className="text-slate-400 mb-2 max-w-2xl mx-auto leading-relaxed">
+      <p className="text-slate-400 mb-2 max-w-3xl mx-auto leading-relaxed text-[15px] sm:text-base">
         Disease → targets → ranked small molecules from free public databases. Transparent
         multi-axis scores you can reweight — not a black-box model.
         <PrefTooltip
@@ -189,12 +189,12 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
           text="Pipeline: confirm disease → identify targets → gather candidates (ChEMBL, trials, Open Targets) → resolve PubChem identity → weighted multi-axis score. Optional safety/novelty harvest. LLMs never invent ranks."
         />
       </p>
-      <p className="text-[11px] text-slate-600 mb-6 max-w-xl mx-auto">
+      <p className="text-[11px] text-slate-600 mb-4 max-w-3xl mx-auto">
         Expect a shortlist with source honesty, identity trust, and deep links into molecule
         profiles. Not regulatory advice.
       </p>
 
-      <form onSubmit={handleSubmit} className="max-w-xl mx-auto mb-4">
+      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto mb-4">
         <div className="relative" ref={containerRef}>
           <div className="flex gap-2">
             <div className="relative flex-1">
@@ -325,7 +325,7 @@ export function DiscoveryHero({ onSearch, isLoading, initialQuery = '' }: Props)
         </div>
       </div>
 
-      <div className="mx-auto mt-6 max-w-2xl text-left">
+      <div className="mx-auto mt-4 max-w-3xl text-left">
         <DiscoverAlgorithmGuide variant="hero" />
       </div>
     </div>

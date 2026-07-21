@@ -240,11 +240,11 @@ export default function ProjectsPage() {
 
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
-      <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
-        <div className="mb-8 flex flex-wrap items-start justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-100">Projects</h1>
-            <p className="mt-1 text-sm text-slate-400">
+      <div className="page-canvas">
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-slate-100">Projects</h1>
+            <p className="mt-0.5 text-[13px] text-slate-400">
               Local candidate boards for disease triage. Browser storage is the default; optional
               cloud sync when signed in.
             </p>

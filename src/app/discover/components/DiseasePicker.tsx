@@ -23,7 +23,7 @@ export function DiseasePicker({
 }: Props) {
   return (
     <div
-      className="w-full max-w-2xl mx-auto mb-8"
+      className="w-full max-w-4xl mx-auto mb-6"
       role="region"
       aria-label="Disease disambiguation"
       data-testid="disease-picker"

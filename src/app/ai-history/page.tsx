@@ -146,7 +146,7 @@ export default function AiHistoryPage() {
   return (
     <main className="min-h-screen bg-[#0f1117] text-slate-200">
       {/* Full main-canvas width — dense list, not narrow cards */}
-      <div className="mx-auto w-full max-w-[1600px] px-3 py-4 sm:px-5 lg:px-6">
+      <div className="page-canvas-tight">
         <header className="mb-3 flex flex-col gap-2 border-b border-slate-800/80 pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
             <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">
