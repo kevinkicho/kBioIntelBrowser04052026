@@ -28,6 +28,7 @@ interface BagRow {
   href?: string
   score?: number
   extra?: string
+  haystack: string
 }
 
 const BAG_LABEL: Record<DossierBag, string> = {
@@ -64,10 +65,18 @@ const SORT_OPTIONS: { id: BagSort; label: string }[] = [
 
 function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
   const rows: BagRow[] = []
+  const push = (row: Omit<BagRow, 'haystack'>) => {
+    rows.push({
+      ...row,
+      haystack: [row.title, row.meta, row.location, row.extra, row.bag, row.href ?? '']
+        .join(' ')
+        .toLowerCase(),
+    })
+  }
 
   for (const o of dossier.rorOrgs) {
     const location = [o.city, o.countryName || o.countryCode].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `ror:${o.rorId}`,
       bag: 'ror',
       title: o.name,
@@ -80,7 +89,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
 
   for (const i of dossier.openAlexInstitutions) {
     const location = [i.city, i.countryCode].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `oa:${i.openAlexId}`,
       bag: 'openalex',
       title: i.name,
@@ -93,7 +102,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
 
   for (const c of dossier.colleges) {
     const location = [c.city, c.state].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `college:${c.id}`,
       bag: 'college',
       title: c.name,
@@ -106,7 +115,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
 
   for (const h of dossier.hospitals) {
     const location = [h.city, h.state].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `hospital:${h.facilityId}`,
       bag: 'hospital',
       title: h.facilityName,
@@ -118,7 +127,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
   }
 
   for (const g of dossier.grants) {
-    rows.push({
+    push({
       id: `grant:${g.projectNumber || g.title}`,
       bag: 'grant',
       title: g.title || g.projectNumber || 'NIH project',
@@ -129,7 +138,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
   }
 
   for (const a of dossier.openAire) {
-    rows.push({
+    push({
       id: `openaire:${a.id}`,
       bag: 'openaire',
       title: a.title || a.id,
@@ -141,7 +150,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
   }
 
   for (const e of dossier.affiliationEdges) {
-    rows.push({
+    push({
       id: `join:${e.id}`,
       bag: 'join',
       title: `${e.leftLabel} ↔ ${e.rightLabel}`,
@@ -154,7 +163,7 @@ function buildBagRows(dossier: ResearchLabDossier): BagRow[] {
   }
 
   for (const l of dossier.deepLinks) {
-    rows.push({
+    push({
       id: `link:${l.url}:${l.label}`,
       bag: 'link',
       title: l.label,
@@ -195,12 +204,7 @@ export function ResearchLabDossierBagsList({ dossier }: { dossier: ResearchLabDo
     const needle = query.trim().toLowerCase()
     let list = filter === 'all' ? [...allRows] : allRows.filter((r) => r.bag === filter)
     if (needle) {
-      list = list.filter((r) => {
-        const hay = [r.title, r.meta, r.location, r.extra, r.bag, r.href ?? '']
-          .join(' ')
-          .toLowerCase()
-        return hay.includes(needle)
-      })
+      list = list.filter((r) => r.haystack.includes(needle))
     }
     list.sort((a, b) => {
       if (sort === 'bag') {

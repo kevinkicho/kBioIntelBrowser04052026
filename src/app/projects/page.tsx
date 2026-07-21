@@ -123,67 +123,82 @@ export default function ProjectsPage() {
     if (showArchives && auth.user?.uid) void refreshCloudExports()
   }, [showArchives, auth.user?.uid, refreshCloudExports])
 
+  /** Per-project metrics + search haystack — rebuilt only when project set changes */
+  const projectIndex = useMemo(() => {
+    return projects.map((p) => {
+      const promote = promoteCount(p)
+      const disease = diseaseLabel(p)
+      const haystack = [
+        p.name,
+        p.description ?? '',
+        disease,
+        p.id,
+        ...(p.targetIds ?? []),
+        // Cap candidate names scanned for search (boards max 50; slice keeps keystrokes cheap)
+        ...p.candidates.slice(0, 50).map((c) => c.identity?.name ?? ''),
+      ]
+        .join(' ')
+        .toLowerCase()
+      return {
+        project: p,
+        promote,
+        disease,
+        empty: p.candidates.length === 0,
+        hasTargets: (p.targetIds?.length ?? 0) > 0,
+        haystack,
+      }
+    })
+  }, [projects])
+
   const filterCounts = useMemo(() => {
     const m: Record<ProjectFilter, number> = {
-      all: projects.length,
+      all: projectIndex.length,
       has_promote: 0,
       empty: 0,
       has_disease: 0,
       has_targets: 0,
     }
-    for (const p of projects) {
-      if (promoteCount(p) > 0) m.has_promote += 1
-      if (p.candidates.length === 0) m.empty += 1
-      if (diseaseLabel(p)) m.has_disease += 1
-      if ((p.targetIds?.length ?? 0) > 0) m.has_targets += 1
+    for (const r of projectIndex) {
+      if (r.promote > 0) m.has_promote += 1
+      if (r.empty) m.empty += 1
+      if (r.disease) m.has_disease += 1
+      if (r.hasTargets) m.has_targets += 1
     }
     return m
-  }, [projects])
+  }, [projectIndex])
 
   const filteredSorted = useMemo(() => {
     const needle = query.trim().toLowerCase()
-    let list = [...projects]
+    let list = projectIndex
 
-    if (filter === 'has_promote') list = list.filter((p) => promoteCount(p) > 0)
-    else if (filter === 'empty') list = list.filter((p) => p.candidates.length === 0)
-    else if (filter === 'has_disease') list = list.filter((p) => Boolean(diseaseLabel(p)))
-    else if (filter === 'has_targets') list = list.filter((p) => (p.targetIds?.length ?? 0) > 0)
+    if (filter === 'has_promote') list = list.filter((r) => r.promote > 0)
+    else if (filter === 'empty') list = list.filter((r) => r.empty)
+    else if (filter === 'has_disease') list = list.filter((r) => Boolean(r.disease))
+    else if (filter === 'has_targets') list = list.filter((r) => r.hasTargets)
 
     if (needle) {
-      list = list.filter((p) => {
-        const hay = [
-          p.name,
-          p.description ?? '',
-          diseaseLabel(p),
-          p.id,
-          ...(p.targetIds ?? []),
-          ...p.candidates.map((c) => c.identity?.name ?? ''),
-        ]
-          .join(' ')
-          .toLowerCase()
-        return hay.includes(needle)
-      })
+      list = list.filter((r) => r.haystack.includes(needle))
     }
 
-    list.sort((a, b) => {
-      if (sort === 'name') return a.name.localeCompare(b.name)
+    const sorted = [...list]
+    sorted.sort((a, b) => {
+      if (sort === 'name') return a.project.name.localeCompare(b.project.name)
       if (sort === 'candidates') {
-        const d = b.candidates.length - a.candidates.length
-        return d !== 0 ? d : a.name.localeCompare(b.name)
+        const d = b.project.candidates.length - a.project.candidates.length
+        return d !== 0 ? d : a.project.name.localeCompare(b.project.name)
       }
       if (sort === 'promote') {
-        const d = promoteCount(b) - promoteCount(a)
-        return d !== 0 ? d : a.name.localeCompare(b.name)
+        const d = b.promote - a.promote
+        return d !== 0 ? d : a.project.name.localeCompare(b.project.name)
       }
-      if (sort === 'updated') return b.updatedAt.localeCompare(a.updatedAt)
-      // opened: last opened first, then updated
-      const ao = lastOpened[a.id] ?? ''
-      const bo = lastOpened[b.id] ?? ''
+      if (sort === 'updated') return b.project.updatedAt.localeCompare(a.project.updatedAt)
+      const ao = lastOpened[a.project.id] ?? ''
+      const bo = lastOpened[b.project.id] ?? ''
       if (ao || bo) return (bo || '').localeCompare(ao || '')
-      return b.updatedAt.localeCompare(a.updatedAt)
+      return b.project.updatedAt.localeCompare(a.project.updatedAt)
     })
-    return list
-  }, [projects, query, sort, filter, lastOpened])
+    return sorted.map((r) => r.project)
+  }, [projectIndex, query, sort, filter, lastOpened])
 
   const showBanner = (type: 'ok' | 'err', text: string) => {
     setBanner({ type, text })

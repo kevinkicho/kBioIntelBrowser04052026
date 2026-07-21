@@ -78,17 +78,27 @@ export async function searchGenes(query: string): Promise<MyGeneAnnotation[]> {
     // Prefer symbol match first, then free-text — improves gene hits in unified search
     const fields =
       'symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name'
+    // Parallel symbol + free-text; symbol hits preferred by merge order
     const queries = [
       `${BASE_URL}/query?q=symbol:${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
       `${BASE_URL}/query?q=${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
     ]
+    const responses = await Promise.all(
+      queries.map(async (url) => {
+        try {
+          const res = await fetch(url, fetchOptions)
+          if (!res.ok) return [] as unknown[]
+          const data = (await res.json()) as { hits?: unknown[] }
+          return data.hits ?? []
+        } catch {
+          return [] as unknown[]
+        }
+      }),
+    )
     const seen = new Set<string>()
     const out: MyGeneAnnotation[] = []
-    for (const url of queries) {
-      const res = await fetch(url, fetchOptions)
-      if (!res.ok) continue
-      const data = await res.json()
-      for (const hit of data.hits ?? []) {
+    for (const hits of responses) {
+      for (const hit of hits) {
         const mapped = mapMyGeneHit(hit as Record<string, unknown>)
         const key = mapped.geneId || mapped.symbol
         if (!key || seen.has(key)) continue

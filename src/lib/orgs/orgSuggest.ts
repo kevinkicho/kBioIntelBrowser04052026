@@ -125,11 +125,20 @@ export async function searchOrgSuggestions(
     ...openAlex.map(openAlexToSuggestion),
   ]
 
-  // Prefer exact match → starts-with → contains; then shorter names (University
-  // before long “Club/Institute” rows); education-ish types; then source rank.
+  // Prefer exact match → starts-with → contains; then shorter names; education; source.
+  // Cache normalized names so sort/dedupe do not re-regex every comparison.
   const qn = normName(q)
+  const normCache = new Map<string, string>()
+  const nn = (name: string) => {
+    let v = normCache.get(name)
+    if (v === undefined) {
+      v = normName(name)
+      normCache.set(name, v)
+    }
+    return v
+  }
   const matchTier = (name: string): number => {
-    const n = normName(name)
+    const n = nn(name)
     if (n === qn) return 0
     if (n.startsWith(qn + ' ')) return 1
     if (n.startsWith(qn)) return 2
@@ -152,13 +161,12 @@ export async function searchOrgSuggestions(
     const ea = educationBoost(a)
     const eb = educationBoost(b)
     if (ea !== eb) return ea - eb
-    // Shorter display names first within same tier (Harvard University before Harvard Club…)
     const lenDiff = a.name.length - b.name.length
     if (Math.abs(lenDiff) > 4) return lenDiff
     if (SOURCE_RANK[a.source] !== SOURCE_RANK[b.source]) {
       return SOURCE_RANK[a.source] - SOURCE_RANK[b.source]
     }
-    return normName(a.name).localeCompare(normName(b.name))
+    return nn(a.name).localeCompare(nn(b.name))
   })
 
   // Round-robin fill so Scorecard / OpenAlex appear even when ROR has many hits
@@ -169,7 +177,7 @@ export async function searchOrgSuggestions(
   }
   const seenGlobal = new Set<string>()
   for (const s of ranked) {
-    const key = normName(s.name)
+    const key = nn(s.name)
     if (!key || seenGlobal.has(key)) continue
     seenGlobal.add(key)
     bySource[s.source].push(s)
@@ -184,7 +192,7 @@ export async function searchOrgSuggestions(
     for (const src of order) {
       const next = bySource[src].shift()
       if (!next) continue
-      const key = normName(next.name)
+      const key = nn(next.name)
       if (seenOut.has(key)) continue
       seenOut.add(key)
       out.push(next)
@@ -193,7 +201,6 @@ export async function searchOrgSuggestions(
     }
     if (!added) break
   }
-  // Final sort of the mixed list by match quality (keep diversity of sources)
   out.sort((a, b) => {
     const ta = matchTier(a.name)
     const tb = matchTier(b.name)

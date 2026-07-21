@@ -7,7 +7,7 @@ import { searchRorOrganizations } from '@/lib/api/ror'
 import { searchEuResearchOrgsPack } from '@/lib/api/euResearchOrgs'
 import { searchUsCollegesByName } from '@/lib/api/collegeScorecard'
 import { searchCmsHospitalsByName } from '@/lib/api/cmsHospitals'
-import { searchOpenAlexResearchLabs } from '@/lib/api/openAlexInstitutions'
+import { searchOpenAlexInstitutions } from '@/lib/api/openAlexInstitutions'
 import { getNihGrantsByName } from '@/lib/api/nihreporter'
 import {
   getEuResearchProjectsByName,
@@ -73,7 +73,8 @@ export async function runResearchLabPipeline(
           return []
         })
       : Promise.resolve([]),
-    searchUsCollegesByName(q, 12).catch(() => {
+    // Skip IPEDS enrich on interactive pipeline — saves sequential outbound calls
+    searchUsCollegesByName(q, 12, { enrichIpeds: false }).catch(() => {
       warnings.push('College Scorecard failed')
       return []
     }),
@@ -83,7 +84,8 @@ export async function runResearchLabPipeline(
           return []
         })
       : Promise.resolve([]),
-    searchOpenAlexResearchLabs(q, {
+    // Single untyped OpenAlex search (3 type-split calls was 3× latency for typeahead-like UX)
+    searchOpenAlexInstitutions(q, {
       limit: 18,
       countryCode: input.countryCode,
     }).catch(() => {

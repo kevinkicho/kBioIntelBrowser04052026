@@ -22,6 +22,8 @@ export interface DirectoryRow {
   href: string
   extra?: string
   types?: string[]
+  /** Precomputed lowercase haystack for filter (avoids re-join per keystroke) */
+  haystack: string
 }
 
 const SOURCE_LABEL: Record<DirectorySource, string> = {
@@ -54,9 +56,17 @@ function buildRows(input: {
   hospitals: CmsHospital[]
 }): DirectoryRow[] {
   const rows: DirectoryRow[] = []
+  const push = (row: Omit<DirectoryRow, 'haystack'>) => {
+    rows.push({
+      ...row,
+      haystack: [row.name, row.meta, row.location, row.extra, row.source, ...(row.types ?? [])]
+        .join(' ')
+        .toLowerCase(),
+    })
+  }
   for (const o of input.orgs) {
     const location = [o.city, o.countryName || o.countryCode].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `ror:${o.rorId}`,
       source: 'ror',
       name: o.name,
@@ -69,7 +79,7 @@ function buildRows(input: {
   }
   for (const o of input.euOrgs) {
     const location = [o.city, o.countryName || o.countryCode].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `eu:${o.rorId}`,
       source: 'eu',
       name: o.name,
@@ -82,7 +92,7 @@ function buildRows(input: {
   }
   for (const c of input.colleges) {
     const location = [c.city, c.state].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `college:${c.id}`,
       source: 'college',
       name: c.name,
@@ -94,7 +104,7 @@ function buildRows(input: {
   }
   for (const h of input.hospitals) {
     const location = [h.city, h.state].filter(Boolean).join(', ')
-    rows.push({
+    push({
       id: `hospital:${h.facilityId}`,
       source: 'hospital',
       name: h.facilityName,
@@ -149,12 +159,7 @@ export function OrgDirectoryList({
     let list =
       filter === 'all' ? [...allRows] : allRows.filter((r) => r.source === filter)
     if (needle) {
-      list = list.filter((r) => {
-        const hay = [r.name, r.meta, r.location, r.extra, r.source, ...(r.types ?? [])]
-          .join(' ')
-          .toLowerCase()
-        return hay.includes(needle)
-      })
+      list = list.filter((r) => r.haystack.includes(needle))
     }
     list.sort((a, b) => {
       if (sort === 'source') {

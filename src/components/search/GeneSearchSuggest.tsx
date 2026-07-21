@@ -98,10 +98,18 @@ export function GeneSearchSuggest({
   useLayoutEffect(() => {
     if (!open) return
     updateMenuRect()
-    const onWin = () => updateMenuRect()
+    let raf = 0
+    const onWin = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        updateMenuRect()
+      })
+    }
     window.addEventListener('resize', onWin)
     window.addEventListener('scroll', onWin, true)
     return () => {
+      if (raf) window.cancelAnimationFrame(raf)
       window.removeEventListener('resize', onWin)
       window.removeEventListener('scroll', onWin, true)
     }
@@ -145,7 +153,6 @@ export function GeneSearchSuggest({
         const res = await fetch(`/api/search/gene?${params.toString()}`, {
           signal: ac.signal,
           headers: { Accept: 'application/json' },
-          cache: 'no-store',
         })
         const data = (await res.json().catch(() => ({}))) as {
           results?: GeneSuggestion[]
@@ -174,6 +181,7 @@ export function GeneSearchSuggest({
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      abortRef.current?.abort()
     }
   }, [value])
 

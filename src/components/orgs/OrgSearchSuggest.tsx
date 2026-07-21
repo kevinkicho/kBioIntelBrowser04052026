@@ -93,10 +93,19 @@ export function OrgSearchSuggest({
   useLayoutEffect(() => {
     if (!open) return
     updateMenuRect()
-    const onWin = () => updateMenuRect()
+    // Throttle scroll/resize to one layout read per frame (capture scroll is hot)
+    let raf = 0
+    const onWin = () => {
+      if (raf) return
+      raf = window.requestAnimationFrame(() => {
+        raf = 0
+        updateMenuRect()
+      })
+    }
     window.addEventListener('resize', onWin)
     window.addEventListener('scroll', onWin, true)
     return () => {
+      if (raf) window.cancelAnimationFrame(raf)
       window.removeEventListener('resize', onWin)
       window.removeEventListener('scroll', onWin, true)
     }
@@ -142,7 +151,6 @@ export function OrgSearchSuggest({
         const res = await fetch(`/api/orgs/suggest?${params.toString()}`, {
           signal: ac.signal,
           headers: { Accept: 'application/json' },
-          cache: 'no-store',
         })
         const data = (await res.json().catch(() => ({}))) as {
           ok?: boolean
@@ -172,6 +180,8 @@ export function OrgSearchSuggest({
 
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current)
+      // Abort in-flight suggest when query/country changes or unmount
+      abortRef.current?.abort()
     }
   }, [value, country])
 
