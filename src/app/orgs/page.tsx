@@ -1,20 +1,23 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import Link from 'next/link'
 import type { RorOrganization } from '@/lib/api/ror'
 import type { CmsHospital } from '@/lib/api/cmsHospitals'
+import type { UsCollege } from '@/lib/api/collegeScorecard'
 
 /**
- * Free public org / hospital search (ROR + CMS).
- * Affiliation context for research — not clinical referral.
+ * Free public org / hospital / college search (ROR + CMS + Scorecard + EU packs).
+ * Affiliation context for research — not clinical referral or admissions advice.
  */
 export default function OrgsPage() {
   const [q, setQ] = useState('')
   const [country, setCountry] = useState('')
+  const [euPack, setEuPack] = useState(false)
   const [loading, setLoading] = useState(false)
   const [orgs, setOrgs] = useState<RorOrganization[]>([])
+  const [euOrgs, setEuOrgs] = useState<RorOrganization[]>([])
   const [hospitals, setHospitals] = useState<CmsHospital[]>([])
+  const [colleges, setColleges] = useState<UsCollege[]>([])
   const [error, setError] = useState<string | null>(null)
 
   const runSearch = useCallback(async () => {
@@ -28,9 +31,19 @@ export default function OrgsPage() {
     try {
       const params = new URLSearchParams({ q: query })
       if (country) params.set('country', country)
-      const [rorRes, cmsRes] = await Promise.all([
+      const euParams = new URLSearchParams({ q: query })
+      if (euPack) euParams.set('pack', '1')
+      else if (country && country !== 'US' && country !== 'CA' && country !== 'GB') {
+        euParams.set('country', country)
+      } else if (!country) {
+        euParams.set('pack', '1')
+      }
+
+      const [rorRes, cmsRes, collegeRes, euRes] = await Promise.all([
         fetch(`/api/ror?${params.toString()}`),
         fetch(`/api/cms-hospitals?q=${encodeURIComponent(query)}&limit=20`),
+        fetch(`/api/us-colleges?q=${encodeURIComponent(query)}&limit=15`),
+        fetch(`/api/eu-orgs?${euParams.toString()}`),
       ])
       const rorJson = (await rorRes.json()) as {
         ok?: boolean
@@ -42,20 +55,36 @@ export default function OrgsPage() {
         hospitals?: CmsHospital[]
         error?: string
       }
-      if (!rorJson.ok && !cmsJson.ok) {
-        setError(rorJson.error || cmsJson.error || 'Search failed')
-        setOrgs([])
-        setHospitals([])
-      } else {
-        setOrgs(rorJson.orgs || [])
-        setHospitals(cmsJson.hospitals || [])
+      const collegeJson = (await collegeRes.json()) as {
+        ok?: boolean
+        colleges?: UsCollege[]
+        error?: string
+      }
+      const euJson = (await euRes.json()) as {
+        ok?: boolean
+        orgs?: RorOrganization[]
+        error?: string
+      }
+
+      setOrgs(rorJson.orgs || [])
+      setHospitals(cmsJson.hospitals || [])
+      setColleges(collegeJson.colleges || [])
+      setEuOrgs(euJson.orgs || [])
+      if (!rorJson.ok && !cmsJson.ok && !collegeJson.ok && !euJson.ok) {
+        setError(
+          rorJson.error ||
+            cmsJson.error ||
+            collegeJson.error ||
+            euJson.error ||
+            'Search failed',
+        )
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setLoading(false)
     }
-  }, [q, country])
+  }, [q, country, euPack])
 
   return (
     <div className="mx-auto max-w-4xl px-4 py-8 sm:px-6">
@@ -64,19 +93,14 @@ export default function OrgsPage() {
           Free public registries
         </p>
         <h1 className="text-2xl font-semibold text-slate-100">
-          Research orgs &amp; US hospitals
+          Orgs, colleges &amp; hospitals
         </h1>
         <p className="mt-2 text-sm text-slate-400 leading-relaxed max-w-2xl">
-          Search the Research Organization Registry (ROR — universities, institutes, research
-          hospitals worldwide) and CMS Medicare hospital registry (US). Evidence affiliation
-          context only — not clinical referral or “best hospital” advice.
+          ROR research organizations (global), EU research org packs, US College Scorecard, and CMS
+          Medicare hospitals. Affiliation / directory context only — not clinical referral or
+          admissions advice.
         </p>
         <p className="mt-2 text-[11px] text-slate-500">
-          Design notes:{' '}
-          <Link href="/how-it-works" className="text-indigo-400 hover:underline">
-            How it works
-          </Link>
-          {' · '}
           <a
             href="https://ror.org/"
             target="_blank"
@@ -84,6 +108,15 @@ export default function OrgsPage() {
             className="text-indigo-400 hover:underline"
           >
             ROR
+          </a>
+          {' · '}
+          <a
+            href="https://collegescorecard.ed.gov/"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-indigo-400 hover:underline"
+          >
+            College Scorecard
           </a>
           {' · '}
           <a
@@ -98,45 +131,60 @@ export default function OrgsPage() {
       </div>
 
       <form
-        className="flex flex-col sm:flex-row gap-2 mb-6"
+        className="flex flex-col gap-2 mb-6"
         onSubmit={(e) => {
           e.preventDefault()
           void runSearch()
         }}
       >
-        <input
-          type="search"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="e.g. Mayo Clinic, Harvard, Karolinska…"
-          className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
-          data-testid="orgs-search-input"
-        />
-        <select
-          value={country}
-          onChange={(e) => setCountry(e.target.value)}
-          className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300"
-          aria-label="Country filter (ROR)"
-        >
-          <option value="">All countries (ROR)</option>
-          <option value="US">United States</option>
-          <option value="GB">United Kingdom</option>
-          <option value="DE">Germany</option>
-          <option value="FR">France</option>
-          <option value="NL">Netherlands</option>
-          <option value="SE">Sweden</option>
-          <option value="ES">Spain</option>
-          <option value="IT">Italy</option>
-          <option value="CH">Switzerland</option>
-          <option value="CA">Canada</option>
-        </select>
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-lg bg-emerald-700/80 hover:bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
-        >
-          {loading ? 'Searching…' : 'Search'}
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <input
+            type="search"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            placeholder="e.g. Mayo, Harvard, Karolinska, Pasteur…"
+            className="flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600"
+            data-testid="orgs-search-input"
+          />
+          <select
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+            className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-slate-300"
+            aria-label="Country filter (ROR)"
+          >
+            <option value="">All countries (ROR)</option>
+            <option value="US">United States</option>
+            <option value="GB">United Kingdom</option>
+            <option value="DE">Germany</option>
+            <option value="FR">France</option>
+            <option value="NL">Netherlands</option>
+            <option value="SE">Sweden</option>
+            <option value="ES">Spain</option>
+            <option value="IT">Italy</option>
+            <option value="BE">Belgium</option>
+            <option value="DK">Denmark</option>
+            <option value="AT">Austria</option>
+            <option value="IE">Ireland</option>
+            <option value="CH">Switzerland</option>
+            <option value="CA">Canada</option>
+          </select>
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-lg bg-emerald-700/80 hover:bg-emerald-600 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          >
+            {loading ? 'Searching…' : 'Search'}
+          </button>
+        </div>
+        <label className="flex items-center gap-2 text-[11px] text-slate-400">
+          <input
+            type="checkbox"
+            checked={euPack}
+            onChange={(e) => setEuPack(e.target.checked)}
+            className="rounded border-slate-600"
+          />
+          Force multi-country EU research pack (ROR education/healthcare/facility)
+        </label>
       </form>
 
       {error && (
@@ -177,15 +225,82 @@ export default function OrgsPage() {
         )}
       </section>
 
+      <section className="mb-10">
+        <h2 className="text-sm font-semibold text-slate-200 mb-3">
+          EU research orgs pack{euOrgs.length ? ` · ${euOrgs.length}` : ''}
+        </h2>
+        <p className="text-[10px] text-slate-500 mb-2">
+          Country-filtered ROR (not a complete EU hospital census).
+        </p>
+        {euOrgs.length === 0 && !loading ? (
+          <p className="text-xs text-slate-500">No EU pack hits yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {euOrgs.map((o) => (
+              <li
+                key={`eu-${o.rorId}`}
+                className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
+                data-testid="orgs-eu-row"
+              >
+                <p className="text-sm text-slate-100 font-medium">{o.name}</p>
+                <p className="text-[11px] text-slate-500">
+                  {[o.city, o.countryName, o.types.join(', '), o.matchSource]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </p>
+                <a
+                  href={`https://ror.org/${o.rorId}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-indigo-400 hover:underline"
+                >
+                  ror.org/{o.rorId} ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
+      <section className="mb-10">
+        <h2 className="text-sm font-semibold text-slate-200 mb-3">
+          US colleges (Scorecard){colleges.length ? ` · ${colleges.length}` : ''}
+        </h2>
+        {colleges.length === 0 && !loading ? (
+          <p className="text-xs text-slate-500">No Scorecard hits yet.</p>
+        ) : (
+          <ul className="space-y-2">
+            {colleges.map((c) => (
+              <li
+                key={c.id}
+                className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
+                data-testid="orgs-college-row"
+              >
+                <p className="text-sm text-slate-100 font-medium">{c.name}</p>
+                <p className="text-[11px] text-slate-500">
+                  {[c.city, c.state, c.ownership, c.predominantDegree].filter(Boolean).join(' · ')}
+                </p>
+                <a
+                  href={c.scorecardUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-[10px] text-indigo-400 hover:underline"
+                >
+                  Scorecard ↗
+                </a>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
       <section>
         <h2 className="text-sm font-semibold text-slate-200 mb-3">
           US hospitals (CMS Medicare){hospitals.length ? ` · ${hospitals.length}` : ''}
         </h2>
-        <p className="text-[10px] text-slate-500 mb-2">
-          US only. Country filter does not apply to CMS.
-        </p>
+        <p className="text-[10px] text-slate-500 mb-2">US only.</p>
         {hospitals.length === 0 && !loading ? (
-          <p className="text-xs text-slate-500">No CMS hospital hits yet — run a search.</p>
+          <p className="text-xs text-slate-500">No CMS hospital hits yet.</p>
         ) : (
           <ul className="space-y-2">
             {hospitals.map((h) => (

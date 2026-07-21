@@ -302,6 +302,20 @@ export const CATEGORIES: CategoryDef[] = [
         tier: 'supporting',
       },
       {
+        id: 'eu-research-orgs',
+        title: 'EuResearchOrgs',
+        propKey: 'euResearchOrgs',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
+        id: 'us-colleges',
+        title: 'UsColleges',
+        propKey: 'usColleges',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
         id: 'openaire-projects',
         title: 'OpenAIREProjects',
         propKey: 'openAireProjects',

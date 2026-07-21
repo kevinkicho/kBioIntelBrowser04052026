@@ -1,6 +1,6 @@
 # Research orgs & hospitals compendium (free public data)
 
-**Status:** Active — Wave A/B shipped (ROR + CMS)  
+**Status:** Active — Waves A–C shipped (ROR + CMS + Scorecard + EU packs)  
 **Product law:** Free public APIs only · evidence-first · not clinical referral / “best hospital” language  
 **Role:** Affiliation / site context for trials, grants, literature — not a standalone directory product
 
@@ -10,8 +10,9 @@
 |--------|--------|------|------|
 | **ROR** | Global (US + EU + …) | A | Research universities, institutes, many academic hospitals, funders |
 | **CMS Hospital General Information** | US Medicare | A/B | Registered hospitals (name, address, type, rating) |
-| **IPEDS / College Scorecard** | US colleges | B | Optional later (Scorecard API needs free api.data.gov key) |
-| **National EU hospital open data** | Per country | C | No single free pan-EU hospital API |
+| **College Scorecard** | US colleges | A | Free `api.data.gov` DEMO_KEY (or `DATA_GOV_API_KEY`) |
+| **EU ROR packs** | Core EU countries | A | Multi-country education/healthcare/facility filters |
+| **National EU hospital open data** | Per country | C | Still no single free pan-EU hospital API |
 
 ## Shipped code
 
@@ -19,10 +20,12 @@
 |-------|------|
 | ROR client | `src/lib/api/ror.ts` |
 | CMS hospitals | `src/lib/api/cmsHospitals.ts` |
-| Panels | `ResearchOrgsPanel`, `UsHospitalsPanel` |
+| College Scorecard | `src/lib/api/collegeScorecard.ts` |
+| EU packs | `src/lib/api/euResearchOrgs.ts` |
+| Panels | `ResearchOrgsPanel`, `UsHospitalsPanel`, `UsCollegesPanel` |
 | Browse UI | `/orgs` |
-| APIs | `GET /api/ror?q=`, `GET /api/cms-hospitals?q=` |
-| Molecule join | Clinical sponsors + facilities → ROR; facility names → CMS |
+| APIs | `/api/ror`, `/api/cms-hospitals`, `/api/us-colleges`, `/api/eu-orgs` |
+| Molecule join | Trials → ROR/CMS; grants → ROR/Scorecard; name → EU pack |
 
 ## Language rules
 

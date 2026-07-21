@@ -17,6 +17,8 @@ import { searchPubMed } from '@/lib/api/pubmed'
 import { searchCrossRef } from '@/lib/api/crossref'
 import { searchArXiv } from '@/lib/api/arxiv'
 import { resolveRorByNames, searchRorOrganizations } from '@/lib/api/ror'
+import { resolveUsCollegesByNames, searchUsCollegesByName } from '@/lib/api/collegeScorecard'
+import { searchEuResearchOrgsPack } from '@/lib/api/euResearchOrgs'
 
 export async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [literature, nihGrants, openAireProjects, openAirePublications, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
@@ -62,11 +64,16 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
   const grantInstitutes = (nihGrants as Array<{ institute?: string }>)
     .map((g) => g.institute)
     .filter((s): s is string => Boolean(s && s !== 'Unknown'))
-  const [citationMetrics, rorFromGrants, rorFromName] = await Promise.all([
-    trackedSafe('opencitations', getCitationMetrics(dois), []),
-    trackedSafe('ror-grants', resolveRorByNames(grantInstitutes, 8), []),
-    trackedSafe('ror-lit-query', searchRorOrganizations(queryFor('research-orgs') || name), []),
-  ])
+  const q = queryFor('research-orgs') || name
+  const [citationMetrics, rorFromGrants, rorFromName, euResearchOrgs, usCollegesFromGrants, usCollegesFromName] =
+    await Promise.all([
+      trackedSafe('opencitations', getCitationMetrics(dois), []),
+      trackedSafe('ror-grants', resolveRorByNames(grantInstitutes, 8), []),
+      trackedSafe('ror-lit-query', searchRorOrganizations(q), []),
+      trackedSafe('ror-eu-pack', searchEuResearchOrgsPack(q, { totalCap: 16, perCountry: 2 }), []),
+      trackedSafe('scorecard-grants', resolveUsCollegesByNames(grantInstitutes, 8), []),
+      trackedSafe('scorecard-query', searchUsCollegesByName(queryFor('us-colleges') || name, 10), []),
+    ])
   const seen = new Set<string>()
   const researchOrgsLit = []
   for (const o of [...rorFromGrants, ...rorFromName]) {
@@ -74,6 +81,14 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
     seen.add(o.rorId)
     researchOrgsLit.push(o)
     if (researchOrgsLit.length >= 16) break
+  }
+  const seenCollege = new Set<string>()
+  const usColleges = []
+  for (const c of [...usCollegesFromGrants, ...usCollegesFromName]) {
+    if (seenCollege.has(c.id)) continue
+    seenCollege.add(c.id)
+    usColleges.push(c)
+    if (usColleges.length >= 12) break
   }
   return {
     literature,
@@ -89,5 +104,7 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
     crossRefWorks,
     arxivPapers,
     researchOrgsLit,
+    euResearchOrgs,
+    usColleges,
   }
 }

@@ -176,6 +176,14 @@ export const LazyUsHospitalsPanel = dynamic(
   { loading: LoadingComponent },
 )
 
+export const LazyUsCollegesPanel = dynamic(
+  () =>
+    import('@/components/profile/UsCollegesPanel').then((m) => ({
+      default: m.UsCollegesPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
 export const LazyPatentsPanel = dynamic(
   () => import('@/components/profile/PatentsPanel').then(m => ({ default: m.PatentsPanel })),
   { loading: LoadingComponent }

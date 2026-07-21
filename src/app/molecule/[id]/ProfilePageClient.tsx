@@ -1081,6 +1081,20 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
           lastFetched={lastFetched}
         />
       ),
+      'eu-research-orgs': (panelId, lastFetched) => (
+        <LazyPanels.LazyResearchOrgsPanel
+          orgs={d('euResearchOrgs')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
+      'us-colleges': (panelId, lastFetched) => (
+        <LazyPanels.LazyUsCollegesPanel
+          colleges={d('usColleges')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'openaire-projects': (panelId, lastFetched) => (
         <LazyPanels.LazyOpenAireProjectsPanel
           projects={d('openAireProjects')}

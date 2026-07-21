@@ -151,6 +151,18 @@ export const API_IDENTIFIER_CONFIGS: ApiIdentifierConfig[] = [
     supportedTypes: ['name'],
   },
   {
+    panelId: 'eu-research-orgs',
+    label: 'EU research orgs (ROR pack)',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
+    panelId: 'us-colleges',
+    label: 'US colleges (Scorecard)',
+    defaultType: 'name',
+    supportedTypes: ['name'],
+  },
+  {
     panelId: 'international-regulators',
     label: 'International regulators',
     defaultType: 'name',

@@ -45,6 +45,19 @@ export const API_METADATA: Record<string, ApiMeta> = {
     apiEndpoint:
       'https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0',
   },
+  'college-scorecard': {
+    organization: 'U.S. Department of Education',
+    description:
+      'College Scorecard institution directory (costs/outcomes context optional; free api.data.gov DEMO_KEY)',
+    apiDocs: 'https://collegescorecard.ed.gov/data/api-documentation/',
+    apiEndpoint: 'https://api.data.gov/ed/collegescorecard/v1/schools',
+  },
+  'ror-eu-pack': {
+    organization: 'Research Organization Registry',
+    description: 'EU multi-country ROR packs (education, healthcare, facility types)',
+    apiDocs: 'https://ror.readme.io/docs/api-filtering',
+    apiEndpoint: 'https://api.ror.org/v2/organizations',
+  },
   'ema-bulk': {
     organization: 'European Medicines Agency',
     description:
