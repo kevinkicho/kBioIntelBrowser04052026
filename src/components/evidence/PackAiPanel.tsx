@@ -15,6 +15,7 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 
@@ -62,6 +63,8 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
   const [error, setError] = useState<string | null>(null)
   const [customQuestion, setCustomQuestion] = useState('')
   const [regenOpen, setRegenOpen] = useState(false)
+  const [histRefresh, setHistRefresh] = useState(0)
+  const [activeGenId, setActiveGenId] = useState<string | null>(null)
 
   const claimCount = pack?.claims?.length ?? 0
   const citableCount = useMemo(() => {
@@ -139,7 +142,7 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       })
       if (data.refused || !data.insight) {
         setError(data.refuseReason ?? data.error ?? 'Refused or empty response')
-        void persistAiGeneration({
+        const saved = await persistAiGeneration({
           kind: 'pack',
           mode,
           content: data.refuseReason ?? data.error ?? 'refused',
@@ -150,12 +153,14 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           promptSystem: sys,
           promptUser: usr,
         })
+        if (saved.id) setActiveGenId(saved.id)
+        setHistRefresh((n) => n + 1)
         return
       }
       setInsight(data.insight)
       onInsight?.(mode, data.insight)
       setRegenOpen(false)
-      void persistAiGeneration({
+      const saved = await persistAiGeneration({
         kind: 'pack',
         mode,
         content: JSON.stringify(data.insight),
@@ -170,10 +175,25 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
         promptSystem: sys,
         promptUser: usr,
       })
+      if (saved.id) setActiveGenId(saved.id)
+      setHistRefresh((n) => n + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Pack AI failed')
     } finally {
       setBusy(false)
+    }
+  }
+
+  function restorePackEntry(entry: AiGeneratedRecord) {
+    try {
+      const next = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
+      if (next?.summary || next?.claimIds) {
+        setInsight(next)
+        setError(null)
+        setActiveGenId(entry.id)
+      }
+    } catch {
+      setError('Could not load that generation')
     }
   }
 
@@ -336,20 +356,25 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           busy={busy}
           allowOverrideSystem
           onLoadEntry={(entry: AiGeneratedRecord) => {
-            try {
-              const next = (entry.task ?? JSON.parse(entry.content)) as StructuredInsight
-              if (next?.summary || next?.claimIds) {
-                setInsight(next)
-                setError(null)
-              }
-            } catch {
-              setError('Could not load that generation')
-            }
+            restorePackEntry(entry)
           }}
           onRegenerate={async ({ system, user }) => {
             await run({ system, user })
           }}
           testId="pack-ai-regen-modal"
+        />
+      )}
+
+      {pack && (
+        <AiRunNavigator
+          kind="pack"
+          mode={mode}
+          contextKey={pack.id}
+          refreshKey={histRefresh}
+          activeId={activeGenId}
+          onSelect={restorePackEntry}
+          className="mb-2 mt-2"
+          testId="pack-ai-runs"
         />
       )}
 

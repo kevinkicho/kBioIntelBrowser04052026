@@ -8,7 +8,9 @@ import {
   collection,
   doc,
   getDocs,
+  getDoc,
   setDoc,
+  updateDoc,
   deleteDoc,
   serverTimestamp,
   query,
@@ -32,6 +34,7 @@ export type AiDataKind =
   | 'rh'
   | 'discover_rank'
   | 'board_recommend'
+  | 'research_lab'
   | 'other'
 
 export type AiGeneratedEntry = {
@@ -58,6 +61,10 @@ export type AiGeneratedEntry = {
   /** Prompt transparency — what was sent to the model (for learning / audit). */
   promptSystem?: string
   promptUser?: string
+  /** User research notes on this generation (never model-authored). */
+  userComment?: string
+  /** ISO timestamp when userComment was last saved. */
+  commentUpdatedAt?: string
 }
 
 /** Stored document shape (client-readable). */
@@ -107,6 +114,8 @@ export function getSignedInUid(): string | null {
   }
 }
 
+const COMMENT_SOFT_MAX = 8_000
+
 function toRecord(id: string, data: DocumentData): AiGeneratedRecord {
   return {
     id,
@@ -120,6 +129,9 @@ function toRecord(id: string, data: DocumentData): AiGeneratedRecord {
     error: data.error != null ? String(data.error) : undefined,
     promptSystem: data.promptSystem != null ? String(data.promptSystem) : undefined,
     promptUser: data.promptUser != null ? String(data.promptUser) : undefined,
+    userComment: data.userComment != null ? String(data.userComment) : undefined,
+    commentUpdatedAt:
+      data.commentUpdatedAt != null ? String(data.commentUpdatedAt) : undefined,
     createdAt: String(data.createdAt || ''),
     cloudSchema: typeof data.cloudSchema === 'number' ? data.cloudSchema : undefined,
   }
@@ -130,8 +142,10 @@ function toRecord(id: string, data: DocumentData): AiGeneratedRecord {
  * Skips when user is signed out (privacy + product: local default).
  */
 export async function saveAiGeneratedData(
-  entry: AiGeneratedEntry,
+  entry: AiGeneratedEntry & { id?: string },
   uidOverride?: string | null,
+  /** Prefer shared id from local dual-write so comments resolve. */
+  preferredId?: string,
 ): Promise<{ ok: boolean; id?: string; skipped?: boolean; message?: string }> {
   const uid = uidOverride ?? getSignedInUid()
   if (!uid) {
@@ -142,7 +156,10 @@ export async function saveAiGeneratedData(
     return { ok: false, message: 'Firestore unavailable' }
   }
 
-  const id = `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
+  const id =
+    preferredId ||
+    entry.id ||
+    `ai_${Date.now()}_${Math.random().toString(36).slice(2, 9)}`
   const content = truncateContent(entry.content || '')
   if (!content.trim() && !entry.error && !entry.task) {
     return { ok: true, skipped: true, message: 'Empty AI output' }
@@ -165,9 +182,13 @@ export async function saveAiGeneratedData(
       promptUser: entry.promptUser
         ? truncateContent(entry.promptUser, PROMPT_SOFT_MAX)
         : null,
+      userComment: entry.userComment
+        ? truncateContent(entry.userComment, COMMENT_SOFT_MAX)
+        : null,
+      commentUpdatedAt: entry.commentUpdatedAt ?? null,
       createdAt: new Date().toISOString(),
       _serverCreatedAt: serverTimestamp(),
-      cloudSchema: 2,
+      cloudSchema: 3,
     }) as Record<string, unknown>
 
     if (approxJsonBytes(payload) > FIRESTORE_DOC_SOFT_MAX_BYTES) {
@@ -318,4 +339,69 @@ export async function deleteAllAiGeneratedData(uid: string): Promise<number> {
     n += 1
   }
   return n
+}
+
+/**
+ * Patch user research comment on a cloud AI generation (signed-in only).
+ */
+export async function updateAiGeneratedCommentCloud(
+  id: string,
+  userComment: string,
+  uidOverride?: string | null,
+): Promise<{ ok: boolean; skipped?: boolean; message?: string }> {
+  const uid = uidOverride ?? getSignedInUid()
+  if (!uid) {
+    return { ok: true, skipped: true, message: 'Not signed in — comment saved locally only' }
+  }
+  const col = aiCol(uid)
+  if (!col) return { ok: false, message: 'Firestore unavailable' }
+  const comment = truncateContent((userComment || '').trim(), COMMENT_SOFT_MAX)
+  const commentUpdatedAt = new Date().toISOString()
+  try {
+    const ref = doc(col, id)
+    const existing = await getDoc(ref)
+    if (!existing.exists()) {
+      // Local-only ids (local_*) are not in cloud — not an error.
+      if (id.startsWith('local_')) {
+        return { ok: true, skipped: true, message: 'Local-only generation' }
+      }
+      return { ok: false, message: 'Generation not found in cloud' }
+    }
+    await updateDoc(ref, {
+      userComment: comment || null,
+      commentUpdatedAt,
+    })
+    logAgentActivity(
+      'firebase.ai.comment',
+      { uid, id, len: comment.length },
+      { source: 'firebase' },
+    )
+    return { ok: true }
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err)
+    logAgentActivity(
+      'firebase.ai.comment_error',
+      { message, id },
+      { source: 'firebase', level: 'warn' },
+    )
+    return { ok: false, message }
+  }
+}
+
+/** Fetch one cloud generation by id (signed-in). */
+export async function getAiGeneratedByIdCloud(
+  id: string,
+  uidOverride?: string | null,
+): Promise<AiGeneratedRecord | null> {
+  const uid = uidOverride ?? getSignedInUid()
+  if (!uid) return null
+  const col = aiCol(uid)
+  if (!col) return null
+  try {
+    const snap = await getDoc(doc(col, id))
+    if (!snap.exists()) return null
+    return toRecord(snap.id, snap.data())
+  } catch {
+    return null
+  }
 }

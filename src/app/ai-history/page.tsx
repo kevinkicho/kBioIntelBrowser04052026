@@ -15,6 +15,7 @@ import {
 } from '@/lib/ai/aiHistoryStore'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
+import { AiUserComment } from '@/components/ai/AiUserComment'
 import { clearAiHistoryLocal } from '@/lib/ai/aiHistoryIdb'
 
 const KINDS: Array<AiDataKind | 'all'> = [
@@ -23,6 +24,7 @@ const KINDS: Array<AiDataKind | 'all'> = [
   'board_recommend',
   'pack',
   'rh',
+  'research_lab',
   'disease',
   'copilot',
 ]
@@ -72,9 +74,10 @@ export default function AiHistoryPage() {
         <div className="mb-6">
           <h1 className="text-2xl font-bold text-slate-100">AI generation history</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Paginated history of AI outputs for learning and restore. Stored in this browser
+            Paginated history of live AI outputs — review prompts, load prior runs, and add your
+            research notes on each generation. Stored in this browser
             {auth.user ? ' and your cloud account when signed in' : ' (sign in to sync cloud)'}.
-            Of-record Discover ranks stay deterministic free-API scores.
+            Of-record Discover ranks stay deterministic free-API scores. No mock generations.
           </p>
           <p className="mt-1 text-[11px] text-slate-600">
             Source: {source === 'cloud' ? 'Firestore' : 'local IndexedDB'} ·{' '}
@@ -155,6 +158,24 @@ export default function AiHistoryPage() {
                       user={entry.promptUser}
                       mode={entry.mode}
                       testId={`ai-history-prompt-${entry.id}`}
+                    />
+                    <AiUserComment
+                      generationId={entry.id}
+                      initialComment={entry.userComment}
+                      testId={`ai-history-comment-${entry.id}`}
+                      onSaved={(comment) => {
+                        setItems((prev) =>
+                          prev.map((r) =>
+                            r.id === entry.id
+                              ? {
+                                  ...r,
+                                  userComment: comment,
+                                  commentUpdatedAt: new Date().toISOString(),
+                                }
+                              : r,
+                          ),
+                        )
+                      }}
                     />
                   </div>
                 )}

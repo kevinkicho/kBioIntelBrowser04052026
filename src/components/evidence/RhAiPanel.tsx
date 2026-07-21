@@ -15,6 +15,7 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 
 const MODES: { id: RhAiMode; label: string }[] = [
   { id: 'rh_thesis_draft', label: 'Thesis draft' },
@@ -53,6 +54,8 @@ export function RhAiPanel({
   const [error, setError] = useState<string | null>(null)
   const [customQuestion, setCustomQuestion] = useState('')
   const [regenOpen, setRegenOpen] = useState(false)
+  const [histRefresh, setHistRefresh] = useState(0)
+  const [activeGenId, setActiveGenId] = useState<string | null>(null)
 
   const claimCount = claims.length
   const minClaims = minClaimsForRhMode(mode)
@@ -138,7 +141,7 @@ export function RhAiPanel({
       })
       if (data.refused || !data.insight) {
         setError(data.refuseReason ?? data.error ?? 'Refused or empty response')
-        void persistAiGeneration({
+        const saved = await persistAiGeneration({
           kind: 'rh',
           mode,
           content: data.refuseReason ?? data.error ?? 'refused',
@@ -149,12 +152,14 @@ export function RhAiPanel({
           promptSystem: sys,
           promptUser: usr,
         })
+        if (saved.id) setActiveGenId(saved.id)
+        setHistRefresh((n) => n + 1)
         return
       }
       setInsight(data.insight)
       onInsight?.(mode, data.insight)
       setRegenOpen(false)
-      void persistAiGeneration({
+      const saved = await persistAiGeneration({
         kind: 'rh',
         mode,
         content: JSON.stringify(data.insight),
@@ -165,10 +170,25 @@ export function RhAiPanel({
         promptSystem: sys,
         promptUser: usr,
       })
+      if (saved.id) setActiveGenId(saved.id)
+      setHistRefresh((n) => n + 1)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'RH AI failed')
     } finally {
       setBusy(false)
+    }
+  }
+
+  function restoreRhEntry(entry: AiGeneratedRecord) {
+    try {
+      const next = (entry.task ?? JSON.parse(entry.content)) as RhStructuredInsight
+      if (next?.summary || next?.claimIds) {
+        setInsight(next)
+        setError(null)
+        setActiveGenId(entry.id)
+      }
+    } catch {
+      setError('Could not load that generation')
     }
   }
 
@@ -268,21 +288,22 @@ export function RhAiPanel({
         contextKey={hyp.id}
         busy={busy}
         allowOverrideSystem
-        onLoadEntry={(entry: AiGeneratedRecord) => {
-          try {
-            const restored = (entry.task ?? JSON.parse(entry.content)) as RhStructuredInsight
-            if (restored?.summary || restored?.claimIds) {
-              setInsight(restored)
-              setError(null)
-            }
-          } catch {
-            setError('Could not load that generation')
-          }
-        }}
+        onLoadEntry={restoreRhEntry}
         onRegenerate={async ({ system, user }) => {
           await run({ system, user })
         }}
         testId="rh-ai-regen-modal"
+      />
+
+      <AiRunNavigator
+        kind="rh"
+        mode={mode}
+        contextKey={hyp.id}
+        refreshKey={histRefresh}
+        activeId={activeGenId}
+        onSelect={restoreRhEntry}
+        className="mb-2 mt-2"
+        testId="rh-ai-runs"
       />
 
       {error && (

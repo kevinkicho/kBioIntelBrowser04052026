@@ -15,6 +15,7 @@ import {
   type AiDataKind,
   type AiGeneratedRecord,
 } from '@/lib/ai/aiHistoryStore'
+import { AiUserComment } from './AiUserComment'
 
 export interface AiRegenerateModalProps {
   open: boolean
@@ -289,6 +290,25 @@ export function AiRegenerateModal({
                             Copy prompts into editor
                           </button>
                         )}
+                        <AiUserComment
+                          generationId={entry.id}
+                          initialComment={entry.userComment}
+                          compact
+                          testId={`${testId}-comment-${entry.id}`}
+                          onSaved={(comment) => {
+                            setItems((prev) =>
+                              prev.map((r) =>
+                                r.id === entry.id
+                                  ? {
+                                      ...r,
+                                      userComment: comment,
+                                      commentUpdatedAt: new Date().toISOString(),
+                                    }
+                                  : r,
+                              ),
+                            )
+                          }}
+                        />
                       </div>
                     )}
                   </li>

@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import {
   type DiseaseDetailContext,
   type DiseaseIntelligenceMode,
@@ -48,6 +49,8 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
   const [regenOpen, setRegenOpen] = useState(false)
   const [customDraft, setCustomDraft] = useState('')
   const [followUp, setFollowUp] = useState('')
+  const [histRefresh, setHistRefresh] = useState(0)
+  const [activeGenId, setActiveGenId] = useState<string | null>(null)
   const mountedRef = useRef(true)
   const autoSummaryRef = useRef(false)
   const streamingModeRef = useRef<DiseaseIntelligenceMode | null>(null)
@@ -149,7 +152,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
       if (gen !== streamGenRef.current) return
 
       if (full.trim()) {
-        void persistAiGeneration({
+        const saved = await persistAiGeneration({
           kind: 'disease',
           mode: `disease_${mode}`,
           content: full,
@@ -162,6 +165,8 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
           promptSystem: prompts.system,
           promptUser: prompts.user,
         })
+        if (saved.id) setActiveGenId(saved.id)
+        setHistRefresh((n) => n + 1)
       }
 
       if (mountedRef.current) {
@@ -461,7 +466,7 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                     }
                     if (gen !== streamGenRef.current) return
                     if (full.trim()) {
-                      void persistAiGeneration({
+                      const saved = await persistAiGeneration({
                         kind: 'disease',
                         mode: `disease_${activeTab}`,
                         content: full,
@@ -474,6 +479,8 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                         promptSystem: system,
                         promptUser: user,
                       })
+                      if (saved.id) setActiveGenId(saved.id)
+                      setHistRefresh((n) => n + 1)
                     }
                     if (mountedRef.current) {
                       setModes((prev) => ({
@@ -491,6 +498,35 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                 />
               )
             })()}
+
+            <AiRunNavigator
+              kind="disease"
+              mode={`disease_${activeTab}`}
+              contextKey={context.diseaseName}
+              refreshKey={histRefresh}
+              activeId={activeGenId}
+              onSelect={(entry) => {
+                setActiveGenId(entry.id)
+                setModes((prev) => ({
+                  ...prev,
+                  [activeTab]: {
+                    ...prev[activeTab],
+                    content: entry.content,
+                    wasTriggered: true,
+                    isStreaming: false,
+                    prompt:
+                      entry.promptSystem || entry.promptUser
+                        ? {
+                            system: entry.promptSystem || '',
+                            user: entry.promptUser || '',
+                          }
+                        : prev[activeTab].prompt,
+                  },
+                }))
+              }}
+              className="mt-2"
+              testId="disease-intel-runs"
+            />
 
             <div
               className="disease-intel-body mt-2 min-h-[4rem]"

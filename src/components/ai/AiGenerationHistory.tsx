@@ -12,6 +12,7 @@ import {
   type AiGeneratedRecord,
 } from '@/lib/ai/aiHistoryStore'
 import { AiPromptReveal } from './AiPromptReveal'
+import { AiUserComment } from './AiUserComment'
 
 export interface AiGenerationHistoryProps {
   kind?: AiDataKind
@@ -154,6 +155,25 @@ export function AiGenerationHistory({
                           testId={`${testId}-prompt-${entry.id}`}
                         />
                       )}
+                      <AiUserComment
+                        generationId={entry.id}
+                        initialComment={entry.userComment}
+                        compact
+                        testId={`${testId}-comment-${entry.id}`}
+                        onSaved={(comment) => {
+                          setItems((prev) =>
+                            prev.map((r) =>
+                              r.id === entry.id
+                                ? {
+                                    ...r,
+                                    userComment: comment,
+                                    commentUpdatedAt: new Date().toISOString(),
+                                  }
+                                : r,
+                            ),
+                          )
+                        }}
+                      />
                     </div>
                   )}
                 </li>

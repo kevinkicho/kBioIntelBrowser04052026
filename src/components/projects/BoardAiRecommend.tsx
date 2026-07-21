@@ -19,6 +19,7 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import {
   buildAiRankWhy,
@@ -54,6 +55,8 @@ export function BoardAiRecommend({
   const [goal, setGoal] = useState('')
   const [lastPrompt, setLastPrompt] = useState<{ system: string; user: string } | null>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [histRefresh, setHistRefresh] = useState(0)
+  const [activeGenId, setActiveGenId] = useState<string | null>(null)
 
   const aiAvailable = ai.enabled && ai.status === 'available' && Boolean(ai.model)
   const candidates = project.candidates
@@ -102,7 +105,7 @@ export function BoardAiRecommend({
           count: validated.ordering.length,
           refused: validated.refused,
         })
-        void persistAiGeneration({
+        const saved = await persistAiGeneration({
           kind: 'board_recommend',
           mode: 'board_recommend',
           content: JSON.stringify(validated),
@@ -117,6 +120,8 @@ export function BoardAiRecommend({
           promptUser: user,
           task: validated,
         })
+        if (saved.id) setActiveGenId(saved.id)
+        setHistRefresh((n) => n + 1)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
       } finally {
@@ -133,6 +138,7 @@ export function BoardAiRecommend({
         : (JSON.parse(entry.content) as AiRankResult)
       if (parsed?.ordering) {
         setResult(parsed)
+        setActiveGenId(entry.id)
         if (entry.promptSystem || entry.promptUser) {
           setLastPrompt({
             system: entry.promptSystem || '',
@@ -290,6 +296,16 @@ export function BoardAiRecommend({
           await run({ system, user })
         }}
         testId="board-ai-regen-modal"
+      />
+      <AiRunNavigator
+        kind="board_recommend"
+        mode="board_recommend"
+        contextKey={project.id}
+        refreshKey={histRefresh}
+        activeId={activeGenId}
+        onSelect={restoreFromHistory}
+        className="mt-2"
+        testId="board-ai-runs"
       />
     </div>
   )

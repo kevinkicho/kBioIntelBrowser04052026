@@ -25,6 +25,7 @@ import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
+import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildAiRankWhy } from '@/lib/ai/aiWhyTooltip'
 
@@ -63,6 +64,8 @@ export function AiAnalysisView({
   const [result, setResult] = useState<AiRankResult | null>(null)
   const [lastPrompt, setLastPrompt] = useState<{ system: string; user: string } | null>(null)
   const [regenOpen, setRegenOpen] = useState(false)
+  const [histRefresh, setHistRefresh] = useState(0)
+  const [activeGenId, setActiveGenId] = useState<string | null>(null)
   const [disclaimerAck, setDisclaimerAck] = useState(() => {
     try {
       return typeof sessionStorage !== 'undefined' && sessionStorage.getItem(DISCLAIMER_KEY) === '1'
@@ -139,7 +142,7 @@ export function AiAnalysisView({
           refused: validated.refused,
           model: ai.model,
         })
-        void persistAiGeneration({
+        const saved = await persistAiGeneration({
           kind: 'discover_rank',
           mode: 'ai_analysis_reorder',
           content: JSON.stringify(validated),
@@ -151,6 +154,8 @@ export function AiAnalysisView({
           task: validated,
           error: validated.refused ? validated.refuseReason : undefined,
         })
+        if (saved.id) setActiveGenId(saved.id)
+        setHistRefresh((n) => n + 1)
       } catch (e) {
         setError(e instanceof Error ? e.message : String(e))
         setResult(null)
@@ -170,6 +175,7 @@ export function AiAnalysisView({
       if (parsed?.ordering) {
         setResult(parsed)
         onResult?.(parsed)
+        setActiveGenId(entry.id)
         if (entry.promptSystem || entry.promptUser) {
           setLastPrompt({
             system: entry.promptSystem || '',
@@ -353,6 +359,16 @@ export function AiAnalysisView({
                 await runAnalysis({ system, user })
               }}
               testId="discover-ai-regen-modal"
+            />
+            <AiRunNavigator
+              kind="discover_rank"
+              mode="ai_analysis_reorder"
+              contextKey={diseaseName}
+              refreshKey={histRefresh}
+              activeId={activeGenId}
+              onSelect={restoreFromHistory}
+              className="mt-2"
+              testId="discover-ai-runs"
             />
           </div>
         )}

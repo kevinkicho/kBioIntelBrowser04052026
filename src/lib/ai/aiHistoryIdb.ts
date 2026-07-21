@@ -45,7 +45,7 @@ function idbReq<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 export async function putAiHistoryLocal(
-  entry: AiGeneratedEntry & { id?: string },
+  entry: AiGeneratedEntry & { id?: string; createdAt?: string },
 ): Promise<AiGeneratedRecord | null> {
   const db = await openDb()
   if (!db) return null
@@ -53,8 +53,8 @@ export async function putAiHistoryLocal(
   const record: AiGeneratedRecord = {
     ...entry,
     id,
-    createdAt: new Date().toISOString(),
-    cloudSchema: 0,
+    createdAt: entry.createdAt || new Date().toISOString(),
+    cloudSchema: entry.id?.startsWith('ai_') ? 3 : 0,
   }
   try {
     const tx = db.transaction(AI_HISTORY_IDB_STORE, 'readwrite')
@@ -156,5 +156,104 @@ export async function clearAiHistoryLocal(): Promise<number> {
   } catch {
     db.close()
     return 0
+  }
+}
+
+export async function getAiHistoryLocalById(id: string): Promise<AiGeneratedRecord | null> {
+  const db = await openDb()
+  if (!db) return null
+  try {
+    const tx = db.transaction(AI_HISTORY_IDB_STORE, 'readonly')
+    const store = tx.objectStore(AI_HISTORY_IDB_STORE)
+    const row = (await idbReq(store.get(id))) as AiGeneratedRecord | undefined
+    db.close()
+    return row ?? null
+  } catch {
+    try {
+      db.close()
+    } catch {
+      /* */
+    }
+    return null
+  }
+}
+
+/** Update user research comment on a local generation. */
+export async function updateAiHistoryLocalComment(
+  id: string,
+  userComment: string,
+): Promise<AiGeneratedRecord | null> {
+  const db = await openDb()
+  if (!db) return null
+  try {
+    const tx = db.transaction(AI_HISTORY_IDB_STORE, 'readwrite')
+    const store = tx.objectStore(AI_HISTORY_IDB_STORE)
+    const existing = (await idbReq(store.get(id))) as AiGeneratedRecord | undefined
+    if (!existing) {
+      db.close()
+      return null
+    }
+    const next: AiGeneratedRecord = {
+      ...existing,
+      userComment: (userComment || '').trim().slice(0, 8_000),
+      commentUpdatedAt: new Date().toISOString(),
+    }
+    await idbReq(store.put(next))
+    db.close()
+    return next
+  } catch {
+    try {
+      db.close()
+    } catch {
+      /* */
+    }
+    return null
+  }
+}
+
+/** Count local rows (for durable navigator UI). */
+export async function countAiHistoryLocal(opts?: {
+  kind?: AiDataKind
+  mode?: string
+  contextKey?: string
+}): Promise<number> {
+  const page = await listAiHistoryLocal({
+    kind: opts?.kind,
+    mode: opts?.mode,
+    contextKey: opts?.contextKey,
+    pageSize: 25,
+  })
+  // Approximate: if hasMore, we only know lower bound — load full via getAll path
+  const db = await openDb()
+  if (!db) return page.items.length
+  try {
+    const tx = db.transaction(AI_HISTORY_IDB_STORE, 'readonly')
+    const store = tx.objectStore(AI_HISTORY_IDB_STORE)
+    let all = (await idbReq(store.getAll())) as AiGeneratedRecord[]
+    db.close()
+    if (opts?.kind) all = all.filter((r) => r.kind === opts.kind)
+    if (opts?.mode) all = all.filter((r) => r.mode === opts.mode)
+    if (opts?.contextKey) {
+      const k = opts.contextKey.toLowerCase()
+      all = all.filter((r) => {
+        const c = r.context
+        if (!c) return false
+        return (
+          (c.name && c.name.toLowerCase().includes(k)) ||
+          (c.packId && c.packId.includes(opts.contextKey!)) ||
+          (c.projectId && c.projectId.includes(opts.contextKey!)) ||
+          (c.hypId && c.hypId.includes(opts.contextKey!)) ||
+          String(c.cid ?? '') === opts.contextKey
+        )
+      })
+    }
+    return all.length
+  } catch {
+    try {
+      db.close()
+    } catch {
+      /* */
+    }
+    return page.items.length
   }
 }
