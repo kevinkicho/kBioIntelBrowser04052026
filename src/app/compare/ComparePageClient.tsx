@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MoleculeSearch } from '@/components/compare/MoleculeSearch'
 import { clientFetch } from '@/lib/clientFetch'
@@ -107,14 +107,6 @@ export function ComparePageClient() {
     readyToCompare &&
     urlCids.length === selectedCids.length &&
     selectedCids.every((c, i) => c === urlCids[i])
-
-  const setSlot = useCallback((index: number, sel: CompareSelection | null) => {
-    setSlots((prev) => {
-      const next = [...prev]
-      next[index] = sel
-      return next
-    })
-  }, [])
 
   function handleCompare() {
     if (!readyToCompare) return
