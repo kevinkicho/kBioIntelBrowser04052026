@@ -44,22 +44,71 @@ export interface PackAiResponse {
   validationErrors?: string[]
 }
 
+/** Max claims embedded in Pack AI prompts (was 80; raised for denser free-API packs). */
+export const PACK_AI_CONTEXT_CLAIM_LIMIT = 140
+
 export interface PackAiContextBlock {
   title: string
   diseaseName?: string
   candidateNames: string[]
-  claims: Array<{ id: string; statement: string; claimType: string; source: string }>
+  claims: Array<{
+    id: string
+    statement: string
+    claimType: string
+    source: string
+    sourceUrl?: string
+    quote?: string
+  }>
   claimIdAllowlist: string[]
+  /** Facet histogram for thorough gap analysis */
+  claimTypeCounts: Record<string, number>
+  /** Distinct provenance sources present in the pack */
+  sources: string[]
+  totalClaimCount: number
+  contextClaimCount: number
 }
 
 export function buildPackAiContext(
   pack: Pick<EvidencePack, 'title' | 'claims' | 'candidates' | 'disease'>,
 ): PackAiContextBlock {
-  const claims = (pack.claims ?? []).slice(0, 80).map((c: EvidenceClaim) => ({
+  const all = pack.claims ?? []
+  const claimTypeCounts: Record<string, number> = {}
+  const sourceSet = new Set<string>()
+  for (const c of all) {
+    claimTypeCounts[c.claimType] = (claimTypeCounts[c.claimType] ?? 0) + 1
+    if (c.provenance?.source) sourceSet.add(c.provenance.source)
+  }
+
+  // Prefer breadth: round-robin sample by claimType so literature/safety aren't all truncated
+  const byType = new Map<string, EvidenceClaim[]>()
+  for (const c of all) {
+    const list = byType.get(c.claimType) ?? []
+    list.push(c)
+    byType.set(c.claimType, list)
+  }
+  const selected: EvidenceClaim[] = []
+  const types = Array.from(byType.keys()).sort()
+  let guard = 0
+  while (selected.length < PACK_AI_CONTEXT_CLAIM_LIMIT && guard < PACK_AI_CONTEXT_CLAIM_LIMIT * 4) {
+    guard += 1
+    let added = false
+    for (const t of types) {
+      const bucket = byType.get(t)
+      if (!bucket?.length) continue
+      selected.push(bucket.shift()!)
+      added = true
+      if (selected.length >= PACK_AI_CONTEXT_CLAIM_LIMIT) break
+    }
+    if (!added) break
+  }
+
+  const claims = selected.map((c: EvidenceClaim) => ({
     id: c.id,
     statement: c.statement,
     claimType: c.claimType,
     source: c.provenance?.source ?? 'unknown',
+    sourceUrl: c.provenance?.sourceUrl,
+    quote: c.provenance?.quote?.slice(0, 160),
   }))
   return {
     title: pack.title,
@@ -69,6 +118,10 @@ export function buildPackAiContext(
       .map((c: MoleculeCandidate) => c.identity.name),
     claims,
     claimIdAllowlist: claims.map((c) => c.id),
+    claimTypeCounts,
+    sources: Array.from(sourceSet).sort(),
+    totalClaimCount: all.length,
+    contextClaimCount: claims.length,
   }
 }
 
@@ -90,14 +143,16 @@ export function packModeTaskLabel(mode: PackAiMode): string {
   }
 }
 
-const PACK_JSON_RULES = `You are BioIntel Copilot operating on an evidence pack.
+const PACK_JSON_RULES = `You are BioIntel Copilot operating on an evidence pack built from free public APIs (trials, safety, bioactivity, literature, grants, patents, regulators, org landscape, etc.).
 RULES:
 1. Base the summary only on the claim statements provided. Cite claimIds you used in claimIds[].
 2. Do NOT invent claimIds. Use only ids from the allowlist. If evidence is thin, write a cautious summary and list gaps in nextSteps/risks — do not invent clinical conclusions.
-3. Do NOT invent a confidence rating (no high/medium/low). Evidence quality is the pack's claim set, not your self-score.
-4. Respond with JSON only matching:
+3. Prefer thorough analysis across claim types (mechanism, binds-target, indicated-for, trial, safety, property, literature, other) and multiple sources when present.
+4. Do NOT invent a confidence rating (no high/medium/low). Evidence quality is the pack's claim set, not your self-score.
+5. FAERS/recall counts are reporting counts, not incidence. Label/Orange Book/Purple Book rows are registry facts, not treatment advice.
+6. Respond with JSON only matching:
 {"summary":"string","claimIds":["ec:..."],"nextSteps":["..."],"risks":["..."]}
-claimIds must be the evidence claim ids you relied on (from the allowlist).`
+claimIds must be the evidence claim ids you relied on (from the allowlist). Include several claimIds when the pack is dense.`
 
 export function packModeSystemPrompt(mode: PackAiMode): string {
   switch (mode) {
@@ -132,17 +187,33 @@ export function packModeUserPrompt(
     ctx.candidateNames.length > 0
       ? `Candidates: ${ctx.candidateNames.join(', ')}\n`
       : ''
+  const typeSummary = Object.entries(ctx.claimTypeCounts ?? {})
+    .sort((a, b) => b[1] - a[1])
+    .map(([t, n]) => `${t}:${n}`)
+    .join(', ')
+  const sourceSummary = (ctx.sources ?? []).slice(0, 24).join('; ')
+  const inventory =
+    `Pack inventory: ${ctx.totalClaimCount ?? ctx.claims.length} total claims` +
+    (ctx.contextClaimCount != null && ctx.totalClaimCount != null && ctx.contextClaimCount < ctx.totalClaimCount
+      ? ` (${ctx.contextClaimCount} embedded in this prompt for breadth)`
+      : '') +
+    `\nClaim types: ${typeSummary || '(none)'}` +
+    `\nSources: ${sourceSummary || '(none)'}\n`
   const claimLines = ctx.claims
-    .map((c) => `- ${c.id} [${c.claimType}/${c.source}]: ${c.statement}`)
+    .map((c) => {
+      const quote = c.quote ? ` | quote: ${c.quote}` : ''
+      const url = c.sourceUrl ? ` | url: ${c.sourceUrl}` : ''
+      return `- ${c.id} [${c.claimType}/${c.source}]: ${c.statement}${quote}${url}`
+    })
     .join('\n')
-  const packBlock = `${disease}${cands}Allowlisted claimIds: ${ctx.claimIdAllowlist.join(', ') || '(none)'}\n\nClaims:\n${claimLines || '(no claims)'}`
+  const packBlock = `${disease}${cands}${inventory}Allowlisted claimIds: ${ctx.claimIdAllowlist.join(', ') || '(none)'}\n\nClaims:\n${claimLines || '(no claims)'}`
 
   if (mode === 'pack_custom_prompt') {
     const q = (customQuestion || '').trim() || '(no question provided)'
     return `${packBlock}\n\nUser question:\n${q}`
   }
 
-  return `${packBlock}\n\nMode: ${mode}\nTask: ${packModeTaskLabel(mode)}`
+  return `${packBlock}\n\nMode: ${mode}\nTask: ${packModeTaskLabel(mode)}\nUse multiple claim types and sources when available; cite claimIds. Do not invent clinical conclusions.`
 }
 
 /** Full prompts as sent to the model (for UI preview). */

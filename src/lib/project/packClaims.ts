@@ -217,6 +217,26 @@ function mergeCorePanels(
     relatedMolecules: [...(into.relatedMolecules ?? []), ...(from.relatedMolecules ?? [])],
     diseaseName: into.diseaseName || from.diseaseName,
     landscape: mergeLandscapeBags(into.landscape, from.landscape),
+    // Supporting free-API bags for Pack AI density
+    patents: [...(into.patents ?? []), ...(from.patents ?? [])],
+    nihGrants: [...(into.nihGrants ?? []), ...(from.nihGrants ?? [])],
+    literature: [...(into.literature ?? []), ...(from.literature ?? [])],
+    pubmedArticles: [...(into.pubmedArticles ?? []), ...(from.pubmedArticles ?? [])],
+    openAlexWorks: [...(into.openAlexWorks ?? []), ...(from.openAlexWorks ?? [])],
+    openAireProjects: [...(into.openAireProjects ?? []), ...(from.openAireProjects ?? [])],
+    openAirePublications: [
+      ...(into.openAirePublications ?? []),
+      ...(from.openAirePublications ?? []),
+    ],
+    drugRecalls: [...(into.drugRecalls ?? []), ...(from.drugRecalls ?? [])],
+    chemblIndications: [...(into.chemblIndications ?? []), ...(from.chemblIndications ?? [])],
+    drugGeneInteractions: [
+      ...(into.drugGeneInteractions ?? []),
+      ...(from.drugGeneInteractions ?? []),
+    ],
+    computedProperties: into.computedProperties ?? from.computedProperties ?? null,
+    orangeBookEntries: [...(into.orangeBookEntries ?? []), ...(from.orangeBookEntries ?? [])],
+    drugLabels: [...(into.drugLabels ?? []), ...(from.drugLabels ?? [])],
   }
 }
 

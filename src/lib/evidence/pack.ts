@@ -14,7 +14,13 @@ import type { ScoreRubric } from '@/lib/domain/score'
 import { createDefaultScoreRubric } from '@/lib/domain/score'
 import type { DiscoveryPreferencesSnapshot } from '@/lib/discovery/preferences'
 import { sha256Hex } from '@/lib/domain/sha256'
-import type { ClinicalTrial } from '@/lib/types'
+import type {
+  ClinicalTrial,
+  LiteratureResult,
+  NihGrant,
+  PubMedArticle,
+} from '@/lib/types'
+import type { OpenAlexWorkLike, OrangeBookRowLike } from './extractors/supporting'
 import {
   DEFAULT_CLAIM_TOTAL_CAP,
   claimSourceNames,
@@ -334,12 +340,34 @@ export function corePanelsFromProfileData(
 ): CorePanelEvidenceInput {
   if (!data) return {}
   const clinicalTrials = asArray<ClinicalTrial>(data.clinicalTrials)
+  const nihGrants = asArray<NihGrant>(data.nihGrants)
+  const literature = asArray<LiteratureResult>(data.literature)
+  const pubmedArticles = asArray<PubMedArticle>(data.pubmedArticles)
+  const openAlexWorks = asArray<OpenAlexWorkLike>(data.openAlexWorks)
+  const orangeBookEntries = asArray<OrangeBookRowLike>(data.orangeBookEntries)
   return {
     chemblActivities: asArray(data.chemblActivities),
     chemblMechanisms: asArray(data.chemblMechanisms),
     adverseEvents: asArray(data.adverseEvents),
     clinicalTrials,
     diseaseAssociations: asArray(data.diseaseAssociations),
+    // Supporting free-API bags for denser Pack AI
+    patents: asArray(data.patents),
+    nihGrants,
+    literature,
+    pubmedArticles,
+    openAlexWorks,
+    openAireProjects: asArray(data.openAireProjects),
+    openAirePublications: asArray(data.openAirePublications),
+    drugRecalls: asArray(data.drugRecalls),
+    chemblIndications: asArray(data.chemblIndications),
+    drugGeneInteractions: asArray(data.drugGeneInteractions),
+    computedProperties:
+      data.computedProperties && typeof data.computedProperties === 'object'
+        ? (data.computedProperties as CorePanelEvidenceInput['computedProperties'])
+        : null,
+    orangeBookEntries,
+    drugLabels: asArray(data.drugLabels),
     landscape: {
       moleculeName: typeof data.moleculeName === 'string' ? data.moleculeName : undefined,
       clinicalTrials,
@@ -348,17 +376,17 @@ export function corePanelsFromProfileData(
       euResearchOrgs: asArray(data.euResearchOrgs),
       usHospitals: asArray(data.usHospitals),
       usColleges: asArray(data.usColleges),
-      nihGrants: asArray(data.nihGrants),
-      literature: asArray(data.literature),
-      pubmedArticles: asArray(data.pubmedArticles),
-      openAlexWorks: asArray(data.openAlexWorks),
+      nihGrants,
+      literature,
+      pubmedArticles,
+      openAlexWorks,
       biologicsLicensed: asArray(data.biologicsLicensed),
       purpleBookProducts: asArray(data.purpleBookProducts),
       purpleBookPatents: asArray(data.purpleBookPatents),
       emaBulkMedicines: asArray(data.emaBulkMedicines),
       healthCanadaProducts: asArray(data.healthCanadaProducts),
       emaMedicines: asArray(data.emaMedicines),
-      orangeBookEntries: asArray(data.orangeBookEntries),
+      orangeBookEntries,
       internationalRegulatorLinks: asArray(data.internationalRegulatorLinks),
     },
   }
