@@ -8,6 +8,18 @@ Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI. When
 
 ![BioIntel Explorer homepage](screenshots/homepage.png)
 
+## Table of contents
+
+- [Getting Started](#getting-started)
+- [Built With Claude Code](#built-with-claude-code)
+- [Data Sources (110+ Free Public APIs)](#data-sources-110-free-public-apis)
+  - [Shareable API sources manifest](#shareable-api-sources-manifest) — full name / docs / endpoint list for other apps
+- [Features](#features)
+- [Tech Stack](#tech-stack)
+- [Project Structure](#project-structure)
+- [Recent Changes](#recent-changes)
+- [License](#license)
+
 ## Getting Started
 
 ```bash
@@ -57,6 +69,21 @@ Traffic: browser → same-origin `/api/ai/*` → `https://ollama.com` with the u
 This project was designed and engineered almost entirely by [Claude Code](https://claude.ai/claude-code) (Anthropic's AI coding agent), working in collaboration with a bioengineering domain expert who provided the scientific vision, feature direction, and quality review. Claude Code authored the architecture, all API integrations, UI components, test suite, and documentation — from initial scaffold through 110+ data source integrations across multiple iterative development cycles.
 
 ## Data Sources (110+ Free Public APIs)
+
+### Shareable API sources manifest
+
+Combined free-public API list (name, organization, docs URL, endpoint) for sharing with other apps:
+
+| File | Format |
+|------|--------|
+| [`docs/api-sources-manifest.json`](docs/api-sources-manifest.json) | Machine-readable (prefer the `sources` array) |
+| [`docs/api-sources-manifest.md`](docs/api-sources-manifest.md) | Human-readable tables |
+
+Regenerate after editing `src/lib/panelSources.ts` or `src/lib/analytics/api-meta.ts`:
+
+```bash
+npm run export:api-sources
+```
 
 ### NIH High-Impact (experimental / partial)
 | Source | Status |
@@ -289,6 +316,9 @@ src/
     graph/                       # D3.js network graph
     ui/                          # Shared primitives (Panel with source footer, Card, Table)
   __tests__/                     # Test suites
+docs/
+  api-sources-manifest.json      # Shareable free-API name/docs/endpoint list
+  api-sources-manifest.md        # Human-readable twin (npm run export:api-sources)
 ```
 
 ## Recent Changes
