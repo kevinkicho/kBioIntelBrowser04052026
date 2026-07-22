@@ -47,6 +47,9 @@ export {
   extractClaimsFromProperties,
   extractClaimsFromOrangeBook,
   extractClaimsFromDrugLabels,
+  extractClaimsFromDrugsFda,
+  extractClaimsFromOpenFdaLabelSections,
+  extractClaimsFromNsfAwards,
   PATENTS_SOURCE,
   NIH_REPORTER_SOURCE,
   EUROPEPMC_SOURCE,
@@ -59,6 +62,9 @@ export {
   PUBCHEM_PROPERTIES_SOURCE,
   ORANGE_BOOK_SOURCE,
   OPENFDA_LABELS_SOURCE,
+  DRUGS_FDA_SOURCE,
+  OPENFDA_LABEL_SECTIONS_SOURCE,
+  NSF_AWARDS_SOURCE,
 } from './extractors'
 export type { LandscapeEvidenceInput } from './extractors'
 

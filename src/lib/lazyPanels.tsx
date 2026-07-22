@@ -23,6 +23,24 @@ export const LazyOrangeBookPanel = dynamic(
   { loading: LoadingComponent }
 )
 
+export const LazyDrugsFdaPanel = dynamic(
+  () => import('@/components/profile/DrugsFdaPanel').then((m) => ({ default: m.DrugsFdaPanel })),
+  { loading: LoadingComponent },
+)
+
+export const LazyOpenFdaLabelSectionsPanel = dynamic(
+  () =>
+    import('@/components/profile/OpenFdaLabelSectionsPanel').then((m) => ({
+      default: m.OpenFdaLabelSectionsPanel,
+    })),
+  { loading: LoadingComponent },
+)
+
+export const LazyNsfAwardsPanel = dynamic(
+  () => import('@/components/profile/NsfAwardsPanel').then((m) => ({ default: m.NsfAwardsPanel })),
+  { loading: LoadingComponent },
+)
+
 export const LazyHealthCanadaDpdPanel = dynamic(
   () =>
     import('@/components/profile/HealthCanadaDpdPanel').then((m) => ({

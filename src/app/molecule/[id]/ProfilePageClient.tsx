@@ -1042,6 +1042,20 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'nadac': (panelId, lastFetched) => <LazyPanels.LazyNadacPanel prices={d('drugPrices')} panelId={panelId} lastFetched={lastFetched} />,
       'drug-interactions': (panelId, lastFetched) => <LazyPanels.LazyDrugInteractionsPanel interactions={d('drugInteractions')} panelId={panelId} lastFetched={lastFetched} />,
       'dailymed': (panelId, lastFetched) => <LazyPanels.LazyDailyMedPanel labels={d('drugLabels')} panelId={panelId} lastFetched={lastFetched} />,
+      'drugs-fda': (panelId, lastFetched) => (
+        <LazyPanels.LazyDrugsFdaPanel
+          applications={d('drugsFdaApplications')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
+      'openfda-labels': (panelId, lastFetched) => (
+        <LazyPanels.LazyOpenFdaLabelSectionsPanel
+          labels={d('openFdaLabelSections')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'atc': (panelId, lastFetched) => <LazyPanels.LazyAtcPanel classifications={d('atcClassifications')} panelId={panelId} lastFetched={lastFetched} />,
       'clinical-trials': (panelId, lastFetched) => <LazyPanels.LazyClinicalTrialsPanel trials={d('clinicalTrials')} panelId={panelId} lastFetched={lastFetched} diseaseName={searchParams.get('disease') ?? undefined} />,
       'research-orgs': (panelId, lastFetched) => (
@@ -1115,6 +1129,13 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
       'wikipathways': (panelId, lastFetched) => <LazyPanels.LazyWikiPathwaysPanel pathways={d('wikiPathways')} panelId={panelId} lastFetched={lastFetched} />,
       'pathway-commons': (panelId, lastFetched) => <LazyPanels.LazyPathwayCommonsPanel results={d('pathwayCommonsResults')} panelId={panelId} lastFetched={lastFetched} />,
       'nih-reporter': (panelId, lastFetched) => <LazyPanels.LazyNihReporterPanel grants={d('nihGrants')} panelId={panelId} lastFetched={lastFetched} />,
+      'nsf-awards': (panelId, lastFetched) => (
+        <LazyPanels.LazyNsfAwardsPanel
+          awards={d('nsfAwards')}
+          panelId={panelId}
+          lastFetched={lastFetched}
+        />
+      ),
       'research-orgs-lit': (panelId, lastFetched) => (
         <LazyPanels.LazyResearchOrgsPanel
           orgs={d('researchOrgsLit')}

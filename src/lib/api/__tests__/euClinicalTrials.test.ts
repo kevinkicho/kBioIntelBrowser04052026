@@ -1,4 +1,5 @@
 import {
+  euCtisSearchUrl,
   eudraCtRegisterUrl,
   isEudraCtNumber,
   parseSecondaryTrialIds,
@@ -14,6 +15,12 @@ describe('euClinicalTrials', () => {
     expect(eudraCtRegisterUrl('2019-001458-24')).toMatch(
       /clinicaltrialsregister\.eu.*2019-001458-24/,
     )
+  })
+
+  it('builds CTIS public search URL', () => {
+    const url = euCtisSearchUrl('2019-001458-24')
+    expect(url).toContain('euclinicaltrials.eu/ctis-public/search')
+    expect(url).toContain(encodeURIComponent('2019-001458-24'))
   })
 
   it('parses secondary IDs from CTG', () => {

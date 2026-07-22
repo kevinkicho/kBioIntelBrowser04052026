@@ -21,14 +21,22 @@ import { getDrugCentralEnhanced } from '@/lib/api/drugcentral'
 import { searchGSRS } from '@/lib/api/gsrs'
 import { getPharmGKBData } from '@/lib/api/pharmgkb'
 import { getCPICData } from '@/lib/api/cpic'
+import { getDrugsFdaByName } from '@/lib/api/drugsFda'
+import { getOpenFdaLabelSectionsByName } from '@/lib/api/openFdaLabelSections'
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const searchTerms = [name, ...synonyms.slice(0, 1)]
-  const [companiesNested, ndcProducts, orangeBookEntries, healthCanadaProducts, emaMedicines, biologicsLicensed, purpleBookResult, purpleBookPatentsResult, emaBulkResult, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
+  const [companiesNested, ndcProducts, orangeBookEntries, drugsFdaApplications, openFdaLabelSections, healthCanadaProducts, emaMedicines, biologicsLicensed, purpleBookResult, purpleBookPatentsResult, emaBulkResult, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
     trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
     trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
     trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
+    trackedSafe('drugs-fda', getDrugsFdaByName(queryFor('drugs-fda') || name), []),
+    trackedSafe(
+      'openfda-labels',
+      getOpenFdaLabelSectionsByName(queryFor('openfda-labels') || name),
+      [],
+    ),
     trackedSafe('health-canada-dpd', getHealthCanadaProductsByName(queryFor('health-canada') || name), []),
     trackedSafe('ema-medicines', getEmaMedicinesByName(queryFor('ema-medicines') || name), []),
     trackedSafe(
@@ -76,6 +84,8 @@ export async function fetchPharmaceutical(name: string, synonyms: string[], quer
     companies,
     ndcProducts,
     orangeBookEntries,
+    drugsFdaApplications,
+    openFdaLabelSections,
     healthCanadaProducts,
     emaMedicines,
     biologicsLicensed,

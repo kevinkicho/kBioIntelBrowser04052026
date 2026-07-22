@@ -237,6 +237,15 @@ function mergeCorePanels(
     computedProperties: into.computedProperties ?? from.computedProperties ?? null,
     orangeBookEntries: [...(into.orangeBookEntries ?? []), ...(from.orangeBookEntries ?? [])],
     drugLabels: [...(into.drugLabels ?? []), ...(from.drugLabels ?? [])],
+    drugsFdaApplications: [
+      ...(into.drugsFdaApplications ?? []),
+      ...(from.drugsFdaApplications ?? []),
+    ],
+    openFdaLabelSections: [
+      ...(into.openFdaLabelSections ?? []),
+      ...(from.openFdaLabelSections ?? []),
+    ],
+    nsfAwards: [...(into.nsfAwards ?? []), ...(from.nsfAwards ?? [])],
   }
 }
 

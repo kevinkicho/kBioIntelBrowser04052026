@@ -9,6 +9,24 @@ export const API_METADATA: Record<string, ApiMeta> = {
   openfda: { organization: 'U.S. FDA', description: 'Open data API for FDA drug, device, and food adverse events, recalls, and labeling', apiDocs: 'https://open.fda.gov/api/', apiEndpoint: 'https://api.fda.gov' },
   'fda-ndc': { organization: 'U.S. FDA', description: 'National Drug Code directory via OpenFDA', apiDocs: 'https://open.fda.gov/apis/drug/ndc/', apiEndpoint: 'https://api.fda.gov/drug/ndc.json' },
   orangebook: { organization: 'U.S. FDA', description: 'Approved Drug Products with Therapeutic Equivalence Evaluations (Orange Book)', apiDocs: 'https://open.fda.gov/apis/drug/ndc/', apiEndpoint: 'https://api.fda.gov/drug/ndc.json' },
+  'drugs-fda': {
+    organization: 'U.S. FDA',
+    description: 'openFDA Drugs@FDA — NDA/ANDA/BLA applications and products (free public)',
+    apiDocs: 'https://open.fda.gov/apis/drug/drugsfda/',
+    apiEndpoint: 'https://api.fda.gov/drug/drugsfda.json',
+  },
+  'openfda-labels': {
+    organization: 'U.S. FDA',
+    description: 'openFDA drug/label structured SPL sections (boxed warning, AEs, interactions)',
+    apiDocs: 'https://open.fda.gov/apis/drug/label/',
+    apiEndpoint: 'https://api.fda.gov/drug/label.json',
+  },
+  'nsf-awards': {
+    organization: 'U.S. National Science Foundation',
+    description: 'NSF Awards Search API — extramural awards by keyword (no key for basic search)',
+    apiDocs: 'https://www.research.gov/common/webapi/awardapisearch-v1.htm',
+    apiEndpoint: 'https://api.nsf.gov/services/v2/awards.json',
+  },
   'biologics-licensed': {
     organization: 'U.S. FDA (openFDA)',
     description:

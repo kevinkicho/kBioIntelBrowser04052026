@@ -368,6 +368,9 @@ export function corePanelsFromProfileData(
         : null,
     orangeBookEntries,
     drugLabels: asArray(data.drugLabels),
+    drugsFdaApplications: asArray(data.drugsFdaApplications),
+    openFdaLabelSections: asArray(data.openFdaLabelSections),
+    nsfAwards: asArray(data.nsfAwards),
     landscape: {
       moleculeName: typeof data.moleculeName === 'string' ? data.moleculeName : undefined,
       clinicalTrials,

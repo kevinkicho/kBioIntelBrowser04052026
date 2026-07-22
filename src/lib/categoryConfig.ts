@@ -64,6 +64,20 @@ export const CATEGORIES: CategoryDef[] = [
       { id: 'ndc', title: 'NDC', propKey: 'ndcProducts', isNullable: false, tier: 'supporting' },
       { id: 'orange-book', title: 'OrangeBook', propKey: 'orangeBookEntries', isNullable: false, tier: 'supporting' },
       {
+        id: 'drugs-fda',
+        title: 'DrugsFda',
+        propKey: 'drugsFdaApplications',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
+        id: 'openfda-labels',
+        title: 'OpenFdaLabels',
+        propKey: 'openFdaLabelSections',
+        isNullable: true,
+        tier: 'supporting',
+      },
+      {
         id: 'health-canada',
         title: 'HealthCanadaDPD',
         propKey: 'healthCanadaProducts',
@@ -308,6 +322,13 @@ export const CATEGORIES: CategoryDef[] = [
     icon: '📚',
     panels: [
       { id: 'nih-reporter', title: 'NIHReporter', propKey: 'nihGrants', isNullable: false, tier: 'supporting' },
+      {
+        id: 'nsf-awards',
+        title: 'NsfAwards',
+        propKey: 'nsfAwards',
+        isNullable: true,
+        tier: 'supporting',
+      },
       {
         id: 'research-orgs-lit',
         title: 'ResearchOrgsGrants',

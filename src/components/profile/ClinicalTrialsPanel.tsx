@@ -14,7 +14,7 @@ import {
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emitProductEvent } from '@/lib/productEvents'
-import { eudraCtRegisterUrl } from '@/lib/euClinicalTrials'
+import { eudraCtRegisterUrl, euCtisSearchUrl } from '@/lib/euClinicalTrials'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const STATUS_BADGE: Record<string, string> = {
@@ -367,23 +367,42 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
                     )}
                     {(trial.eudraCtNumbers ?? []).map((eu) => {
                       const euHref = eudraCtRegisterUrl(eu)
+                      const ctisHref = euCtisSearchUrl(eu)
                       return (
-                        <StyledTooltip key={eu} content="EU Clinical Trials Register (EudraCT)">
-                          <a
-                            href={euHref}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="inline-block text-[10px] text-cyan-400 hover:underline"
-                            onClick={() =>
-                              onDeepLinkClick('other', euHref, {
-                                panelId: 'clinical-trials',
-                                label: eu,
-                              })
-                            }
-                          >
-                            EU CTR {eu}
-                          </a>
-                        </StyledTooltip>
+                        <span key={eu} className="inline-flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                          <StyledTooltip content="EU Clinical Trials Register (EudraCT classic)">
+                            <a
+                              href={euHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-[10px] text-cyan-400 hover:underline"
+                              onClick={() =>
+                                onDeepLinkClick('other', euHref, {
+                                  panelId: 'clinical-trials',
+                                  label: eu,
+                                })
+                              }
+                            >
+                              EU CTR {eu}
+                            </a>
+                          </StyledTooltip>
+                          <StyledTooltip content="CTIS public search (newer EU portal)">
+                            <a
+                              href={ctisHref}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="inline-block text-[10px] text-teal-400/90 hover:underline"
+                              onClick={() =>
+                                onDeepLinkClick('other', ctisHref, {
+                                  panelId: 'clinical-trials',
+                                  label: `CTIS ${eu}`,
+                                })
+                              }
+                            >
+                              CTIS
+                            </a>
+                          </StyledTooltip>
+                        </span>
                       )
                     })}
                   </div>

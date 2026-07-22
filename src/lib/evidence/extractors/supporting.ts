@@ -31,6 +31,9 @@ export const DGIDB_SOURCE = 'DGIdb'
 export const PUBCHEM_PROPERTIES_SOURCE = 'PubChem computed properties'
 export const ORANGE_BOOK_SOURCE = 'Orange Book (openFDA)'
 export const OPENFDA_LABELS_SOURCE = 'DailyMed / openFDA labels'
+export const DRUGS_FDA_SOURCE = 'openFDA Drugs@FDA'
+export const OPENFDA_LABEL_SECTIONS_SOURCE = 'openFDA label sections'
+export const NSF_AWARDS_SOURCE = 'NSF Awards'
 
 /** Loose orange-book row from openFDA client. */
 export interface OrangeBookRowLike {
@@ -408,6 +411,127 @@ export function extractClaimsFromDrugLabels(
           (r.setId
             ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${encodeURIComponent(r.setId)}`
             : 'https://dailymed.nlm.nih.gov/'),
+      }),
+    )
+  }
+  return claims
+}
+
+/** Drugs@FDA application rows */
+export interface DrugsFdaRowLike {
+  applicationNumber?: string
+  sponsorName?: string
+  brandName?: string
+  genericName?: string
+  submissionType?: string
+  drugsAtFdaUrl?: string
+}
+
+export function extractClaimsFromDrugsFda(
+  rows: readonly DrugsFdaRowLike[] | null | undefined,
+  ctx: ClaimExtractorContext,
+): EvidenceClaim[] {
+  if (!rows?.length) return []
+  const claims: EvidenceClaim[] = []
+  for (const r of applyLimit([...rows], ctx.limit ?? 10)) {
+    const key = r.applicationNumber || r.brandName
+    if (!key) continue
+    const drug = ctx.moleculeName?.trim() || r.brandName || r.genericName || 'product'
+    claims.push(
+      buildClaim({
+        claimType: 'other',
+        source: DRUGS_FDA_SOURCE,
+        naturalKey: String(key),
+        statement: `Drugs@FDA application ${r.applicationNumber || key} for ${drug}${r.sponsorName ? ` · sponsor ${r.sponsorName}` : ''}${r.submissionType ? ` · ${r.submissionType}` : ''}${r.brandName ? ` · brand ${r.brandName}` : ''}. Registry fact, not treatment advice.`,
+        ctx,
+        sourceUrl:
+          r.drugsAtFdaUrl ||
+          'https://www.accessdata.fda.gov/scripts/cder/daf/',
+      }),
+    )
+  }
+  return claims
+}
+
+/** openFDA label section snippets */
+export interface OpenFdaLabelSectionClaimLike {
+  id?: string
+  brandName?: string
+  genericName?: string
+  setId?: string
+  dailyMedUrl?: string | null
+  sections?: Array<{ key?: string; label?: string; text?: string }>
+}
+
+export function extractClaimsFromOpenFdaLabelSections(
+  rows: readonly OpenFdaLabelSectionClaimLike[] | null | undefined,
+  ctx: ClaimExtractorContext,
+): EvidenceClaim[] {
+  if (!rows?.length) return []
+  const claims: EvidenceClaim[] = []
+  const maxSections = ctx.limit ?? 12
+  let n = 0
+  for (const r of rows) {
+    const drug = ctx.moleculeName?.trim() || r.brandName || r.genericName || 'product'
+    for (const s of r.sections ?? []) {
+      if (n >= maxSections) return claims
+      const text = (s.text || '').trim()
+      if (!text) continue
+      const key = `${r.id || r.setId || r.brandName}|${s.key || s.label}`
+      const isSafety =
+        s.key === 'boxed_warning' ||
+        s.key === 'adverse_reactions' ||
+        s.key === 'warnings_and_cautions' ||
+        s.key === 'contraindications' ||
+        s.key === 'drug_interactions'
+      claims.push(
+        buildClaim({
+          claimType: isSafety ? 'safety' : 'other',
+          source: OPENFDA_LABEL_SECTIONS_SOURCE,
+          naturalKey: key,
+          statement: `openFDA label section “${s.label || s.key || 'section'}” for ${drug}: ${text.slice(0, 280)}${text.length > 280 ? '…' : ''} — label text only, not incidence.`,
+          ctx,
+          sourceUrl:
+            r.dailyMedUrl ||
+            (r.setId
+              ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${encodeURIComponent(r.setId)}`
+              : 'https://open.fda.gov/apis/drug/label/'),
+          quote: text.slice(0, 200),
+        }),
+      )
+      n++
+    }
+  }
+  return claims
+}
+
+export interface NsfAwardRowLike {
+  id?: string
+  title?: string
+  piName?: string
+  organization?: string
+  amount?: number | null
+  awardUrl?: string
+}
+
+export function extractClaimsFromNsfAwards(
+  rows: readonly NsfAwardRowLike[] | null | undefined,
+  ctx: ClaimExtractorContext,
+): EvidenceClaim[] {
+  if (!rows?.length) return []
+  const claims: EvidenceClaim[] = []
+  for (const r of applyLimit([...rows], ctx.limit ?? 8)) {
+    const key = r.id || r.title
+    if (!key) continue
+    const drug = ctx.moleculeName?.trim() || 'topic'
+    claims.push(
+      buildClaim({
+        claimType: 'literature',
+        source: NSF_AWARDS_SOURCE,
+        naturalKey: String(key),
+        statement: `NSF award related to ${drug}: ${r.title || key}${r.organization ? ` · ${r.organization}` : ''}${r.piName ? ` · PI ${r.piName}` : ''}${r.amount != null ? ` · ~$${Math.round(r.amount).toLocaleString()}` : ''}. Funding context only.`,
+        ctx,
+        sourceUrl: r.awardUrl || 'https://www.nsf.gov/awardsearch/',
       }),
     )
   }

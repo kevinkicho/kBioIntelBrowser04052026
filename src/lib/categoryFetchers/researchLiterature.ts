@@ -4,6 +4,7 @@ import { getApiParamNumber } from '@/lib/resolveApiQuery'
 
 import { getLiteratureByName } from '@/lib/api/europepmc'
 import { getNihGrantsByName } from '@/lib/api/nihreporter'
+import { getNsfAwardsByKeyword } from '@/lib/api/nsfAwards'
 import {
   getEuResearchProjectsByName,
   getOpenAirePublicationsByName,
@@ -22,9 +23,10 @@ import { searchEuResearchOrgsPack } from '@/lib/api/euResearchOrgs'
 import { buildEvidenceNeighborhood } from '@/lib/evidenceNeighborhood'
 
 export async function fetchResearchLiterature(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
-  const [literature, nihGrants, openAireProjects, openAirePublications, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
+  const [literature, nihGrants, nsfAwards, openAireProjects, openAirePublications, patents, secFilings, semanticPapers, openAlexWorks, pubmedArticles, crossRefWorks, arxivPapers] = await Promise.all([
     trackedSafe('europepmc', getLiteratureByName(queryFor('literature')), []),
     trackedSafe('nihreporter', getNihGrantsByName(queryFor('nih-reporter')), []),
+    trackedSafe('nsf-awards', getNsfAwardsByKeyword(queryFor('nsf-awards') || name), []),
     trackedSafe('openaire', getEuResearchProjectsByName(queryFor('openaire-projects') || name), []),
     trackedSafe(
       'openaire-pubs',
@@ -94,6 +96,7 @@ export async function fetchResearchLiterature(name: string, queryFor: (s: string
   return {
     literature,
     nihGrants,
+    nsfAwards,
     openAireProjects,
     openAirePublications,
     patents,

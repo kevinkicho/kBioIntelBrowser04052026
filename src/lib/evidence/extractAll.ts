@@ -43,10 +43,16 @@ import {
   extractClaimsFromPubMed,
   extractClaimsFromRecalls,
   extractClaimsFromRelatedMolecules,
+  extractClaimsFromDrugsFda,
+  extractClaimsFromOpenFdaLabelSections,
+  extractClaimsFromNsfAwards,
   type DrugLabelRowLike,
+  type DrugsFdaRowLike,
   type LandscapeEvidenceInput,
   type OpenAlexWorkLike,
+  type OpenFdaLabelSectionClaimLike,
   type OrangeBookRowLike,
+  type NsfAwardRowLike,
 } from './extractors'
 import type { DedupedDiseaseMolecule, DiseaseMolecule } from '@/lib/diseaseSearch'
 
@@ -86,6 +92,9 @@ export interface CorePanelEvidenceInput {
   computedProperties?: ComputedProperties | null
   orangeBookEntries?: readonly OrangeBookRowLike[] | null
   drugLabels?: readonly DrugLabelRowLike[] | null
+  drugsFdaApplications?: readonly DrugsFdaRowLike[] | null
+  openFdaLabelSections?: readonly OpenFdaLabelSectionClaimLike[] | null
+  nsfAwards?: readonly NsfAwardRowLike[] | null
 }
 
 export interface ExtractAllOptions extends ClaimExtractorContext {
@@ -234,6 +243,15 @@ export function extractClaimsFromCorePanels(
           withLimit(ctx, SUPPORTING_LIMIT),
         ),
         ...extractClaimsFromDrugLabels(panels.drugLabels, withLimit(ctx, 6)),
+        ...extractClaimsFromDrugsFda(
+          panels.drugsFdaApplications,
+          withLimit(ctx, SUPPORTING_LIMIT),
+        ),
+        ...extractClaimsFromOpenFdaLabelSections(
+          panels.openFdaLabelSections,
+          withLimit(ctx, 12),
+        ),
+        ...extractClaimsFromNsfAwards(panels.nsfAwards, withLimit(ctx, SUPPORTING_LIMIT)),
       ]
     : []
 
