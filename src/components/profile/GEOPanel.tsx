@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { GEODataset } from '@/lib/types'
@@ -28,7 +29,7 @@ function GEOItem({ dataset }: { dataset: GEODataset }) {
       </div>
       <p className="text-xs text-slate-500 mt-1">{dataset.organism}</p>
       {dataset.summary && (
-        <p className="text-xs text-slate-600 mt-2 line-clamp-2">{dataset.summary}</p>
+        <DescriptionTip text={dataset.summary} className="mt-2" label="Summary" />
       )}
       <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-400">
         <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{dataset.platformType}</span>

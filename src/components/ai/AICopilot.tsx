@@ -119,7 +119,8 @@ function AICopilotInner({
               ? 'Loading molecule data — copilot ready in a moment…'
               : 'Open BioIntel Copilot'
           }
-          className={`fixed bottom-6 left-6 z-50 w-14 h-14 rounded-full text-white shadow-lg shadow-indigo-900/40 flex items-center justify-center transition-all group ${
+          data-testid="ai-copilot-fab"
+          className={`fixed bottom-6 right-6 z-[60] w-14 h-14 rounded-full text-white shadow-lg shadow-indigo-900/40 flex items-center justify-center transition-all group ${
             fabDisabled
               ? 'bg-slate-700 opacity-50 cursor-not-allowed'
               : 'bg-gradient-to-br from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 hover:scale-105'

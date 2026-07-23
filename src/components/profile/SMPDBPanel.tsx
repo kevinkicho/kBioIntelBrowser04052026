@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { SMPDBPathway } from '@/lib/types'
@@ -33,7 +34,7 @@ function PathwayItem({ pathway }: { pathway: SMPDBPathway }) {
         </span>
       </div>
       {pathway.description && (
-        <p className="text-xs text-slate-400 mt-2 line-clamp-2">{pathway.description}</p>
+        <DescriptionTip text={pathway.description} className="mt-2" />
       )}
       <p className="text-xs text-slate-500 mt-1">
         Organism: {pathway.organism}

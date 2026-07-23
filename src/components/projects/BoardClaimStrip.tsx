@@ -6,6 +6,7 @@
  */
 
 import type { MoleculeCandidate, Project } from '@/lib/domain'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 function claimHints(c: MoleculeCandidate): string[] {
   const hints: string[] = []
@@ -31,13 +32,26 @@ export function BoardClaimStrip({ project }: { project: Project }) {
       className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 p-3"
       data-testid="board-claim-strip"
     >
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">
-        Evidence strip (board)
-      </p>
-      <p className="text-[10px] text-slate-600 mb-2">
-        Origins and source breadth already on candidates — open Pack for citable claims. Prefer
-        promote set when available.
-      </p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+            Evidence strip (board)
+          </p>
+          <HelperTip
+            content="Origins and source breadth already on candidates — open Pack below for citable claims. Prefer the promote set when available. Of-record scores stay free-API deterministic."
+            label="About board evidence strip"
+            testId="board-claim-strip-help"
+          />
+        </div>
+        {promote.length > 0 && (
+          <span
+            className="rounded-full border border-emerald-800/40 bg-emerald-950/30 px-2 py-0.5 text-[10px] text-emerald-300"
+            data-testid="board-claim-strip-promote-count"
+          >
+            {promote.length} promote → pack
+          </span>
+        )}
+      </div>
       <div className="space-y-2">
         {sample.map((c) => {
           const hints = claimHints(c)
@@ -66,6 +80,13 @@ export function BoardClaimStrip({ project }: { project: Project }) {
           )
         })}
       </div>
+      {promote.length > 0 && (
+        <p className="mt-2 text-[10px] text-slate-500">
+          Next:{' '}
+          <span className="text-emerald-400/90">build evidence pack</span> for claim-rich export /
+          RH seed (below).
+        </p>
+      )}
     </div>
   )
 }

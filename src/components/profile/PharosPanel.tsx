@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PharosTarget } from '@/lib/types'
@@ -66,7 +67,7 @@ export const PharosPanel = memo(function PharosPanel({ targets, panelId, lastFet
               </div>
               <p className="text-sm font-medium text-slate-200 mt-1">{target.name}</p>
               {target.description && (
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{target.description}</p>
+                <DescriptionTip text={target.description} className="mt-1" />
               )}
               {target.novelty && target.novelty > 0 && (
                 <p className="text-xs text-slate-500 mt-1">Novelty: {target.novelty.toFixed(1)}</p>

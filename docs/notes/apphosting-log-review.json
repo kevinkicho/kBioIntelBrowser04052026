@@ -1,0 +1,76 @@
+{
+  "pulledAt": "2026-07-18T02:43:12.885Z",
+  "counts": {
+    "http4xxPlus": 5,
+    "severityWarnPlus": 5,
+    "recent3d": 300
+  },
+  "httpByStatus": {
+    "502": 5
+  },
+  "httpByPath": {
+    "502 GET /api/molecule/N": 5
+  },
+  "severitySamples": [
+    {
+      "ts": "2026-07-17T07:41:12.486311Z",
+      "severity": "ERROR",
+      "msg": "GET 502 https://biointel-888935385467.us-east4.run.app/api/molecule/2244"
+    },
+    {
+      "ts": "2026-07-17T07:33:39.306368Z",
+      "severity": "ERROR",
+      "msg": "GET 502 https://biointel-888935385467.us-east4.run.app/api/molecule/2244"
+    },
+    {
+      "ts": "2026-07-17T07:24:41.987050Z",
+      "severity": "ERROR",
+      "msg": "GET 502 https://biointel-888935385467.us-east4.run.app/api/molecule/2244"
+    },
+    {
+      "ts": "2026-07-17T07:15:28.759935Z",
+      "severity": "ERROR",
+      "msg": "GET 502 https://biointel-888935385467.us-east4.run.app/api/molecule/2244"
+    },
+    {
+      "ts": "2026-07-17T07:15:17.437609Z",
+      "severity": "ERROR",
+      "msg": "GET 502 https://biointel-888935385467.us-east4.run.app/api/molecule/2244"
+    }
+  ],
+  "severityPatterns": {
+    "ERROR|GET N URL": 5
+  },
+  "recentHttpByStatus": {
+    "200": 212,
+    "304": 16
+  },
+  "recentAppErrorText": {},
+  "recentLatencySlow": [
+    {
+      "ts": "2026-07-18T01:54:46.956355Z",
+      "status": 200,
+      "latency": "8.110953s",
+      "path": "/api/molecule/N/category/CAT"
+    },
+    {
+      "ts": "2026-07-18T01:54:32.920809Z",
+      "status": 200,
+      "latency": "8.190432s",
+      "path": "/api/molecule/N/category/CAT"
+    }
+  ],
+  "httpByPathTop": [
+    [
+      "502 GET /api/molecule/N",
+      5
+    ]
+  ],
+  "severityPatternsTop": [
+    [
+      "ERROR|GET N URL",
+      5
+    ]
+  ],
+  "recentAppErrorTextTop": []
+}

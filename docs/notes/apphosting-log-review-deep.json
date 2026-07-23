@@ -1,0 +1,55 @@
+{
+  "http502": [
+    {
+      "ts": "2026-07-17T07:41:12.486311Z",
+      "url": "https://biointel-888935385467.us-east4.run.app/api/molecule/2244",
+      "lat": "1.173272s"
+    },
+    {
+      "ts": "2026-07-17T07:33:39.306368Z",
+      "url": "https://biointel-888935385467.us-east4.run.app/api/molecule/2244",
+      "lat": "1.129377s"
+    },
+    {
+      "ts": "2026-07-17T07:24:41.987050Z",
+      "url": "https://biointel-888935385467.us-east4.run.app/api/molecule/2244",
+      "lat": "1.306357s"
+    },
+    {
+      "ts": "2026-07-17T07:15:28.759935Z",
+      "url": "https://biointel-888935385467.us-east4.run.app/api/molecule/2244",
+      "lat": "0.069921s"
+    },
+    {
+      "ts": "2026-07-17T07:15:17.437609Z",
+      "url": "https://biointel-888935385467.us-east4.run.app/api/molecule/2244",
+      "lat": "0.060545s"
+    }
+  ],
+  "textBuckets": [
+    [
+      "[ai] Ollama not available: fetch failed",
+      50
+    ],
+    [
+      "[ai/health] Ollama at URL unavailable — Cannot connect to Ollama (cloud fallback also failed: Cannot connect to Ollama)",
+      17
+    ],
+    [
+      "[ai] Ollama not available at URL : fetch failed",
+      4
+    ]
+  ],
+  "category": {
+    "count": 30,
+    "statusCat": {
+      "200": 30
+    },
+    "latBuckets": {
+      "under2s": 15,
+      "s2to8": 11,
+      "s8to20": 4,
+      "over20": 0
+    }
+  }
+}

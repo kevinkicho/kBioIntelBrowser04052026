@@ -11,6 +11,8 @@ import {
   type StyledTooltipAlign,
   type StyledTooltipSide,
 } from '@/components/ui/StyledTooltip'
+import { useUiDensity } from '@/hooks/useUiDensity'
+import { shortPreview } from '@/lib/uiDensity'
 
 export interface HelperTipProps {
   /** Helper / disclaimer text (string or rich node). Empty → render nothing. */
@@ -56,7 +58,8 @@ export function HelperTip({
       {children ?? (
         <button
           type="button"
-          className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-slate-600/80 bg-slate-800/80 text-[9px] font-semibold leading-none text-slate-400 hover:border-slate-500 hover:text-slate-200 focus:outline-none focus-visible:ring-1 focus-visible:ring-indigo-500 cursor-help"
+          tabIndex={0}
+          className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-slate-600/80 bg-slate-800/80 text-[9px] font-semibold leading-none text-slate-400 hover:border-slate-500 hover:text-slate-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900 cursor-help"
           aria-label={label}
           data-testid={`${testId}-trigger`}
         >
@@ -75,10 +78,16 @@ export interface DescriptionTipProps {
   className?: string
   testId?: string
   maxWidth?: string
+  /**
+   * When true (default), comfortable UI density shows a one-line preview
+   * under the chip; dense mode is label + (i) only.
+   */
+  showPreview?: boolean
 }
 
 /**
- * Replace always-visible line-clamped descriptions with a compact “Description” chip + tooltip.
+ * Compact label + (i) with full text in tooltip.
+ * Comfortable density: optional short preview line for scannability.
  */
 export function DescriptionTip({
   text,
@@ -86,21 +95,43 @@ export function DescriptionTip({
   className = 'mt-0.5',
   testId = 'description-tip',
   maxWidth = '20rem',
+  showPreview = true,
 }: DescriptionTipProps) {
   const t = (text || '').trim()
+  // Hook must run unconditionally (Rules of Hooks)
+  const { isComfortable } = useUiDensity()
   if (!t) return null
+  const preview =
+    showPreview && isComfortable ? shortPreview(t, 140) : null
+
   return (
-    <HelperTip content={t} label={label} className={className} testId={testId} maxWidth={maxWidth}>
-      <span className="inline-flex cursor-help items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300">
-        {label}
-        <span
-          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-600/80 text-[9px] font-semibold leading-none"
-          aria-hidden
+    <span className={`inline-flex max-w-full flex-col gap-0.5 ${className}`}>
+      <HelperTip content={t} label={label} testId={testId} maxWidth={maxWidth}>
+        <button
+          type="button"
+          tabIndex={0}
+          className="inline-flex max-w-full cursor-help items-center gap-1 rounded text-left text-[10px] text-slate-500 hover:text-slate-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900"
+          aria-label={`${label}: ${t.slice(0, 160)}`}
+          data-testid={`${testId}-trigger`}
         >
-          i
+          <span className="font-medium text-slate-400">{label}</span>
+          <span
+            className="inline-flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border border-slate-600/80 text-[9px] font-semibold leading-none"
+            aria-hidden
+          >
+            i
+          </span>
+        </button>
+      </HelperTip>
+      {preview && (
+        <span
+          className="line-clamp-1 max-w-md text-[10px] leading-snug text-slate-600"
+          data-testid={`${testId}-preview`}
+        >
+          {preview}
         </span>
-      </span>
-    </HelperTip>
+      )}
+    </span>
   )
 }
 
@@ -112,15 +143,17 @@ export interface StatementTipProps {
   className?: string
   testId?: string
   maxWidth?: string
+  showPreview?: boolean
 }
 
-/** Claim / narrative statement — title chip only; full text on hover. */
+/** Claim / narrative — label + optional comfortable preview; full text on focus/hover. */
 export function StatementTip({
   statement,
   label = 'Statement',
   className = 'mt-0.5',
   testId = 'statement-tip',
   maxWidth = '22rem',
+  showPreview = true,
 }: StatementTipProps) {
   return (
     <DescriptionTip
@@ -129,6 +162,7 @@ export function StatementTip({
       className={className}
       testId={testId}
       maxWidth={maxWidth}
+      showPreview={showPreview}
     />
   )
 }
@@ -172,15 +206,18 @@ export function EmptyStateTip({
   }
   return (
     <HelperTip content={msg || children} label={badge} className={className} testId={testId}>
-      <span
-        className={`inline-flex cursor-help items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] ${toneClass}`}
+      <button
+        type="button"
+        tabIndex={0}
+        className={`inline-flex cursor-help items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-1 focus-visible:ring-offset-slate-900 ${toneClass}`}
         data-testid={`${testId}-badge`}
+        aria-label={`${badge}: ${typeof msg === 'string' ? msg : badge}`}
       >
         {badge}
         <span className="text-[9px] opacity-70" aria-hidden>
           i
         </span>
-      </span>
+      </button>
     </HelperTip>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { PRIDEProject } from '@/lib/types'
@@ -26,7 +27,7 @@ function ProjectItem({ project }: { project: PRIDEProject }) {
         <p className="text-xs text-slate-500 mt-1">{project.species}</p>
       )}
       {project.description && (
-        <p className="text-xs text-slate-600 mt-2 line-clamp-2">{project.description}</p>
+        <DescriptionTip text={project.description} className="mt-2" />
       )}
       <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-400">
         {project.numProteins > 0 && (

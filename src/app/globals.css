@@ -7,7 +7,8 @@
   --foreground: #e2e8f0;
   /* AppHeader outer height (h-12). Secondary stickies use top-[var(--app-header-height)]. */
   --app-header-height: 3rem;
-  /* Search history sidebar (expanded). Collapsed uses 2.5rem via utility pl-10. */
+  /* Search history sidebar — set live by AppShell (2.5rem collapsed / 18rem expanded). */
+  --app-sidebar-width: 2.5rem;
   --search-history-sidebar-width: 18rem;
   /* Main content width — prefer information density over large gutters */
   --page-canvas-max: 1800px;
@@ -16,17 +17,23 @@
 @layer components {
   /**
    * Full main-canvas shell for product pages (projects, discover, orgs, AI history, …).
-   * Tight horizontal padding; wide max-width so lists/tables can use the screen.
+   * Centered within the area to the right of the sidebar (shell already pads left).
    */
   .page-canvas {
     @apply mx-auto w-full px-2 py-3 sm:px-3 lg:px-4;
-    max-width: var(--page-canvas-max);
+    max-width: min(var(--page-canvas-max), 100%);
   }
 
   /** Slightly denser vertical padding for secondary pages */
   .page-canvas-tight {
     @apply mx-auto w-full px-2 py-2 sm:px-3 lg:px-4;
-    max-width: var(--page-canvas-max);
+    max-width: min(var(--page-canvas-max), 100%);
+  }
+
+  /** Header inner row: same horizontal rhythm as page-canvas inside the offset shell */
+  .app-header-inner {
+    @apply mx-auto flex h-[var(--app-header-height)] w-full items-center justify-between gap-2 px-2 sm:gap-3 sm:px-3 lg:px-4;
+    max-width: min(var(--page-canvas-max), 100%);
   }
 }
 

@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { MetaboLightsStudy, MetaboLightsMetabolite } from '@/lib/types'
@@ -19,7 +20,7 @@ function StudyItem({ study }: { study: MetaboLightsStudy }) {
       </div>
       <h4 className="font-semibold text-slate-100 text-sm mt-2 line-clamp-2">{study.title}</h4>
       {study.description && (
-        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{study.description}</p>
+        <DescriptionTip text={study.description} className="mt-1" />
       )}
       <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-400">
         {study.organism && (

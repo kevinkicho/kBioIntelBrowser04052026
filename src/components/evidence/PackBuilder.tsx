@@ -359,16 +359,30 @@ export function PackBuilder({
 
       {densityWarnings.length > 0 && (
         <div
-          className="mb-3 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-200/90"
+          className="mb-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-800/40 bg-amber-950/20 px-3 py-2 text-[11px] text-amber-200/90"
           data-testid="pack-density-warnings"
           role="status"
         >
-          <div className="font-medium text-amber-100">Pack density notes</div>
-          <ul className="mt-1 list-inside list-disc space-y-0.5 text-amber-200/80">
-            {densityWarnings.slice(0, 8).map((w) => (
-              <li key={w}>{w}</li>
-            ))}
-          </ul>
+          <span className="font-medium text-amber-100">Pack density</span>
+          <HelperTip
+            content={densityWarnings.slice(0, 12).join('\n\n')}
+            label={`${densityWarnings.length} note${densityWarnings.length === 1 ? '' : 's'}`}
+            testId="pack-density-warnings-help"
+            maxWidth="22rem"
+          >
+            <button
+              type="button"
+              tabIndex={0}
+              className="inline-flex cursor-help items-center gap-1 rounded-full border border-amber-800/50 bg-amber-950/40 px-2 py-0.5 text-[10px] text-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              aria-label={`Pack density notes: ${densityWarnings.join('; ')}`}
+            >
+              {densityWarnings.length} note{densityWarnings.length === 1 ? '' : 's'}
+              <span aria-hidden>i</span>
+            </button>
+          </HelperTip>
+          <span className="text-[10px] text-amber-200/70">
+            Prefer promote set · Core panels for citable claims
+          </span>
         </div>
       )}
 

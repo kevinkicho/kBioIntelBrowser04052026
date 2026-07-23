@@ -37,8 +37,12 @@ export function AppHeader() {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0f1117]/90 backdrop-blur-md">
-      <div className="mx-auto flex h-[var(--app-header-height)] w-full max-w-[var(--page-canvas-max)] items-center justify-between gap-2 px-2 sm:gap-3 sm:px-3 lg:px-4">
+    <header
+      className="sticky top-0 z-40 border-b border-slate-800/80 bg-[#0f1117]/90 backdrop-blur-md transition-[padding] duration-200"
+      style={{ paddingLeft: 'var(--app-sidebar-width, 2.5rem)' }}
+      data-testid="app-header"
+    >
+      <div className="app-header-inner">
         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
           <Link
             href="/"

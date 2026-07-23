@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { DrugInteraction } from '@/lib/types'
@@ -74,7 +75,7 @@ export const DrugInteractionsPanel = memo(function DrugInteractionsPanel({ inter
                   {interaction.severity}
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-1 line-clamp-2">{interaction.description}</p>
+              <DescriptionTip text={interaction.description} className="mt-1" />
             </div>
           )}
         />

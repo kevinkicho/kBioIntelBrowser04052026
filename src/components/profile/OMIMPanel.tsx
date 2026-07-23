@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useMemo } from 'react'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OMIMEntry } from '@/lib/types'
@@ -108,7 +109,7 @@ export const OMIMPanel = memo(function OMIMPanel({ entries, panelId, lastFetched
                   </div>
 
                   {entry.description && (
-                    <p className="text-xs text-slate-400 mt-1 line-clamp-2">{entry.description}</p>
+                    <DescriptionTip text={entry.description} className="mt-1" />
                   )}
 
                   {entry.geneSymbols && entry.geneSymbols.length > 0 && (

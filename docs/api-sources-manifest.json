@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "title": "BioIntel free public API sources",
   "productLaw": "Free public APIs only. Evidence-first; not regulatory decision support. Endpoints may require optional free keys (e.g. openFDA rate limit, College Scorecard DEMO_KEY).",
-  "generatedAt": "2026-07-22T18:35:01.362Z",
+  "generatedAt": "2026-07-23T16:38:11.411Z",
   "sourceOfTruth": [
     "src/lib/panelSources.ts",
     "src/lib/analytics/api-meta.ts"

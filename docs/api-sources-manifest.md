@@ -17,7 +17,7 @@ Regenerate after editing the TS catalogs:
 node scripts/export-api-sources-manifest.js
 ```
 
-Generated: `2026-07-22T18:35:01.362Z`
+Generated: `2026-07-23T16:38:11.411Z`
 
 Counts: **131** unique sources · **122** panels · **13** meta-only · **120** API_METADATA keys.
 

@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { KEGGPathway, KEGGCompound, KEGGDrug } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -27,9 +28,7 @@ function PathwayItem({ pathway }: { pathway: KEGGPathway }) {
           </span>
         )}
       </div>
-      {pathway.description && (
-        <p className="text-xs text-slate-500 mt-1 line-clamp-2">{pathway.description}</p>
-      )}
+      <DescriptionTip text={pathway.description} className="mt-1" />
       <div className="flex flex-wrap gap-2 mt-2 text-xs text-slate-400">
         {pathway.compounds.length > 0 && (
           <span className="bg-slate-700/50 px-1.5 py-0.5 rounded">{pathway.compounds.length} compounds</span>
