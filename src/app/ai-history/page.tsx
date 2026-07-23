@@ -22,6 +22,7 @@ import {
   formatAiGenerationPreview,
 } from '@/lib/ai/formatAiGeneration'
 import { clearAiHistoryLocal } from '@/lib/ai/aiHistoryIdb'
+import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const KINDS: Array<AiDataKind | 'all'> = [
@@ -230,32 +231,22 @@ export default function AiHistoryPage() {
       <div className="page-canvas-tight">
         <header className="mb-3 flex flex-col gap-2 border-b border-slate-800/80 pb-3 lg:flex-row lg:items-end lg:justify-between">
           <div className="min-w-0">
-            <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">
-              AI generation history
-            </h1>
-            <p className="mt-0.5 max-w-4xl text-[12px] leading-snug text-slate-400">
-              Every Pack, Discover, board, disease, hypothesis, and lab AI run is saved here so you
-              can reopen answers, inspect the exact prompt, and add notes. This is a log of model
-              outputs — not of-record ranking.
-            </p>
-            <dl className="mt-2 grid max-w-3xl gap-1.5 text-[10px] leading-snug sm:grid-cols-3">
-              <div className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5">
-                <dt className="font-semibold uppercase tracking-wide text-slate-500">What</dt>
-                <dd className="mt-0.5 text-slate-400">Past model answers by product surface</dd>
-              </div>
-              <div className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5">
-                <dt className="font-semibold uppercase tracking-wide text-slate-500">How to use</dt>
-                <dd className="mt-0.5 text-slate-400">
-                  Filter by kind → search → expand a row for structured output + Prompt
-                </dd>
-              </div>
-              <div className="rounded border border-slate-800 bg-slate-950/50 px-2 py-1.5">
-                <dt className="font-semibold uppercase tracking-wide text-slate-500">Not</dt>
-                <dd className="mt-0.5 text-slate-400">
-                  Not Discover of-record ranks (those stay free-API scores)
-                </dd>
-              </div>
-            </dl>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">
+                AI generation history
+              </h1>
+              <HelperTip
+                content={[
+                  'Every Pack, Discover, board, disease, hypothesis, and lab AI run is saved here so you can reopen answers, inspect the exact prompt, and add notes. This is a log of model outputs — not of-record ranking.',
+                  'What: Past model answers by product surface.',
+                  'How to use: Filter by kind → search → expand a row for structured output + Prompt.',
+                  'Not: Not Discover of-record ranks (those stay free-API scores).',
+                ].join('\n\n')}
+                label="About AI history"
+                testId="ai-history-help"
+                maxWidth="22rem"
+              />
+            </div>
             <p className="mt-1.5 text-[10px] text-slate-600">
               Source: {source === 'cloud' ? 'cloud + local' : 'this browser (local)'}
               {auth.user ? ' · signed in' : ' · sign in to sync cloud'} ·{' '}
@@ -470,11 +461,17 @@ export default function AiHistoryPage() {
                           ) : null}
                         </span>
                       </StyledTooltip>
-                      <span className="line-clamp-2 text-[11px] leading-snug text-slate-300 sm:line-clamp-1">
-                        {preview}
-                        {entry.userComment?.trim() ? (
-                          <span className="ml-1 text-amber-500/80">· note</span>
-                        ) : null}
+                      <span className="min-w-0">
+                        <StatementTip
+                          statement={
+                            preview +
+                            (entry.userComment?.trim()
+                              ? `\n\nNote: ${entry.userComment.trim()}`
+                              : '')
+                          }
+                          label={entry.userComment?.trim() ? 'Preview · note' : 'Preview'}
+                          testId={`ai-history-preview-${entry.id}`}
+                        />
                       </span>
                       <span className="text-[10px] tabular-nums text-slate-600 sm:text-right">
                         {when}

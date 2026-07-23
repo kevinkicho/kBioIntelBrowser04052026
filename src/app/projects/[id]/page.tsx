@@ -38,7 +38,7 @@ import {
   type CandidateSignalRow,
 } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
-import { HelperTip } from '@/components/ui/HelperTip'
+import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { BoardClaimStrip } from '@/components/projects/BoardClaimStrip'
 import { BoardAiRecommend } from '@/components/projects/BoardAiRecommend'
@@ -979,10 +979,11 @@ export default function ProjectBoardPage() {
                         </button>
                       </div>
                     </div>
-                    <p className="mt-1 line-clamp-3 text-xs text-slate-400">{h.thesis}</p>
-                    <div className="mt-1 text-[10px] text-slate-600">
-                      {h.claimIds.length} claims · {h.candidateIds.length} candidates · v{h.version} ·
-                      updated {new Date(h.updatedAt).toLocaleString()}
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      <StatementTip statement={h.thesis} label="Thesis" testId={`rh-list-thesis-${h.id}`} />
+                      <span className="text-[10px] tabular-nums text-slate-600">
+                        {h.claimIds.length} claims · {h.candidateIds.length} candidates · v{h.version}
+                      </span>
                     </div>
                   </li>
                 )

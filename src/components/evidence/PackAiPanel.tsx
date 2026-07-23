@@ -387,27 +387,26 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300/80">
             Latest result
           </p>
-          {!isStructuredPackMode(mode) ? (
-            <div className="leading-relaxed whitespace-pre-wrap">{insight.summary}</div>
-          ) : (
-            <p className="leading-relaxed">{insight.summary}</p>
-          )}
+          <StatementTip
+            statement={insight.summary}
+            label="Result"
+            testId="pack-ai-result-summary"
+            maxWidth="24rem"
+          />
           {insight.nextSteps && insight.nextSteps.length > 0 && (
             <div>
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
                 Next steps
               </p>
-              <ul className="space-y-1 text-[11px] text-emerald-300/90">
-                {insight.nextSteps.map((s) => (
-                  <li key={s} className="flex items-start gap-1.5">
-                    <span className="mt-0.5 text-emerald-600">•</span>
+              <ul className="flex flex-wrap gap-1.5 text-[11px] text-emerald-300/90">
+                {insight.nextSteps.map((s, idx) => (
+                  <li key={s}>
                     <AiWhyTooltip
                       why={buildInsightNextStepWhy(s, insight.claimIds)}
                       testId="pack-ai-why-next"
-                      className="min-w-0 flex-1"
                     >
-                      <span className="block cursor-help leading-snug underline decoration-dotted decoration-emerald-800/50 underline-offset-2">
-                        {s}
+                      <span className="cursor-help rounded border border-emerald-900/40 bg-emerald-950/20 px-1.5 py-0.5 text-[10px] underline decoration-dotted decoration-emerald-800/50 underline-offset-2">
+                        Step {idx + 1}
                       </span>
                     </AiWhyTooltip>
                   </li>

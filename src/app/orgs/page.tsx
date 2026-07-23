@@ -190,15 +190,17 @@ function OrgsPageInner() {
         <p className="text-[11px] uppercase tracking-wide text-slate-500 mb-0.5">
           Free public registries · research-lab pipeline
         </p>
-        <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">
-          Universities, colleges &amp; research labs
-        </h1>
-        <p className="mt-1 text-[13px] text-slate-400 leading-relaxed max-w-4xl">
-          Parallel free-API pipeline: ROR, OpenAlex institutions, College Scorecard, CMS hospitals,
-          NIH RePORTER, OpenAIRE — assembled into a claim-bound lab dossier with optional AI
-          activities (BYOM Ollama). Affiliation / directory context only — not admissions or
-          clinical referral.
-        </p>
+        <div className="flex flex-wrap items-center gap-1.5">
+          <h1 className="text-xl font-semibold text-slate-100 sm:text-2xl">
+            Universities, colleges &amp; research labs
+          </h1>
+          <HelperTip
+            content="Parallel free-API pipeline: ROR, OpenAlex institutions, College Scorecard, CMS hospitals, NIH RePORTER, OpenAIRE — assembled into a claim-bound lab dossier with optional AI activities (BYOM Ollama). Affiliation / directory context only — not admissions or clinical referral."
+            label="About research orgs"
+            testId="orgs-page-help"
+            maxWidth="22rem"
+          />
+        </div>
       </div>
 
       <form

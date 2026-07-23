@@ -4,6 +4,7 @@ import { useState, useMemo, useCallback } from 'react'
 import { API_IDENTIFIER_CONFIGS, IDENTIFIER_TYPE_LABELS, API_PARAMETERS, type ApiIdentifierType, type SearchType, type ApiParamValue } from '@/lib/apiIdentifiers'
 import { getPanelSource } from '@/lib/panelSources'
 import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface AdvancedSearchPanelProps {
@@ -282,7 +283,9 @@ function ApiDetailDrawer({ panelId, source, onClose }: {
         </div>
 
         {source?.description && (
-          <p className="text-[11px] text-slate-400 mb-3 leading-relaxed">{source.description}</p>
+          <div className="mb-3">
+            <DescriptionTip text={source.description} label="About this API" />
+          </div>
         )}
 
         {fields && fields.length > 0 && (

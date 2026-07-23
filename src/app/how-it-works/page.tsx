@@ -151,14 +151,16 @@ export default function HowItWorksPage() {
           <span className="text-slate-500">How it works</span>
         </p>
 
-        <h1 className="text-2xl font-bold tracking-tight text-slate-50 mb-1 sm:text-3xl">
-          How BioIntel is wired
-        </h1>
-        <p className="text-[13px] text-slate-400 leading-relaxed mb-4 max-w-4xl">
-          Transparent view of <strong className="text-slate-300 font-medium">algorithms</strong>{' '}
-          (deterministic, free public APIs) and <strong className="text-slate-300 font-medium">AI
-          prompts</strong> (claim-bound / evidence-gated). Nothing here invents Discover ranks.
-        </p>
+        <div className="mb-4 flex flex-wrap items-center gap-1.5">
+          <h1 className="text-2xl font-bold tracking-tight text-slate-50 sm:text-3xl">
+            How BioIntel is wired
+          </h1>
+          <HelperTip
+            content="Transparent view of algorithms (deterministic, free public APIs) and AI prompts (claim-bound / evidence-gated). Nothing here invents Discover ranks."
+            label="About this page"
+            testId="how-page-lede-help"
+          />
+        </div>
 
         <div
           className="mb-6 flex flex-wrap gap-1 rounded-xl border border-slate-800 bg-slate-900/50 p-1"
@@ -519,77 +521,44 @@ export default function HowItWorksPage() {
                               {p.sourceSymbol}
                             </span>
                           </span>
-                          {!open && (
-                            <span className="mt-0.5 block line-clamp-1 text-[11px] text-slate-400">
-                              {p.purpose}
-                            </span>
-                          )}
                         </span>
                       </button>
                       {open && (
-                        <div className="space-y-2.5 border-t border-slate-800/80 bg-slate-950/50 px-3 py-2.5 sm:px-4">
-                          <p className="text-[12px] leading-relaxed text-slate-300">{p.purpose}</p>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            <div>
-                              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                                Inputs to the model
-                              </p>
-                              <ul className="space-y-0.5 text-[11px] text-slate-400">
-                                {p.inputs.map((i) => (
-                                  <li key={i} className="flex gap-1.5">
-                                    <span className="text-slate-600">·</span>
-                                    <span>{i}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                            <div>
-                              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                                Constraints
-                              </p>
-                              <ul className="space-y-0.5 text-[11px] text-slate-400">
-                                {p.constraints.map((c) => (
-                                  <li key={c} className="flex gap-1.5">
-                                    <span className="text-slate-600">·</span>
-                                    <span>{c}</span>
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                          <dl className="grid gap-1 text-[10px] sm:grid-cols-2">
-                            <div className="flex gap-2 min-w-0">
-                              <dt className="shrink-0 text-slate-600">id</dt>
-                              <dd className="font-mono text-slate-400 truncate">{p.id}</dd>
-                            </div>
-                            <div className="flex gap-2 min-w-0">
-                              <dt className="shrink-0 text-slate-600">source</dt>
-                              <dd className="font-mono text-cyan-600/90 break-all">
-                                {p.sourceSymbol}
-                              </dd>
-                            </div>
-                            <div className="flex gap-2 min-w-0 sm:col-span-2">
-                              <dt className="shrink-0 text-slate-600">where</dt>
-                              <dd className="text-slate-400">{p.where}</dd>
-                            </div>
-                            <div className="flex gap-2 min-w-0 sm:col-span-2">
-                              <dt className="shrink-0 text-slate-600">rank path</dt>
-                              <dd className="text-emerald-500/90">
-                                {p.affectsDiscoverRank
-                                  ? 'Affects Discover rank (should never)'
-                                  : 'Never writes of-record Discover scores'}
-                              </dd>
-                            </div>
-                          </dl>
+                        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-800/80 bg-slate-950/50 px-3 py-2 sm:px-4">
+                          <HelperTip
+                            content={p.purpose}
+                            label="Purpose"
+                            testId={`how-prompt-purpose-${p.id}`}
+                          />
+                          <HelperTip
+                            content={p.inputs.map((i, n) => `${n + 1}. ${i}`).join('\n')}
+                            label="Inputs"
+                            testId={`how-prompt-inputs-${p.id}`}
+                          />
+                          <HelperTip
+                            content={p.constraints.map((c, n) => `${n + 1}. ${c}`).join('\n')}
+                            label="Constraints"
+                            testId={`how-prompt-constraints-${p.id}`}
+                          />
+                          <HelperTip
+                            content={[
+                              `id: ${p.id}`,
+                              `source: ${p.sourceSymbol}`,
+                              `where: ${p.where}`,
+                              p.affectsDiscoverRank
+                                ? 'Affects Discover rank (should never)'
+                                : 'Never writes of-record Discover scores',
+                            ].join('\n')}
+                            label="Meta"
+                            testId={`how-prompt-meta-${p.id}`}
+                          />
                           {p.systemExcerpt && (
-                            <div>
-                              <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-                                System prompt (excerpt)
-                              </p>
-                              <pre className="max-h-56 overflow-y-auto rounded-lg border border-slate-800 bg-slate-950 p-2.5 text-[10px] leading-relaxed text-slate-400 whitespace-pre-wrap">
-                                {p.systemExcerpt}
-                              </pre>
-                            </div>
+                            <HelperTip
+                              content={p.systemExcerpt}
+                              label="System excerpt"
+                              testId={`how-prompt-excerpt-${p.id}`}
+                              maxWidth="22rem"
+                            />
                           )}
                         </div>
                       )}

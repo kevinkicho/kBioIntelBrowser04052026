@@ -6,10 +6,8 @@ import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList
 import type { NciConcept } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
-
-/** Soft cap for list density — full text available via title tooltip + NCI link. */
-const DEF_CLAMP = 'line-clamp-2'
 
 export const NciThesaurusPanel = memo(function NciThesaurusPanel({
   concepts,
@@ -110,24 +108,20 @@ export const NciThesaurusPanel = memo(function NciThesaurusPanel({
                     <p className="mt-0.5 text-[10px] text-slate-500">{concept.semanticType}</p>
                   )}
                   {def ? (
-                    <StyledTooltip content={def}>
-                      <p
-                        className={`mt-1 text-[11px] text-slate-400 leading-snug ${DEF_CLAMP}`}
-                        data-testid="nci-concept-definition"
-                      >
-                        {def}
-                      </p>
-                    </StyledTooltip>
+                    <div className="mt-1" data-testid="nci-concept-definition">
+                      <DescriptionTip text={def} label="Definition" />
+                    </div>
                   ) : (
-                    <p className="mt-1 text-[10px] text-slate-600 italic">No definition on record</p>
+                    <span className="mt-1 inline-block text-[10px] text-slate-600 italic">
+                      No definition
+                    </span>
                   )}
                   {concept.synonyms?.length > 0 && (
-                    <StyledTooltip content={concept.synonyms.join(', ')}>
-                      <p className="mt-0.5 text-[10px] text-slate-600 truncate">
-                        Also: {concept.synonyms.slice(0, 3).join(', ')}
-                        {concept.synonyms.length > 3 ? '…' : ''}
-                      </p>
-                    </StyledTooltip>
+                    <DescriptionTip
+                      text={concept.synonyms.join(', ')}
+                      label={`Synonyms (${concept.synonyms.length})`}
+                      className="mt-0.5"
+                    />
                   )}
                 </div>
               </div>

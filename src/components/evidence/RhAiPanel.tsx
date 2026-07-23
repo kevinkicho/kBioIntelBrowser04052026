@@ -17,7 +17,7 @@ import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
-import { HelperTip } from '@/components/ui/HelperTip'
+import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import {
   aiRunButtonLabel,
@@ -364,20 +364,28 @@ export function RhAiPanel({
           <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-300/80">
             Latest result
           </p>
-          <p className="leading-relaxed whitespace-pre-wrap">{insight.summary}</p>
+          <StatementTip
+            statement={insight.summary}
+            label="Result"
+            testId="rh-ai-result-summary"
+            maxWidth="24rem"
+          />
           {insight.sections?.workingClaim && (
-            <p className="text-[11px] text-emerald-300/90">
-              <span className="text-slate-500">Working claim · </span>
-              {insight.sections.workingClaim}
-            </p>
+            <StatementTip
+              statement={insight.sections.workingClaim}
+              label="Working claim"
+              testId="rh-ai-working-claim"
+            />
           )}
           {insight.rivals && insight.rivals.length > 0 && (
-            <ul className="space-y-1 text-[11px]">
+            <ul className="flex flex-wrap gap-1.5 text-[11px]">
               {insight.rivals.map((r) => (
-                <li key={`${r.role}-${r.title}`} className="rounded border border-slate-800 px-2 py-1">
-                  <span className="uppercase text-[9px] text-slate-500">{r.role}</span>
-                  <div className="font-medium text-slate-200">{r.title}</div>
-                  <div className="text-slate-400">{r.thesis}</div>
+                <li key={`${r.role}-${r.title}`}>
+                  <StatementTip
+                    statement={`${r.role}: ${r.title}\n\n${r.thesis}`}
+                    label={r.title || r.role}
+                    testId={`rh-ai-rival-${r.role}`}
+                  />
                 </li>
               ))}
             </ul>

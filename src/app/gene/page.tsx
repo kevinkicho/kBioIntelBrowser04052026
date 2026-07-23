@@ -9,6 +9,7 @@ import {
   type GeneSuggestion,
 } from '@/components/search/GeneSearchSuggest'
 import { recordSearch } from '@/lib/searchHistory'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 
 interface GeneResult {
   geneId: string
@@ -191,11 +192,11 @@ function GeneSearchInner() {
                         </span>
                       )}
                     </div>
-                    {g.summary && (
-                      <p className="mt-0.5 line-clamp-2 text-[11px] text-slate-500">
-                        {g.summary}
-                      </p>
-                    )}
+                    {g.summary ? (
+                      <div className="mt-0.5">
+                        <DescriptionTip text={g.summary} label="Summary" />
+                      </div>
+                    ) : null}
                     {(() => {
                       const aliasList = Array.isArray(g.aliases)
                         ? g.aliases

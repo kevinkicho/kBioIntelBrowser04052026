@@ -26,7 +26,7 @@ import { clientFetch } from '@/lib/clientFetch'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
-import { HelperTip } from '@/components/ui/HelperTip'
+import { DescriptionTip, HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { buildGeneCrossSource } from '@/lib/crossSource'
@@ -121,7 +121,9 @@ function GeneOverview({
 
       {overview.summary && (
         <DataPoint sourceKey="ncbi-gene" fetchedAt={fetchedAt} label="Gene summary" recordUrl={overview.url}>
-          <p className="text-sm text-slate-300 leading-relaxed mb-4">{overview.summary}</p>
+          <div className="mb-4">
+            <DescriptionTip text={overview.summary} label="Gene summary" />
+          </div>
         </DataPoint>
       )}
 
