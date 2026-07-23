@@ -8,7 +8,9 @@ import { ProfileModeToggle } from '@/components/profile/ProfileModeToggle'
 import { DecisionStrip } from '@/components/profile/DecisionStrip'
 import { LandscapeDualStrip } from '@/components/profile/LandscapeDualStrip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
 import { buildMoleculeCrossSource } from '@/lib/crossSource'
+import { buildMoleculeDataHub } from '@/lib/dataHub'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
@@ -100,6 +102,7 @@ interface Props {
   cid: number
   moleculeName: string
   molecularWeight: number
+  formula?: string | null
   inchiKey: string
   iupacName: string
   cas?: string | null
@@ -172,7 +175,7 @@ function initStatus(): CategoriesStatus {
   return s
 }
 
-export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
+export function ProfilePageClient({ cid, moleculeName, molecularWeight, formula, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
   return (
     <Suspense fallback={<div className="animate-pulse h-96 bg-slate-800/50 rounded-xl" />}>
       {/* key=cid remounts client state on SPA molecule→molecule nav (avoids stale panels / skipped loads). */}
@@ -181,6 +184,7 @@ export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey
         cid={cid}
         moleculeName={moleculeName}
         molecularWeight={molecularWeight}
+        formula={formula}
         inchiKey={inchiKey}
         iupacName={iupacName}
         cas={cas}
@@ -191,7 +195,7 @@ export function ProfilePageClient({ cid, moleculeName, molecularWeight, inchiKey
   )
 }
 
-function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
+function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, inchiKey, iupacName, cas, synonyms, embedMode }: Props) {
   const isEmbed = !!embedMode
   const allowedPanelSet = useMemo(() => {
     if (!embedMode?.allowedPanels) return null
@@ -906,6 +910,27 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
     () =>
       buildMoleculeCrossSource(String(cid), moleculeName, mergedData as Record<string, unknown>),
     [cid, moleculeName, mergedData],
+  )
+  const moleculeDataHub = useMemo(
+    () =>
+      buildMoleculeDataHub(
+        {
+          cid,
+          name: moleculeName,
+          molecularWeight,
+          inchiKey,
+          iupacName,
+          cas,
+          synonyms,
+          formula:
+            formula ||
+            (typeof (mergedData as { formula?: string }).formula === 'string'
+              ? (mergedData as { formula?: string }).formula
+              : null),
+        },
+        mergedData as Record<string, unknown>,
+      ),
+    [cid, moleculeName, molecularWeight, formula, inchiKey, iupacName, cas, synonyms, mergedData],
   )
 
   // Decision strip: scores (project > scores JSON > score composite) + claims from Core extractors
@@ -1691,11 +1716,32 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
             </ErrorBoundary>
           )}
 
+          {/* Primary: multi-source factual data hub (not AI narrative) */}
+          <ErrorBoundary>
+            <DataHubLedgerView
+              ledger={moleculeDataHub}
+              className="mb-4"
+              testId="molecule-data-hub"
+              density={isDecisionMode ? 'compact' : 'full'}
+              onOpenPanel={(categoryId, panelId) => {
+                const catId = categoryId as CategoryId
+                setView('panels')
+                setQuickViewPanel({ categoryId: catId, panelId })
+                if (categoryStatus[catId] === 'idle') {
+                  loadCategory(catId)
+                }
+                scrollToCategory(catId)
+              }}
+            />
+          </ErrorBoundary>
+
           <ErrorBoundary>
             <CrossSourceStrip
               bundle={moleculeCrossSource}
               className="mb-4"
               testId="molecule-cross-source"
+              title="Source coverage (counts)"
+              density={isDecisionMode ? 'compact' : 'full'}
               onOpenPanel={(categoryId, panelId) => {
                 const catId = categoryId as CategoryId
                 setView('panels')
@@ -1728,14 +1774,6 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
 
           {!isDecisionMode && (
             <>
-              <ErrorBoundary>
-                <NextStepsPanel
-                  moleculeName={moleculeName}
-                  data={{ ...mergedData, synonyms, cas, inchiKey }}
-                  cid={cid}
-                />
-              </ErrorBoundary>
-
               <ErrorBoundary><PipelinePanel cid={cid} /></ErrorBoundary>
 
               <ErrorBoundary><VendorsPanel cid={cid} /></ErrorBoundary>
@@ -1750,13 +1788,35 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, inchiKey, 
                 />
               </ErrorBoundary>
 
-              <ErrorBoundary>
-                <ResearchBrief data={mergedData} moleculeName={moleculeName} cid={cid} />
-              </ErrorBoundary>
-
-              <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
-
-              <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
+              {/* Secondary: derived / assistive — not of-record facts */}
+              <div className="mb-4 rounded-xl border border-slate-800/80 bg-slate-950/40 p-3" data-testid="derived-assistive-block">
+                <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                  <h2 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                    Derived assistive views
+                  </h2>
+                  <span className="rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-500">
+                    not of-record
+                  </span>
+                </div>
+                <p className="mb-3 text-[10px] text-slate-600">
+                  Charts, next steps, and research digests are conveniences over the public data above.
+                  Prefer Data hub + siloed source panels for factual citation.
+                </p>
+                <div className="space-y-4">
+                  <ErrorBoundary>
+                    <NextStepsPanel
+                      moleculeName={moleculeName}
+                      data={{ ...mergedData, synonyms, cas, inchiKey }}
+                      cid={cid}
+                    />
+                  </ErrorBoundary>
+                  <ErrorBoundary>
+                    <ResearchBrief data={mergedData} moleculeName={moleculeName} cid={cid} />
+                  </ErrorBoundary>
+                  <ErrorBoundary><SimilarMolecules cid={cid} /></ErrorBoundary>
+                  <ErrorBoundary><InsightsSection data={mergedData} /></ErrorBoundary>
+                </div>
+              </div>
             </>
           )}
         </>

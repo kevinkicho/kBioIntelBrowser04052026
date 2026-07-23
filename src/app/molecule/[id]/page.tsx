@@ -67,6 +67,7 @@ export default async function MoleculePage({ params }: { params: { id: string } 
           cid={cid}
           moleculeName={molecule.name}
           molecularWeight={molecule.molecularWeight}
+          formula={molecule.formula}
           inchiKey={molecule.inchiKey}
           iupacName={molecule.iupacName}
           cas={extractCasFromSynonyms(molecule.synonyms)}
