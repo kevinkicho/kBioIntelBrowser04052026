@@ -88,3 +88,14 @@ biointel-research-kit-{slug}-{id}-manifest.json
 ## Methodology page (P2)
 
 Public citable page: **`/methodology`** (“How we present data”) — of-record layers, honesty rules, exports, product law. Linked from header (**Data methods**), homepage, how-it-works, compare footer.
+
+## Saved research view prefs (P3)
+
+| Item | Detail |
+|------|--------|
+| Storage | `biointel-research-view-prefs-v1` (localStorage, solo) |
+| Code | `src/lib/researchViewPrefs.ts`, `useResearchViewPrefs`, `ResearchViewPrefsBar` |
+| Pins | Research tables (lit/grants/trials/structures); hub domains (identity…other) |
+| Other | `hideEmpty`, `preferredProfileView` (research\|panels), `tableRowLimit` |
+| UI | Bar on Research view + Data hub (full density) |
+| Does not | Change Discover of-record ranks; invent facts; sync across devices |

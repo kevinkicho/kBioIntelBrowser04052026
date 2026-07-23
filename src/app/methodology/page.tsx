@@ -184,6 +184,16 @@ export default function MethodologyPage() {
           </dl>
         </section>
 
+        <section className="mb-8 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+          <h2 className="text-sm font-semibold text-slate-100">Saved research view (local)</h2>
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-400">
+            On molecule Research view and Data hub headers you can pin which tables and domains stay visible,
+            set default profile view (Research vs Panels), hide empty facts, and choose rows-per-table. Preferences
+            live only in this browser (<code className="text-slate-500">biointel-research-view-prefs-v1</code>) —
+            solo-local product law, not a multi-tenant cloud profile.
+          </p>
+        </section>
+
         <section className="mb-8">
           <h2 className="mb-3 text-sm font-semibold text-slate-100">Exports for research</h2>
           <ul className="space-y-2">

@@ -13,6 +13,7 @@ import { ResearchFocusView } from '@/components/dataHub/ResearchFocusView'
 import { buildMoleculeCrossSource } from '@/lib/crossSource'
 import { buildMoleculeDataHub } from '@/lib/dataHub'
 import type { ProfileView } from '@/components/profile/ViewToggle'
+import { loadResearchViewPrefs } from '@/lib/researchViewPrefs'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
@@ -242,14 +243,34 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
     if (initialView === 'graph') return 'graph'
     if (initialView === 'research') return 'research'
     if (initialView === 'panels') return 'panels'
-    // Decision / discover deep-links keep panels; casual browse defaults to research
+    // Decision / discover deep-links keep panels; casual browse uses saved research prefs
     const decisionish =
       searchParams.get('from') === 'discover' ||
       !!searchParams.get('project') ||
       !!searchParams.get('disease') ||
       parseProfileMode(searchParams.get('mode')) === 'decision'
-    return decisionish ? 'panels' : 'research'
+    if (decisionish) return 'panels'
+    // SSR-safe default; client effect applies preferredProfileView from localStorage
+    return 'research'
   })
+
+  // Apply solo-local preferred profile view once (casual browse only)
+  useEffect(() => {
+    if (initialView === 'graph' || initialView === 'research' || initialView === 'panels') {
+      return
+    }
+    const decisionish =
+      searchParams.get('from') === 'discover' ||
+      !!searchParams.get('project') ||
+      !!searchParams.get('disease') ||
+      parseProfileMode(searchParams.get('mode')) === 'decision'
+    if (decisionish) return
+    const pref = loadResearchViewPrefs().preferredProfileView
+    if (pref === 'panels' || pref === 'research') setView(pref)
+    // once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Decision profile mode (PR11) — independent of ViewToggle panels/graph
   const [profileMode, setProfileMode] = useState<ProfileMode>(() => {
     const fromUrl = parseProfileMode(searchParams.get('mode'))

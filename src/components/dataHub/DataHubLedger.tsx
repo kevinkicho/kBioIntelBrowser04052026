@@ -5,7 +5,7 @@
  * Fact | Value | Source | Open — no narrative AI claims.
  */
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DataHubLedger, DataHubRow } from '@/lib/dataHub'
 import {
   buildSourceDirectory,
@@ -24,6 +24,9 @@ import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { SourceDirectoryPanel } from '@/components/dataHub/SourceDirectoryPanel'
+import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
+import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
+import { isHubDomainEnabled } from '@/lib/researchViewPrefs'
 
 export interface DataHubLedgerProps {
   ledger: DataHubLedger
@@ -40,6 +43,10 @@ export interface DataHubLedgerProps {
   claims?: readonly EvidenceClaim[] | null
   /** Show Research kit multi-file export (default true for full density) */
   showResearchKit?: boolean
+  /** Show domain pin prefs bar (default true for full density) */
+  showPrefsBar?: boolean
+  /** Apply saved hub domain filters (default true) */
+  respectDomainPrefs?: boolean
 }
 
 function stableHref(url?: string): string | null {
@@ -104,11 +111,27 @@ export function DataHubLedgerView({
   showSourceDirectory,
   claims,
   showResearchKit,
+  showPrefsBar,
+  respectDomainPrefs = true,
 }: DataHubLedgerProps) {
+  const { prefs, patch, hydrated } = useResearchViewPrefs()
   const [hideEmpty, setHideEmpty] = useState(hideEmptyProp)
   const [kitBusy, setKitBusy] = useState(false)
   const showDir = showSourceDirectory ?? density === 'full'
   const showKit = showResearchKit ?? density === 'full'
+  const showBar = showPrefsBar ?? density === 'full'
+
+  // Sync hideEmpty from saved prefs when prefs change (e.g. prefs bar checkbox)
+  useEffect(() => {
+    if (hydrated) setHideEmpty(prefs.hideEmpty)
+  }, [hydrated, prefs.hideEmpty])
+
+  const toggleHideEmpty = () => {
+    const next = !hideEmpty
+    setHideEmpty(next)
+    patch({ hideEmpty: next })
+  }
+
   const byId = useMemo(() => {
     const m = new Map<string, DataHubRow>()
     for (const r of ledger.rows) m.set(r.id, r)
@@ -123,11 +146,17 @@ export function DataHubLedgerView({
         const rows = sec.rowIds
           .map((id) => byId.get(id))
           .filter((r): r is DataHubRow => Boolean(r))
-          .filter((r) => (hideEmpty ? !isDataHubValueEmpty(r.value) : true))
+          .filter((r) => {
+            if (respectDomainPrefs && !isHubDomainEnabled(prefs, r.domain)) {
+              return false
+            }
+            if (hideEmpty && isDataHubValueEmpty(r.value)) return false
+            return true
+          })
         return { sec, rows }
       })
       .filter(({ rows }) => rows.length > 0)
-  }, [ledger.sections, byId, hideEmpty])
+  }, [ledger.sections, byId, hideEmpty, prefs, respectDomainPrefs])
 
   const filledCount = ledger.rows.filter((r) => !isDataHubValueEmpty(r.value)).length
 
@@ -222,7 +251,7 @@ export function DataHubLedgerView({
           )}
           <button
             type="button"
-            onClick={() => setHideEmpty((v) => !v)}
+            onClick={toggleHideEmpty}
             className={`rounded-md border px-2 py-0.5 text-[10px] font-medium transition-colors ${
               hideEmpty
                 ? 'border-indigo-700/50 bg-indigo-950/40 text-indigo-200'
@@ -234,6 +263,16 @@ export function DataHubLedgerView({
           </button>
         </div>
       </div>
+
+      {showBar && (
+        <div className="border-b border-slate-800/80 px-3 py-2 sm:px-4">
+          <ResearchViewPrefsBar
+            mode="hub"
+            compact
+            testId={`${testId}-prefs`}
+          />
+        </div>
+      )}
 
       {visibleSections.length === 0 ? (
         <div className="px-3 py-6 text-center text-[11px] text-slate-500 sm:px-4">

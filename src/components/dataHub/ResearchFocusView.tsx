@@ -10,6 +10,9 @@ import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { HelperTip } from '@/components/ui/HelperTip'
+import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
+import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
+import { isResearchTableEnabled } from '@/lib/researchViewPrefs'
 function asArr(data: Record<string, unknown>, key: string): Record<string, unknown>[] {
   const v = data[key]
   if (!Array.isArray(v)) return []
@@ -165,9 +168,11 @@ export interface ResearchFocusViewProps {
   data: Record<string, unknown>
   entityLabel: string
   className?: string
-  /** Max rows per table */
+  /** Max rows per table (overrides saved prefs when set) */
   limit?: number
   testId?: string
+  /** Show domain pin bar (default true) */
+  showPrefsBar?: boolean
 }
 
 /**
@@ -177,9 +182,13 @@ export function ResearchFocusView({
   data,
   entityLabel,
   className = '',
-  limit = 12,
+  limit: limitProp,
   testId = 'research-focus',
+  showPrefsBar = true,
 }: ResearchFocusViewProps) {
+  const { prefs } = useResearchViewPrefs()
+  const limit = limitProp ?? prefs.tableRowLimit
+
   const lit = useMemo(() => {
     const rows = [
       ...asArr(data, 'literature'),
@@ -245,8 +254,16 @@ export function ResearchFocusView({
     }
   }, [data, limit])
 
+  const showLit = isResearchTableEnabled(prefs, 'literature')
+  const showGrants = isResearchTableEnabled(prefs, 'grants')
+  const showTrials = isResearchTableEnabled(prefs, 'trials')
+  const showStruct = isResearchTableEnabled(prefs, 'structures')
+
   const total =
-    lit.cells.length + grants.cells.length + trials.cells.length + structures.cells.length
+    (showLit ? lit.cells.length : 0) +
+    (showGrants ? grants.cells.length : 0) +
+    (showTrials ? trials.cells.length : 0) +
+    (showStruct ? structures.cells.length : 0)
 
   return (
     <div className={`space-y-4 ${className}`} data-testid={testId}>
@@ -257,7 +274,7 @@ export function ResearchFocusView({
             content={[
               `Dense public-record tables for ${entityLabel}.`,
               'Literature · NIH grants · clinical trials · PDB structures from free APIs loaded on this page.',
-              'Each Open link goes to the source registry. Not model-generated. Not clinical decision support.',
+              'Pin tables below — saved in this browser only. Not model-generated. Not clinical decision support.',
             ].join('\n\n')}
             label="About research view"
           />
@@ -270,49 +287,61 @@ export function ResearchFocusView({
         </p>
       </header>
 
-      <ResearchTable
-        title="Literature"
-        source="Europe PMC / PubMed / OpenAlex"
-        help="Paper titles, years, venues from free literature APIs. Open DOI/PubMed when available."
-        columns={['Title', 'Year', 'Venue', 'DOI/PMID']}
-        rows={lit.cells}
-        links={lit.links}
-        testId={`${testId}-lit`}
-        emptyMessage="No literature rows loaded yet — open Research & Literature category panels or wait for fetch."
-      />
+      {showPrefsBar && (
+        <ResearchViewPrefsBar mode="research" testId={`${testId}-prefs`} />
+      )}
 
-      <ResearchTable
-        title="NIH grants"
-        source="NIH RePORTER"
-        help="Grant titles, PIs, and institutes from free NIH RePORTER. Affiliation context for research activity."
-        columns={['Title', 'PI', 'Institute', 'Start', 'Project #']}
-        rows={grants.cells}
-        links={grants.links}
-        testId={`${testId}-grants`}
-        emptyMessage="No NIH grant rows loaded yet."
-      />
+      {showLit && (
+        <ResearchTable
+          title="Literature"
+          source="Europe PMC / PubMed / OpenAlex"
+          help="Paper titles, years, venues from free literature APIs. Open DOI/PubMed when available."
+          columns={['Title', 'Year', 'Venue', 'DOI/PMID']}
+          rows={lit.cells}
+          links={lit.links}
+          testId={`${testId}-lit`}
+          emptyMessage="No literature rows loaded yet — open Research & Literature category panels or wait for fetch."
+        />
+      )}
 
-      <ResearchTable
-        title="Clinical trials"
-        source="ClinicalTrials.gov"
-        help="Registered studies from CT.gov. Phase/status are registry fields — not efficacy conclusions."
-        columns={['NCT', 'Title', 'Phase', 'Status', 'Conditions']}
-        rows={trials.cells}
-        links={trials.links}
-        testId={`${testId}-trials`}
-        emptyMessage="No clinical trial rows loaded yet."
-      />
+      {showGrants && (
+        <ResearchTable
+          title="NIH grants"
+          source="NIH RePORTER"
+          help="Grant titles, PIs, and institutes from free NIH RePORTER. Affiliation context for research activity."
+          columns={['Title', 'PI', 'Institute', 'Start', 'Project #']}
+          rows={grants.cells}
+          links={grants.links}
+          testId={`${testId}-grants`}
+          emptyMessage="No NIH grant rows loaded yet."
+        />
+      )}
 
-      <ResearchTable
-        title="Structures"
-        source="RCSB PDB"
-        help="Experimental structures linked to this entity name/search. Open RCSB for full record."
-        columns={['PDB', 'Title', 'Method', 'Resolution']}
-        rows={structures.cells}
-        links={structures.links}
-        testId={`${testId}-structures`}
-        emptyMessage="No PDB structure rows loaded yet — open Protein & Structure category."
-      />
+      {showTrials && (
+        <ResearchTable
+          title="Clinical trials"
+          source="ClinicalTrials.gov"
+          help="Registered studies from CT.gov. Phase/status are registry fields — not efficacy conclusions."
+          columns={['NCT', 'Title', 'Phase', 'Status', 'Conditions']}
+          rows={trials.cells}
+          links={trials.links}
+          testId={`${testId}-trials`}
+          emptyMessage="No clinical trial rows loaded yet."
+        />
+      )}
+
+      {showStruct && (
+        <ResearchTable
+          title="Structures"
+          source="RCSB PDB"
+          help="Experimental structures linked to this entity name/search. Open RCSB for full record."
+          columns={['PDB', 'Title', 'Method', 'Resolution']}
+          rows={structures.cells}
+          links={structures.links}
+          testId={`${testId}-structures`}
+          emptyMessage="No PDB structure rows loaded yet — open Protein & Structure category."
+        />
+      )}
     </div>
   )
 }
