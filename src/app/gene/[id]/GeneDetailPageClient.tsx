@@ -29,7 +29,9 @@ import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
 import { DescriptionTip, HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
 import { buildGeneCrossSource } from '@/lib/crossSource'
+import { buildGeneDataHub } from '@/lib/dataHub'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -2368,6 +2370,73 @@ function GeneDetailPageClientInner({
     ],
   )
 
+  const geneDataHub = useMemo(() => {
+    const disgenet = (geneDiseases?.disgenetAssociations ?? []) as Array<{
+      diseaseName?: string
+    }>
+    const clinvar = (geneVariants?.clinvarVariants ?? []) as Array<{
+      title?: string
+      clinicalSignificance?: string
+    }>
+    const drugs = (Array.isArray(categoryData?.geneDrugs)
+      ? categoryData!.geneDrugs
+      : []) as Array<{ drugName?: string; name?: string }>
+    const pathways = (pathwayBundle?.reactomePathways ?? []) as Array<{ name?: string }>
+    const gtex = (exprBundle?.gtexExpressions ?? []) as Array<{ tissue?: string; tissueSite?: string }>
+    return buildGeneDataHub({
+      symbol: displaySymbol,
+      geneId: String(geneId),
+      name: displayName,
+      description: overview?.summary || null,
+      ncbiGeneId: String(geneId),
+      ensemblId: displayEnsemblId || null,
+      uniprotAccession: displayUniprotId || null,
+      gtexCount: loaded ? gtexCount : 0,
+      bgeeCount: loaded ? bgeeCount : 0,
+      expressionAtlasCount: loaded ? atlasCount : 0,
+      topTissue: gtex[0]?.tissue || gtex[0]?.tissueSite || null,
+      reactomeCount: loaded ? pathwayBundle?.reactomePathways?.length ?? 0 : 0,
+      wikiPathwaysCount: loaded ? pathwayBundle?.wikiPathways?.length ?? 0 : 0,
+      goCount: loaded ? pathwayBundle?.goTerms?.length ?? 0 : 0,
+      topPathway: pathways[0]?.name || null,
+      clinvarCount: loaded ? clinvarCount : 0,
+      dbsnpCount: loaded ? dbsnpCount : 0,
+      clingenCount: loaded
+        ? (geneVariants?.clingenDosage?.length ?? 0) +
+          (geneDiseases?.clingenCurations?.length ?? 0)
+        : 0,
+      topClinvar: clinvar[0]
+        ? [clinvar[0].title, clinvar[0].clinicalSignificance].filter(Boolean).join(' · ')
+        : null,
+      disgenetCount: loaded ? diseaseCount : 0,
+      gwasCount: loaded ? geneDiseases?.gwasAssociations?.length ?? 0 : 0,
+      openTargetsCount: loaded ? geneDiseases?.openTargetsAssociations?.length ?? 0 : 0,
+      topDisease: disgenet[0]?.diseaseName || null,
+      dgidbDrugCount: loaded ? drugCount : 0,
+      topDrug: drugs[0]?.drugName || drugs[0]?.name || null,
+    })
+  }, [
+    displaySymbol,
+    displayName,
+    geneId,
+    overview,
+    displayEnsemblId,
+    displayUniprotId,
+    loaded,
+    gtexCount,
+    bgeeCount,
+    atlasCount,
+    pathwayBundle,
+    clinvarCount,
+    dbsnpCount,
+    geneVariants,
+    geneDiseases,
+    diseaseCount,
+    drugCount,
+    categoryData,
+    exprBundle,
+  ])
+
   const glanceTiles: {
     id: (typeof GENE_PANELS)[number]['id']
     label: string
@@ -2555,12 +2624,21 @@ function GeneDetailPageClientInner({
         </div>
 
         {loaded && (
-          <CrossSourceStrip
-            bundle={geneCrossBundle}
-            className="mb-4"
-            testId="gene-cross-source"
-            density="full"
-          />
+          <>
+            <DataHubLedgerView
+              ledger={geneDataHub}
+              className="mb-4"
+              testId="gene-data-hub"
+              density="full"
+            />
+            <CrossSourceStrip
+              bundle={geneCrossBundle}
+              className="mb-4"
+              testId="gene-cross-source"
+              title="Source coverage (counts)"
+              density="full"
+            />
+          </>
         )}
 
         <div

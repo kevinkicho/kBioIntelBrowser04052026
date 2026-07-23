@@ -7,12 +7,21 @@
 
 import { useMemo, useState } from 'react'
 import type { DataHubLedger, DataHubRow } from '@/lib/dataHub'
-import { isDataHubValueEmpty } from '@/lib/dataHub'
+import {
+  buildSourceDirectory,
+  dataHubExportFilename,
+  dataHubMime,
+  dataHubToDelimited,
+  isDataHubValueEmpty,
+  type DataHubExportFormat,
+} from '@/lib/dataHub'
+import { downloadFile } from '@/lib/exportData'
 import { emptyDataClass } from '@/lib/summaryEmpty'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { SourceDirectoryPanel } from '@/components/dataHub/SourceDirectoryPanel'
 
 export interface DataHubLedgerProps {
   ledger: DataHubLedger
@@ -23,6 +32,8 @@ export interface DataHubLedgerProps {
   hideEmpty?: boolean
   /** Compact header for decision mode */
   density?: 'full' | 'compact'
+  /** Show source directory under the ledger (default true for full density) */
+  showSourceDirectory?: boolean
 }
 
 function stableHref(url?: string): string | null {
@@ -84,13 +95,17 @@ export function DataHubLedgerView({
   testId = 'data-hub-ledger',
   hideEmpty: hideEmptyProp = true,
   density = 'full',
+  showSourceDirectory,
 }: DataHubLedgerProps) {
   const [hideEmpty, setHideEmpty] = useState(hideEmptyProp)
+  const showDir = showSourceDirectory ?? density === 'full'
   const byId = useMemo(() => {
     const m = new Map<string, DataHubRow>()
     for (const r of ledger.rows) m.set(r.id, r)
     return m
   }, [ledger.rows])
+
+  const directory = useMemo(() => buildSourceDirectory(ledger), [ledger])
 
   const visibleSections = useMemo(() => {
     return ledger.sections
@@ -106,6 +121,11 @@ export function DataHubLedgerView({
 
   const filledCount = ledger.rows.filter((r) => !isDataHubValueEmpty(r.value)).length
 
+  const exportHub = (format: DataHubExportFormat) => {
+    const body = dataHubToDelimited(ledger, format, { includeEmpty: !hideEmpty })
+    downloadFile(body, dataHubExportFilename(ledger, format), dataHubMime(format))
+  }
+
   return (
     <section
       className={`rounded-xl border border-slate-800 bg-slate-900/50 ${className}`}
@@ -120,9 +140,10 @@ export function DataHubLedgerView({
             <h2 className="text-sm font-semibold text-slate-100">Data hub</h2>
             <HelperTip
               content={[
-                'Multi-source factual ledger for this molecule.',
+                'Multi-source factual ledger for this entity.',
                 'Each row is a value retrieved from a free public API with its source name.',
                 'Open Panel for the siloed full table; Source opens the primary registry when a deep link exists.',
+                'Export CSV/TSV for lab notebooks — of-record facts only, not AI narrative.',
                 'Not model-generated. Not for clinical or regulatory decisions.',
                 ...(ledger.notes || []),
               ].join('\n\n')}
@@ -147,6 +168,22 @@ export function DataHubLedgerView({
           >
             {filledCount} facts · {ledger.sourceCount} sources
           </span>
+          <button
+            type="button"
+            onClick={() => exportHub('csv')}
+            className="rounded-md border border-emerald-800/40 bg-emerald-950/30 px-2 py-0.5 text-[10px] font-medium text-emerald-300 hover:border-emerald-600/50"
+            data-testid={`${testId}-export-csv`}
+          >
+            Export CSV
+          </button>
+          <button
+            type="button"
+            onClick={() => exportHub('tsv')}
+            className="rounded-md border border-emerald-800/40 bg-emerald-950/20 px-2 py-0.5 text-[10px] font-medium text-emerald-300/90 hover:border-emerald-600/50"
+            data-testid={`${testId}-export-tsv`}
+          >
+            Export TSV
+          </button>
           <button
             type="button"
             onClick={() => setHideEmpty((v) => !v)}
@@ -216,6 +253,16 @@ export function DataHubLedgerView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {showDir && (
+        <div className="border-t border-slate-800/80 p-3 sm:p-4">
+          <SourceDirectoryPanel
+            directory={directory}
+            onOpenPanel={onOpenPanel}
+            testId={`${testId}-sources`}
+          />
         </div>
       )}
     </section>

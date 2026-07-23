@@ -6,8 +6,10 @@ import { researchLabDossierToEvidencePack } from '@/lib/researchLabs'
 import { ResearchLabAiPanel } from '@/components/orgs/ResearchLabAiPanel'
 import { ResearchLabDossierBagsList } from '@/components/orgs/ResearchLabDossierBagsList'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { buildOrgDossierCrossSource } from '@/lib/crossSource'
+import { buildOrgDataHub } from '@/lib/dataHub'
 import { packToJson, packToMarkdown, packExportFilename } from '@/lib/evidence'
 import { downloadFile } from '@/lib/exportData'
 
@@ -38,6 +40,34 @@ export function ResearchLabDossierView({ dossier }: { dossier: ResearchLabDossie
       }),
     [dossier],
   )
+
+  const orgDataHub = useMemo(() => {
+    const ror0 = dossier.rorOrgs[0]
+    const college0 = dossier.colleges[0]
+    const hospital0 = dossier.hospitals[0]
+    const grant0 = dossier.grants[0]
+    return buildOrgDataHub({
+      id: dossier.query || dossier.name,
+      name: dossier.name,
+      kind: dossier.kind,
+      query: dossier.query,
+      builtAt: dossier.builtAt,
+      rorCount: dossier.stats.rorCount,
+      openAlexCount: dossier.stats.openAlexCount,
+      collegeCount: dossier.stats.collegeCount,
+      hospitalCount: dossier.stats.hospitalCount,
+      grantCount: dossier.stats.grantCount,
+      openAireCount: dossier.stats.openAireCount,
+      edgeCount: dossier.stats.edgeCount,
+      worksHint: dossier.stats.totalWorksHint,
+      sampleRorName: ror0?.name || null,
+      sampleRorId: ror0?.rorId || null,
+      sampleCollege: college0?.name || null,
+      sampleHospital: hospital0?.facilityName || null,
+      sampleGrant: grant0?.title || null,
+      notes: dossier.notes,
+    })
+  }, [dossier])
 
   const exportPack = (format: 'json' | 'md') => {
     const body = format === 'json' ? packToJson(pack) : packToMarkdown(pack)
@@ -121,13 +151,24 @@ export function ResearchLabDossierView({ dossier }: { dossier: ResearchLabDossie
         ))}
       </header>
 
+      <DataHubLedgerView
+        ledger={orgDataHub}
+        testId="research-lab-data-hub"
+        density="full"
+      />
+
       <CrossSourceStrip
         bundle={orgCross}
         testId="research-lab-cross-source"
-        title="Joined from free public registers"
+        title="Source coverage (counts)"
       />
 
-      <ResearchLabAiPanel pack={pack} />
+      <div className="rounded-xl border border-slate-800/80 bg-slate-950/40 p-3" data-testid="org-derived-assistive">
+        <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-500">
+          Derived assistive · not of-record
+        </p>
+        <ResearchLabAiPanel pack={pack} />
+      </div>
 
       <section>
         <div className="mb-3 flex flex-wrap items-center gap-1.5">

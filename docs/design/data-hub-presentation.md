@@ -32,8 +32,27 @@ Present **accurate, source-attributed facts** from many free public databases as
 4. FAERS / spontaneous reports are not incidence rates (explicit detail).
 5. Do not auto-apply AI reorder to Discover of-record scores.
 
-## Next (optional)
+## Surfaces (v1)
 
-- Gene / disease / org data hub builders (parity with molecule)
-- Export data hub as CSV / TSV for lab notebooks
-- Source directory page filtered by coverage on current entity
+| Entity | Builder | UI mount |
+|--------|---------|---------|
+| Molecule | `buildMoleculeDataHub` | profile after summary |
+| Gene | `buildGeneDataHub` | gene detail (loaded) |
+| Disease | `buildDiseaseDataHub` | disease detail header |
+| Org / lab | `buildOrgDataHub` | research lab dossier |
+
+## Export
+
+- CSV (UTF-8 BOM) and TSV from ledger header buttons
+- `dataHubToDelimited` / `dataHubExportFilename` in `src/lib/dataHub/exportDataHub.ts`
+- Columns: section, fact, value, source, sourceUrl, panelId, categoryId, domain, detail
+
+## Source directory
+
+- `buildSourceDirectory(ledger)` → per-source fact counts + docs links
+- UI: `SourceDirectoryPanel` under each full-density Data hub
+- Filter: hide empty sources (toggle)
+
+## Cross-DB identity keys (molecule)
+
+When category bags fill: ChEMBL, ChEBI, DrugBank xref, RxCUI, ATC, UNII/GSRS, UniChem/MyChem counts — each with provenance and deep links where policy-safe.

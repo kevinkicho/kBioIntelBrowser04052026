@@ -6,7 +6,9 @@ import { DiseaseDrugsTrialsTable } from '@/components/disease/DiseaseDrugsTrials
 import { DiseaseRelatedMoleculesTable } from '@/components/disease/DiseaseRelatedMoleculesTable'
 import { WhoGhoContextStrip } from '@/components/disease/WhoGhoContextStrip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
 import { buildDiseaseCrossSource } from '@/lib/crossSource'
+import { buildDiseaseDataHub } from '@/lib/dataHub'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { DataPoint } from '@/components/ui/DataPoint'
 import Link from 'next/link'
@@ -114,6 +116,32 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
     openTargetsHit: /open.?target/i.test(source) || Boolean(id),
   })
 
+  const diseaseDataHub = buildDiseaseDataHub({
+    diseaseId: id,
+    diseaseName,
+    description,
+    source: source || undefined,
+    therapeuticAreas,
+    geneCount: genes.length,
+    geneSource: source || genes[0]?.source || 'Open Targets / DisGeNET',
+    topGenes: genes.slice(0, 8).map((g) => g.geneSymbol).filter(Boolean),
+    trialDrugCount: drugInterventions.length,
+    topTrialDrugs: drugInterventions.slice(0, 6).map((d) => d.name),
+    moleculeCount: dedupedMolecules.length,
+    moleculeSources: Array.from(
+      new Set(
+        dedupedMolecules
+          .flatMap((m) => [m.relationKind, ...(m.reasons ?? [])])
+          .filter(Boolean)
+          .map(String),
+      ),
+    ).slice(0, 6),
+    topMolecules: dedupedMolecules.slice(0, 6).map((m) => m.name).filter(Boolean),
+    orphanetHit: /orphanet/i.test(source) || therapeuticAreas.some((t) => /orphan/i.test(t)),
+    openTargetsHit: /open.?target/i.test(source) || Boolean(id),
+    whoGhoCount: whoGho.indicators?.length ?? whoGho.facts?.length ?? 0,
+  })
+
   /** Map gene association source label → provenance key */
   const geneSourceKey = (src: string): string => {
     const s = (src || '').toLowerCase()
@@ -179,10 +207,18 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
                 </div>
               )}
 
+              <DataHubLedgerView
+                ledger={diseaseDataHub}
+                className="mb-4 mt-2"
+                testId="disease-data-hub"
+                density="full"
+              />
+
               <CrossSourceStrip
                 bundle={diseaseCrossSource}
                 className="mb-4 mt-2"
                 testId="disease-cross-source"
+                title="Source coverage (counts)"
               />
 
               <div className="flex items-center gap-3 text-xs text-slate-500 mt-4 pt-4 border-t border-slate-800">
