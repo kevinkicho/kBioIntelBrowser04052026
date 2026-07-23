@@ -56,3 +56,23 @@ Present **accurate, source-attributed facts** from many free public databases as
 ## Cross-DB identity keys (molecule)
 
 When category bags fill: ChEMBL, ChEBI, DrugBank xref, RxCUI, ATC, UNII/GSRS, UniChem/MyChem counts — each with provenance and deep links where policy-safe.
+
+## Research capabilities (P0–P1)
+
+| Capability | Code | Notes |
+|------------|------|-------|
+| Deep lit/grant/trial/structure rows | `buildMoleculeDataHub` | Titles, years, DOI/PMID, PI, institute, NCT title, PDB, UniProt |
+| Research kit export | `downloadResearchKit` | Multi-file: hub CSV, sources.json, claims.md, README, manifest |
+| Research view (molecule) | `ResearchFocusView` + ViewToggle `research` | Dense tables; default for casual browse |
+| Research tab (gene) | `gene-research` panel | Drugs · diseases · variants · pathways samples |
+| Discover mini hub | `buildDiscoverMiniHub` + `DiscoverMiniHub` | Gather facts on shortlist cards; no rank mutation |
+
+### Research kit files
+
+```
+biointel-research-kit-{slug}-{id}-data-hub.csv
+biointel-research-kit-{slug}-{id}-sources.json
+biointel-research-kit-{slug}-{id}-claims.md   # when claims present
+biointel-research-kit-{slug}-{id}-README.md
+biointel-research-kit-{slug}-{id}-manifest.json
+```

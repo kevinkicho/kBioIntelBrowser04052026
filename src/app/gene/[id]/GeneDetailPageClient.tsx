@@ -2136,8 +2136,167 @@ function GenePathwaysPanel({
   )
 }
 
+/** Dense research tables for gene page (drugs · diseases · variants · pathways samples). */
+function GeneResearchFocus({
+  geneSymbol,
+  categoryData,
+  drugCount,
+  diseaseCount,
+  clinvarCount,
+  pathwayCount,
+}: {
+  geneSymbol: string
+  categoryData: Record<string, unknown> | null
+  drugCount: number
+  diseaseCount: number
+  clinvarCount: number
+  pathwayCount: number
+}) {
+  const drugs = Array.isArray(categoryData?.geneDrugs)
+    ? (categoryData!.geneDrugs as Array<Record<string, unknown>>).slice(0, 12)
+    : []
+  const diseases = (
+    (categoryData?.geneDiseases as { disgenetAssociations?: Array<Record<string, unknown>> })
+      ?.disgenetAssociations ?? []
+  ).slice(0, 12)
+  const variants = (
+    (categoryData?.geneVariants as { clinvarVariants?: Array<Record<string, unknown>> })
+      ?.clinvarVariants ?? []
+  ).slice(0, 12)
+  const pathways = (
+    (categoryData?.genePathways as { reactomePathways?: Array<Record<string, unknown>> })
+      ?.reactomePathways ?? []
+  ).slice(0, 12)
+
+  const cell = (v: unknown) => {
+    if (v == null || v === '') return '—'
+    return String(v).slice(0, 100)
+  }
+
+  const Table = ({
+    title,
+    source,
+    cols,
+    rows,
+    testId,
+  }: {
+    title: string
+    source: string
+    cols: string[]
+    rows: string[][]
+    testId: string
+  }) => (
+    <section
+      className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden"
+      data-testid={testId}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 px-3 py-2">
+        <div>
+          <h3 className="text-xs font-semibold text-slate-100">{title}</h3>
+          <p className="text-[9px] text-slate-500">{source}</p>
+        </div>
+        <span className="text-[9px] tabular-nums text-slate-500">{rows.length} rows</span>
+      </div>
+      {rows.length === 0 ? (
+        <p className="px-3 py-3 text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[28rem] text-left">
+            <thead>
+              <tr className="text-[9px] uppercase tracking-wide text-slate-600">
+                {cols.map((c) => (
+                  <th key={c} className="px-3 py-1.5 font-semibold">
+                    {c}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((r, i) => (
+                <tr key={i} className="border-t border-slate-800/50">
+                  {r.map((c, j) => (
+                    <td
+                      key={j}
+                      className={`px-3 py-1.5 text-[11px] ${
+                        j === 0 ? 'text-slate-100 font-medium' : 'text-slate-400'
+                      }`}
+                    >
+                      <span className="line-clamp-2">{c}</span>
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  )
+
+  return (
+    <div data-testid="gene-research-focus" className="space-y-2">
+      <header className="rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 mb-3">
+        <h2 className="text-sm font-semibold text-slate-100">
+          Research view · {geneSymbol}
+        </h2>
+        <p className="text-[10px] text-slate-500">
+          Dense of-record samples from free gene sources ·{' '}
+          {drugCount + diseaseCount + clinvarCount + pathwayCount} rows across domains
+        </p>
+      </header>
+      <Table
+        title="Targeted drugs"
+        source="DGIdb"
+        cols={['Drug', 'Interaction', 'Score', 'Source']}
+        rows={drugs.map((d) => [
+          cell(d.drugName || d.name),
+          cell(d.interactionType || d.interaction),
+          cell(d.score),
+          cell(d.source || 'DGIdb'),
+        ])}
+        testId="gene-research-drugs"
+      />
+      <Table
+        title="Disease associations"
+        source="DisGeNET"
+        cols={['Disease', 'Score', 'PMIDs', 'Source']}
+        rows={diseases.map((d) => [
+          cell(d.diseaseName),
+          cell(d.score),
+          cell(d.pmids || d.pmidCount),
+          cell(d.source || 'DisGeNET'),
+        ])}
+        testId="gene-research-diseases"
+      />
+      <Table
+        title="ClinVar variants"
+        source="ClinVar"
+        cols={['Title', 'Significance', 'Condition']}
+        rows={variants.map((v) => [
+          cell(v.title || v.variantId),
+          cell(v.clinicalSignificance),
+          cell(v.conditionName || v.condition),
+        ])}
+        testId="gene-research-variants"
+      />
+      <Table
+        title="Reactome pathways"
+        source="Reactome"
+        cols={['Pathway', 'ID', 'Species']}
+        rows={pathways.map((p) => [
+          cell(p.name || p.displayName),
+          cell(p.id || p.stId),
+          cell(p.species),
+        ])}
+        testId="gene-research-pathways"
+      />
+    </div>
+  )
+}
+
 const GENE_PANELS = [
   { id: 'gene-overview', label: 'Overview' },
+  { id: 'gene-research', label: 'Research' },
   { id: 'gene_drugs', label: 'Targeted Drugs' },
   { id: 'gene-diseases', label: 'Diseases' },
   { id: 'gene-variants', label: 'Variants' },
@@ -2486,6 +2645,8 @@ function GeneDetailPageClientInner({
   const countForPanel = (panelId: string): number | null => {
     if (!loaded) return null
     switch (panelId) {
+      case 'gene-research':
+        return drugCount + diseaseCount + variantCount + pathwayCount
       case 'gene_drugs':
         return drugCount
       case 'gene-diseases':
@@ -2730,6 +2891,16 @@ function GeneDetailPageClientInner({
           <div>
             {activePanel === 'gene-overview' && (
               <GeneOverview overview={overview} fetchedAt={fetchedAt} />
+            )}
+            {activePanel === 'gene-research' && (
+              <GeneResearchFocus
+                geneSymbol={displaySymbol}
+                categoryData={categoryData as Record<string, unknown> | null}
+                drugCount={drugCount}
+                diseaseCount={diseaseCount}
+                clinvarCount={clinvarCount}
+                pathwayCount={pathwayCount}
+              />
             )}
             {activePanel === 'gene_drugs' && (
               <TargetedDrugsPanel data={categoryData} fetchedAt={fetchedAt} />

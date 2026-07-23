@@ -37,3 +37,17 @@ export {
   dataHubRowsForExport,
   type DataHubExportFormat,
 } from './exportDataHub'
+export {
+  downloadResearchKit,
+  buildResearchKitSourcesJson,
+  buildResearchKitClaimsMarkdown,
+  buildResearchKitReadme,
+  buildResearchKitManifest,
+  researchKitBaseName,
+  type ResearchKitInput,
+  type ResearchKitManifest,
+} from './researchKit'
+export {
+  buildDiscoverMiniHub,
+  type DiscoverMiniHubInput,
+} from './buildDiscoverMiniHub'

@@ -12,9 +12,11 @@ import {
   dataHubExportFilename,
   dataHubMime,
   dataHubToDelimited,
+  downloadResearchKit,
   isDataHubValueEmpty,
   type DataHubExportFormat,
 } from '@/lib/dataHub'
+import type { EvidenceClaim } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import { emptyDataClass } from '@/lib/summaryEmpty'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
@@ -34,6 +36,10 @@ export interface DataHubLedgerProps {
   density?: 'full' | 'compact'
   /** Show source directory under the ledger (default true for full density) */
   showSourceDirectory?: boolean
+  /** Optional claims for research kit export */
+  claims?: readonly EvidenceClaim[] | null
+  /** Show Research kit multi-file export (default true for full density) */
+  showResearchKit?: boolean
 }
 
 function stableHref(url?: string): string | null {
@@ -96,9 +102,13 @@ export function DataHubLedgerView({
   hideEmpty: hideEmptyProp = true,
   density = 'full',
   showSourceDirectory,
+  claims,
+  showResearchKit,
 }: DataHubLedgerProps) {
   const [hideEmpty, setHideEmpty] = useState(hideEmptyProp)
+  const [kitBusy, setKitBusy] = useState(false)
   const showDir = showSourceDirectory ?? density === 'full'
+  const showKit = showResearchKit ?? density === 'full'
   const byId = useMemo(() => {
     const m = new Map<string, DataHubRow>()
     for (const r of ledger.rows) m.set(r.id, r)
@@ -124,6 +134,20 @@ export function DataHubLedgerView({
   const exportHub = (format: DataHubExportFormat) => {
     const body = dataHubToDelimited(ledger, format, { includeEmpty: !hideEmpty })
     downloadFile(body, dataHubExportFilename(ledger, format), dataHubMime(format))
+  }
+
+  const exportKit = async () => {
+    if (kitBusy) return
+    setKitBusy(true)
+    try {
+      await downloadResearchKit({
+        ledger,
+        claims: claims ?? null,
+        includeEmpty: !hideEmpty,
+      })
+    } finally {
+      setKitBusy(false)
+    }
   }
 
   return (
@@ -184,6 +208,18 @@ export function DataHubLedgerView({
           >
             Export TSV
           </button>
+          {showKit && (
+            <button
+              type="button"
+              onClick={() => void exportKit()}
+              disabled={kitBusy}
+              className="rounded-md border border-sky-800/50 bg-sky-950/30 px-2 py-0.5 text-[10px] font-medium text-sky-200 hover:border-sky-600/50 disabled:opacity-50"
+              data-testid={`${testId}-export-kit`}
+              title="Downloads data-hub CSV, sources.json, optional claims, README"
+            >
+              {kitBusy ? 'Exporting kit…' : 'Research kit'}
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setHideEmpty((v) => !v)}

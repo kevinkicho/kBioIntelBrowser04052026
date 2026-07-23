@@ -9,8 +9,10 @@ import { DecisionStrip } from '@/components/profile/DecisionStrip'
 import { LandscapeDualStrip } from '@/components/profile/LandscapeDualStrip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
+import { ResearchFocusView } from '@/components/dataHub/ResearchFocusView'
 import { buildMoleculeCrossSource } from '@/lib/crossSource'
 import { buildMoleculeDataHub } from '@/lib/dataHub'
+import type { ProfileView } from '@/components/profile/ViewToggle'
 import { CategoryTabBar } from '@/components/profile/CategoryTabBar'
 import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
@@ -236,9 +238,18 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
     } catch { return {} }
   }, [searchParams])
 
-  const [view, setView] = useState<'panels' | 'graph'>(
-    initialView === 'graph' ? 'graph' : 'panels'
-  )
+  const [view, setView] = useState<ProfileView>(() => {
+    if (initialView === 'graph') return 'graph'
+    if (initialView === 'research') return 'research'
+    if (initialView === 'panels') return 'panels'
+    // Decision / discover deep-links keep panels; casual browse defaults to research
+    const decisionish =
+      searchParams.get('from') === 'discover' ||
+      !!searchParams.get('project') ||
+      !!searchParams.get('disease') ||
+      parseProfileMode(searchParams.get('mode')) === 'decision'
+    return decisionish ? 'panels' : 'research'
+  })
   // Decision profile mode (PR11) — independent of ViewToggle panels/graph
   const [profileMode, setProfileMode] = useState<ProfileMode>(() => {
     const fromUrl = parseProfileMode(searchParams.get('mode'))
@@ -1723,6 +1734,8 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
               className="mb-4"
               testId="molecule-data-hub"
               density={isDecisionMode ? 'compact' : 'full'}
+              claims={stripClaims}
+              showResearchKit={!isEmbed}
               onOpenPanel={(categoryId, panelId) => {
                 const catId = categoryId as CategoryId
                 setView('panels')
@@ -1822,7 +1835,42 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
         </>
       )}
 
-        {view === 'panels' || isDecisionMode ? (
+        {view === 'research' && !isDecisionMode ? (
+          <ErrorBoundary>
+            <ResearchFocusView
+              data={mergedData as Record<string, unknown>}
+              entityLabel={moleculeName}
+              testId="molecule-research-focus"
+              className="mb-6"
+            />
+            <div className="mb-4 flex flex-wrap gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  for (const id of [
+                    'research-literature',
+                    'clinical-safety',
+                    'protein-structure',
+                  ] as CategoryId[]) {
+                    if (categoryStatus[id] === 'idle') void loadCategory(id)
+                  }
+                }}
+                disabled={isBusy}
+                className="rounded-lg border border-sky-800/50 bg-sky-950/30 px-3 py-1.5 text-xs font-medium text-sky-200 hover:border-sky-600/50 disabled:opacity-50"
+                data-testid="research-load-categories"
+              >
+                Load research categories
+              </button>
+              <button
+                type="button"
+                onClick={() => setView('panels')}
+                className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:text-slate-200"
+              >
+                Open full panels →
+              </button>
+            </div>
+          </ErrorBoundary>
+        ) : view === 'panels' || isDecisionMode ? (
           <div>
             {!isEmbed && (
               <div className="mb-4 flex items-center gap-3">

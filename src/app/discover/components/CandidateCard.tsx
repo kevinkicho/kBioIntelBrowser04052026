@@ -22,6 +22,7 @@ import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
 import { buildCandidateWhy } from '@/lib/discovery/candidateWhy'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { DiscoverMiniHub } from '@/components/dataHub/DiscoverMiniHub'
 import { buildDiscoverCandidateCrossSource } from '@/lib/crossSource'
 import { candidateKey } from '@/lib/ai/aiRank'
 import { discoverCandidateAnchorId } from '@/lib/discovery/sourceHonesty'
@@ -336,12 +337,35 @@ export function CandidateCard({
               </span>
             )}
           </div>
+          <DiscoverMiniHub
+            className="mt-2"
+            testId={`candidate-mini-hub-${rank}`}
+            input={{
+              key: candidateKey(candidate),
+              name: candidate.name,
+              cid: candidate.cid,
+              chemblId: domainCandidate.identity.chemblId,
+              diseaseName,
+              sources: candidate.sources,
+              clinicalPhase: candidate.clinicalPhaseRaw,
+              trialCount: candidate.trialCountRaw,
+              targetNames:
+                candidate.sharedTargetCountRaw > 0
+                  ? [`${candidate.sharedTargetCountRaw} shared target(s)`]
+                  : undefined,
+              geneAssociationScore: candidate.geneAssociationScore,
+              compositeScore,
+              identityTrust: scores?.axes?.identityTrust ?? null,
+              evidenceBreadthSources: domainCandidate.evidenceBreadthSources,
+            }}
+          />
           {!crossBundle.empty && (
             <CrossSourceStrip
               bundle={crossBundle}
               density="compact"
               className="mt-2 mb-0 border-slate-800/60 bg-slate-950/30 p-2"
               testId={`candidate-cross-source-${rank}`}
+              title="Source coverage"
             />
           )}
           <StyledTooltip content={buildCandidateWhy(candidate, diseaseName)}>
