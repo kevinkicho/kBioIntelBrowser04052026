@@ -42,14 +42,11 @@ export const DailyMedPanel = memo(function DailyMedPanel({
       title="Drug Labels (DailyMed)"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="FDA Structured Product Labels via DailyMed. Click a row to open that label on DailyMed (setid deep link). Label text is not clinical advice."
       empty={isEmpty ? 'No drug label found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
-          <p className="mb-2 text-[10px] text-slate-600 leading-relaxed">
-            FDA Structured Product Labels via DailyMed. Click a row to open that label on DailyMed
-            (setid deep link).
-          </p>
           <FilterablePaginatedList
             items={labels}
             getSearchText={(label) =>

@@ -60,11 +60,13 @@ export function DiscoverySettingsDrawer({
         className="relative w-full max-w-md h-full bg-[#0f1117] border-l border-slate-700/60 shadow-2xl flex flex-col animate-in slide-in-from-right duration-200"
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800/60">
-          <div>
+          <div className="flex flex-wrap items-center gap-1.5">
             <h2 className="text-lg font-semibold text-slate-100">Discovery preferences</h2>
-            <p className="text-[11px] text-slate-500 mt-0.5">
-              Sticky defaults for ranking, safety, and harvest timing
-            </p>
+            <HelperTip
+              content="Sticky defaults for ranking, safety, and harvest timing. Changes apply to the next Discover rank."
+              label="About discovery preferences"
+              testId="prefs-drawer-help"
+            />
           </div>
           <button
             type="button"
@@ -116,21 +118,23 @@ export function DiscoverySettingsDrawer({
                   ['rank-time', 'Always rank-time (top-15)'],
                 ] as const
               ).map(([id, label]) => (
-                <button
+                <StyledTooltip
                   key={id}
-                  type="button"
-                  onClick={() => onChange({ harvestTiming: id as HarvestTimingPref })}
-                  className={`text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
-                    prefs.harvestTiming === id
-                      ? 'bg-indigo-900/40 border-indigo-500/60 text-indigo-100'
-                      : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-600'
-                  }`}
+                  content={PREFERENCE_TOOLTIPS.harvestTiming[id]}
+                  className="w-full"
                 >
-                  <span className="font-medium">{label}</span>
-                  <span className="block text-[10px] text-slate-500 mt-0.5">
-                    {PREFERENCE_TOOLTIPS.harvestTiming[id]}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    onClick={() => onChange({ harvestTiming: id as HarvestTimingPref })}
+                    className={`w-full text-left text-xs px-3 py-2 rounded-lg border transition-colors ${
+                      prefs.harvestTiming === id
+                        ? 'bg-indigo-900/40 border-indigo-500/60 text-indigo-100'
+                        : 'bg-slate-800/50 border-slate-700/50 text-slate-400 hover:border-slate-600'
+                    }`}
+                  >
+                    <span className="font-medium">{label}</span>
+                  </button>
+                </StyledTooltip>
               ))}
             </div>
             <label className="mt-3 flex items-center gap-2 text-xs text-slate-400 cursor-pointer">

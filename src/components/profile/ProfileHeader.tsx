@@ -10,6 +10,7 @@ import { MoleculeViewer3D } from '@/components/profile/MoleculeViewer3D'
 import { SaveToProjectButton } from '@/components/projects/SaveToProjectButton'
 import { mapLegacyCandidateToMoleculeCandidate } from '@/lib/domain'
 import { probePubChem3dClient } from '@/lib/api/pubchem3d'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 /**
@@ -193,7 +194,9 @@ export function ProfileHeader({ molecule }: { molecule: Molecule }) {
           </span>
         </div>
         {molecule.description && (
-          <p className="text-slate-400 text-sm mt-3 line-clamp-2">{molecule.description}</p>
+          <div className="mt-3">
+            <DescriptionTip text={molecule.description} label="Molecule description" />
+          </div>
         )}
       </div>
     </div>

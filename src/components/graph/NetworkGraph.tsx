@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as d3 from 'd3'
 import type { GraphData, GraphNode } from '@/lib/types'
 import { useRouter } from 'next/navigation'
+import { HelperTip } from '@/components/ui/HelperTip'
 import {
   formatProvenanceTimestamp,
   resolveProvenance,
@@ -188,9 +189,13 @@ export function NetworkGraph({
   return (
     <div className="relative w-full bg-slate-900 border border-slate-700 rounded-xl overflow-hidden" style={{ height: '520px' }}>
       <svg ref={svgRef} width="100%" height="100%" />
-      <p className="absolute top-3 left-3 text-[10px] text-slate-500 pointer-events-none">
-        Click a node for API provenance · double-click to open molecule/gene
-      </p>
+      <div className="absolute top-3 left-3 z-10 pointer-events-auto">
+        <HelperTip
+          content="Click a node for API provenance · double-click to open molecule/gene"
+          label="Graph controls"
+          testId="network-graph-help"
+        />
+      </div>
       <div className="absolute bottom-4 right-4 flex flex-wrap gap-2 text-xs pointer-events-none">
         {(Object.entries(NODE_COLORS) as [GraphNode['type'], string][]).map(([type, color]) => (
           <span key={type} className="flex items-center gap-1 text-slate-400">

@@ -203,38 +203,39 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
               </span>
               <div className="min-w-0">
                 <p className={`text-xs font-semibold ${c.text} truncate`}>{card.title}</p>
-                <p className="text-[10px] text-slate-500 line-clamp-2">{card.description}</p>
               </div>
             </>
           )
 
           if (card.id === 'order') {
             return (
-              <button
-                key={card.id}
-                type="button"
-                onClick={openOrder}
-                className={`flex w-56 flex-shrink-0 cursor-pointer items-start gap-2 rounded-lg border p-3 text-left transition-colors ${c.bg} ${c.border} ${c.hover} ${
-                  orderOpen ? 'ring-1 ring-cyan-500/40' : ''
-                }`}
-                data-testid="order-compound-cta"
-                aria-expanded={orderOpen}
-                aria-controls="order-compound-panel"
-              >
-                {content}
-              </button>
+              <StyledTooltip key={card.id} content={card.description} className="shrink-0">
+                <button
+                  type="button"
+                  onClick={openOrder}
+                  className={`flex w-56 flex-shrink-0 cursor-pointer items-start gap-2 rounded-lg border p-3 text-left transition-colors ${c.bg} ${c.border} ${c.hover} ${
+                    orderOpen ? 'ring-1 ring-cyan-500/40' : ''
+                  }`}
+                  data-testid="order-compound-cta"
+                  aria-expanded={orderOpen}
+                  aria-controls="order-compound-panel"
+                >
+                  {content}
+                </button>
+              </StyledTooltip>
             )
           }
 
           return (
-            <button
-              key={card.id}
-              type="button"
-              onClick={() => card.scrollTarget && scrollRef(card.scrollTarget)}
-              className={`flex w-52 flex-shrink-0 cursor-pointer items-start gap-2 rounded-lg border p-3 text-left transition-colors ${c.bg} ${c.border} ${c.hover}`}
-            >
-              {content}
-            </button>
+            <StyledTooltip key={card.id} content={card.description} className="shrink-0">
+              <button
+                type="button"
+                onClick={() => card.scrollTarget && scrollRef(card.scrollTarget)}
+                className={`flex w-52 flex-shrink-0 cursor-pointer items-start gap-2 rounded-lg border p-3 text-left transition-colors ${c.bg} ${c.border} ${c.hover}`}
+              >
+                {content}
+              </button>
+            </StyledTooltip>
           )
         })}
       </div>

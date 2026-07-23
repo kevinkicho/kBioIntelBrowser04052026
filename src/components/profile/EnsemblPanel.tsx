@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { EnsemblGene } from '@/lib/types'
 import {
   alphaSortOptions,
@@ -95,11 +96,7 @@ export const EnsemblPanel = memo(function EnsemblPanel({
                     {gene.end?.toLocaleString?.() ?? gene.end}
                     {gene.strand != null ? ` (${gene.strand > 0 ? '+' : '−'})` : ''}
                   </p>
-                  {gene.description && (
-                    <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
-                      {gene.description}
-                    </p>
-                  )}
+                  <DescriptionTip text={gene.description} />
                 </div>
                 {gene.url && (
                   <a

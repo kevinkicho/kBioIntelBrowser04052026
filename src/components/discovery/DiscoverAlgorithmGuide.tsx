@@ -9,6 +9,7 @@ import {
   effortLabel,
 } from '@/lib/discovery/algorithmGuide'
 import { PrefTooltip } from '@/components/discovery/PrefTooltip'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { emitProductEvent } from '@/lib/productEvents'
 
 interface DiscoverAlgorithmGuideProps {
@@ -82,28 +83,30 @@ export function DiscoverAlgorithmGuide({
           <div className="border-t border-slate-800/80 px-4 pb-4 pt-3 space-y-4">
             <div className="grid gap-2 sm:grid-cols-2">
               {DISCOVER_EXPECTATIONS.bullets.map((b) => (
-                <div
-                  key={b.title}
-                  className="rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
-                >
-                  <p className="text-[11px] font-semibold text-slate-200">{b.title}</p>
-                  <p className="mt-0.5 text-[11px] leading-snug text-slate-500">{b.text}</p>
-                </div>
+                <HelperTip key={b.title} content={b.text} label={b.title} className="w-full">
+                  <div className="cursor-help rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-slate-200">{b.title}</p>
+                  </div>
+                </HelperTip>
               ))}
             </div>
 
             <PipelineSteps />
             <AxisStrip />
 
-            <p className="text-[10px] leading-relaxed text-slate-600">
-              {DISCOVER_EXPECTATIONS.lawNote}
-            </p>
-            <Link
-              href="/how-it-works"
-              className="inline-flex text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline"
-            >
-              Full algorithms & AI prompt catalog →
-            </Link>
+            <div className="flex flex-wrap items-center gap-2">
+              <HelperTip
+                content={DISCOVER_EXPECTATIONS.lawNote}
+                label="Product law note"
+                testId="discover-algo-law-help"
+              />
+              <Link
+                href="/how-it-works"
+                className="inline-flex text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline"
+              >
+                Full algorithms & AI prompt catalog →
+              </Link>
+            </div>
           </div>
         )}
       </div>
@@ -115,8 +118,14 @@ export function DiscoverAlgorithmGuide({
       className={`rounded-xl border border-slate-800 bg-slate-900/50 p-4 ${className}`}
       data-testid="discover-algorithm-guide-panel"
     >
-      <h3 className="text-sm font-semibold text-slate-100 mb-1">How ranking works</h3>
-      <p className="text-[11px] text-slate-500 mb-3">{DISCOVER_EXPECTATIONS.subhead}</p>
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <h3 className="text-sm font-semibold text-slate-100">How ranking works</h3>
+        <HelperTip
+          content={`${DISCOVER_EXPECTATIONS.subhead}\n\n${DISCOVER_EXPECTATIONS.lawNote}`}
+          label="About ranking"
+          testId="discover-algo-panel-help"
+        />
+      </div>
       <PipelineSteps />
       <div className="mt-3">
         <AxisStrip />

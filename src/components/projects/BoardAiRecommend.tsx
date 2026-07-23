@@ -22,6 +22,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { HelperTip } from '@/components/ui/HelperTip'
 import {
   buildAiRankWhy,
   buildBoardStatusSuggestWhy,
@@ -284,8 +285,12 @@ export function BoardAiRecommend({
                   )}
                 </span>
                 {item.reasons[0] && (
-                  <span className="block text-[10px] text-slate-500 ml-4">
-                    {item.reasons[0]}
+                  <span className="ml-4 inline-block">
+                    <HelperTip
+                      content={item.reasons[0]}
+                      label="Why this rank"
+                      testId={`board-ai-reason-${item.key}`}
+                    />
                   </span>
                 )}
               </li>
@@ -294,7 +299,14 @@ export function BoardAiRecommend({
         </ol>
       )}
       {result?.caveats?.[0] && (
-        <p className="mt-2 text-[10px] text-slate-600">{result.caveats[0]}</p>
+        <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+          <span>Caveats</span>
+          <HelperTip
+            content={result.caveats.join('\n\n')}
+            label="AI ranking caveats"
+            testId="board-ai-caveats-help"
+          />
+        </div>
       )}
       <AiPromptReveal
         system={lastPrompt?.system ?? livePrompt?.system}

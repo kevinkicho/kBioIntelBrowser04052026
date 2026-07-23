@@ -67,11 +67,12 @@ export const AdverseEventsPanel = memo(function AdverseEventsPanel({
   }
 
   return (
-    <Panel title={`Adverse Events (${list.length})`} panelId={panelId} lastFetched={lastFetched}>
-      <p className="mb-2 text-[10px] text-slate-600 leading-relaxed">
-        openFDA FAERS reaction counts. Row opens the FDA FAERS Public Dashboard; use API for the
-        exact openFDA JSON query (± this drug).
-      </p>
+    <Panel
+      title={`Adverse Events (${list.length})`}
+      panelId={panelId}
+      lastFetched={lastFetched}
+      help="openFDA FAERS reaction counts (reporting counts, not incidence). Row opens the FDA FAERS Public Dashboard; use API for the exact openFDA JSON query (± this drug)."
+    >
       <FilterablePaginatedList
         items={list}
         getSearchText={(e) =>

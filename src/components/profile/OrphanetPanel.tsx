@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { OrphanetDisease } from '@/lib/types'
@@ -93,9 +94,7 @@ export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, la
                   {disease.prevalence || 'Unknown'}
                 </span>
               </div>
-              {disease.definition && (
-                <p className="text-xs text-slate-400 mt-1 line-clamp-2">{disease.definition}</p>
-              )}
+              <DescriptionTip text={disease.definition} label="Definition" className="mt-1" />
               {disease.genes && disease.genes.length > 0 && (
                 <p className="text-xs text-slate-500 mt-1">
                   Genes: {disease.genes.slice(0, 5).join(', ')}

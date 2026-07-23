@@ -2,6 +2,7 @@
 
 import { AXES, getAxis } from '@/lib/hypothesis/axes'
 import type { Filter, FilterAxis } from '@/lib/hypothesis/types'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 interface Props {
   index: number
@@ -91,7 +92,13 @@ export function FilterSlot({ index, filter, onChange, onRemove, disabled }: Prop
       </div>
 
       {axis?.description && (
-        <p className="mt-2 text-[11px] text-slate-500">{axis.description}</p>
+        <div className="mt-2 flex items-center gap-1.5">
+          <HelperTip
+            content={axis.description}
+            label={`About ${axis.label || 'filter'}`}
+            testId="filter-slot-help"
+          />
+        </div>
       )}
     </div>
   )

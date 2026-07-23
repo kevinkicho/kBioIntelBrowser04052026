@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { PubMedArticle } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
@@ -31,9 +32,7 @@ function PubMedItem({ article }: { article: PubMedArticle }) {
           .filter(Boolean)
           .join(' · ')}
       </p>
-      {article.abstract && (
-        <p className="text-[11px] text-slate-600 mt-1 line-clamp-2">{article.abstract}</p>
-      )}
+      <DescriptionTip text={article.abstract} label="Abstract" className="mt-1" />
       <div className="flex gap-2 mt-1 text-[10px]">
         {article.url && (
           <a

@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { MedGenConcept } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -33,9 +34,7 @@ function ConceptItem({ concept }: { concept: MedGenConcept }) {
               {concept.conceptId}
             </span>
           </div>
-          {definition && (
-            <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-snug">{definition}</p>
-          )}
+          <DescriptionTip text={definition} label="Definition" />
           <div className="flex flex-wrap gap-1 mt-1">
             {semanticTypes.slice(0, 6).map((type, i) => (
               <span

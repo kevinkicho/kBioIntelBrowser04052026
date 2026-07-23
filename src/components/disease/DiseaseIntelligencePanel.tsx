@@ -17,6 +17,7 @@ import {
 } from '@/lib/ai/diseasePrompts'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { renderInsightMarkdown } from '@/lib/sanitize'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface ModeState {
@@ -315,16 +316,17 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
           <div className="p-5">
             <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
               <div className="min-w-0">
-                <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
-                  {meta.title}
-                  {active.isStreaming && <StreamingDots />}
-                </h3>
-                <p className="mt-0.5 text-xs text-slate-500 leading-relaxed">
-                  {meta.description}
-                </p>
-                <p className="mt-1 text-[10px] text-indigo-300/80">
-                  You get: a written analysis for this tab only (saved under Past results).
-                </p>
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <h3 className="text-sm font-semibold text-slate-100 flex items-center gap-2">
+                    {meta.title}
+                    {active.isStreaming && <StreamingDots />}
+                  </h3>
+                  <HelperTip
+                    content={`${meta.description}\n\nYou get: a written analysis for this tab only (saved under Past results).`}
+                    label={`About ${meta.title}`}
+                    testId="disease-intel-tab-help"
+                  />
+                </div>
               </div>
               <div className="flex flex-wrap items-center gap-2 shrink-0">
                 {active.prompt && (active.prompt.system || active.prompt.user) ? (
@@ -547,16 +549,18 @@ export function DiseaseIntelligencePanel({ context }: DiseaseIntelligencePanelPr
                     className="rounded-lg border border-dashed border-slate-700/80 bg-slate-950/40 px-4 py-5 text-center"
                     data-testid="disease-intel-empty"
                   >
-                    <p className="text-sm text-slate-300 font-medium mb-1">
-                      {activeTab === 'custom'
-                        ? 'Write a research question, then generate'
-                        : `Generate ${meta.shortLabel.toLowerCase()} analysis`}
-                    </p>
-                    <p className="text-xs text-slate-500 mb-3 max-w-md mx-auto leading-relaxed">
-                      Uses your Ollama Cloud key and the genes, trial drugs, and molecules already
-                      loaded for this disease — not a clinical prediction. Nothing runs until you
-                      click Generate.
-                    </p>
+                    <div className="mb-3 flex flex-wrap items-center justify-center gap-1.5">
+                      <p className="text-sm text-slate-300 font-medium">
+                        {activeTab === 'custom'
+                          ? 'Write a research question, then generate'
+                          : `Generate ${meta.shortLabel.toLowerCase()} analysis`}
+                      </p>
+                      <HelperTip
+                        content="Uses your Ollama Cloud key and the genes, trial drugs, and molecules already loaded for this disease — not a clinical prediction. Nothing runs until you click Generate."
+                        label="About disease AI generate"
+                        testId="disease-intel-empty-help"
+                      />
+                    </div>
                     {activeTab !== 'custom' && (
                       <button
                         type="button"

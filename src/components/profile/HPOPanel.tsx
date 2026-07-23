@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { HPOTerm } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -59,11 +60,7 @@ export const HPOPanel = memo(function HPOPanel({
                         {term.id}
                       </span>
                     </div>
-                    {term.definition && (
-                      <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
-                        {term.definition}
-                      </p>
-                    )}
+                    <DescriptionTip text={term.definition} label="Definition" />
                     {term.synonyms?.length > 0 && (
                       <div className="mt-1 flex flex-wrap gap-1">
                         {term.synonyms.slice(0, 5).map((syn, j) => (

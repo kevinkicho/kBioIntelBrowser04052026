@@ -18,6 +18,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 import {
@@ -248,15 +249,19 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
             }}
           />
         </div>
-        <p className="mt-1 text-[9px] text-slate-600">
-          The model may only use allowlisted claim ids from this pack. Empty Core panels → thinner
-          answers.
-        </p>
       </div>
 
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        1. Pick what to generate
-      </p>
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          1. Pick what to generate
+        </p>
+        <HelperTip
+          content={`${packModeTaskLabel(mode)}\n\n${packModeExpectLine(mode)}\n\nThe model may only use allowlisted claim ids from this pack. Empty Core panels → thinner answers.`}
+          label="About this pack AI mode"
+          testId="pack-ai-mode-help"
+          maxWidth="20rem"
+        />
+      </div>
       <div className="mb-2 flex flex-wrap items-center gap-1">
         {MODES.map((m) => (
           <AiWhyTooltip
@@ -284,13 +289,6 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
             </button>
           </AiWhyTooltip>
         ))}
-      </div>
-
-      <div className="mb-2 rounded border border-slate-800/70 bg-slate-950/30 px-2.5 py-1.5">
-        <p className="text-[11px] leading-relaxed text-slate-400">{packModeTaskLabel(mode)}</p>
-        <p className="mt-0.5 text-[10px] leading-relaxed text-indigo-300/80">
-          {packModeExpectLine(mode)}
-        </p>
       </div>
 
       {isCustom && (

@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { MonarchDisease } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -101,11 +102,7 @@ export const MonarchPanel = memo(function MonarchPanel({
                           .join(' · ')}
                       </p>
                     )}
-                    {disease.description && (
-                      <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
-                        {disease.description}
-                      </p>
-                    )}
+                    <DescriptionTip text={disease.description} />
                   </div>
                   <div className="shrink-0 flex flex-col items-end gap-1 text-[10px]">
                     {disease.url && (

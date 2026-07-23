@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { UniprotEntry } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -63,9 +64,7 @@ export const UniprotPanel = memo(function UniprotPanel({ entries, panelId, lastF
                 )}
               </div>
               <p className="text-xs text-slate-400 mt-1">{entry.organism}</p>
-              {entry.functionSummary && (
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{entry.functionSummary}</p>
-              )}
+              <DescriptionTip text={entry.functionSummary} label="Function" className="mt-1" />
               <a
                 href={`https://www.uniprot.org/uniprotkb/${entry.accession}`}
                 target="_blank"

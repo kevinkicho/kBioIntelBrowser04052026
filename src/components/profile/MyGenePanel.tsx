@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { MyGeneAnnotation } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -95,9 +96,7 @@ export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetch
                     )}
                   </div>
                   <p className="text-xs text-slate-400 mt-1">{gene.name}</p>
-                  {gene.summary && (
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{gene.summary}</p>
-                  )}
+                  <DescriptionTip text={gene.summary} label="Summary" className="mt-1" />
                 </div>
                 <span className="text-xs px-2 py-1 bg-slate-700 text-slate-300 rounded whitespace-nowrap">
                   {gene.typeOfGene || 'gene'}

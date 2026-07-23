@@ -4,6 +4,7 @@ import { memo, useMemo, useState } from 'react'
 import Image from 'next/image'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import { PathwayMiniGraph } from '@/components/charts/PathwayMiniGraph'
 import type { ReactomePathway } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
@@ -96,9 +97,7 @@ export const ReactomePanel = memo(function ReactomePanel({ pathways, moleculeNam
                     </span>
                     <span className="text-xs text-slate-500">{pathway.species}</span>
                   </div>
-                  {pathway.summation && (
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{pathway.summation}</p>
-                  )}
+                  <DescriptionTip text={pathway.summation} label="Summation" className="mt-1" />
                   <details className="mt-2">
                     <summary className="text-xs text-indigo-400 hover:text-indigo-300 cursor-pointer">
                       View Diagram

@@ -17,6 +17,7 @@ import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import {
   aiRunButtonLabel,
@@ -229,44 +230,49 @@ export function RhAiPanel({
     >
       <AiPanelIntro intro={intro} status={status} testId="rh-ai-intro" />
 
-      <p className="mb-1 text-[10px] text-slate-500">
-        Evidence available: <span className="font-mono text-slate-300">{claimCount}</span> claims
-        {minClaims > 0 ? ` · this mode needs at least ${minClaims}` : ''}
-      </p>
+      <div className="mb-1 flex flex-wrap items-center gap-1.5 text-[10px] text-slate-500">
+        <span>
+          Evidence:{' '}
+          <span className="font-mono text-slate-300">{claimCount}</span>
+          {minClaims > 0 ? ` · need ≥${minClaims}` : ''}
+        </span>
+        <HelperTip
+          content={`${rhModeTaskLabel(mode)}\n\n${rhModeExpectLine(mode)}`}
+          label="About this RH AI mode"
+          testId="rh-ai-mode-help"
+          maxWidth="20rem"
+        />
+      </div>
 
       <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
         1. Pick what to generate
       </p>
       <div className="mb-2 flex flex-wrap gap-1">
         {MODES.map((m) => (
-          <StyledTooltip key={m.id} content={rhModeTaskLabel(m.id)}>
-          <button
-            type="button"
-            onClick={() => {
-              setMode(m.id)
-              setInsight(null)
-              setError(null)
-            }}
-            className={`rounded border px-2 py-1 text-[10px] ${
-              mode === m.id
-                ? m.id === 'rh_custom'
-                  ? 'border-cyan-600 bg-cyan-900/40 text-cyan-200'
-                  : 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
-                : 'border-slate-700 text-slate-500 hover:border-slate-600'
-            }`}
-            data-testid={`rh-ai-mode-${m.id}`}
+          <StyledTooltip
+            key={m.id}
+            content={`${rhModeTaskLabel(m.id)}\n\n${rhModeExpectLine(m.id)}`}
           >
-            {m.label}
-          </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMode(m.id)
+                setInsight(null)
+                setError(null)
+              }}
+              className={`rounded border px-2 py-1 text-[10px] ${
+                mode === m.id
+                  ? m.id === 'rh_custom'
+                    ? 'border-cyan-600 bg-cyan-900/40 text-cyan-200'
+                    : 'border-indigo-600 bg-indigo-900/40 text-indigo-200'
+                  : 'border-slate-700 text-slate-500 hover:border-slate-600'
+              }`}
+              data-testid={`rh-ai-mode-${m.id}`}
+            >
+              {m.label}
+            </button>
           </StyledTooltip>
         ))}
-      </div>
-
-      <div className="mb-2 rounded border border-slate-800/70 bg-slate-950/30 px-2.5 py-1.5">
-        <p className="text-[11px] leading-relaxed text-slate-400">{rhModeTaskLabel(mode)}</p>
-        <p className="mt-0.5 text-[10px] leading-relaxed text-indigo-300/80">
-          {rhModeExpectLine(mode)}
-        </p>
       </div>
 
       {isCustom && (

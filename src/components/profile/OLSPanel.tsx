@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { OLSTerm } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -95,11 +96,7 @@ export const OLSPanel = memo(function OLSPanel({
                       <span className="text-[10px] font-mono text-slate-600">{term.id}</span>
                     )}
                   </div>
-                  {term.description && (
-                    <p className="mt-0.5 text-[11px] text-slate-500 line-clamp-2 leading-snug">
-                      {term.description}
-                    </p>
-                  )}
+                  <DescriptionTip text={term.description} />
                   {term.synonyms?.length > 0 && (
                     <p className="mt-0.5 text-[10px] text-slate-600">
                       Also: {term.synonyms.slice(0, 4).join(', ')}

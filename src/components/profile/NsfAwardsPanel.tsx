@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { NsfAward } from '@/lib/api/nsfAwards'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
@@ -70,11 +71,7 @@ export const NsfAwardsPanel = memo(function NsfAwardsPanel({
                   {[a.startDate, a.endDate].filter(Boolean).join(' → ')}
                 </p>
               )}
-              {a.abstract && (
-                <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500 line-clamp-3">
-                  {a.abstract}
-                </p>
-              )}
+              <DescriptionTip text={a.abstract} label="Abstract" className="mt-1.5" />
               <a
                 href={a.awardUrl}
                 target="_blank"

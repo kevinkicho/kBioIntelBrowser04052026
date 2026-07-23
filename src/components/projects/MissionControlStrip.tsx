@@ -7,6 +7,7 @@
 
 import Link from 'next/link'
 import type { Project } from '@/lib/domain'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 function promoteCount(p: Project): number {
   return p.candidates.filter((c) => c.boardStatus === 'promote').length
@@ -49,37 +50,32 @@ export function MissionControlStrip({
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
-            Mission control
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-400/90">
+              Mission control
+            </p>
+            <HelperTip
+              content={[
+                needsBoard
+                  ? 'Board empty — rank candidates in Discover.'
+                  : unfinishedPack
+                    ? 'Promote set ready — open board pack for claim-rich export / RH seed.'
+                    : promote === 0
+                      ? 'Triage board: set promote / hold / kill on candidates.'
+                      : 'Continue triage or open the project board.',
+                'Of-record scores stay deterministic; optional AI analysis is non-of-record.',
+              ].join('\n\n')}
+              label="Mission control next steps"
+              testId="mission-control-help"
+            />
+          </div>
           <h2 className="text-lg font-semibold text-slate-100 truncate mt-0.5">
             {focus.name}
           </h2>
-          <p className="text-[11px] text-slate-500 mt-1">
+          <p className="text-[11px] text-slate-500 mt-1 tabular-nums">
             {focus.candidates.length} candidates · {promote} promote · {watching} watching
             {disease ? ` · ${disease}` : ''}
           </p>
-          <ul className="mt-2 text-[11px] text-slate-400 space-y-1">
-            {needsBoard && (
-              <li>
-                Board empty —{' '}
-                <Link href="/discover" className="text-indigo-400 hover:text-indigo-300">
-                  rank candidates in Discover
-                </Link>
-              </li>
-            )}
-            {!needsBoard && unfinishedPack && (
-              <li>
-                Promote set ready — open board pack for claim-rich export / RH seed
-              </li>
-            )}
-            {!needsBoard && promote === 0 && (
-              <li>Triage board: set promote / hold / kill on candidates</li>
-            )}
-            <li className="text-slate-600">
-              Of-record scores stay deterministic; optional AI analysis is non-of-record.
-            </li>
-          </ul>
         </div>
         <div className="flex flex-col gap-2 shrink-0">
           <Link

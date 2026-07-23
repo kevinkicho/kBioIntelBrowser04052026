@@ -66,3 +66,40 @@ export function HelperTip({
     </StyledTooltip>
   )
 }
+
+export interface DescriptionTipProps {
+  /** Full description / abstract / definition text */
+  text?: string | null
+  /** Short visible label (default Description) */
+  label?: string
+  className?: string
+  testId?: string
+  maxWidth?: string
+}
+
+/**
+ * Replace always-visible line-clamped descriptions with a compact “Description” chip + tooltip.
+ */
+export function DescriptionTip({
+  text,
+  label = 'Description',
+  className = 'mt-0.5',
+  testId = 'description-tip',
+  maxWidth = '20rem',
+}: DescriptionTipProps) {
+  const t = (text || '').trim()
+  if (!t) return null
+  return (
+    <HelperTip content={t} label={label} className={className} testId={testId} maxWidth={maxWidth}>
+      <span className="inline-flex cursor-help items-center gap-1 text-[10px] text-slate-500 hover:text-slate-300">
+        {label}
+        <span
+          className="inline-flex h-3.5 w-3.5 items-center justify-center rounded-full border border-slate-600/80 text-[9px] font-semibold leading-none"
+          aria-hidden
+        >
+          i
+        </span>
+      </span>
+    </HelperTip>
+  )
+}

@@ -8,6 +8,7 @@ import {
 } from '@/lib/discovery/preferences'
 import type { RubricPresetId } from '@/lib/domain/score'
 import { emitProductEvent } from '@/lib/productEvents'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface JourneyDef {
@@ -85,22 +86,24 @@ export function DiscoverJourneys({ onRun, disabled }: Props) {
 
   return (
     <div className="mt-4 text-center" data-testid="discover-journeys">
-      <p className="mb-2 text-[10px] uppercase tracking-wide text-slate-600">
-        Guided journeys (sets rubric + harvest, then ranks)
-      </p>
+      <div className="mb-2 flex flex-wrap items-center justify-center gap-1.5">
+        <p className="text-[10px] uppercase tracking-wide text-slate-600">Guided journeys</p>
+        <HelperTip
+          content="Each journey sets rubric + harvest preferences, then ranks the disease. Descriptions on hover."
+          label="About guided journeys"
+          testId="discover-journeys-help"
+        />
+      </div>
       <div className="flex flex-wrap items-stretch justify-center gap-2">
         {DISCOVER_JOURNEYS.map((j) => (
-          <StyledTooltip key={j.id} content={j.description}>
+          <StyledTooltip key={j.id} content={j.description} className="max-w-[14rem]">
             <button
               type="button"
               disabled={disabled}
               onClick={() => run(j)}
-              className="max-w-[14rem] rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-center transition-colors hover:border-indigo-600/50 hover:bg-slate-800/50 disabled:opacity-40"
+              className="w-full rounded-xl border border-slate-700/60 bg-slate-900/60 px-3 py-2 text-center transition-colors hover:border-indigo-600/50 hover:bg-slate-800/50 disabled:opacity-40"
             >
               <span className="block text-[11px] font-medium text-slate-200">{j.label}</span>
-              <span className="mt-0.5 block text-[9px] text-slate-500 leading-snug line-clamp-2">
-                {j.description}
-              </span>
             </button>
           </StyledTooltip>
         ))}

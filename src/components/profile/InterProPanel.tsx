@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { DescriptionTip } from '@/components/ui/HelperTip'
 import type { ProteinDomain } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -72,9 +73,7 @@ export const InterProPanel = memo(function InterProPanel({
                 </a>
               </div>
 
-              {domain.description && (
-                <p className="text-xs text-slate-400 mt-2 line-clamp-2">{domain.description}</p>
-              )}
+              <DescriptionTip text={domain.description} className="mt-2" />
             </div>
           )}
         />

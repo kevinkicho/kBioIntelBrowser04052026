@@ -24,6 +24,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 import {
@@ -196,9 +197,17 @@ export function ResearchLabAiPanel({
     >
       <AiPanelIntro intro={intro} status={status} testId="research-lab-ai-intro" />
 
-      <p className="mb-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-        1. Pick what to generate
-      </p>
+      <div className="mb-1 flex flex-wrap items-center gap-1.5">
+        <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+          1. Pick what to generate
+        </p>
+        <HelperTip
+          content={`${packModeTaskLabel(mode)}\n\n${packModeExpectLine(mode)}`}
+          label="About this lab AI mode"
+          testId="lab-ai-mode-help"
+          maxWidth="20rem"
+        />
+      </div>
       <div className="flex flex-wrap items-center gap-1.5">
         {LAB_MODES.map((m) => (
           <AiWhyTooltip key={m.id} why={buildPackAiModeWhy(m.id)} testId={`lab-ai-why-${m.id}`}>
@@ -219,10 +228,6 @@ export function ResearchLabAiPanel({
             </button>
           </AiWhyTooltip>
         ))}
-      </div>
-      <div className="mt-1.5 rounded border border-slate-800/70 bg-slate-950/30 px-2.5 py-1.5">
-        <p className="text-[10px] text-slate-500">{packModeTaskLabel(mode)}</p>
-        <p className="mt-0.5 text-[10px] text-violet-300/80">{packModeExpectLine(mode)}</p>
       </div>
 
       {isCustom && (

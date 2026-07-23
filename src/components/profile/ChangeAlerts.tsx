@@ -4,6 +4,7 @@ import { useState } from 'react'
 import type { ChangeItem } from '@/lib/changeDetection'
 import { getSnapshotAge } from '@/lib/changeDetection'
 import { buildMoleculePanelDeepLink } from '@/lib/signals'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
@@ -79,9 +80,14 @@ export function ChangeAlerts({ changes, cid, projectId }: Props) {
           )
         })}
       </div>
-      <p className="mt-2 text-[10px] text-slate-500">
-        Click a chip to open the corresponding data panel.
-      </p>
+      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+        <span>Change chips</span>
+        <HelperTip
+          content="Click a chip to open the corresponding data panel. Counts reflect local snapshot diffs, not clinical alerts."
+          label="About change alerts"
+          testId="change-alerts-help"
+        />
+      </div>
     </div>
   )
 }

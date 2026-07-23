@@ -172,12 +172,8 @@ export const ClinicalTrialsPanel = memo(function ClinicalTrialsPanel({
       panelId={panelId}
       lastFetched={lastFetched}
       titleExtra={titleSuffix}
+      help="ClinicalTrials.gov studies — default sort is latest → oldest (by completion, else start). Click an NCT ID for conditions & interventions. Use search, sort, Columns, and Export CSV. EudraCT/CTIS links appear when secondary IDs are present."
     >
-      <p className="mb-2 text-[10px] text-slate-600 leading-relaxed">
-        ClinicalTrials.gov studies — default sort is{' '}
-        <strong className="text-slate-500">latest → oldest</strong> (by completion, else start).
-        Click an NCT ID for conditions & interventions. Use search, sort, Columns, and Export CSV.
-      </p>
       <div className="overflow-x-auto -mx-0.5 px-0.5" data-testid="clinical-trials-table">
         <FilterablePaginatedList
           items={list}

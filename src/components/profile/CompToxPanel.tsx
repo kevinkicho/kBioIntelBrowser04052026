@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { HelperTip } from '@/components/ui/HelperTip'
 import type { CompToxData } from '@/lib/types'
 import { buildEchaDeepLinks } from '@/lib/echaLinks'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
@@ -156,13 +157,13 @@ export const CompToxPanel = memo(function CompToxPanel({
                 </p>
               </div>
             ) : (
-              <div className="rounded-md border border-slate-700/80 bg-slate-800/40 px-3 py-2">
+              <div className="flex flex-wrap items-center gap-1.5 rounded-md border border-slate-700/80 bg-slate-800/40 px-3 py-2">
                 <p className="text-xs font-medium text-slate-300">ToxCast assay counts</p>
-                <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
-                  Not available from the free CompTox search API (detail/ToxCast endpoints no
-                  longer return public counts). Open the CompTox Dashboard for bioactivity and
-                  ToxCast tables, or check the separate ToxCast panel when assay rows load.
-                </p>
+                <HelperTip
+                  content="Not available from the free CompTox search API (detail/ToxCast endpoints no longer return public counts). Open the CompTox Dashboard for bioactivity and ToxCast tables, or check the separate ToxCast panel when assay rows load."
+                  label="About ToxCast counts"
+                  testId="comptox-toxcast-help"
+                />
               </div>
             )}
 
