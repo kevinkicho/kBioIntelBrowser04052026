@@ -32,6 +32,14 @@ Coding agents and human implementers: read this before changing product behavior
 - Search history sidebar: `src/lib/searchHistory.ts`, `src/components/layout/SearchHistorySidebar.tsx`
 - Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/profileRevisitIdb.ts`, `src/lib/fetchCategory.ts`
 
+## UI chrome (agents)
+
+- **Search history sidebar**: width CSS var `--app-sidebar-width` (2.5rem collapsed / 18rem expanded); header + main pad with it so canvas centers in remaining space
+- **UI density**: Comfortable | Dense toggle (`biointel-ui-density-v1`); comfortable shows short description previews + tips
+- **AI copilot FAB**: bottom-right on profile pages (`data-testid="ai-copilot-fab"`); configure AI via header chip
+- **API sources share**: `npm run export:api-sources` → `docs/api-sources-manifest.json`
+- **Optional free keys**: `docs/operator-free-api-keys.md` (never product requirements)
+
 ## Commands
 
 ```text
@@ -39,6 +47,7 @@ npm run dev                              # required before e2e (no Playwright we
 npx tsc --noEmit
 npm test
 npm run test:gate                        # tsc + key jest suites (v2.1)
+npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
 npm run test:e2e:fixture                 # north-star e2e (needs npm run dev, E2E_FIXTURE=1)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
 npm run test:e2e:live                    # north-star e2e against live APIs (optional)
