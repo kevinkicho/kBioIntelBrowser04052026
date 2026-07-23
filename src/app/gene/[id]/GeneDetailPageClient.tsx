@@ -30,6 +30,9 @@ import { DescriptionTip, HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
+import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
+import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
+import { isGeneResearchTableEnabled } from '@/lib/researchViewPrefs'
 import { buildGeneCrossSource } from '@/lib/crossSource'
 import { buildGeneDataHub } from '@/lib/dataHub'
 
@@ -2152,21 +2155,29 @@ function GeneResearchFocus({
   clinvarCount: number
   pathwayCount: number
 }) {
+  const { prefs } = useResearchViewPrefs()
+  const limit = prefs.tableRowLimit
+
+  const showDrugs = isGeneResearchTableEnabled(prefs, 'drugs')
+  const showDiseases = isGeneResearchTableEnabled(prefs, 'diseases')
+  const showVariants = isGeneResearchTableEnabled(prefs, 'variants')
+  const showPathways = isGeneResearchTableEnabled(prefs, 'pathways')
+
   const drugs = Array.isArray(categoryData?.geneDrugs)
-    ? (categoryData!.geneDrugs as Array<Record<string, unknown>>).slice(0, 12)
+    ? (categoryData!.geneDrugs as Array<Record<string, unknown>>).slice(0, limit)
     : []
   const diseases = (
     (categoryData?.geneDiseases as { disgenetAssociations?: Array<Record<string, unknown>> })
       ?.disgenetAssociations ?? []
-  ).slice(0, 12)
+  ).slice(0, limit)
   const variants = (
     (categoryData?.geneVariants as { clinvarVariants?: Array<Record<string, unknown>> })
       ?.clinvarVariants ?? []
-  ).slice(0, 12)
+  ).slice(0, limit)
   const pathways = (
     (categoryData?.genePathways as { reactomePathways?: Array<Record<string, unknown>> })
       ?.reactomePathways ?? []
-  ).slice(0, 12)
+  ).slice(0, limit)
 
   const cell = (v: unknown) => {
     if (v == null || v === '') return '—'
@@ -2241,55 +2252,65 @@ function GeneResearchFocus({
         </h2>
         <p className="text-[10px] text-slate-500">
           Dense of-record samples from free gene sources ·{' '}
-          {drugCount + diseaseCount + clinvarCount + pathwayCount} rows across domains
+          {drugCount + diseaseCount + clinvarCount + pathwayCount} rows across domains · pins saved
+          locally
         </p>
       </header>
-      <Table
-        title="Targeted drugs"
-        source="DGIdb"
-        cols={['Drug', 'Interaction', 'Score', 'Source']}
-        rows={drugs.map((d) => [
-          cell(d.drugName || d.name),
-          cell(d.interactionType || d.interaction),
-          cell(d.score),
-          cell(d.source || 'DGIdb'),
-        ])}
-        testId="gene-research-drugs"
-      />
-      <Table
-        title="Disease associations"
-        source="DisGeNET"
-        cols={['Disease', 'Score', 'PMIDs', 'Source']}
-        rows={diseases.map((d) => [
-          cell(d.diseaseName),
-          cell(d.score),
-          cell(d.pmids || d.pmidCount),
-          cell(d.source || 'DisGeNET'),
-        ])}
-        testId="gene-research-diseases"
-      />
-      <Table
-        title="ClinVar variants"
-        source="ClinVar"
-        cols={['Title', 'Significance', 'Condition']}
-        rows={variants.map((v) => [
-          cell(v.title || v.variantId),
-          cell(v.clinicalSignificance),
-          cell(v.conditionName || v.condition),
-        ])}
-        testId="gene-research-variants"
-      />
-      <Table
-        title="Reactome pathways"
-        source="Reactome"
-        cols={['Pathway', 'ID', 'Species']}
-        rows={pathways.map((p) => [
-          cell(p.name || p.displayName),
-          cell(p.id || p.stId),
-          cell(p.species),
-        ])}
-        testId="gene-research-pathways"
-      />
+      <ResearchViewPrefsBar mode="gene" testId="gene-research-prefs" className="mb-3" />
+      {showDrugs && (
+        <Table
+          title="Targeted drugs"
+          source="DGIdb"
+          cols={['Drug', 'Interaction', 'Score', 'Source']}
+          rows={drugs.map((d) => [
+            cell(d.drugName || d.name),
+            cell(d.interactionType || d.interaction),
+            cell(d.score),
+            cell(d.source || 'DGIdb'),
+          ])}
+          testId="gene-research-drugs"
+        />
+      )}
+      {showDiseases && (
+        <Table
+          title="Disease associations"
+          source="DisGeNET"
+          cols={['Disease', 'Score', 'PMIDs', 'Source']}
+          rows={diseases.map((d) => [
+            cell(d.diseaseName),
+            cell(d.score),
+            cell(d.pmids || d.pmidCount),
+            cell(d.source || 'DisGeNET'),
+          ])}
+          testId="gene-research-diseases"
+        />
+      )}
+      {showVariants && (
+        <Table
+          title="ClinVar variants"
+          source="ClinVar"
+          cols={['Title', 'Significance', 'Condition']}
+          rows={variants.map((v) => [
+            cell(v.title || v.variantId),
+            cell(v.clinicalSignificance),
+            cell(v.conditionName || v.condition),
+          ])}
+          testId="gene-research-variants"
+        />
+      )}
+      {showPathways && (
+        <Table
+          title="Reactome pathways"
+          source="Reactome"
+          cols={['Pathway', 'ID', 'Species']}
+          rows={pathways.map((p) => [
+            cell(p.name || p.displayName),
+            cell(p.id || p.stId),
+            cell(p.species),
+          ])}
+          testId="gene-research-pathways"
+        />
+      )}
     </div>
   )
 }

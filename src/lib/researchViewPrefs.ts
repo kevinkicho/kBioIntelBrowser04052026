@@ -51,11 +51,30 @@ export const HUB_DOMAIN_LABELS: Record<DataHubDomain, string> = {
   other: 'Structures / other',
 }
 
+/** Gene Research tab tables */
+export type GeneResearchTableDomain = 'drugs' | 'diseases' | 'variants' | 'pathways'
+
+export const GENE_RESEARCH_TABLE_DOMAINS: readonly GeneResearchTableDomain[] = [
+  'drugs',
+  'diseases',
+  'variants',
+  'pathways',
+] as const
+
+export const GENE_RESEARCH_TABLE_LABELS: Record<GeneResearchTableDomain, string> = {
+  drugs: 'Drugs',
+  diseases: 'Diseases',
+  variants: 'Variants',
+  pathways: 'Pathways',
+}
+
 export interface ResearchViewPrefs {
   /** Which research tables are visible (empty array = all) */
   researchTables: ResearchTableDomain[]
   /** Which hub domains are visible (empty array = all) */
   hubDomains: DataHubDomain[]
+  /** Gene Research tab tables */
+  geneResearchTables: GeneResearchTableDomain[]
   /** Hide empty hub / matrix rows by default */
   hideEmpty: boolean
   /** Casual profile default when no URL/decision context */
@@ -67,6 +86,7 @@ export interface ResearchViewPrefs {
 export const DEFAULT_RESEARCH_VIEW_PREFS: ResearchViewPrefs = {
   researchTables: [...RESEARCH_TABLE_DOMAINS],
   hubDomains: [...HUB_DOMAIN_ORDER],
+  geneResearchTables: [...GENE_RESEARCH_TABLE_DOMAINS],
   hideEmpty: true,
   preferredProfileView: 'research',
   tableRowLimit: 12,
@@ -94,6 +114,12 @@ function isHubDomain(v: unknown): v is DataHubDomain {
   )
 }
 
+function isGeneTableDomain(v: unknown): v is GeneResearchTableDomain {
+  return (
+    v === 'drugs' || v === 'diseases' || v === 'variants' || v === 'pathways'
+  )
+}
+
 export function parseResearchViewPrefs(raw: unknown): ResearchViewPrefs {
   if (!raw || typeof raw !== 'object') return { ...DEFAULT_RESEARCH_VIEW_PREFS }
 
@@ -104,6 +130,9 @@ export function parseResearchViewPrefs(raw: unknown): ResearchViewPrefs {
   const hubs = Array.isArray(o.hubDomains)
     ? o.hubDomains.filter(isHubDomain)
     : [...DEFAULT_RESEARCH_VIEW_PREFS.hubDomains]
+  const geneTables = Array.isArray(o.geneResearchTables)
+    ? o.geneResearchTables.filter(isGeneTableDomain)
+    : [...DEFAULT_RESEARCH_VIEW_PREFS.geneResearchTables]
 
   const limit =
     typeof o.tableRowLimit === 'number' &&
@@ -122,6 +151,10 @@ export function parseResearchViewPrefs(raw: unknown): ResearchViewPrefs {
     researchTables:
       tables.length > 0 ? tables : [...DEFAULT_RESEARCH_VIEW_PREFS.researchTables],
     hubDomains: hubs.length > 0 ? hubs : [...DEFAULT_RESEARCH_VIEW_PREFS.hubDomains],
+    geneResearchTables:
+      geneTables.length > 0
+        ? geneTables
+        : [...DEFAULT_RESEARCH_VIEW_PREFS.geneResearchTables],
     hideEmpty: o.hideEmpty === false ? false : true,
     preferredProfileView: preferred,
     tableRowLimit: limit,
@@ -180,6 +213,29 @@ export function isHubDomainEnabled(
 ): boolean {
   if (!prefs.hubDomains.length) return true
   return prefs.hubDomains.includes(domain)
+}
+
+export function isGeneResearchTableEnabled(
+  prefs: ResearchViewPrefs,
+  domain: GeneResearchTableDomain,
+): boolean {
+  if (!prefs.geneResearchTables.length) return true
+  return prefs.geneResearchTables.includes(domain)
+}
+
+/** JSON body for research kit / lab handoff */
+export function researchViewPrefsExportPayload(
+  prefs?: ResearchViewPrefs,
+): Record<string, unknown> {
+  const p = prefs ?? DEFAULT_RESEARCH_VIEW_PREFS
+  return {
+    schemaVersion: 1,
+    kind: 'biointel-research-view-prefs',
+    key: RESEARCH_VIEW_PREFS_KEY,
+    exportedAt: new Date().toISOString(),
+    prefs: p,
+    note: 'Solo-local presentation pins only. Does not change of-record Discover ranks.',
+  }
 }
 
 export function toggleListItem<T extends string>(

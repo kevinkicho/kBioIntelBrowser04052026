@@ -3,7 +3,9 @@ import {
   buildLedgerForCompare,
   compareBagsFromMoleculeData,
   compareHubMatrixToDelimited,
+  compareSectionToDomain,
 } from '@/lib/dataHub'
+import { isHubDomainEnabled, parseResearchViewPrefs } from '@/lib/researchViewPrefs'
 
 describe('compare data hub matrix', () => {
   it('aligns facts across two molecules', () => {
@@ -76,5 +78,36 @@ describe('compare data hub matrix', () => {
     const m = buildCompareHubMatrix([])
     expect(m.rows).toHaveLength(0)
     expect(m.filledFactCount).toBe(0)
+  })
+
+  it('matrix rows carry domain for hub pin filtering', () => {
+    const a = buildLedgerForCompare(
+      { cid: 1, name: 'A' },
+      compareBagsFromMoleculeData({
+        trials: [
+          {
+            nctId: 'NCT1',
+            title: 'T',
+            phase: 'P2',
+            status: 'A',
+            conditions: ['x'],
+            sponsor: 's',
+          },
+        ],
+      }),
+    )
+    const matrix = buildCompareHubMatrix([
+      { subjectId: '1', subjectLabel: 'A', ledger: a },
+      { subjectId: '2', subjectLabel: 'B', ledger: a },
+    ])
+    const clinical = matrix.rows.find((r) => r.factId === 'cl-sample-nct')
+    expect(clinical?.domain).toBe('clinical')
+    expect(compareSectionToDomain('literature')).toBe('literature')
+    expect(compareSectionToDomain('structures')).toBe('other')
+
+    const prefs = parseResearchViewPrefs({ hubDomains: ['identity'] })
+    const visible = matrix.rows.filter((r) => isHubDomainEnabled(prefs, r.domain))
+    expect(visible.every((r) => r.domain === 'identity')).toBe(true)
+    expect(visible.some((r) => r.factId === 'cl-sample-nct')).toBe(false)
   })
 })

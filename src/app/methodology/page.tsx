@@ -187,10 +187,15 @@ export default function MethodologyPage() {
         <section className="mb-8 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <h2 className="text-sm font-semibold text-slate-100">Saved research view (local)</h2>
           <p className="mt-2 text-[12px] leading-relaxed text-slate-400">
-            On molecule Research view and Data hub headers you can pin which tables and domains stay visible,
-            set default profile view (Research vs Panels), hide empty facts, and choose rows-per-table. Preferences
-            live only in this browser (<code className="text-slate-500">biointel-research-view-prefs-v1</code>) —
-            solo-local product law, not a multi-tenant cloud profile.
+            Pin molecule research tables, data-hub domains (also on{' '}
+            <Link href="/compare" className="text-indigo-300 hover:underline">
+              compare
+            </Link>
+            ), and gene research tables; set default profile view, hide empty facts, and rows-per-table.
+            Stored only in this browser (
+            <code className="text-slate-500">biointel-research-view-prefs-v1</code>
+            ). <strong className="font-medium text-slate-300">Research kit + prefs</strong> downloads a
+            snapshot JSON with the hub CSV for lab handoff — import is manual and never changes Discover ranks.
           </p>
         </section>
 

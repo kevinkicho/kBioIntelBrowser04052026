@@ -4,7 +4,7 @@
  * Side-by-side multi-CID data hub table for /compare.
  */
 
-import { Fragment, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import type { CompareHubMatrix } from '@/lib/dataHub'
 import { compareHubMatrixFilename, compareHubMatrixToDelimited } from '@/lib/dataHub'
@@ -13,6 +13,9 @@ import { emptyDataClass } from '@/lib/summaryEmpty'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { HelperTip } from '@/components/ui/HelperTip'
+import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
+import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
+import { isHubDomainEnabled } from '@/lib/researchViewPrefs'
 
 export interface CompareDataHubMatrixProps {
   matrix: CompareHubMatrix
@@ -32,12 +35,21 @@ export function CompareDataHubMatrix({
   className = '',
   testId = 'compare-data-hub',
 }: CompareDataHubMatrixProps) {
+  const { prefs, patch, hydrated } = useResearchViewPrefs()
   const [hideEmpty, setHideEmpty] = useState(true)
+
+  useEffect(() => {
+    if (hydrated) setHideEmpty(prefs.hideEmpty)
+  }, [hydrated, prefs.hideEmpty])
+
+  const filteredRows = useMemo(() => {
+    return matrix.rows.filter((r) => isHubDomainEnabled(prefs, r.domain))
+  }, [matrix.rows, prefs])
 
   const sections = useMemo(() => {
     const order: string[] = []
     const map = new Map<string, { title: string; rows: typeof matrix.rows }>()
-    for (const r of matrix.rows) {
+    for (const r of filteredRows) {
       if (hideEmpty && r.cells.every((c) => c.empty)) continue
       if (!map.has(r.sectionId)) {
         order.push(r.sectionId)
@@ -46,10 +58,16 @@ export function CompareDataHubMatrix({
       map.get(r.sectionId)!.rows.push(r)
     }
     return order.map((id) => ({ id, ...map.get(id)! }))
-  }, [matrix.rows, hideEmpty])
+  }, [filteredRows, hideEmpty])
 
   const exportMatrix = (format: 'csv' | 'tsv') => {
-    const body = compareHubMatrixToDelimited(matrix, format, {
+    // Export respects current domain pins + hideEmpty
+    const exportMatrixShape: CompareHubMatrix = {
+      ...matrix,
+      rows: filteredRows,
+      filledFactCount: filteredRows.filter((r) => r.cells.some((c) => !c.empty)).length,
+    }
+    const body = compareHubMatrixToDelimited(exportMatrixShape, format, {
       includeEmpty: !hideEmpty,
     })
     const mime =
@@ -57,6 +75,12 @@ export function CompareDataHubMatrix({
         ? 'text/tab-separated-values;charset=utf-8'
         : 'text/csv;charset=utf-8'
     downloadFile(body, compareHubMatrixFilename(matrix, format), mime)
+  }
+
+  const toggleHideEmpty = () => {
+    const next = !hideEmpty
+    setHideEmpty(next)
+    patch({ hideEmpty: next })
   }
 
   if (matrix.columns.length < 2) {
@@ -88,6 +112,7 @@ export function CompareDataHubMatrix({
               content={[
                 'Same fact rows across molecules for research comparison.',
                 'Values are free public API samples loaded for this compare page.',
+                'Domain pins match Data hub saved research view (solo localStorage).',
                 'Empty cells are not evidence of absence. Not clinical decision support.',
                 ...(matrix.notes || []),
               ].join('\n\n')}
@@ -95,7 +120,11 @@ export function CompareDataHubMatrix({
             />
           </div>
           <p className="mt-0.5 text-[10px] text-slate-500">
-            {matrix.filledFactCount} facts · {n} molecules · of-record public samples
+            {filteredRows.filter((r) => r.cells.some((c) => !c.empty)).length} facts
+            {filteredRows.length < matrix.rows.length
+              ? ` (of ${matrix.rows.length} total)`
+              : ''}{' '}
+            · {n} molecules · domain pins applied
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -117,7 +146,7 @@ export function CompareDataHubMatrix({
           </button>
           <button
             type="button"
-            onClick={() => setHideEmpty((v) => !v)}
+            onClick={toggleHideEmpty}
             className={`rounded-md border px-2 py-0.5 text-[10px] font-medium ${
               hideEmpty
                 ? 'border-indigo-700/50 bg-indigo-950/40 text-indigo-200'
@@ -128,6 +157,10 @@ export function CompareDataHubMatrix({
             {hideEmpty ? 'Show empty' : 'Hide empty'}
           </button>
         </div>
+      </div>
+
+      <div className="border-b border-slate-800/80 px-3 py-2 sm:px-4">
+        <ResearchViewPrefsBar mode="hub" compact testId={`${testId}-prefs`} />
       </div>
 
       {/* Column headers */}

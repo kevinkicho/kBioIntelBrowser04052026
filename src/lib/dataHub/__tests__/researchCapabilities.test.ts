@@ -7,6 +7,7 @@ import {
   buildResearchKitSourcesJson,
   dataHubToDelimited,
 } from '@/lib/dataHub'
+import { researchViewPrefsExportPayload, DEFAULT_RESEARCH_VIEW_PREFS } from '@/lib/researchViewPrefs'
 import type { EvidenceClaim } from '@/lib/domain'
 
 describe('research capabilities P0–P1', () => {
@@ -94,10 +95,16 @@ describe('research capabilities P0–P1', () => {
     const files = ['a.csv', 'b.json']
     const readme = buildResearchKitReadme(ledger, files)
     expect(readme).toMatch(/research kit/i)
-    const manifest = buildResearchKitManifest(ledger, files, 1)
+    const filesWithPrefs = [...files, 'prefs.json']
+    const readme2 = buildResearchKitReadme(ledger, filesWithPrefs)
+    expect(readme2).toMatch(/research-view-prefs/i)
+    const manifest = buildResearchKitManifest(ledger, filesWithPrefs, 1)
     expect(manifest.kind).toBe('biointel-research-kit')
     expect(manifest.claimCount).toBe(1)
     expect(manifest.schemaVersion).toBe(1)
+    expect(researchViewPrefsExportPayload(DEFAULT_RESEARCH_VIEW_PREFS).kind).toBe(
+      'biointel-research-view-prefs',
+    )
   })
 
   it('discover mini hub surfaces identity and research gather facts', () => {

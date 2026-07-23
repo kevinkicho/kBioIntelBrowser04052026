@@ -5,11 +5,14 @@
  */
 
 import {
+  GENE_RESEARCH_TABLE_DOMAINS,
+  GENE_RESEARCH_TABLE_LABELS,
   HUB_DOMAIN_LABELS,
   HUB_DOMAIN_ORDER,
   RESEARCH_TABLE_DOMAINS,
   RESEARCH_TABLE_LABELS,
   toggleListItem,
+  type GeneResearchTableDomain,
   type PreferredProfileView,
   type ResearchTableDomain,
 } from '@/lib/researchViewPrefs'
@@ -19,7 +22,7 @@ import { HelperTip } from '@/components/ui/HelperTip'
 
 export interface ResearchViewPrefsBarProps {
   /** Which chip groups to show */
-  mode?: 'research' | 'hub' | 'both'
+  mode?: 'research' | 'hub' | 'gene' | 'both'
   className?: string
   testId?: string
   /** Compact: fewer labels */
@@ -45,6 +48,7 @@ export function ResearchViewPrefsBar({
 
   const showResearch = mode === 'research' || mode === 'both'
   const showHub = mode === 'hub' || mode === 'both'
+  const showGene = mode === 'gene'
 
   return (
     <div
@@ -141,6 +145,43 @@ export function ResearchViewPrefsBar({
                   data-testid={`${testId}-hub-${d}`}
                 >
                   {HUB_DOMAIN_LABELS[d]}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {showGene && (
+        <div className="mb-2">
+          {!compact && (
+            <p className="mb-1 text-[9px] text-slate-600">Gene research tables</p>
+          )}
+          <div className="flex flex-wrap gap-1" role="group" aria-label="Gene research tables">
+            {GENE_RESEARCH_TABLE_DOMAINS.map((d) => {
+              const on = prefs.geneResearchTables.includes(d)
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() =>
+                    patch({
+                      geneResearchTables: toggleListItem(
+                        prefs.geneResearchTables,
+                        d,
+                        GENE_RESEARCH_TABLE_DOMAINS,
+                      ) as GeneResearchTableDomain[],
+                    })
+                  }
+                  className={`rounded-full border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+                    on
+                      ? 'border-violet-700/50 bg-violet-950/40 text-violet-200'
+                      : 'border-slate-700 text-slate-500 hover:text-slate-300'
+                  }`}
+                  data-testid={`${testId}-gene-${d}`}
+                >
+                  {GENE_RESEARCH_TABLE_LABELS[d]}
                 </button>
               )
             })}

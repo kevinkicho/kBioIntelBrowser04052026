@@ -1,10 +1,13 @@
 import {
   DEFAULT_RESEARCH_VIEW_PREFS,
+  isGeneResearchTableEnabled,
   isHubDomainEnabled,
   isResearchTableEnabled,
   parseResearchViewPrefs,
+  researchViewPrefsExportPayload,
   toggleListItem,
   RESEARCH_TABLE_DOMAINS,
+  GENE_RESEARCH_TABLE_DOMAINS,
   HUB_DOMAIN_ORDER,
 } from '@/lib/researchViewPrefs'
 
@@ -54,11 +57,14 @@ describe('researchViewPrefs', () => {
     const prefs = parseResearchViewPrefs({
       researchTables: ['literature'],
       hubDomains: ['identity'],
+      geneResearchTables: ['drugs', 'pathways'],
     })
     expect(isResearchTableEnabled(prefs, 'literature')).toBe(true)
     expect(isResearchTableEnabled(prefs, 'trials')).toBe(false)
     expect(isHubDomainEnabled(prefs, 'identity')).toBe(true)
     expect(isHubDomainEnabled(prefs, 'safety')).toBe(false)
+    expect(isGeneResearchTableEnabled(prefs, 'drugs')).toBe(true)
+    expect(isGeneResearchTableEnabled(prefs, 'diseases')).toBe(false)
     // full lists enable all
     const all = DEFAULT_RESEARCH_VIEW_PREFS
     for (const d of RESEARCH_TABLE_DOMAINS) {
@@ -67,5 +73,17 @@ describe('researchViewPrefs', () => {
     for (const d of HUB_DOMAIN_ORDER) {
       expect(isHubDomainEnabled(all, d)).toBe(true)
     }
+    for (const d of GENE_RESEARCH_TABLE_DOMAINS) {
+      expect(isGeneResearchTableEnabled(all, d)).toBe(true)
+    }
+  })
+
+  it('export payload is handoff-safe JSON shape', () => {
+    const payload = researchViewPrefsExportPayload(DEFAULT_RESEARCH_VIEW_PREFS)
+    expect(payload.kind).toBe('biointel-research-view-prefs')
+    expect(payload.schemaVersion).toBe(1)
+    expect((payload.prefs as { geneResearchTables: string[] }).geneResearchTables).toContain(
+      'drugs',
+    )
   })
 })

@@ -7,6 +7,11 @@
 import type { EvidenceClaim } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import {
+  loadResearchViewPrefs,
+  researchViewPrefsExportPayload,
+  type ResearchViewPrefs,
+} from '@/lib/researchViewPrefs'
+import {
   buildSourceDirectory,
   type SourceDirectory,
 } from './buildSourceDirectory'
@@ -25,6 +30,11 @@ export interface ResearchKitInput {
   notes?: string[]
   /** Include empty hub rows in CSV */
   includeEmpty?: boolean
+  /**
+   * Include research-view prefs JSON for lab handoff (default true).
+   * Pass false to skip; pass an object to use explicit prefs instead of localStorage.
+   */
+  includePrefs?: boolean | ResearchViewPrefs
 }
 
 export interface ResearchKitManifest {
@@ -121,6 +131,7 @@ export function buildResearchKitReadme(
     '1. Open the CSV in a spreadsheet or notebook for of-record public facts.',
     '2. Use `sources.json` for API docs links and per-source fact counts on this page session.',
     '3. Claims (if present) are extractor statements with provenance — cite primary registries for grants.',
+    '4. If present, `research-view-prefs.json` is a solo-local presentation pin snapshot (domains / hide-empty / default view). Import is manual; it does not change Discover ranks.',
     '',
     '## Honesty',
     '',
@@ -159,19 +170,31 @@ export function buildResearchKitManifest(
 
 /**
  * Trigger multi-file research kit download in the browser.
+ * Includes research-view prefs JSON by default for lab handoff.
  */
 export async function downloadResearchKit(input: ResearchKitInput): Promise<ResearchKitManifest> {
-  const { ledger, claims, notes, includeEmpty } = input
+  const { ledger, claims, notes, includeEmpty, includePrefs = true } = input
   const base = kitBase(ledger)
   const hubCsvName = `${base}-data-hub.csv`
   const sourcesName = `${base}-sources.json`
+  const prefsName = `${base}-research-view-prefs.json`
   const readmeName = `${base}-README.md`
   const manifestName = `${base}-manifest.json`
   const claimsName = `${base}-claims.md`
 
-  const files = [hubCsvName, sourcesName, readmeName, manifestName]
   const claimList = claims ? [...claims] : []
-  if (claimList.length > 0) files.splice(2, 0, claimsName)
+  const wantPrefs = includePrefs !== false
+  const prefsObj =
+    typeof includePrefs === 'object' && includePrefs
+      ? includePrefs
+      : wantPrefs
+        ? loadResearchViewPrefs()
+        : null
+
+  const files = [hubCsvName, sourcesName]
+  if (claimList.length > 0) files.push(claimsName)
+  if (prefsObj) files.push(prefsName)
+  files.push(readmeName, manifestName)
 
   const hubCsv = dataHubToDelimited(ledger, 'csv', { includeEmpty: !!includeEmpty })
   const sourcesJson = buildResearchKitSourcesJson(ledger)
@@ -179,6 +202,9 @@ export async function downloadResearchKit(input: ResearchKitInput): Promise<Rese
     claimList.length > 0
       ? buildResearchKitClaimsMarkdown(claimList, ledger.subjectLabel)
       : null
+  const prefsJson = prefsObj
+    ? JSON.stringify(researchViewPrefsExportPayload(prefsObj), null, 2)
+    : null
   const readme = buildResearchKitReadme(ledger, files, notes)
   const manifest = buildResearchKitManifest(ledger, files, claimList.length)
 
@@ -189,6 +215,10 @@ export async function downloadResearchKit(input: ResearchKitInput): Promise<Rese
   await sleep(180)
   if (claimsMd) {
     downloadFile(claimsMd, claimsName, 'text/markdown;charset=utf-8')
+    await sleep(180)
+  }
+  if (prefsJson) {
+    downloadFile(prefsJson, prefsName, 'application/json;charset=utf-8')
     await sleep(180)
   }
   downloadFile(readme, readmeName, 'text/markdown;charset=utf-8')

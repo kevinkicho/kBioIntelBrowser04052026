@@ -3,7 +3,7 @@
  * Pure — no network. Aligns fact ids across molecule ledgers.
  */
 
-import type { DataHubLedger, DataHubRow } from './types'
+import type { DataHubDomain, DataHubLedger, DataHubRow } from './types'
 import { isDataHubValueEmpty } from './types'
 import { buildMoleculeDataHub, type MoleculeIdentityInput } from './buildMoleculeDataHub'
 
@@ -26,9 +26,45 @@ export interface CompareHubMatrixRow {
   fact: string
   sectionId: string
   sectionTitle: string
+  /** Data hub domain for saved research view pins */
+  domain: DataHubDomain
   /** Consensus source label when all agree, else “multi” */
   sourceHint: string
   cells: CompareHubMatrixCell[]
+}
+
+/** Map molecule hub section ids → DataHubDomain for prefs filtering. */
+export function compareSectionToDomain(sectionId: string): DataHubDomain {
+  switch (sectionId) {
+    case 'identity':
+    case 'keys':
+      return 'identity'
+    case 'regulatory':
+      return 'regulatory'
+    case 'clinical':
+      return 'clinical'
+    case 'targets':
+      return 'targets'
+    case 'safety':
+      return 'safety'
+    case 'literature':
+      return 'literature'
+    case 'structures':
+      return 'other'
+    default:
+      if (
+        sectionId === 'chemistry' ||
+        sectionId === 'regulatory' ||
+        sectionId === 'clinical' ||
+        sectionId === 'targets' ||
+        sectionId === 'safety' ||
+        sectionId === 'literature' ||
+        sectionId === 'other'
+      ) {
+        return sectionId as DataHubDomain
+      }
+      return 'other'
+  }
 }
 
 export interface CompareHubMatrix {
@@ -119,8 +155,13 @@ export function buildCompareHubMatrix(columns: CompareHubColumn[]): CompareHubMa
 
   // Ordered fact ids: first ledger sections, then remaining from others
   const seen = new Set<string>()
-  const ordered: Array<{ factId: string; sectionId: string; sectionTitle: string; fact: string }> =
-    []
+  const ordered: Array<{
+    factId: string
+    sectionId: string
+    sectionTitle: string
+    fact: string
+    domain: DataHubDomain
+  }> = []
 
   for (const col of columns) {
     for (const sec of col.ledger.sections) {
@@ -133,6 +174,7 @@ export function buildCompareHubMatrix(columns: CompareHubColumn[]): CompareHubMa
           sectionId: sec.id,
           sectionTitle: sec.title,
           fact: row?.fact || id,
+          domain: row?.domain || compareSectionToDomain(sec.id),
         })
       }
     }
@@ -155,15 +197,17 @@ export function buildCompareHubMatrix(columns: CompareHubColumn[]): CompareHubMa
     const sources = new Set(
       cells.filter((c) => !c.empty && c.source).map((c) => c.source as string),
     )
-    // Prefer section title from first non-empty ledger that has the row
+    // Prefer section title / domain from first non-empty ledger that has the row
     let sectionId = meta.sectionId
     let sectionTitle = meta.sectionTitle
+    let domain = meta.domain
     for (let i = 0; i < columns.length; i++) {
       const r = byCol[i]!.get(meta.factId)
       if (r && !isDataHubValueEmpty(r.value)) {
         const st = sectionTitleFor(columns[i]!.ledger, meta.factId)
         sectionId = st.id
         sectionTitle = st.title
+        domain = r.domain || compareSectionToDomain(st.id)
         break
       }
     }
@@ -172,6 +216,7 @@ export function buildCompareHubMatrix(columns: CompareHubColumn[]): CompareHubMa
       fact: meta.fact,
       sectionId,
       sectionTitle,
+      domain,
       sourceHint: sources.size <= 1 ? Array.from(sources)[0] || '—' : 'multiple sources',
       cells,
     }

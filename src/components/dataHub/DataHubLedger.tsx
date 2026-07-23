@@ -197,6 +197,7 @@ export function DataHubLedgerView({
                 'Each row is a value retrieved from a free public API with its source name.',
                 'Open Panel for the siloed full table; Source opens the primary registry when a deep link exists.',
                 'Export CSV/TSV for lab notebooks — of-record facts only, not AI narrative.',
+                'Research kit + prefs downloads hub CSV, sources, optional claims, research-view-prefs.json, README.',
                 'Not model-generated. Not for clinical or regulatory decisions.',
                 ...(ledger.notes || []),
               ].join('\n\n')}
@@ -246,7 +247,7 @@ export function DataHubLedgerView({
               data-testid={`${testId}-export-kit`}
               title="Downloads data-hub CSV, sources.json, optional claims, README"
             >
-              {kitBusy ? 'Exporting kit…' : 'Research kit'}
+              {kitBusy ? 'Exporting kit…' : 'Research kit + prefs'}
             </button>
           )}
           <button

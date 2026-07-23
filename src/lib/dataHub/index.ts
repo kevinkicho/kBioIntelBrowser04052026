@@ -57,6 +57,7 @@ export {
   compareBagsFromMoleculeData,
   compareHubMatrixToDelimited,
   compareHubMatrixFilename,
+  compareSectionToDomain,
   type CompareHubColumn,
   type CompareHubMatrix,
   type CompareHubMatrixRow,
