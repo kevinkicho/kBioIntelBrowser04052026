@@ -41,6 +41,7 @@ const NAV_LINKS = [
   { href: '/analytics', label: 'API Analytics', color: 'emerald' },
   { href: '/watchlist', label: 'Watchlist', color: 'amber' },
   { href: '/orgs', label: 'Research labs & orgs', color: 'violet' },
+  { href: '/methodology', label: 'How we present data', color: 'slate' },
 ]
 
 function LinkChip({

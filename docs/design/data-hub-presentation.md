@@ -76,3 +76,15 @@ biointel-research-kit-{slug}-{id}-claims.md   # when claims present
 biointel-research-kit-{slug}-{id}-README.md
 biointel-research-kit-{slug}-{id}-manifest.json
 ```
+
+## Compare side-by-side hub (P2)
+
+| Piece | Path |
+|-------|------|
+| Builder | `buildCompareHubMatrix` / `compareBagsFromMoleculeData` |
+| UI | `CompareDataHubMatrix` on `/compare` when ≥2 CIDs load |
+| Export | CSV/TSV of fact × molecule matrix |
+
+## Methodology page (P2)
+
+Public citable page: **`/methodology`** (“How we present data”) — of-record layers, honesty rules, exports, product law. Linked from header (**Data methods**), homepage, how-it-works, compare footer.

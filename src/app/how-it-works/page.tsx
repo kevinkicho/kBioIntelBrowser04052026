@@ -160,6 +160,13 @@ export default function HowItWorksPage() {
             label="About this page"
             testId="how-page-lede-help"
           />
+          <Link
+            href="/methodology"
+            className="ml-auto text-[11px] text-indigo-400 hover:text-indigo-300 hover:underline"
+            data-testid="how-to-methodology-link"
+          >
+            How we present data →
+          </Link>
         </div>
 
         <div

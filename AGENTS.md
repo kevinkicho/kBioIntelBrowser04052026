@@ -39,7 +39,7 @@ Coding agents and human implementers: read this before changing product behavior
 - **AI copilot FAB**: bottom-right on profile pages (`data-testid="ai-copilot-fab"`); configure AI via header chip
 - **API sources share**: `npm run export:api-sources` → `docs/api-sources-manifest.json`
 - **Optional free keys**: `docs/operator-free-api-keys.md` (never product requirements)
-- **Data hub (of-record facts)**: Fact|Value|Source|Open ledger on molecule / gene / disease / org — `src/lib/dataHub/*`, `DataHubLedgerView`; CSV/TSV + **Research kit** multi-file export; source directory; molecule **Research** view + gene Research tab; Discover **mini hub** on candidates. Derived charts/AI labeled non-of-record. See `docs/design/data-hub-presentation.md`
+- **Data hub (of-record facts)**: Fact|Value|Source|Open ledger on molecule / gene / disease / org — `src/lib/dataHub/*`, `DataHubLedgerView`; CSV/TSV + **Research kit** multi-file export; source directory; molecule **Research** view + gene Research tab; Discover **mini hub**; **compare side-by-side hub**; public **`/methodology`**. Derived charts/AI labeled non-of-record. See `docs/design/data-hub-presentation.md`
 
 ## Commands
 

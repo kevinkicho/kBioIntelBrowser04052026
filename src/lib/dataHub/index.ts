@@ -51,3 +51,14 @@ export {
   buildDiscoverMiniHub,
   type DiscoverMiniHubInput,
 } from './buildDiscoverMiniHub'
+export {
+  buildCompareHubMatrix,
+  buildLedgerForCompare,
+  compareBagsFromMoleculeData,
+  compareHubMatrixToDelimited,
+  compareHubMatrixFilename,
+  type CompareHubColumn,
+  type CompareHubMatrix,
+  type CompareHubMatrixRow,
+  type CompareHubMatrixCell,
+} from './buildCompareHub'

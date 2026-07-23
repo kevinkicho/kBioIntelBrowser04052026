@@ -23,6 +23,13 @@ import { getSemanticPapersByName } from '@/lib/api/semantic-scholar'
 import { getPdbStructuresByName } from '@/lib/api/pdb'
 import { getReactomePathwaysByName } from '@/lib/api/reactome'
 import { ComparePageClient } from './ComparePageClient'
+import { CompareDataHubMatrix } from '@/components/dataHub/CompareDataHubMatrix'
+import {
+  buildCompareHubMatrix,
+  buildLedgerForCompare,
+  compareBagsFromMoleculeData,
+  type CompareHubColumn,
+} from '@/lib/dataHub'
 import { CompareSection } from '@/components/compare/CompareSection'
 import { PropertiesCompare } from '@/components/compare/PropertiesCompare'
 import { ProfileHeader } from '@/components/profile/ProfileHeader'
@@ -300,6 +307,48 @@ export default async function ComparePage({
   const d0 = datasets[0]?.data
   const d1 = datasets[1]?.data
 
+  const compareHubMatrix =
+    n >= 2
+      ? buildCompareHubMatrix(
+          datasets.map(({ cid, data }): CompareHubColumn => {
+            const mol = data.molecule
+            const ledger = buildLedgerForCompare(
+              {
+                cid,
+                name: mol.name,
+                formula: mol.formula,
+                molecularWeight: mol.molecularWeight,
+                inchiKey: mol.inchiKey,
+                iupacName: mol.iupacName,
+                synonyms: mol.synonyms,
+              },
+              compareBagsFromMoleculeData({
+                trials: data.trials,
+                adverseEvents: data.adverseEvents,
+                orangeBookEntries: data.orangeBookEntries,
+                ndcProducts: data.ndcProducts,
+                drugLabels: data.drugLabels,
+                chemblActivities: data.chemblActivities,
+                chemblMechanisms: data.chemblMechanisms,
+                chemblIndications: data.chemblIndications,
+                literature: data.literature,
+                nihGrants: data.nihGrants,
+                semanticPapers: data.semanticPapers,
+                patents: data.patents,
+                pdbStructures: data.pdbStructures,
+                uniprotEntries: data.uniprotEntries,
+                drugRecalls: data.drugRecalls,
+              }),
+            )
+            return {
+              subjectId: String(cid),
+              subjectLabel: mol.name || `CID ${cid}`,
+              ledger,
+            }
+          }),
+        )
+      : null
+
   return (
     <div className="page-canvas" data-testid="compare-page">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-slate-800/80 pb-3">
@@ -339,6 +388,19 @@ export default async function ComparePage({
         <p className="py-10 text-center text-sm text-slate-500">
           Add at least two molecules above to compare them across free public evidence sources.
         </p>
+      )}
+
+      {n >= 2 && compareHubMatrix && (
+        <div className="mb-6 min-w-0">
+          <CompareDataHubMatrix matrix={compareHubMatrix} className="mb-2" />
+          <p className="text-[10px] text-slate-600">
+            See also{' '}
+            <Link href="/methodology" className="text-indigo-400 hover:underline">
+              how we present data
+            </Link>{' '}
+            for of-record vs assistive layers.
+          </p>
+        </div>
       )}
 
       {n >= 2 && (

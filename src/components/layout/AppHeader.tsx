@@ -21,6 +21,11 @@ const NAV = [
     label: 'How it works',
     match: (p: string) => p.startsWith('/how-it-works'),
   },
+  {
+    href: '/methodology',
+    label: 'Data methods',
+    match: (p: string) => p.startsWith('/methodology'),
+  },
 ] as const
 
 /**
