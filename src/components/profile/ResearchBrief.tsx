@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useState } from 'react'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { clientFetch } from '@/lib/clientFetch'
 import {
   buildOllamaBriefSystemPrompt,
@@ -346,9 +347,11 @@ export function ResearchBrief({ data, moleculeName, cid }: Props) {
                 ? ` · AI at ${new Date(aiMeta.generatedAt).toLocaleString()}`
                 : ''}
             </span>
-            <span className="text-slate-600">
-              Not clinical / regulatory decision support
-            </span>
+            <HelperTip
+              content="Not clinical / regulatory decision support. Evidence-first brief from free public sources only."
+              label="About this research brief"
+              testId="research-brief-disclaimer"
+            />
           </div>
         </div>
       )}

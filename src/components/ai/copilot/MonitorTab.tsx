@@ -8,6 +8,7 @@ import {
   type RetrievalGap,
   type RetrievalSnapshot,
 } from '@/lib/ai/retrievalMonitor'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function gapDotClass(reason: RetrievalGap['reason']): string {
@@ -54,9 +55,16 @@ export function MonitorTab({
     <div className="space-y-3" data-testid="copilot-monitor">
       <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
-            Data retrieval
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+              Data retrieval
+            </span>
+            <HelperTip
+              content={`Share of terminal outcomes with data: ${pct}%. Empty = retrieved, no rows (honest). Failed = timeout/error (retry). Pending = not loaded yet.`}
+              label="About data retrieval"
+              testId="copilot-monitor-retrieval-help"
+            />
+          </div>
           <StyledTooltip content="Share of terminal outcomes with data">
             <span className="text-[10px] text-slate-500">{pct}% with data</span>
           </StyledTooltip>
@@ -85,10 +93,6 @@ export function MonitorTab({
             <p className="text-[8px] text-slate-500 uppercase">Pending</p>
           </div>
         </div>
-        <p className="mt-2 text-[9px] text-slate-600 leading-relaxed">
-          Empty = retrieved, no rows (honest). Failed = timeout/error (retry). Pending = not loaded
-          yet.
-        </p>
       </div>
 
       {Object.entries(snapshot.categories).map(([catId, cat]) => (

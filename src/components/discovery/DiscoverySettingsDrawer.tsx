@@ -13,6 +13,8 @@ import type { RubricPresetId, ScoreAxisWeights } from '@/lib/domain/score'
 import type { AeAggressivenessPref } from '@/lib/discovery/preferences'
 import { RubricEditor } from '@/app/discover/components/RubricEditor'
 import { PrefTooltip } from '@/components/discovery/PrefTooltip'
+import { HelperTip } from '@/components/ui/HelperTip'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface DiscoverySettingsDrawerProps {
   open: boolean
@@ -180,13 +182,14 @@ export function DiscoverySettingsDrawer({
           </div>
 
           <div>
-            <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
               Beachhead persona
+              <HelperTip
+                content="One-click presets for repurposing triage (default) vs rare-disease lab. Does not change ranking math — only tour examples, Orphanet pin boost, and soft AE defaults."
+                label="About beachhead persona"
+                testId="prefs-persona-help"
+              />
             </div>
-            <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
-              One-click presets for repurposing triage (default) vs rare-disease lab. Does not
-              change ranking math — only tour examples, Orphanet pin boost, and soft AE defaults.
-            </p>
             <div className="flex flex-col gap-2">
               {(
                 [
@@ -207,50 +210,52 @@ export function DiscoverySettingsDrawer({
                     ? prefs.rareDiseaseBoost && prefs.tourExampleSet === 'rare-only'
                     : !prefs.rareDiseaseBoost && prefs.tourExampleSet === 'mixed'
                 return (
-                  <button
-                    key={id}
-                    type="button"
-                    onClick={() => {
-                      const next = applyBeachheadPersona(id as BeachheadPersonaId)
-                      onChange({
-                        rubricPreset: next.rubricPreset,
-                        aeAggressiveness: next.aeAggressiveness,
-                        harvestTiming: next.harvestTiming,
-                        tourExampleSet: next.tourExampleSet,
-                        rareDiseaseBoost: next.rareDiseaseBoost,
-                        collaborationMode: next.collaborationMode,
-                      })
-                    }}
-                    className={`rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
-                      active
-                        ? 'border-violet-500/60 bg-violet-900/30 text-violet-100'
-                        : 'border-slate-700/50 bg-slate-800/50 text-slate-400 hover:border-slate-600'
-                    }`}
-                    data-testid={`persona-${id}`}
-                  >
-                    <span className="font-medium">{label}</span>
-                    <span className="block text-[10px] text-slate-500 mt-0.5">{hint}</span>
-                  </button>
+                  <StyledTooltip key={id} content={hint} className="w-full">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const next = applyBeachheadPersona(id as BeachheadPersonaId)
+                        onChange({
+                          rubricPreset: next.rubricPreset,
+                          aeAggressiveness: next.aeAggressiveness,
+                          harvestTiming: next.harvestTiming,
+                          tourExampleSet: next.tourExampleSet,
+                          rareDiseaseBoost: next.rareDiseaseBoost,
+                          collaborationMode: next.collaborationMode,
+                        })
+                      }}
+                      className={`w-full rounded-lg border px-3 py-2 text-left text-xs transition-colors ${
+                        active
+                          ? 'border-violet-500/60 bg-violet-900/30 text-violet-100'
+                          : 'border-slate-700/50 bg-slate-800/50 text-slate-400 hover:border-slate-600'
+                      }`}
+                      data-testid={`persona-${id}`}
+                    >
+                      <span className="font-medium">{label}</span>
+                    </button>
+                  </StyledTooltip>
                 )
               })}
             </div>
           </div>
 
           <div>
-            <div className="mb-2 flex items-center text-xs font-semibold text-slate-300">
+            <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
               Rare-disease boost (Orphanet)
+              <HelperTip
+                content="After ranking, fetch Orphanet gene associations for the disease name and merge into pinned targets (max 10). Free Orphadata only; no effect when no Orphanet hit."
+                label="About Orphanet boost"
+                testId="prefs-orphanet-help"
+              />
             </div>
-            <label className="flex cursor-pointer items-start gap-2 text-xs text-slate-400">
+            <label className="flex cursor-pointer items-center gap-2 text-xs text-slate-400">
               <input
                 type="checkbox"
                 checked={prefs.rareDiseaseBoost}
                 onChange={(e) => onChange({ rareDiseaseBoost: e.target.checked })}
-                className="mt-0.5 rounded border-slate-600 accent-indigo-500"
+                className="rounded border-slate-600 accent-indigo-500"
               />
-              <span>
-                After ranking, fetch Orphanet gene associations for the disease name and merge into
-                pinned targets (max 10). Free Orphadata only; no effect when no Orphanet hit.
-              </span>
+              <span>Enable Orphanet gene pin merge</span>
             </label>
           </div>
 
@@ -282,11 +287,14 @@ export function DiscoverySettingsDrawer({
             </div>
           </div>
 
-          <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-3 text-[11px] leading-relaxed text-slate-500">
-            Empty AE data is never scored as “safe.” Soft-flag mode clamps safety for high
-            clinical-stage drugs and surfaces FAERS as badges. Rank-time harvest adds ~8–12s for
-            top-15 safety + novelty. Share pack uses content-hashed 30-day snapshots when
-            collaboration mode allows.
+          <div className="flex items-center gap-1.5 text-[11px] text-slate-500">
+            <span>Scoring & harvest notes</span>
+            <HelperTip
+              content='Empty AE data is never scored as "safe." Soft-flag mode clamps safety for high clinical-stage drugs and surfaces FAERS as badges. Rank-time harvest adds ~8–12s for top-15 safety + novelty. Share pack uses content-hashed 30-day snapshots when collaboration mode allows.'
+              label="Scoring and harvest notes"
+              testId="prefs-scoring-notes-help"
+              maxWidth="20rem"
+            />
           </div>
         </div>
 

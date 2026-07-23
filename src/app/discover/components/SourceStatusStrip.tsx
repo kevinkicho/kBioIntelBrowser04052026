@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import type { DataLoadStatus, SourceFetchStatus } from '@/lib/dataStatus'
 import { emitProductEvent } from '@/lib/productEvents'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
@@ -143,15 +144,16 @@ export function SourceStatusStrip({
       aria-label="Upstream source status"
     >
       <div className="mb-1 flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
           <h3 className="text-[11px] font-semibold text-slate-200">
             Upstream APIs for this rank
           </h3>
-          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-            Did each free public gather step load, return empty, or fail? Open a source name for its
-            registry. Molecule-level hits are in <strong className="font-medium text-slate-400">Source honesty</strong>{' '}
-            below.
-          </p>
+          <HelperTip
+            content="Did each free public gather step load, return empty, or fail? Open a source name for its registry. Molecule-level hits are in Source honesty below. Scores are investigation priority aids, not predictions of clinical success. Empty ≠ absence of biology; empty safety ≠ safe."
+            label="About upstream API status"
+            testId="source-status-help"
+            maxWidth="20rem"
+          />
         </div>
         <span className="text-[10px] text-slate-600 tabular-nums" data-testid="source-status-total">
           {counts.total} source{counts.total !== 1 ? 's' : ''}
@@ -245,13 +247,11 @@ export function SourceStatusStrip({
         </ul>
       </details>
 
-      <p
-        className="text-[11px] leading-relaxed text-slate-500"
-        data-testid="source-status-disclaimer"
-      >
+      {/* Disclaimer lives in HelperTip above (source-status-help) to reduce strip clutter */}
+      <span className="sr-only" data-testid="source-status-disclaimer">
         Scores are investigation priority aids, not predictions of clinical success. Empty ≠
         absence of biology; empty safety ≠ safe.
-      </p>
+      </span>
     </section>
   )
 }

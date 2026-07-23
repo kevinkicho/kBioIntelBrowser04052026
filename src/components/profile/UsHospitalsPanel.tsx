@@ -35,20 +35,17 @@ export const UsHospitalsPanel = memo(function UsHospitalsPanel({
           ? 'No Medicare-registered hospitals matched trial facility / sponsor names (CMS free dataset).'
           : undefined
       }
+      help="CMS Hospital General Information (Medicare-registered US hospitals). Ratings are public Care Compare fields — not a treatment recommendation or referral."
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          CMS Hospital General Information (Medicare-registered US hospitals). Ratings are public
-          Care Compare fields — not a treatment recommendation or referral.{' '}
-          <a
-            href="https://data.cms.gov/provider-data/dataset/xubh-q36u"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:underline"
-          >
-            Dataset
-          </a>
-        </p>
+        <a
+          href="https://data.cms.gov/provider-data/dataset/xubh-q36u"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-[10px] text-indigo-400 hover:underline"
+        >
+          CMS dataset
+        </a>
         {list.length > 0 && (
           <FilterablePaginatedList
             items={list}

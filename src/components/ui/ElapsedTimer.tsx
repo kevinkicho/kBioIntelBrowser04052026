@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { elapsedWaitHint, formatElapsed } from '@/lib/elapsedTime'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 /**
  * Live elapsed clock while `active` is true. Resets when becoming active again.
@@ -70,12 +71,17 @@ export function ElapsedTimer({
         </span>
       </div>
       {showHint && active && (
-        <p
-          className="mt-1.5 text-center text-[10px] text-slate-500 leading-relaxed transition-opacity duration-500"
-          data-testid={`${testId}-hint`}
-        >
-          {elapsedWaitHint(elapsed)}
-        </p>
+        <div className="mt-1.5 flex justify-center" data-testid={`${testId}-hint`}>
+          <HelperTip
+            content={elapsedWaitHint(elapsed)}
+            label="Wait tip"
+            testId={`${testId}-hint-tip`}
+          >
+            <span className="cursor-help text-[10px] text-slate-500 underline decoration-dotted decoration-slate-600 underline-offset-2">
+              Wait tip
+            </span>
+          </HelperTip>
+        </div>
       )}
     </div>
   )

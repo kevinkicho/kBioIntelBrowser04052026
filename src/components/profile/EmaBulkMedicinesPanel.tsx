@@ -39,6 +39,7 @@ export const EmaBulkMedicinesPanel = memo(function EmaBulkMedicinesPanel({
       }
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Official EMA medicines output Excel (cached server-side). Biosimilar flag is EMA's table column — not clinical decision support."
       empty={
         list.length === 0
           ? 'No rows matched this name in the official EMA medicines Excel dump (tier B, overnight updates).'
@@ -46,25 +47,21 @@ export const EmaBulkMedicinesPanel = memo(function EmaBulkMedicinesPanel({
       }
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Official EMA medicines output Excel (cached server-side). Biosimilar flag is EMA&apos;s
-          table column — not clinical decision support.{' '}
-          <a
-            href="https://www.ema.europa.eu/en/medicines/download-medicine-data"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:underline"
-            onClick={() =>
-              onDeepLinkClick(
-                'other',
-                'https://www.ema.europa.eu/en/medicines/download-medicine-data',
-                { panelId: panelId || 'ema-bulk', label: 'ema-download-portal' },
-              )
-            }
-          >
-            EMA download page
-          </a>
-        </p>
+        <a
+          href="https://www.ema.europa.eu/en/medicines/download-medicine-data"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-[10px] text-indigo-400 hover:underline"
+          onClick={() =>
+            onDeepLinkClick(
+              'other',
+              'https://www.ema.europa.eu/en/medicines/download-medicine-data',
+              { panelId: panelId || 'ema-bulk', label: 'ema-download-portal' },
+            )
+          }
+        >
+          EMA download page
+        </a>
         {list.length > 0 && (
           <FilterablePaginatedList
             items={list}

@@ -12,6 +12,7 @@ import {
 } from '@/lib/diseaseSearch'
 import { DiseaseRelatedMoleculesTable } from '@/components/disease/DiseaseRelatedMoleculesTable'
 import Link from 'next/link'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export default function DiseasePage() {
   const searchParams = useSearchParams()
@@ -227,37 +228,37 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Associated Molecules</p>
           <ul className="space-y-1.5">
-            {result.molecules.slice(0, 6).map((m) => (
-              <li
-                key={m.cid ?? m.name}
-                className="rounded-lg bg-slate-900/50 border border-slate-700/60 px-2.5 py-1.5"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  {m.cid ? (
-                    <Link
-                      href={`/molecule/${m.cid}`}
-                      className="text-sm text-emerald-300 hover:text-emerald-200 truncate"
-                    >
-                      {m.name}
-                    </Link>
-                  ) : (
-                    <span className="text-sm text-slate-400 truncate">{m.name}</span>
-                  )}
-                  <span className="text-[9px] text-slate-600 shrink-0">
-                    {m.relationKind === 'known_drug'
-                      ? 'drug'
-                      : m.relationKind === 'gene_associated'
-                        ? 'gene'
-                        : 'linked'}
-                  </span>
-                </div>
-                {m.reason && (
-                  <p className="text-[10px] text-slate-500 leading-snug mt-0.5 line-clamp-2">
-                    {m.reason}
-                  </p>
-                )}
-              </li>
-            ))}
+            {result.molecules.slice(0, 6).map((m) => {
+              const kind =
+                m.relationKind === 'known_drug'
+                  ? 'drug'
+                  : m.relationKind === 'gene_associated'
+                    ? 'gene'
+                    : 'linked'
+              const tip = [m.reason, kind].filter(Boolean).join(' · ')
+              return (
+                <li
+                  key={m.cid ?? m.name}
+                  className="rounded-lg bg-slate-900/50 border border-slate-700/60 px-2.5 py-1.5"
+                >
+                  <StyledTooltip content={tip || undefined} className="w-full">
+                    <div className="flex items-center justify-between gap-2">
+                      {m.cid ? (
+                        <Link
+                          href={`/molecule/${m.cid}`}
+                          className="text-sm text-emerald-300 hover:text-emerald-200 truncate"
+                        >
+                          {m.name}
+                        </Link>
+                      ) : (
+                        <span className="text-sm text-slate-400 truncate">{m.name}</span>
+                      )}
+                      <span className="text-[9px] text-slate-600 shrink-0">{kind}</span>
+                    </div>
+                  </StyledTooltip>
+                </li>
+              )
+            })}
             {result.molecules.length > 6 && (
               <li className="text-[10px] text-slate-600 px-1">
                 +{result.molecules.length - 6} more on detail page

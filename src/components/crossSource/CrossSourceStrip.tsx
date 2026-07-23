@@ -11,6 +11,7 @@ import { isFactEmpty } from '@/lib/crossSource'
 import { emptyDataClass } from '@/lib/summaryEmpty'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const TONE: Record<CrossSourceTone, string> = {
@@ -77,13 +78,19 @@ export function CrossSourceStrip({
       aria-label={heading}
     >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
           <h3 className="text-xs font-semibold text-slate-100">{heading}</h3>
           {density === 'full' && (
-            <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-              Free public sources joined for analysis — each chip keeps its source. Open a chip for
-              the full siloed table (list cards stay one-API for provenance).
-            </p>
+            <HelperTip
+              content={[
+                'Free public sources joined for analysis — each chip keeps its source. Open a chip for the full siloed table (list cards stay one-API for provenance).',
+                bundle.notes[0] || '',
+              ]
+                .filter(Boolean)
+                .join('\n\n')}
+              label="About this evidence strip"
+              testId={`${testId}-help`}
+            />
           )}
         </div>
         <span
@@ -126,10 +133,6 @@ export function CrossSourceStrip({
           </div>
         )
       })}
-
-      {bundle.notes[0] && density === 'full' && (
-        <p className="mt-2 text-[9px] leading-relaxed text-slate-600">{bundle.notes[0]}</p>
-      )}
     </section>
   )
 }

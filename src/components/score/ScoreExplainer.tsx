@@ -6,11 +6,11 @@ import { createDefaultScoreRubric } from '@/lib/domain/score'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import {
   AXIS_HELP,
-  axisStatusHelp,
   explainScoreContributions,
   formatCompositeTooltip,
 } from '@/lib/domain/scoreAxisHelp'
 import { emitProductEvent } from '@/lib/productEvents'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface ScoreExplainerProps {
@@ -110,11 +110,16 @@ export function ScoreExplainer({
               &times;
             </button>
           </div>
-          <p className="mb-2 text-[11px]">
-            Weighted sum over five axes (preset:{' '}
-            <span className="text-slate-200">{String(preset)}</span>
-            ). Missing axes are renormalized or penalized per rubric — never invented by AI.
-          </p>
+          <div className="mb-2 flex flex-wrap items-center gap-1.5 text-[11px] text-slate-400">
+            <span>
+              Preset: <span className="text-slate-200">{String(preset)}</span>
+            </span>
+            <HelperTip
+              content="Weighted sum over five axes. Missing axes are renormalized or penalized per rubric — never invented by AI."
+              label="About multi-axis composite"
+              testId="score-explainer-method-help"
+            />
+          </div>
           {expl && (
             <p
               className="mb-2 rounded border border-slate-700/80 bg-slate-900/50 px-2 py-1 text-[11px] text-emerald-300/90 tabular-nums"
@@ -161,27 +166,34 @@ export function ScoreExplainer({
                         )}
                       </span>
                     </div>
-                    <p className="mt-0.5 text-[10px] text-slate-500 leading-snug">{help.summary}</p>
-                    {scores && (
-                      <p className="mt-0.5 text-[9px] text-slate-600">
-                        {axisStatusHelp(scores.axisStatus[key])}
-                      </p>
-                    )}
                   </div>
                 </StyledTooltip>
               )
             })}
           </div>
           {expl && (
-            <p className="mb-2 text-[10px] text-slate-500" data-testid="score-explainer-policy">
+            <span className="sr-only" data-testid="score-explainer-policy">
               {expl.policy}
-            </p>
+            </span>
           )}
-          <p className="text-[10px] text-slate-500 border-t border-slate-700/80 pt-2">
-            Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
-            Soft AE flags may appear as badges without hard-penalizing unless the rubric is set to
-            hard penalty.
-          </p>
+          <div className="flex items-center gap-1.5 border-t border-slate-700/80 pt-2 text-[10px] text-slate-500">
+            <span>Investigation priority only</span>
+            <HelperTip
+              content={[
+                expl?.policy,
+                'Not a prediction of clinical success. Empty safety ≠ safe. Soft AE flags may appear as badges without hard-penalizing unless the rubric is set to hard penalty.',
+                ...AXIS_ORDER.map((key) => {
+                  const h = AXIS_HELP[key]
+                  return h ? `${AXIS_LABELS[key]}: ${h.summary}` : ''
+                }),
+              ]
+                .filter(Boolean)
+                .join('\n\n')}
+              label="About score axes"
+              testId="score-explainer-disclaimer-help"
+              maxWidth="20rem"
+            />
+          </div>
         </div>
       )}
     </div>

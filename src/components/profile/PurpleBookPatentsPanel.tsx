@@ -31,6 +31,7 @@ export const PurpleBookPatentsPanel = memo(function PurpleBookPatentsPanel({
       title={list.length > 0 ? `Purple Book patents / BPPT (${list.length})` : 'Purple Book patents / BPPT'}
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Biological Product Patent Transparency (BPPT) list from FDA's Purple Book patent page. FDA publishes lists ministerially — not a determination of validity, enforceability, or infringement. Not legal or clinical advice."
       empty={
         list.length === 0
           ? 'No BPPT patent rows matched this name. Only some reference-product BLAs have sponsor-submitted patent lists published by FDA.'
@@ -38,25 +39,20 @@ export const PurpleBookPatentsPanel = memo(function PurpleBookPatentsPanel({
       }
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Biological Product Patent Transparency (BPPT) list from FDA&apos;s Purple Book patent page.
-          FDA publishes lists ministerially — not a determination of validity, enforceability, or
-          infringement. Not legal or clinical advice.{' '}
-          <a
-            href="https://purplebooksearch.fda.gov/patent-list"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:underline"
-            onClick={() =>
-              onDeepLinkClick('other', 'https://purplebooksearch.fda.gov/patent-list', {
-                panelId: panelId || 'purple-book-patents',
-                label: 'bppt-portal',
-              })
-            }
-          >
-            Official patent list
-          </a>
-        </p>
+        <a
+          href="https://purplebooksearch.fda.gov/patent-list"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-[10px] text-indigo-400 hover:underline"
+          onClick={() =>
+            onDeepLinkClick('other', 'https://purplebooksearch.fda.gov/patent-list', {
+              panelId: panelId || 'purple-book-patents',
+              label: 'bppt-portal',
+            })
+          }
+        >
+          Official patent list
+        </a>
         {list.length > 0 && (
           <FilterablePaginatedList
             items={list}

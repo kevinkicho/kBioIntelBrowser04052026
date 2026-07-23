@@ -8,6 +8,7 @@
 
 import { memo, useId, useMemo, useState, type ReactNode } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 import {
   buildEvidenceNeighborhood,
@@ -190,7 +191,11 @@ export const EvidenceNeighborhoodMap = memo(function EvidenceNeighborhoodMap({
               </a>
             </ChipTooltip>
           ))}
-          <span className="text-[9px] text-slate-600">· not ranking / referral</span>
+          <HelperTip
+            content="Deterministic free-API join of sponsors, ROR orgs, hospitals, grants, and literature density. Not competitive ranking or clinical referral."
+            label="About evidence neighborhood"
+            testId="evidence-neighborhood-help"
+          />
         </div>
 
         {/* Stats — dim zero/empty at opacity 0.3 */}

@@ -16,6 +16,7 @@ import { getLastMigrateAt } from '@/lib/firebase/migrate'
 import { backupProjectsJsonToCloud } from '@/lib/firebase/storageSync'
 import { deleteAllUserData } from '@/lib/firebase/deleteUserData'
 import { exportProjectsToJson, listProjects } from '@/lib/project'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 function initialsFromUser(name: string | null | undefined, email: string | null | undefined): string {
@@ -244,19 +245,25 @@ export function UserMenu() {
         >
           {!configured ? (
             <div className="space-y-2 px-3 py-4" data-testid="user-menu-unconfigured">
-              <p className="text-sm font-medium text-slate-200">Cloud sign-in unavailable</p>
-              <p className="text-[11px] leading-relaxed text-slate-500">
-                Optional account sync is not set up for this deployment. You can still use BioIntel
-                fully offline with local projects and file export.
-              </p>
+              <div className="flex items-center gap-1.5">
+                <p className="text-sm font-medium text-slate-200">Cloud sign-in unavailable</p>
+                <HelperTip
+                  content="Optional account sync is not set up for this deployment. You can still use BioIntel fully offline with local projects and file export."
+                  label="About cloud sign-in"
+                  testId="user-menu-unconfigured-help"
+                />
+              </div>
             </div>
           ) : !user ? (
             <div className="p-3" data-testid="user-menu-signed-out">
-              <p className="mb-1 text-sm font-medium text-slate-100">Sign in to BioIntel</p>
-              <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-                Optional Google sign-in. After sign-in, local projects and discovery prefs can sync to
-                your private cloud. Solo local mode still works without an account.
-              </p>
+              <div className="mb-3 flex items-center gap-1.5">
+                <p className="text-sm font-medium text-slate-100">Sign in to BioIntel</p>
+                <HelperTip
+                  content="Optional Google sign-in. After sign-in, local projects and discovery prefs can sync to your private cloud. Solo local mode still works without an account."
+                  label="About sign-in"
+                  testId="user-menu-signin-help"
+                />
+              </div>
               <button
                 type="button"
                 role="menuitem"

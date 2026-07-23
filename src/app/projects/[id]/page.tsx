@@ -38,6 +38,7 @@ import {
   type CandidateSignalRow,
 } from '@/lib/signals'
 import { BoardTable } from '@/components/projects/BoardTable'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { BoardClaimStrip } from '@/components/projects/BoardClaimStrip'
 import { BoardAiRecommend } from '@/components/projects/BoardAiRecommend'
@@ -727,25 +728,28 @@ export default function ProjectBoardPage() {
 
         {/* Research hypotheses — narrative theses, distinct from set-ops /hypothesis */}
         <section className="mt-8 space-y-3" data-testid="research-hypotheses-section">
-          <h2 className="text-lg font-semibold text-slate-100">Research hypotheses</h2>
-          <p className="text-[11px] text-slate-500">
-            Project-scoped narrative theses (not set-ops filter intersections). Claim-bound AI on
-            the editor: thesis studio, rivals, Monday experiments, gap map, adversarial review,
-            exports.
-          </p>
+          <div className="flex flex-wrap items-center gap-1.5">
+            <h2 className="text-lg font-semibold text-slate-100">Research hypotheses</h2>
+            <HelperTip
+              content="Project-scoped narrative theses (not set-ops filter intersections). Claim-bound AI on the editor: thesis studio, rivals, Monday experiments, gap map, adversarial review, exports."
+              label="About research hypotheses"
+              testId="project-rh-section-help"
+            />
+          </div>
 
           {/* Start RH — pack seed (best) or AI from promoted board claims */}
           <div
             className="rounded-xl border border-slate-800 bg-slate-900/40 p-3"
             data-testid="rh-path-chooser"
           >
-            <p className="text-[11px] font-medium text-slate-300">Start a hypothesis</p>
-            <p className="mt-1 text-[10px] text-slate-500 leading-relaxed">
-              Prefer <strong className="font-medium text-slate-400">Seed research hypothesis</strong> on
-              a downloaded pack above. Or generate a claim-bound thesis from{' '}
-              <strong className="font-medium text-slate-400">promoted</strong> board candidates using
-              RH AI (Ollama Cloud) grounded in Core-panel claims — not boilerplate templates.
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <p className="text-[11px] font-medium text-slate-300">Start a hypothesis</p>
+              <HelperTip
+                content="Prefer Seed research hypothesis on a downloaded pack above. Or generate a claim-bound thesis from promoted board candidates using RH AI (Ollama Cloud) grounded in Core-panel claims — not boilerplate templates."
+                label="How to start a hypothesis"
+                testId="rh-path-chooser-help"
+              />
+            </div>
             <div className="mt-2 flex flex-wrap gap-2">
               <button
                 type="button"

@@ -37,6 +37,7 @@ export const NsfAwardsPanel = memo(function NsfAwardsPanel({
       title="NSF awards"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free NSF Awards API — funding context only, not a completeness graph of all research."
       empty={isEmpty ? 'No NSF awards matched this name keyword.' : undefined}
     >
       {!isEmpty && (
@@ -92,9 +93,6 @@ export const NsfAwardsPanel = memo(function NsfAwardsPanel({
           )}
         />
       )}
-      <p className="mt-2 text-[9px] text-slate-600">
-        Free NSF Awards API — funding context only, not a completeness graph of all research.
-      </p>
     </Panel>
   )
 })

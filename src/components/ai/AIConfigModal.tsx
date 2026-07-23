@@ -10,6 +10,7 @@ import { createPortal } from 'react-dom'
 import { useAI } from '@/lib/ai/useAI'
 import { maskApiKey } from '@/lib/ai/userApiKey'
 import { useFirebaseAuth } from '@/lib/firebase/FirebaseProvider'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 interface AIConfigModalProps {
   isOpen: boolean
@@ -218,22 +219,22 @@ export function AIConfigModal({ isOpen, onClose }: AIConfigModalProps) {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-medium text-slate-300">
-              Ollama Cloud API key
-            </label>
-            <p className="mb-2 text-[10px] text-slate-500 leading-relaxed">
-              Create a key at{' '}
+            <div className="mb-1.5 flex flex-wrap items-center gap-1.5">
+              <label className="text-xs font-medium text-slate-300">Ollama Cloud API key</label>
+              <HelperTip
+                content={`Create a key at ollama.com (https://ollama.com). Stored in this browser${auth.user ? ' and under your signed-in account' : ''} — never logged.`}
+                label="About API key storage"
+                testId="ai-config-key-help"
+              />
               <a
                 href="https://ollama.com"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-cyan-400 hover:underline"
+                className="text-[10px] text-cyan-400 hover:underline"
               >
                 ollama.com
               </a>
-              . Stored in this browser
-              {auth.user ? ' and under your signed-in account' : ''} — never logged.
-            </p>
+            </div>
             <div className="flex gap-2">
               <div className="relative flex-1">
                 <input

@@ -45,6 +45,7 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
       }
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Official FDA Purple Book monthly data download (CSV). License type is from FDA files (351(a) / 351(k) biosimilar / interchangeable) — not clinical decision support."
       empty={
         list.length === 0
           ? 'No Purple Book monthly dump rows matched this name (tier B CSV cache). Try brand or proper name.'
@@ -52,24 +53,20 @@ export const PurpleBookPanel = memo(function PurpleBookPanel({
       }
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Official FDA Purple Book monthly data download (CSV). License type is from FDA files
-          (351(a) / 351(k) biosimilar / interchangeable) — not clinical decision support.{' '}
-          <a
-            href="https://purplebooksearch.fda.gov/downloads"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:underline"
-            onClick={() =>
-              onDeepLinkClick('other', 'https://purplebooksearch.fda.gov/downloads', {
-                panelId: panelId || 'purple-book',
-                label: 'purple-book-downloads',
-              })
-            }
-          >
-            Downloads
-          </a>
-        </p>
+        <a
+          href="https://purplebooksearch.fda.gov/downloads"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-[10px] text-indigo-400 hover:underline"
+          onClick={() =>
+            onDeepLinkClick('other', 'https://purplebooksearch.fda.gov/downloads', {
+              panelId: panelId || 'purple-book',
+              label: 'purple-book-downloads',
+            })
+          }
+        >
+          Purple Book downloads
+        </a>
         {list.length > 0 && (
           <FilterablePaginatedList
             items={list}

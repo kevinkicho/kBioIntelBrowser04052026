@@ -26,6 +26,7 @@ import { clientFetch } from '@/lib/clientFetch'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emptyDataClass, isEmptyMetric } from '@/lib/summaryEmpty'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { buildGeneCrossSource } from '@/lib/crossSource'
@@ -2603,15 +2604,15 @@ function GeneDetailPageClientInner({
             className="mb-4 rounded-xl border border-indigo-800/40 bg-slate-900/60 p-4"
             data-testid="gene-loading-progress"
           >
-            <div className="flex items-center gap-2 text-sm text-indigo-200">
+            <div className="flex flex-wrap items-center gap-2 text-sm text-indigo-200">
               <div className="w-4 h-4 border-2 border-indigo-400 border-t-transparent rounded-full animate-spin" />
-              Fetching gene data from free public APIs…
+              <span>Fetching gene data…</span>
+              <HelperTip
+                content="Free public APIs: MyGene · NCBI Gene · Ensembl · DisGeNET · ClinVar · dbSNP · DGIdb · GWAS Catalog · ClinGen · GTEx · Bgee · Expression Atlas · GO · Reactome · WikiPathways · UniProt · STRING · PharmGKB"
+                label="Gene data sources"
+                testId="gene-loading-sources-help"
+              />
             </div>
-            <p className="mt-2 text-[10px] text-slate-500 leading-relaxed">
-              MyGene · NCBI Gene · Ensembl · DisGeNET · ClinVar · dbSNP · DGIdb · GWAS Catalog ·
-              ClinGen · GTEx · Bgee · Expression Atlas · GO · Reactome · WikiPathways · UniProt ·
-              STRING · PharmGKB
-            </p>
             <ul className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-1.5 text-[10px] text-slate-400">
               {GENE_PANELS.map((p) => (
                 <li

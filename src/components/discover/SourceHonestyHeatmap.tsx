@@ -13,6 +13,7 @@ import {
   honestyCellLabel,
   type HonestyCellKind,
 } from '@/lib/discovery/sourceHonesty'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { emptyDataClass } from '@/lib/summaryEmpty'
@@ -79,17 +80,14 @@ export function SourceHonestyHeatmap({
       data-testid="source-honesty-heatmap"
     >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold text-slate-200">
-            Source honesty
-            <span className="ml-2 font-normal text-slate-500">
-              which free APIs contributed each shortlist row
-            </span>
-          </p>
-          <p className="mt-0.5 text-[10px] leading-relaxed text-slate-500">
-            Each column is one public gather family. Green = this molecule came from that source.
-            Click a name to jump to its card; click a column header to open the source registry.
-          </p>
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+          <p className="text-[11px] font-semibold text-slate-200">Source honesty</p>
+          <HelperTip
+            content="Which free APIs contributed each shortlist row. Each column is one public gather family. Green = this molecule came from that source. Click a name to jump to its card; click a column header to open the source registry."
+            label="About source honesty"
+            testId="source-honesty-help"
+            maxWidth="20rem"
+          />
         </div>
         <div className="flex flex-wrap gap-1.5 text-[9px] text-slate-500">
           <span
@@ -241,9 +239,16 @@ export function SourceHonestyHeatmap({
         </tbody>
       </table>
 
-      <p className="mt-2 text-[9px] leading-relaxed text-slate-600">{matrix.notes[0]}</p>
-      {matrix.notes[1] && (
-        <p className="text-[9px] leading-relaxed text-slate-600">{matrix.notes[1]}</p>
+      {(matrix.notes[0] || matrix.notes[1]) && (
+        <div className="mt-2 flex items-center gap-1.5 text-[9px] text-slate-500">
+          <span>Notes</span>
+          <HelperTip
+            content={[matrix.notes[0], matrix.notes[1]].filter(Boolean).join('\n\n')}
+            label="Source honesty notes"
+            testId="source-honesty-notes"
+            maxWidth="20rem"
+          />
+        </div>
       )}
     </div>
   )

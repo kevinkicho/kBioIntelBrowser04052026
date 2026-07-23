@@ -16,6 +16,7 @@ import {
 } from '@/components/profile/ProfilePanelContext'
 import { filterTraceForPanel, loadStatusFromPanelTrace } from '@/lib/panelApiTrace'
 import { PanelApiDetailModal } from './PanelApiDetailModal'
+import { HelperTip } from './HelperTip'
 import { StyledTooltip } from './StyledTooltip'
 
 type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
@@ -28,6 +29,11 @@ interface PanelProps {
   className?: string
   titleExtra?: React.ReactNode
   empty?: string
+  /**
+   * Honesty / method helper — shown as a compact (i) tooltip next to the title
+   * instead of always-visible intro or footer paragraphs.
+   */
+  help?: React.ReactNode
   sourceHealth?: SourceHealth
   /** Scientific honesty: data vs empty vs timeout/error/disabled */
   loadStatus?: DataLoadStatus
@@ -61,6 +67,7 @@ export function Panel({
   className = '',
   titleExtra,
   empty,
+  help,
   sourceHealth,
   loadStatus,
   loadError,
@@ -158,6 +165,14 @@ export function Panel({
       <div className="flex justify-between items-start mb-4 gap-2">
         <div className="flex items-baseline gap-2 flex-wrap min-w-0">
           <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+          {help != null && help !== false && help !== '' && (
+            <HelperTip
+              content={help}
+              label={`About ${title}`}
+              testId={panelId ? `panel-help-${panelId}` : 'panel-help'}
+              className="self-center"
+            />
+          )}
           {titleExtra}
           {showTierBadge && tier && (
             <StyledTooltip content={`Data tier: ${TIER_LABEL[tier]}`}>

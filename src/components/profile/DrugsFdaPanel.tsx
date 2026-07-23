@@ -36,6 +36,7 @@ export const DrugsFdaPanel = memo(function DrugsFdaPanel({
       title="FDA Drugs@FDA applications"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free openFDA Drugs@FDA — application / product registry facts, not treatment advice."
       empty={isEmpty ? 'No Drugs@FDA applications found for this molecule.' : undefined}
     >
       {!isEmpty && (
@@ -93,9 +94,6 @@ export const DrugsFdaPanel = memo(function DrugsFdaPanel({
           )}
         />
       )}
-      <p className="mt-2 text-[9px] text-slate-600">
-        Free openFDA Drugs@FDA — application / product registry facts, not treatment advice.
-      </p>
     </Panel>
   )
 })

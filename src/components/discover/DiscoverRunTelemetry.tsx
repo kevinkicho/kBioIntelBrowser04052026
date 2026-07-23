@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import type { RankResult } from '@/lib/candidateRanker'
 import { DISCOVER_PIPELINE_STAGES } from '@/lib/discovery/algorithmGuide'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
@@ -103,23 +104,22 @@ export function DiscoverRunTelemetry({
       data-testid="discover-run-telemetry"
     >
       <div className="flex flex-wrap items-center justify-between gap-2 mb-2">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold text-slate-200">
-            This run
-            {fromCache ? (
-              <span className="ml-2 rounded-full border border-amber-800/50 bg-amber-950/30 px-2 py-0.5 text-[9px] text-amber-300">
-                cached
-              </span>
-            ) : (
-              <span className="ml-2 rounded-full border border-emerald-800/50 bg-emerald-950/30 px-2 py-0.5 text-[9px] text-emerald-300">
-                live
-              </span>
-            )}
-          </p>
-          <p className="mt-0.5 text-[10px] text-slate-500 leading-relaxed">
-            Wall-clock stages for the last rank. Click a stage for what it does; open Preferences to
-            switch deferred harvest (faster first paint).
-          </p>
+        <div className="min-w-0 flex flex-wrap items-center gap-1.5">
+          <p className="text-[11px] font-semibold text-slate-200">This run</p>
+          {fromCache ? (
+            <span className="rounded-full border border-amber-800/50 bg-amber-950/30 px-2 py-0.5 text-[9px] text-amber-300">
+              cached
+            </span>
+          ) : (
+            <span className="rounded-full border border-emerald-800/50 bg-emerald-950/30 px-2 py-0.5 text-[9px] text-emerald-300">
+              live
+            </span>
+          )}
+          <HelperTip
+            content="Wall-clock stages for the last rank. Click a stage for what it does; open Preferences to switch deferred harvest (faster first paint)."
+            label="About this run"
+            testId="discover-telemetry-help"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {onOpenPreferences && (

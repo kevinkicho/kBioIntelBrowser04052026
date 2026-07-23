@@ -38,6 +38,7 @@ export const OpenAirePublicationsPanel = memo(function OpenAirePublicationsPanel
       }
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free OpenAIRE research products search (publications). Complements Europe PMC / OpenAlex."
       empty={
         list.length === 0
           ? 'No OpenAIRE publications matched this name (free public Graph API).'
@@ -46,9 +47,6 @@ export const OpenAirePublicationsPanel = memo(function OpenAirePublicationsPanel
     >
       {list.length > 0 && (
         <>
-          <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
-            Free OpenAIRE research products search (publications). Complements Europe PMC / OpenAlex.
-          </p>
           <FilterablePaginatedList
             items={list}
             getSearchText={(p) =>

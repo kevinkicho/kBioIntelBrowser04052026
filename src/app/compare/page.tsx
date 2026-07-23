@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { Suspense } from 'react'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { getMoleculeById } from '@/lib/api/pubchem'
 import { getDrugsByIngredient } from '@/lib/api/openfda'
 import { getPatentsByMoleculeName } from '@/lib/api/patents'
@@ -302,12 +303,13 @@ export default async function ComparePage({
   return (
     <div className="page-canvas" data-testid="compare-page">
       <div className="mb-3 flex flex-wrap items-end justify-between gap-2 border-b border-slate-800/80 pb-3">
-        <div className="min-w-0">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
           <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">Compare molecules</h1>
-          <p className="mt-0.5 max-w-3xl text-[12px] leading-snug text-slate-500">
-            Side-by-side free-public-API evidence (trials, safety, targets, literature). Not clinical
-            predictions.
-          </p>
+          <HelperTip
+            content="Side-by-side free-public-API evidence (trials, safety, targets, literature). Not clinical predictions."
+            label="About molecule compare"
+            testId="compare-page-help"
+          />
         </div>
         <Link
           href="/discover"

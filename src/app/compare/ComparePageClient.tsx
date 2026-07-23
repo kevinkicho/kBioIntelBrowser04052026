@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { MoleculeSearch } from '@/components/compare/MoleculeSearch'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { clientFetch } from '@/lib/clientFetch'
 
 export interface CompareSelection {
@@ -141,13 +142,14 @@ export function ComparePageClient() {
 
   return (
     <div className="mb-4" data-testid="compare-picker">
-      <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
-        <div className="min-w-0">
-          <p className="text-[11px] text-slate-500 leading-relaxed">
-            Type 2+ characters for live molecule suggestions (PubChem / free APIs). Compare{' '}
-            <strong className="font-medium text-slate-400">2–{MAX_SLOTS}</strong> molecules side by
-            side.
-          </p>
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <p className="text-[11px] font-medium text-slate-300">Pick molecules</p>
+          <HelperTip
+            content={`Type 2+ characters for live molecule suggestions (PubChem / free APIs). Compare 2–${MAX_SLOTS} molecules side by side.`}
+            label="About molecule picker"
+            testId="compare-picker-help"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 shrink-0">
           {slots.length < MAX_SLOTS && (

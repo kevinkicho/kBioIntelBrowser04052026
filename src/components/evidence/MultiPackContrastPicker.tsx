@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useMemo, useState } from 'react'
+import { HelperTip } from '@/components/ui/HelperTip'
 import type { EvidenceClaim, Project, ProjectPackIndexEntry, ResearchHypothesis } from '@/lib/domain'
 import type { EvidencePack } from '@/lib/evidence/pack'
 import {
@@ -188,13 +189,16 @@ export function MultiPackContrastPicker({
       className={`rounded-xl border border-indigo-900/30 bg-slate-950/40 p-3 ${className}`}
       data-testid="multi-pack-contrast"
     >
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-indigo-300/90">
-        Multi-pack contrast
-      </h3>
-      <p className="mt-1 text-[10px] text-slate-500 leading-relaxed">
-        Why promote pack A over pack B? Deterministic claim-type / source / candidate diff — no LLM
-        ranking. Optional: seed a rival research hypothesis from the contrast pack.
-      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-indigo-300/90">
+          Multi-pack contrast
+        </h3>
+        <HelperTip
+          content="Why promote pack A over pack B? Deterministic claim-type / source / candidate diff — no LLM ranking. Optional: seed a rival research hypothesis from the contrast pack."
+          label="About multi-pack contrast"
+          testId="multi-pack-contrast-help"
+        />
+      </div>
 
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
         <label className="block text-[10px] text-slate-400">

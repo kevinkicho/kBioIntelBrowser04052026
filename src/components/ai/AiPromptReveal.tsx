@@ -7,6 +7,7 @@
  */
 
 import { useId, useState } from 'react'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 import { humanModeLabel } from '@/lib/ai/aiUiCopy'
 
@@ -79,12 +80,15 @@ export function AiPromptReveal({
             align === 'right' ? 'right-0 top-full' : 'left-0 top-full'
           }`}
         >
-          <span className="mb-1 block text-[10px] font-semibold text-indigo-200">
-            What was sent to the model{meta ? ` · ${meta}` : ''}
-          </span>
-          <span className="mb-1.5 block text-[9px] leading-relaxed text-slate-500">
-            Exact system rules + user context your Ollama model receives. Use this to audit
-            grounding. Not a regulatory record — of-record ranks stay free-API scores.
+          <span className="mb-1.5 flex flex-wrap items-center gap-1.5">
+            <span className="text-[10px] font-semibold text-indigo-200">
+              What was sent to the model{meta ? ` · ${meta}` : ''}
+            </span>
+            <HelperTip
+              content="Exact system rules + user context your Ollama model receives. Use this to audit grounding. Not a regulatory record — of-record ranks stay free-API scores."
+              label="About prompt reveal"
+              testId={`${testId}-about`}
+            />
           </span>
           {system && (
             <span className="mb-2 block">

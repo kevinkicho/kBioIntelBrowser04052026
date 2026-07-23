@@ -7,6 +7,7 @@ import {
   buildOrderCatalogLinks as buildCatalogLinksFromVars,
   extractCasFromSynonyms,
 } from '@/lib/vendorCatalogLinks'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface ActionCard {
@@ -280,14 +281,22 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
             </button>
           </div>
 
-          <div className="mb-3 rounded-lg border border-amber-900/40 bg-amber-950/20 px-3 py-2 text-[10px] leading-relaxed text-amber-200/80">
-            <strong className="text-amber-200">Research use only.</strong> Not a pharmacy, not
-            clinical dispensing, and not regulatory advice. Confirm identity (CID / InChIKey /
-            CAS), grade, and purity with the supplier before purchase.
-            {inchiKey ? (
-              <span className="mt-1 block font-mono text-[9px] text-amber-300/70">
-                InChIKey {inchiKey}
+          <div className="mb-3 flex flex-wrap items-center gap-2 text-[10px]">
+            <HelperTip
+              content={`Research use only. Not a pharmacy, not clinical dispensing, and not regulatory advice. Confirm identity (CID / InChIKey / CAS), grade, and purity with the supplier before purchase.${inchiKey ? ` InChIKey ${inchiKey}` : ''}`}
+              label="Research use disclaimer"
+              testId="order-research-use-help"
+              maxWidth="20rem"
+            >
+              <span className="inline-flex cursor-help items-center gap-1 rounded-full border border-amber-800/50 bg-amber-950/30 px-2 py-0.5 text-amber-200/90">
+                Research use only
+                <span className="text-[9px] text-amber-400/80" aria-hidden>
+                  i
+                </span>
               </span>
+            </HelperTip>
+            {inchiKey ? (
+              <span className="font-mono text-[9px] text-slate-500">InChIKey {inchiKey}</span>
             ) : null}
           </div>
 
@@ -341,11 +350,15 @@ export function NextStepsPanel({ moleculeName, data, cid }: Props) {
             ))}
           </div>
 
-          <p className="mt-3 text-[9px] leading-snug text-slate-600">
-            Tip: After suppliers load below, prefer chips with direct molecule links from PubChem
-            xrefs. Catalog buttons above always search by name
-            {cid != null ? ' (use PubChem CID link to disambiguate salts/forms)' : ''}.
-          </p>
+          <div className="mt-3 flex items-center gap-1.5 text-[9px] text-slate-500">
+            <span>Ordering tips</span>
+            <HelperTip
+              content={`After suppliers load below, prefer chips with direct molecule links from PubChem xrefs. Catalog buttons above always search by name${cid != null ? ' (use PubChem CID link to disambiguate salts/forms)' : ''}. Research use only — not a pharmacy, not clinical dispensing, and not regulatory advice. Confirm identity (CID / InChIKey / CAS), grade, and purity with the supplier before purchase.`}
+              label="Ordering tips"
+              testId="order-tips-help"
+              maxWidth="20rem"
+            />
+          </div>
         </div>
       )}
     </div>

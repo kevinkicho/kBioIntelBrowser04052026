@@ -6,6 +6,7 @@ import { researchLabDossierToEvidencePack } from '@/lib/researchLabs'
 import { ResearchLabAiPanel } from '@/components/orgs/ResearchLabAiPanel'
 import { ResearchLabDossierBagsList } from '@/components/orgs/ResearchLabDossierBagsList'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { buildOrgDossierCrossSource } from '@/lib/crossSource'
 import { packToJson, packToMarkdown, packExportFilename } from '@/lib/evidence'
 import { downloadFile } from '@/lib/exportData'
@@ -129,13 +130,16 @@ export function ResearchLabDossierView({ dossier }: { dossier: ResearchLabDossie
       <ResearchLabAiPanel pack={pack} />
 
       <section>
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-          Dossier bags
-        </h3>
-        <p className="mb-3 text-[11px] leading-relaxed text-slate-500">
-          Unified list of free-API rows in this dossier. Search, filter by bag, sort — expand a row
-          for ids and deep links. Affiliation context only.
-        </p>
+        <div className="mb-3 flex flex-wrap items-center gap-1.5">
+          <h3 className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+            Dossier bags
+          </h3>
+          <HelperTip
+            content="Unified list of free-API rows in this dossier. Search, filter by bag, sort — expand a row for ids and deep links. Affiliation context only."
+            label="About dossier bags"
+            testId="research-lab-bags-help"
+          />
+        </div>
         <ResearchLabDossierBagsList dossier={dossier} />
       </section>
     </div>

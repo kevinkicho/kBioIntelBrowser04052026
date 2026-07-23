@@ -16,6 +16,7 @@ import {
   type KeyboardEvent,
 } from 'react'
 import { createPortal } from 'react-dom'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface GeneSuggestion {
   geneId: string
@@ -283,79 +284,65 @@ export function GeneSearchSuggest({
               role="presentation"
               className="border-b border-slate-800/70 last:border-b-0"
             >
-              <button
-                type="button"
-                id={`${listId}-opt-${i}`}
-                role="option"
-                aria-selected={active}
-                className={`w-full px-3 py-2.5 text-left transition-colors ${
-                  active
-                    ? 'bg-violet-900/45 text-slate-50'
-                    : 'text-slate-200 hover:bg-slate-800/90'
-                }`}
-                onMouseEnter={() => setHighlight(i)}
-                onMouseDown={(ev) => {
-                  ev.preventDefault()
-                }}
-                onClick={() => pick(s)}
-                data-testid={`${testId}-option`}
+              <StyledTooltip
+                content={
+                  [
+                    s.summary,
+                    aliases.length > 0 ? `Also: ${aliases.join(', ')}` : '',
+                  ]
+                    .filter(Boolean)
+                    .join('\n\n') || undefined
+                }
+                className="w-full"
+                maxWidth="20rem"
+                side="bottom"
               >
-                {/* Row 1: fixed symbol col · name · chips — aligned listitem to listitem */}
-                <span className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1 sm:grid-cols-[5.25rem_minmax(0,1fr)_auto]">
-                  <span
-                    className="truncate font-mono text-[13px] font-semibold tracking-tight text-violet-200"
-                    title={symbol}
-                  >
-                    {symbol}
-                  </span>
-                  <span className="min-w-0">
-                    <span
-                      className="block truncate text-[12px] font-medium leading-snug text-slate-100"
-                      title={name || undefined}
-                    >
-                      {name || '—'}
+                <button
+                  type="button"
+                  id={`${listId}-opt-${i}`}
+                  role="option"
+                  aria-selected={active}
+                  className={`w-full px-3 py-2.5 text-left transition-colors ${
+                    active
+                      ? 'bg-violet-900/45 text-slate-50'
+                      : 'text-slate-200 hover:bg-slate-800/90'
+                  }`}
+                  onMouseEnter={() => setHighlight(i)}
+                  onMouseDown={(ev) => {
+                    ev.preventDefault()
+                  }}
+                  onClick={() => pick(s)}
+                  data-testid={`${testId}-option`}
+                >
+                  <span className="grid grid-cols-[5.25rem_minmax(0,1fr)] items-start gap-x-3 gap-y-1 sm:grid-cols-[5.25rem_minmax(0,1fr)_auto]">
+                    <span className="truncate font-mono text-[13px] font-semibold tracking-tight text-violet-200">
+                      {symbol}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-[12px] font-medium leading-snug text-slate-100">
+                        {name || '—'}
+                      </span>
+                    </span>
+                    <span className="col-span-2 flex flex-wrap items-center justify-start gap-1 sm:col-span-1 sm:max-w-[14rem] sm:justify-end">
+                      {typeLabel ? (
+                        <span className="inline-flex max-w-[9rem] shrink-0 truncate rounded border border-violet-800/40 bg-violet-950/40 px-1.5 py-0.5 text-[9px] font-medium text-violet-200/90">
+                          {typeLabel}
+                        </span>
+                      ) : null}
+                      {chrLabel ? (
+                        <span className="inline-flex shrink-0 rounded border border-slate-700 bg-slate-950/60 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-slate-400">
+                          {chrLabel}
+                        </span>
+                      ) : null}
+                      {s.geneId ? (
+                        <span className="inline-flex shrink-0 rounded border border-slate-700 bg-slate-950/60 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-slate-500">
+                          Entrez {s.geneId}
+                        </span>
+                      ) : null}
                     </span>
                   </span>
-                  <span className="col-span-2 flex flex-wrap items-center justify-start gap-1 sm:col-span-1 sm:max-w-[14rem] sm:justify-end">
-                    {typeLabel ? (
-                      <span className="inline-flex max-w-[9rem] shrink-0 truncate rounded border border-violet-800/40 bg-violet-950/40 px-1.5 py-0.5 text-[9px] font-medium text-violet-200/90">
-                        {typeLabel}
-                      </span>
-                    ) : null}
-                    {chrLabel ? (
-                      <span className="inline-flex shrink-0 rounded border border-slate-700 bg-slate-950/60 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-slate-400">
-                        {chrLabel}
-                      </span>
-                    ) : null}
-                    {s.geneId ? (
-                      <span className="inline-flex shrink-0 rounded border border-slate-700 bg-slate-950/60 px-1.5 py-0.5 font-mono text-[9px] tabular-nums text-slate-500">
-                        Entrez {s.geneId}
-                      </span>
-                    ) : null}
-                  </span>
-                </span>
-                {/* Secondary rows share left inset = symbol column + gap (list-aligned) */}
-                {s.summary ? (
-                  <span className="mt-1.5 block pl-0 text-[10px] leading-relaxed text-slate-500 line-clamp-2 sm:pl-[calc(5.25rem+0.75rem)]">
-                    {s.summary}
-                  </span>
-                ) : null}
-                {aliases.length > 0 ? (
-                  <span className="mt-1.5 flex flex-wrap items-center gap-1 pl-0 sm:pl-[calc(5.25rem+0.75rem)]">
-                    <span className="mr-0.5 text-[8px] uppercase tracking-wide text-slate-600">
-                      also
-                    </span>
-                    {aliases.map((a) => (
-                      <span
-                        key={a}
-                        className="rounded border border-slate-800 bg-slate-950/50 px-1.5 py-0.5 font-mono text-[9px] text-slate-500"
-                      >
-                        {a}
-                      </span>
-                    ))}
-                  </span>
-                ) : null}
-              </button>
+                </button>
+              </StyledTooltip>
             </li>
           )
         })}

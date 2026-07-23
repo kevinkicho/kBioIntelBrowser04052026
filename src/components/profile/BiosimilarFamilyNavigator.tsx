@@ -118,6 +118,7 @@ export const BiosimilarFamilyNavigator = memo(function BiosimilarFamilyNavigator
       }
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Originator → biosimilar / interchangeable siblings from Purple Book license types (or openFDA BLA heuristics). BPPT patents and EMA biosimilar dump rows when loaded. Not interchangeability or clinical advice."
       empty={
         empty
           ? 'No biosimilar family data yet. Load Pharmaceutical panels (Purple Book, BLA, BPPT, EMA bulk) for a biologic name.'
@@ -125,11 +126,6 @@ export const BiosimilarFamilyNavigator = memo(function BiosimilarFamilyNavigator
       }
     >
       <div className="space-y-4" data-testid="biosimilar-family-navigator">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Originator → biosimilar / interchangeable siblings from Purple Book license types (or
-          openFDA BLA heuristics). BPPT patents and EMA biosimilar dump rows when loaded. Not
-          interchangeability or clinical advice.
-        </p>
         {family.notes.map((n) => (
           <p key={n} className="text-[10px] text-amber-500/90">
             {n}

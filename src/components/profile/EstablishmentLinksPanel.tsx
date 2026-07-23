@@ -31,6 +31,7 @@ export const EstablishmentLinksPanel = memo(function EstablishmentLinksPanel({
       title="Manufacturing & establishments"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Portal-first FDA establishment resources (FEI, DRLS, inspections). There is no free public API that joins every BLA to certified plants — search official registries by firm name. Not a certification graph or GMP advice."
       empty={
         !firmHint?.trim()
           ? 'No firm or product name available for establishment deep links.'
@@ -39,11 +40,6 @@ export const EstablishmentLinksPanel = memo(function EstablishmentLinksPanel({
     >
       {links.length > 0 && (
         <div className="space-y-3" data-testid="establishment-links-panel">
-          <p className="text-[10px] text-slate-500 leading-relaxed">
-            Portal-first FDA establishment resources (FEI, DRLS, inspections). There is no free
-            public API that joins every BLA to certified plants — search official registries by firm
-            name. Not a certification graph or GMP advice.
-          </p>
           <ul className="space-y-2">
             {links.map((link) => (
               <li

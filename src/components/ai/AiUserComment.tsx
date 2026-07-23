@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { updateAiGenerationComment } from '@/lib/ai/aiHistoryStore'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 export interface AiUserCommentProps {
   generationId: string | null | undefined
@@ -73,15 +74,18 @@ export function AiUserComment({
       data-testid={testId}
     >
       <div className="flex items-center justify-between gap-2 px-2.5 pt-2">
-        <label htmlFor={`${testId}-input`} className="text-[10px] font-medium text-slate-400">
-          Your research notes
-        </label>
+        <div className="flex items-center gap-1.5">
+          <label htmlFor={`${testId}-input`} className="text-[10px] font-medium text-slate-400">
+            Your research notes
+          </label>
+          <HelperTip
+            content="Private notes on this run — not of-record, not model-generated. Helps when comparing multiple regenerations."
+            label="About research notes"
+            testId={`${testId}-help`}
+          />
+        </div>
         {status && <span className="text-[9px] text-emerald-500/90">{status}</span>}
       </div>
-      <p className="px-2.5 text-[9px] text-slate-600 leading-relaxed">
-        Private notes on this run — not of-record, not model-generated. Helps when comparing
-        multiple regenerations.
-      </p>
       <textarea
         id={`${testId}-input`}
         value={draft}

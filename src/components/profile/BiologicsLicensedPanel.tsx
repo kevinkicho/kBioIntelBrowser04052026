@@ -57,6 +57,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
       }
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free openFDA Drugs@FDA BLA rows (licensed biologics / US biosimilar family). Role tags are heuristics from US 4-letter nonproprietary suffixes — not Purple Book interchangeability determinations. Not clinical decision support."
       empty={
         list.length === 0
           ? 'No FDA BLA records matched this name in openFDA Drugs@FDA. Small molecules usually appear under NDA/ANDA (Orange Book), not here.'
@@ -64,11 +65,7 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
       }
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Free openFDA Drugs@FDA rows with <span className="font-mono">BLA</span> application
-          numbers (licensed biologics and US biosimilar family). Role tags are heuristics from
-          US 4-letter nonproprietary suffixes — not Purple Book interchangeability determinations.
-          Not clinical decision support.{' '}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
           <a
             href={purpleBookDownloadUrl()}
             target="_blank"
@@ -84,25 +81,22 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
             Purple Book downloads
           </a>
           {emaBiosimilar && (
-            <>
-              {' · '}
-              <a
-                href={emaBiosimilar.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-indigo-400 hover:underline"
-                onClick={() =>
-                  onDeepLinkClick('other', emaBiosimilar.url, {
-                    panelId: panelId || 'biologics-licensed',
-                    label: 'ema-biosimilars',
-                  })
-                }
-              >
-                EMA biosimilars hub
-              </a>
-            </>
+            <a
+              href={emaBiosimilar.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-indigo-400 hover:underline"
+              onClick={() =>
+                onDeepLinkClick('other', emaBiosimilar.url, {
+                  panelId: panelId || 'biologics-licensed',
+                  label: 'ema-biosimilars',
+                })
+              }
+            >
+              EMA biosimilars hub
+            </a>
           )}
-        </p>
+        </div>
 
         {list.length > 0 && (
           <FilterablePaginatedList

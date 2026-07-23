@@ -41,6 +41,7 @@ export const HealthCanadaDpdPanel = memo(function HealthCanadaDpdPanel({
       title="Health Canada DPD"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free public DPD API (no key). DIN / status are Canadian market authorizations — not US FDA approval and not clinical efficacy claims."
       empty={
         isEmpty
           ? 'No Health Canada Drug Product Database matches for this molecule name (free public API).'
@@ -49,10 +50,6 @@ export const HealthCanadaDpdPanel = memo(function HealthCanadaDpdPanel({
     >
       {!isEmpty && (
         <>
-          <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
-            Free public DPD API (no key). DIN / status are Canadian market authorizations — not US
-            FDA approval and not clinical efficacy claims.
-          </p>
           <FilterablePaginatedList
             items={list}
             getSearchText={(p) =>

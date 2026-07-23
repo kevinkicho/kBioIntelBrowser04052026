@@ -187,8 +187,8 @@ export function DataPoint({
           )}
         </dl>
 
-        <p className="mt-2 text-[9px] text-slate-600 leading-relaxed">
-          Free public source — verify upstream yourself. BioIntel does not invent associations.
+        <p className="mt-2 text-[9px] text-slate-500">
+          Free public source — verify upstream. BioIntel does not invent associations.
         </p>
       </div>,
       document.body,

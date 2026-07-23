@@ -23,6 +23,7 @@ import { addPackIndexEntryAndSave, putPackInCache } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { PackView } from './PackView'
 import { PackAiPanel } from './PackAiPanel'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface PackBuilderProps {
@@ -328,23 +329,31 @@ export function PackBuilder({
       className={`rounded-xl border border-slate-800 bg-slate-900/30 p-4 ${className}`}
       data-testid="pack-builder"
     >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
-        <div>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-1.5">
           <h3 className="text-sm font-semibold text-slate-100">Evidence pack</h3>
-          <p className="mt-0.5 text-[11px] text-slate-500">
-            Download-primary export · max {MAX_PACK_CLAIMS} claims · content-hashed for cite. Full
-            packs are not stored in the browser — index metadata only.
-            {panelsLoading && ' · Fetching Core panels for claim density…'}
-            {!panelsLoading && preClaims && (
-              <>
-                {' '}
-                · {preClaims.length} pre-extracted · {countCitableClaims(preClaims)} citable
-                {countCitableClaims(preClaims) < 5 && preClaims.length > 0
-                  ? ' · below M3 target (≥5 citable)'
-                  : ''}
-              </>
-            )}
-          </p>
+          <HelperTip
+            content={[
+              `Download-primary export · max ${MAX_PACK_CLAIMS} claims · content-hashed for cite. Full packs are not stored in the browser — index metadata only.`,
+              panelsLoading ? 'Fetching Core panels for claim density…' : '',
+              !panelsLoading && preClaims
+                ? `${preClaims.length} pre-extracted · ${countCitableClaims(preClaims)} citable${countCitableClaims(preClaims) < 5 && preClaims.length > 0 ? ' · below M3 target (≥5 citable)' : ''}`
+                : '',
+            ]
+              .filter(Boolean)
+              .join('\n\n')}
+            label="About evidence pack"
+            testId="pack-builder-help"
+            maxWidth="20rem"
+          />
+          {panelsLoading && (
+            <span className="text-[10px] text-slate-500">Fetching panels…</span>
+          )}
+          {!panelsLoading && preClaims && (
+            <span className="text-[10px] tabular-nums text-slate-500">
+              {preClaims.length} claims · {countCitableClaims(preClaims)} citable
+            </span>
+          )}
         </div>
       </div>
 
@@ -394,10 +403,13 @@ export function PackBuilder({
               </span>
             ) : null}
           </span>
-          <span className="block text-[10px] text-slate-500 leading-relaxed">
-            Prefer org · trial site · grant · biosimilar-family · jurisdiction claims (~55% of the
-            claim cap when extracting from panels). Board path preserves per-candidate attribution.
-            Free public joins only — not competitive or clinical advice.
+          <span className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-slate-500">
+            Landscape claim preference
+            <HelperTip
+              content="Prefer org · trial site · grant · biosimilar-family · jurisdiction claims (~55% of the claim cap when extracting from panels). Board path preserves per-candidate attribution. Free public joins only — not competitive or clinical advice."
+              label="About landscape pack mode"
+              testId="pack-landscape-help"
+            />
           </span>
         </span>
       </label>

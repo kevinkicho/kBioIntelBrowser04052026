@@ -4,6 +4,7 @@ import type { CopilotMessage } from '@/hooks/useAICopilot'
 import { MessageBubble } from './MessageBubble'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildAskSuggestionWhy } from '@/lib/ai/aiWhyTooltip'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 export function AskTab({
   messages,
@@ -52,18 +53,28 @@ export function AskTab({
     suggestions.push(`How does this compare to ${previousMolecules[0]}?`)
   }
 
+  const emptyPrompt = isGeneContext
+    ? `Ask anything about gene ${geneSymbol}`
+    : isDiseaseContext
+      ? 'Ask anything about these diseases'
+      : 'Ask anything about this molecule'
+
   return (
     <div className="space-y-3">
-      <p className="text-[10px] text-slate-500 leading-relaxed">
-        Agentic Ask can use evidence tools (retrieval snapshot, panel samples, load/retry
-        category) — max {5} steps, claim-bound only.
-      </p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
+          Ask
+        </span>
+        <HelperTip
+          content={`Agentic Ask can use evidence tools (retrieval snapshot, panel samples, load/retry category) — max 5 steps, claim-bound only. ${emptyPrompt}.`}
+          label="About Ask"
+          testId="copilot-ask-help"
+          maxWidth="18rem"
+        />
+      </div>
       {messages.length === 0 && (
-        <div className="text-center py-8">
-          <p className="text-[10px] text-slate-500">
-            {isGeneContext ? `Ask anything about gene ${geneSymbol}` : isDiseaseContext ? 'Ask anything about these diseases' : 'Ask anything about this molecule'}
-          </p>
-          <div className="mt-3 space-y-1.5">
+        <div className="py-4">
+          <div className="space-y-1.5">
             {suggestions.map((s) => (
               <AiWhyTooltip
                 key={s}

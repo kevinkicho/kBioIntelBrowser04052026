@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiGenerationHistory } from '@/components/ai/AiGenerationHistory'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 export function SettingsTab({
   ai,
@@ -25,10 +26,16 @@ export function SettingsTab({
   return (
     <div className="space-y-4">
       <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-3">Ollama Cloud</p>
-        <p className="text-[10px] text-slate-500 mb-3">
-          Uses Ollama Cloud with your API key (configure via the header AI button). No local host or port.
-        </p>
+        <div className="mb-3 flex items-center gap-1.5">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">
+            Ollama Cloud
+          </p>
+          <HelperTip
+            content="Uses Ollama Cloud with your API key (configure via the header AI button). No local host or port."
+            label="About Ollama Cloud"
+            testId="copilot-settings-cloud-help"
+          />
+        </div>
 
         <button
           onClick={onConnect}
@@ -118,21 +125,23 @@ export function SettingsTab({
               )}
             </div>
           )}
-          <p className="text-[9px] text-slate-600 mt-1.5">
+          <p className="mt-1.5 text-[9px] text-slate-600">
             {ai.availableModels.length} model{ai.availableModels.length !== 1 ? 's' : ''} available
           </p>
         </div>
       )}
 
       <div className="bg-slate-900/40 rounded-lg p-3 border border-slate-800/30">
-        <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider mb-2">About</p>
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          BioIntel Copilot uses <span className="text-cyan-400">Ollama Cloud</span> with your API key.
-          Configure the key via the header <strong className="text-slate-400">AI</strong> button, then connect.
-          Traffic goes browser → this app’s server → ollama.com (not local port 11434).
-          Insights must cite loaded panels; sparse data triggers a refuse-and-gap response.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-3">
+        <div className="mb-2 flex flex-wrap items-center gap-1.5">
+          <p className="text-[10px] font-semibold text-slate-400 uppercase tracking-wider">About</p>
+          <HelperTip
+            content="BioIntel Copilot uses Ollama Cloud with your API key. Configure the key via the header AI button, then connect. Traffic goes browser → this app's server → ollama.com (not local port 11434). Insights must cite loaded panels; sparse data triggers a refuse-and-gap response."
+            label="About Copilot"
+            testId="copilot-settings-about-help"
+            maxWidth="20rem"
+          />
+        </div>
+        <div className="flex flex-wrap gap-3">
           <Link
             href="/how-it-works"
             className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"

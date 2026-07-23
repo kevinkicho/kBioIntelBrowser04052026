@@ -38,12 +38,11 @@ export function DiscoveryProgress({ state }: Props) {
 
         {stage && (
           <div className="mb-3 ml-5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[11px] text-slate-500 leading-snug">{stage.short}</span>
-            <PrefTooltip eventKey={`progress_${stage.id}`} text={stage.detail} />
-            <span className="text-[9px] text-slate-600">
-              · {stage.sources.slice(0, 3).join(', ')}
-              {stage.sources.length > 3 ? '…' : ''}
-            </span>
+            <span className="text-[11px] font-medium text-slate-400">{stage.title}</span>
+            <PrefTooltip
+              eventKey={`progress_${stage.id}`}
+              text={`${stage.short}\n\n${stage.detail}\n\nSources: ${stage.sources.join(' · ')}`}
+            />
           </div>
         )}
 

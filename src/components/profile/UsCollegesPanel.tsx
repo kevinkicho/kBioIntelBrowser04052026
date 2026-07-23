@@ -35,21 +35,17 @@ export const UsCollegesPanel = memo(function UsCollegesPanel({
           ? 'No College Scorecard institutions matched grant institutes / query (free Dept of Ed data).'
           : undefined
       }
+      help="US colleges: College Scorecard (primary), OpenAlex US education if Scorecard empty, Urban IPEDS enrichment for address/phone when UNITID known. Free public data — not admissions advice."
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          US colleges: College Scorecard (primary), OpenAlex US education if Scorecard empty, Urban
-          IPEDS enrichment for address/phone when UNITID known. Free public data — not admissions
-          advice.{' '}
-          <a
-            href="https://collegescorecard.ed.gov/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:underline"
-          >
-            Scorecard
-          </a>
-        </p>
+        <a
+          href="https://collegescorecard.ed.gov/"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-block text-[10px] text-indigo-400 hover:underline"
+        >
+          College Scorecard
+        </a>
         {list.length > 0 && (
           <FilterablePaginatedList
             items={list}

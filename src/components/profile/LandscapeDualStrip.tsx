@@ -8,6 +8,7 @@ import {
 } from '@/lib/landscapeDualStrip'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip, STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
 
 const TONE: Record<NonNullable<LandscapeStripChip['tone']>, string> = {
@@ -48,17 +49,18 @@ export const LandscapeDualStrip = memo(function LandscapeDualStrip({
       aria-label="Landscape dual strip"
     >
       <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="flex flex-wrap items-center gap-1.5">
           <h3 className="text-xs font-semibold text-slate-100">
             Landscape dual strip
             {strip.family.stem ? (
               <span className="ml-1.5 font-normal text-slate-500">· {strip.family.stem}</span>
             ) : null}
           </h3>
-          <p className="mt-0.5 text-[10px] text-slate-500 leading-relaxed">
-            Free public joins only — biosimilar family · evidence neighborhood · multi-jurisdiction
-            presence. Not clinical advice or competitive ranking.
-          </p>
+          <HelperTip
+            content="Free public joins only — biosimilar family · evidence neighborhood · multi-jurisdiction presence. Not clinical advice or competitive ranking."
+            label="About landscape dual strip"
+            testId="landscape-dual-strip-help"
+          />
         </div>
         {!strip.hasSignal && (
           <span className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-500">

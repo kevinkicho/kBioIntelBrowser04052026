@@ -32,6 +32,7 @@ export const OpenFdaLabelSectionsPanel = memo(function OpenFdaLabelSectionsPanel
       title="openFDA label sections"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free openFDA drug/label sections — label text only, not incidence or clinical advice."
       empty={
         isEmpty
           ? 'No openFDA structured label sections found (boxed warning, AEs, interactions…).'
@@ -105,9 +106,6 @@ export const OpenFdaLabelSectionsPanel = memo(function OpenFdaLabelSectionsPanel
           )}
         />
       )}
-      <p className="mt-2 text-[9px] text-slate-600">
-        Free openFDA drug/label sections — label text only, not incidence or clinical advice.
-      </p>
     </Panel>
   )
 })

@@ -49,14 +49,11 @@ export const BgeePanel = memo(function BgeePanel({
       title={title}
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Human expression from Bgee (UBERON tissues preferred). Each row shows anatomy, ontology id, stage when available, presence/score, and links to Bgee / OLS."
       empty={isEmpty ? 'No gene expression data found for this molecule.' : undefined}
     >
       {!isEmpty && (
         <>
-          <p className="mb-2 text-[10px] text-slate-500 leading-relaxed">
-            Human expression from Bgee (UBERON tissues preferred). Each row shows anatomy, ontology
-            id, stage when available, presence/score, and links to Bgee / OLS.
-          </p>
           <FilterablePaginatedList
             items={list}
             getSearchText={(e) =>

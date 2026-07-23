@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TdlBadge } from '@/components/discover/TdlBadge'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface TargetPinPanelProps {
@@ -104,11 +105,19 @@ export function TargetPinPanel({
           </span>
         ))}
       </div>
-      <p className="mt-2 text-[11px] text-slate-500 leading-relaxed">
-        {waitingForDisease
-          ? 'Enter a disease above to rank candidates. Pins survive via the URL targets= param and are preferred when gathering drugs for ranking (deterministic — not AI rank).'
-          : 'Pinned symbols are preferred when gathering drugs for this disease (positive bias). Ranking stays deterministic; AI is not used in the score path.'}
-      </p>
+      <div className="mt-2 flex items-center gap-1.5 text-[10px] text-slate-500">
+        <span>{waitingForDisease ? 'Waiting for disease' : 'Pins active'}</span>
+        <HelperTip
+          content={
+            waitingForDisease
+              ? 'Enter a disease above to rank candidates. Pins survive via the URL targets= param and are preferred when gathering drugs for ranking (deterministic — not AI rank).'
+              : 'Pinned symbols are preferred when gathering drugs for this disease (positive bias). Ranking stays deterministic; AI is not used in the score path.'
+          }
+          label="About target pins"
+          testId="target-pin-help"
+          maxWidth="18rem"
+        />
+      </div>
     </div>
   )
 }

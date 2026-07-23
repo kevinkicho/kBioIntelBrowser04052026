@@ -38,6 +38,7 @@ import { RhAiPanel } from '@/components/evidence/RhAiPanel'
 import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const STATUSES: ResearchHypothesisStatus[] = [
@@ -381,14 +382,16 @@ export default function ResearchHypothesisEditorPage() {
           ← Project board
         </Link>
         <div className="mt-2 flex flex-wrap items-end justify-between gap-2 border-b border-slate-800 pb-3">
-          <div className="min-w-0">
+          <div className="min-w-0 flex flex-wrap items-center gap-1.5">
             <h1 className="text-xl font-bold text-slate-100 sm:text-2xl">Research hypothesis</h1>
-            <p className="mt-0.5 text-[11px] text-slate-500">
-              Claim-bound narrative thesis (not set-ops). v{hyp.version} · {hyp.claimIds.length}{' '}
-              claims · {linkedCandidates.length} candidates
-              {hyp.role ? ` · ${hyp.role}` : ''}
-              {hyp.packId ? ` · pack ${hyp.packId.slice(0, 10)}…` : ''}
-            </p>
+            <HelperTip
+              content={`Claim-bound narrative thesis (not set-ops). v${hyp.version} · ${hyp.claimIds.length} claims · ${linkedCandidates.length} candidates${hyp.role ? ` · ${hyp.role}` : ''}${hyp.packId ? ` · pack ${hyp.packId.slice(0, 10)}…` : ''}`}
+              label="About research hypothesis"
+              testId="rh-page-help"
+            />
+            <span className="text-[11px] tabular-nums text-slate-500">
+              v{hyp.version} · {hyp.claimIds.length} claims · {linkedCandidates.length} candidates
+            </span>
           </div>
           <span
             className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${RH_STATUS_STYLES[status]}`}

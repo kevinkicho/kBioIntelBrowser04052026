@@ -33,6 +33,7 @@ export const InternationalRegulatorsPanel = memo(function InternationalRegulator
       title="International regulators"
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Official public search / download portals (UK MHRA, AU TGA, JP PMDA, EU EMA, CA/US). Portal-first — no scrape. Not clinical decision support."
       empty={
         !moleculeName?.trim()
           ? 'No molecule name available for regulator deep links.'
@@ -41,10 +42,6 @@ export const InternationalRegulatorsPanel = memo(function InternationalRegulator
     >
       {links.length > 0 && (
         <div className="space-y-3" data-testid="international-regulators-panel">
-          <p className="text-[10px] text-slate-500 leading-relaxed">
-            Official public search / download portals (UK MHRA, AU TGA, JP PMDA, EU EMA, CA/US).
-            Portal-first — no scrape. Not clinical decision support.
-          </p>
           <ul className="space-y-2">
             {links.map((link) => (
               <li

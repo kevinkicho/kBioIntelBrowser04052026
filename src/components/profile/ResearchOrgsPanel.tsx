@@ -31,6 +31,7 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
       title={list.length > 0 ? `Research organizations (${list.length})` : 'Research organizations'}
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Research Organization Registry (ROR) — open CC0 IDs for universities, research centers, and healthcare research orgs. Matched from trial sponsors/sites and related names. Not a clinical referral directory."
       empty={
         list.length === 0
           ? 'No ROR research organizations matched trial sponsors / facilities / name (free ROR API).'
@@ -38,10 +39,7 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
       }
     >
       <div className="space-y-3">
-        <p className="text-[10px] text-slate-500 leading-relaxed">
-          Research Organization Registry (ROR) — open CC0 IDs for universities, research centers,
-          and healthcare research orgs. Matched from trial sponsors/sites and related names. Not a
-          clinical referral directory.{' '}
+        <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
           <a
             href="https://ror.org/search"
             target="_blank"
@@ -51,24 +49,18 @@ export const ResearchOrgsPanel = memo(function ResearchOrgsPanel({
             ROR search
           </a>
           {list[0]?.name ? (
-            <>
-              {' · '}
-              <a
-                href={`/orgs?q=${encodeURIComponent(list[0].name)}`}
-                className="text-violet-400 hover:underline"
-              >
-                Lab dossier + AI
-              </a>
-            </>
+            <a
+              href={`/orgs?q=${encodeURIComponent(list[0].name)}`}
+              className="text-violet-400 hover:underline"
+            >
+              Lab dossier + AI
+            </a>
           ) : (
-            <>
-              {' · '}
-              <a href="/orgs" className="text-violet-400 hover:underline">
-                Research-lab module
-              </a>
-            </>
+            <a href="/orgs" className="text-violet-400 hover:underline">
+              Research-lab module
+            </a>
           )}
-        </p>
+        </div>
         {list.length > 0 && (
           <FilterablePaginatedList
             items={list}

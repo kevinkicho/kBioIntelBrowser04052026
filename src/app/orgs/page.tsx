@@ -15,6 +15,7 @@ import { OrgSearchSuggest } from '@/components/orgs/OrgSearchSuggest'
 import { OrgDirectoryList } from '@/components/orgs/OrgDirectoryList'
 import { OrgAffiliationJoinList } from '@/components/orgs/OrgAffiliationJoinList'
 import type { OrgSuggestion } from '@/lib/orgs/orgSuggest'
+import { HelperTip } from '@/components/ui/HelperTip'
 
 type TabId = 'dossier' | 'directory' | 'joins'
 
@@ -323,10 +324,14 @@ function OrgsPageInner() {
 
       {tab === 'directory' && (
         <div data-testid="orgs-directory-tab">
-          <p className="mb-3 text-[11px] text-slate-500 leading-relaxed">
-            Unified free-API directory: ROR, EU research pack, US College Scorecard, CMS hospitals.
-            Affiliation context only — not admissions or clinical referral.
-          </p>
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-slate-100">Directory</h2>
+            <HelperTip
+              content="Unified free-API directory: ROR, EU research pack, US College Scorecard, CMS hospitals. Affiliation context only — not admissions or clinical referral."
+              label="About org directory"
+              testId="orgs-directory-help"
+            />
+          </div>
           <OrgDirectoryList
             orgs={orgs}
             euOrgs={euOrgs}
@@ -339,19 +344,21 @@ function OrgsPageInner() {
 
       {tab === 'joins' && (
         <div data-testid="orgs-joins-tab">
-          <h2 className="mb-1 text-sm font-semibold text-slate-100">
-            Sponsor ↔ ROR ↔ site joins
-            {affiliation.edges.length ? (
-              <span className="ml-1 font-normal text-slate-500">
-                · {affiliation.edges.length}
-              </span>
-            ) : null}
-          </h2>
-          <p className="mb-3 text-[11px] text-slate-500 leading-relaxed">
-            Paste trial sponsors or use NIH grant institutes from the dossier. Edges are
-            deterministic token overlap only — not official affiliation graphs or clinical
-            referral.
-          </p>
+          <div className="mb-3 flex flex-wrap items-center gap-1.5">
+            <h2 className="text-sm font-semibold text-slate-100">
+              Sponsor ↔ ROR ↔ site joins
+              {affiliation.edges.length ? (
+                <span className="ml-1 font-normal text-slate-500">
+                  · {affiliation.edges.length}
+                </span>
+              ) : null}
+            </h2>
+            <HelperTip
+              content="Paste trial sponsors or use NIH grant institutes from the dossier. Edges are deterministic token overlap only — not official affiliation graphs or clinical referral."
+              label="About affiliation joins"
+              testId="orgs-joins-help"
+            />
+          </div>
           <textarea
             value={sponsorText}
             onChange={(e) => setSponsorText(e.target.value)}

@@ -42,6 +42,7 @@ export const OpenAireProjectsPanel = memo(function OpenAireProjectsPanel({
       title={list.length > 0 ? `OpenAIRE / EU research (${list.length})` : 'OpenAIRE / EU research'}
       panelId={panelId}
       lastFetched={lastFetched}
+      help="Free OpenAIRE project search (includes EC/CORDIS when available). Funding context only — not efficacy claims."
       empty={
         list.length === 0
           ? 'No OpenAIRE projects matched this name (free public Graph API).'
@@ -50,10 +51,6 @@ export const OpenAireProjectsPanel = memo(function OpenAireProjectsPanel({
     >
       {list.length > 0 && (
         <>
-          <p className="text-[10px] text-slate-500 mb-2 leading-relaxed">
-            Free OpenAIRE project search (includes EC/CORDIS when available). Funding context only —
-            not efficacy claims.
-          </p>
           <FilterablePaginatedList
             items={list}
             getSearchText={(p) =>

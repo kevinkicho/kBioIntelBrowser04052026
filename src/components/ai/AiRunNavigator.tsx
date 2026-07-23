@@ -17,6 +17,7 @@ import { humanModeLabel } from '@/lib/ai/aiUiCopy'
 import { AiPromptReveal } from './AiPromptReveal'
 import { AiUserComment } from './AiUserComment'
 import { AiGenerationView } from './AiGenerationView'
+import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface AiRunNavigatorProps {
@@ -225,10 +226,14 @@ export function AiRunNavigator({
       <div className="space-y-2 px-2.5 py-2">
         {error && <p className="text-[10px] text-red-400">{error}</p>}
         {!loading && totalLoaded === 0 && (
-          <p className="text-[10px] leading-relaxed text-slate-500">
-            No results yet for this mode. Generate above — each run is saved here so you can
-            compare answers without losing earlier ones.
-          </p>
+          <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+            <span>No results yet</span>
+            <HelperTip
+              content="Generate above — each run is saved here so you can compare answers without losing earlier ones."
+              label="About generation history"
+              testId={`${testId}-empty-help`}
+            />
+          </div>
         )}
         {current && (
           <>
