@@ -4,6 +4,7 @@ import { useMemo } from 'react'
 import Link from 'next/link'
 import type { EvidenceClaim, ScoreAxisKey, ScoreVector } from '@/lib/domain'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
+import { EmptyStateTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import type { CrossSourceBundle, CrossSourceFact } from '@/lib/crossSource'
@@ -296,49 +297,55 @@ export function DecisionStrip({
               <div className="h-2 bg-slate-800 rounded animate-pulse w-1/2" />
             </div>
           ) : hasClaims ? (
-            <ul className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
-              {claims.map((c) => (
-                <li
-                  key={c.id}
-                  className="flex items-start gap-1.5 text-[11px] leading-snug"
-                  data-testid="decision-strip-claim"
-                >
-                  <span
-                    className={`shrink-0 mt-0.5 text-[9px] px-1 py-0.5 rounded border ${
-                      CLAIM_TYPE_STYLE[c.claimType] ?? CLAIM_TYPE_STYLE.other
-                    }`}
+            <ul className="space-y-1 max-h-40 overflow-y-auto pr-1">
+              {claims.map((c) => {
+                const tip = [
+                  c.statement,
+                  c.provenance?.source,
+                  c.provenance?.sourceUrl,
+                ]
+                  .filter(Boolean)
+                  .join('\n\n')
+                return (
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-center gap-1.5 text-[11px]"
+                    data-testid="decision-strip-claim"
                   >
-                    {c.claimType}
-                  </span>
-                  <span className="text-slate-300 min-w-0">
-                    <span className="line-clamp-2">{c.statement}</span>
-                    {c.provenance?.source && (
-                      <span className="block text-[9px] text-slate-600 mt-0.5">
-                        {c.provenance.sourceUrl ? (
-                          <a
-                            href={c.provenance.sourceUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-indigo-400/80 hover:text-indigo-300 hover:underline"
-                            data-testid="decision-strip-claim-source"
-                          >
-                            {c.provenance.source}
-                          </a>
-                        ) : (
-                          c.provenance.source
-                        )}
-                      </span>
+                    <span
+                      className={`shrink-0 text-[9px] px-1 py-0.5 rounded border ${
+                        CLAIM_TYPE_STYLE[c.claimType] ?? CLAIM_TYPE_STYLE.other
+                      }`}
+                    >
+                      {c.claimType}
+                    </span>
+                    <StatementTip
+                      statement={tip}
+                      label="Statement"
+                      testId="decision-strip-claim-statement"
+                    />
+                    {c.provenance?.sourceUrl && (
+                      <a
+                        href={c.provenance.sourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[9px] text-indigo-400/80 hover:text-indigo-300 hover:underline"
+                        data-testid="decision-strip-claim-source"
+                      >
+                        ↗
+                      </a>
                     )}
-                  </span>
-                </li>
-              ))}
+                  </li>
+                )
+              })}
             </ul>
           ) : coreReady ? (
-            <div data-testid="decision-strip-claims-empty">
-              <p className="text-xs text-slate-500 mb-2">
-                No Core evidence claims extracted for this molecule.
-                Empty ≠ absence of biology — only that decision-panel sources returned nothing extractable.
-              </p>
+            <div data-testid="decision-strip-claims-empty" className="space-y-2">
+              <EmptyStateTip
+                badge="No claims"
+                message="No Core evidence claims extracted for this molecule. Empty ≠ absence of biology — only that decision-panel sources returned nothing extractable."
+                testId="decision-strip-claims-empty-tip"
+              />
               <div className="flex flex-wrap gap-2">
                 {onLoadCorePanels && (
                   <button

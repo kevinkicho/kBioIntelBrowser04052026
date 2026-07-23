@@ -16,7 +16,7 @@ import {
 } from '@/components/profile/ProfilePanelContext'
 import { filterTraceForPanel, loadStatusFromPanelTrace } from '@/lib/panelApiTrace'
 import { PanelApiDetailModal } from './PanelApiDetailModal'
-import { HelperTip } from './HelperTip'
+import { EmptyStateTip, HelperTip } from './HelperTip'
 import { StyledTooltip } from './StyledTooltip'
 
 type SourceHealth = 'healthy' | 'slow' | 'errors' | 'unknown'
@@ -262,51 +262,65 @@ export function Panel({
         </div>
       </div>
       {emptyText || sourceDisabled ? (
-        <div>
-          <p className="text-slate-500 text-sm">
-            {sourceDisabled
-              ? emptyMessageForStatus('disabled', empty || 'No live public endpoint yet.')
-              : emptyText}
-          </p>
-          {(derivedError || disabledReason) && (
-            <StyledTooltip content={disabledReason || derivedError || ''}>
-              <p
-                className={`text-[10px] mt-1.5 leading-relaxed cursor-help ${
-                  isFetchFailure ? 'text-amber-400/90' : 'text-amber-500/80'
-                }`}
-              >
-                {disabledReason || derivedError}
-              </p>
-            </StyledTooltip>
-          )}
+        <div className="flex flex-wrap items-center gap-2">
+          <EmptyStateTip
+            badge={
+              sourceDisabled
+                ? 'Disabled'
+                : isFetchFailure
+                  ? effectiveLoadStatus === 'timeout'
+                    ? 'Timeout'
+                    : 'Error'
+                  : 'No data'
+            }
+            tone={
+              sourceDisabled || isFetchFailure
+                ? isFetchFailure
+                  ? 'error'
+                  : 'warn'
+                : 'empty'
+            }
+            message={
+              sourceDisabled
+                ? emptyMessageForStatus('disabled', empty || 'No live public endpoint yet.')
+                : [
+                    emptyText,
+                    disabledReason,
+                    derivedError,
+                  ]
+                    .filter(Boolean)
+                    .join('\n\n')
+            }
+            testId={panelId ? `panel-empty-${panelId}` : 'panel-empty'}
+          />
           {canRetryCategory && catId && (
             <StyledTooltip content="Re-query all sources in this category (shared fetch)">
-            <button
-              type="button"
-              onClick={(e) => {
-                e.preventDefault()
-                e.stopPropagation()
-                profileCtx!.refreshCategory(catId)
-              }}
-              disabled={Boolean(catRefreshing)}
-              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-amber-700/50 bg-amber-950/40 px-3 py-1.5 text-[11px] font-medium text-amber-200 hover:bg-amber-900/50 disabled:opacity-40 transition-colors"
-              data-testid={panelId ? `panel-retry-category-${panelId}` : 'panel-retry-category'}
-            >
-              <svg
-                className={`h-3.5 w-3.5 ${catRefreshing ? 'animate-spin' : ''}`}
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault()
+                  e.stopPropagation()
+                  profileCtx!.refreshCategory(catId)
+                }}
+                disabled={Boolean(catRefreshing)}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-amber-700/50 bg-amber-950/40 px-2.5 py-1 text-[11px] font-medium text-amber-200 hover:bg-amber-900/50 disabled:opacity-40 transition-colors"
+                data-testid={panelId ? `panel-retry-category-${panelId}` : 'panel-retry-category'}
               >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
-                />
-              </svg>
-              {catRefreshing ? 'Retrying category…' : 'Retry category'}
-            </button>
+                <svg
+                  className={`h-3.5 w-3.5 ${catRefreshing ? 'animate-spin' : ''}`}
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"
+                  />
+                </svg>
+                {catRefreshing ? 'Retrying…' : 'Retry'}
+              </button>
             </StyledTooltip>
           )}
         </div>

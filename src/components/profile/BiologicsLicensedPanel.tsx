@@ -8,6 +8,7 @@ import { purpleBookDownloadUrl } from '@/lib/api/biologicsLicensed'
 import { getEmaBulkDownloadLinks } from '@/lib/api/emaBulk'
 import { alphaSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
+import { ExternalLinkTip } from '@/components/ui/HelperTip'
 
 const ROLE_STYLE: Record<BiologicLicensedProduct['roleGuess'], string> = {
   reference_or_originator: 'border-emerald-800/40 bg-emerald-950/30 text-emerald-300',
@@ -66,35 +67,29 @@ export const BiologicsLicensedPanel = memo(function BiologicsLicensedPanel({
     >
       <div className="space-y-3">
         <div className="flex flex-wrap gap-x-3 gap-y-1 text-[10px]">
-          <a
+          <ExternalLinkTip
             href={purpleBookDownloadUrl()}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-indigo-400 hover:underline"
+            label="Purple Book"
+            title="Purple Book downloads (FDA portal)"
             onClick={() =>
               onDeepLinkClick('other', purpleBookDownloadUrl(), {
                 panelId: panelId || 'biologics-licensed',
                 label: 'purple-book-download',
               })
             }
-          >
-            Purple Book downloads
-          </a>
+          />
           {emaBiosimilar && (
-            <a
+            <ExternalLinkTip
               href={emaBiosimilar.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-indigo-400 hover:underline"
+              label="EMA hub"
+              title="EMA biosimilars hub"
               onClick={() =>
                 onDeepLinkClick('other', emaBiosimilar.url, {
                   panelId: panelId || 'biologics-licensed',
                   label: 'ema-biosimilars',
                 })
               }
-            >
-              EMA biosimilars hub
-            </a>
+            />
           )}
         </div>
 

@@ -10,6 +10,7 @@ import {
   originSourceDeepLink,
   type OriginLinkContext,
 } from '@/lib/originDeepLinks'
+import { EmptyStateTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
@@ -138,49 +139,55 @@ export function PackView({ pack, compact = false, className = '' }: Props) {
       {!compact && (
         <div className="max-h-72 overflow-y-auto px-4 py-3">
           {pack.claims.length === 0 ? (
-            <p className="text-sm text-slate-500">No claims in this pack.</p>
+            <EmptyStateTip message="No claims in this pack." badge="No claims" />
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {pack.claims.map((c) => {
                 const typeLink = claimTypeDeepLink(c.claimType, ctx)
                 const provLink = claimProvenanceDeepLink(c.provenance, ctx)
+                const meta = [
+                  c.statement,
+                  provLink.label,
+                  provLink.title,
+                  c.provenance.retrievedAt
+                    ? `Retrieved ${new Date(c.provenance.retrievedAt).toLocaleDateString()}`
+                    : '',
+                  c.id,
+                  c.epistemicStatus,
+                ]
+                  .filter(Boolean)
+                  .join('\n\n')
                 return (
-                  <li key={c.id} className="border-b border-slate-800/80 pb-2 last:border-0">
-                    <div className="flex flex-wrap items-center gap-2 text-[10px]">
-                      <DeepChip
-                        href={typeLink.href}
-                        title={typeLink.title}
-                        className="rounded border border-emerald-800/40 bg-emerald-900/20 px-1.5 py-0.5 text-emerald-300"
-                        testId="pack-claim-type-chip"
-                      >
-                        {c.claimType}
-                      </DeepChip>
-                      <span className="font-mono text-slate-600">{c.id}</span>
-                      <span className="text-slate-600">{c.epistemicStatus}</span>
-                    </div>
-                    <p className="mt-1 text-sm text-slate-300">{c.statement}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
-                      {provLink.href ? (
-                        <StyledTooltip content={provLink.title}>
-                          <a
-                            href={provLink.href}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-indigo-400/90 hover:text-indigo-300 hover:underline"
-                            data-testid="pack-claim-source-url"
-                          >
-                            {provLink.label}
-                          </a>
-                        </StyledTooltip>
-                      ) : (
-                        <StyledTooltip content={provLink.title}>
-                          <span>{provLink.label}</span>
-                        </StyledTooltip>
-                      )}
-                      {c.provenance.retrievedAt
-                        ? ` · ${new Date(c.provenance.retrievedAt).toLocaleDateString()}`
-                        : ''}
-                    </p>
+                  <li
+                    key={c.id}
+                    className="flex flex-wrap items-center gap-2 border-b border-slate-800/80 pb-2 last:border-0"
+                  >
+                    <DeepChip
+                      href={typeLink.href}
+                      title={typeLink.title}
+                      className="rounded border border-emerald-800/40 bg-emerald-900/20 px-1.5 py-0.5 text-emerald-300"
+                      testId="pack-claim-type-chip"
+                    >
+                      {c.claimType}
+                    </DeepChip>
+                    <StatementTip statement={meta} label="Statement" testId="pack-claim-statement" />
+                    {provLink.href ? (
+                      <StyledTooltip content={provLink.title || provLink.label}>
+                        <a
+                          href={provLink.href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-[10px] text-indigo-400/90 hover:text-indigo-300 hover:underline"
+                          data-testid="pack-claim-source-url"
+                        >
+                          Source ↗
+                        </a>
+                      </StyledTooltip>
+                    ) : (
+                      <StyledTooltip content={provLink.title || provLink.label}>
+                        <span className="text-[10px] text-slate-500">Source</span>
+                      </StyledTooltip>
+                    )}
                   </li>
                 )
               })}

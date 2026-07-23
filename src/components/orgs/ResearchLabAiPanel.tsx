@@ -24,7 +24,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
-import { HelperTip } from '@/components/ui/HelperTip'
+import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 import {
@@ -365,9 +365,9 @@ export function ResearchLabAiPanel({
               <p className="text-[10px] font-semibold uppercase text-slate-400">Grounded claims</p>
               <ul className="mt-1 space-y-1 max-h-36 overflow-y-auto">
                 {evidenceLines.map((c) => (
-                  <li key={c.id} className="text-[10px] text-slate-400">
-                    <span className="font-mono text-slate-600">{c.id.slice(0, 18)}…</span>{' '}
-                    {c.statement}
+                  <li key={c.id} className="flex flex-wrap items-center gap-1.5 text-[10px] text-slate-400">
+                    <span className="font-mono text-slate-600">{c.id.slice(0, 18)}…</span>
+                    <StatementTip statement={c.statement} label="Statement" />
                   </li>
                 ))}
               </ul>

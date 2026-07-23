@@ -38,7 +38,11 @@ import { RhAiPanel } from '@/components/evidence/RhAiPanel'
 import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
 import { loadProjectSignals, type CandidateSignalRow } from '@/lib/signals'
 import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
-import { HelperTip } from '@/components/ui/HelperTip'
+import {
+  ExternalLinkTip,
+  HelperTip,
+  StatementTip,
+} from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const STATUSES: ResearchHypothesisStatus[] = [
@@ -779,23 +783,24 @@ export default function ResearchHypothesisEditorPage() {
                       <span className="rounded border border-emerald-900/40 bg-emerald-950/20 px-1 py-0.5 text-[9px] uppercase text-emerald-300/90 w-fit">
                         {c.claimType}
                       </span>
-                      <p className="leading-snug text-slate-200">{c.statement}</p>
+                      <StatementTip
+                        statement={[c.statement, c.provenance?.source, href || ''].filter(Boolean).join('\n\n')}
+                        label="Statement"
+                        testId={`rh-claim-statement-${c.id}`}
+                      />
                       <StyledTooltip content={c.id}>
                         <span className="font-mono text-[9px] text-slate-600 truncate">{c.id}</span>
                       </StyledTooltip>
                       {href ? (
-                        <a
+                        <ExternalLinkTip
                           href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-[10px] text-indigo-400 hover:underline justify-self-end"
-                        >
-                          {c.provenance?.source ?? 'source'}
-                        </a>
+                          label="Source"
+                          title={c.provenance?.source ?? 'source'}
+                          className="justify-self-end"
+                          testId={`rh-claim-source-${c.id}`}
+                        />
                       ) : (
-                        <span className="text-[9px] text-slate-600 justify-self-end">
-                          {c.provenance?.source ?? '—'}
-                        </span>
+                        <span className="text-[9px] text-slate-600 justify-self-end">—</span>
                       )}
                     </li>
                   )

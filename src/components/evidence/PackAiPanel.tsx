@@ -18,7 +18,7 @@ import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
-import { HelperTip } from '@/components/ui/HelperTip'
+import { EmptyStateTip, HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 import {
@@ -447,29 +447,37 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
                 {evidenceLines.slice(0, 12).map((e) => (
                   <li
                     key={e.id}
-                    className="rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1.5 text-[11px] text-slate-300 leading-snug"
+                    className="flex flex-wrap items-center gap-1.5 rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1 text-[11px]"
                   >
-                    <span className="text-slate-200">{e.statement}</span>
-                    {(e.source || e.type) && (
-                      <span className="mt-0.5 block text-[9px] text-slate-600">
+                    {(e.type || e.source) && (
+                      <span className="text-[9px] text-slate-500">
                         {[e.type, e.source].filter(Boolean).join(' · ')}
                       </span>
                     )}
+                    <StatementTip
+                      statement={e.statement}
+                      label="Statement"
+                      testId={`pack-ai-evidence-${e.id}`}
+                    />
                   </li>
                 ))}
               </ul>
               {evidenceLines.length > 12 && (
-                <p className="mt-1 text-[9px] text-slate-600">
-                  +{evidenceLines.length - 12} more claims cited
-                </p>
+                <EmptyStateTip
+                  badge={`+${evidenceLines.length - 12} more`}
+                  message={`${evidenceLines.length - 12} additional claims cited (not shown).`}
+                  testId="pack-ai-evidence-more"
+                />
               )}
             </div>
           )}
           {insight.claimIds.length > 0 && evidenceLines.length === 0 && isStructuredPackMode(mode) && (
-            <p className="text-[10px] text-slate-600">
-              Model cited {insight.claimIds.length} claim id(s), but they could not be matched to
-              pack statements (stale pack or invalid ids).
-            </p>
+            <EmptyStateTip
+              badge="Unmatched ids"
+              tone="warn"
+              message={`Model cited ${insight.claimIds.length} claim id(s), but they could not be matched to pack statements (stale pack or invalid ids).`}
+              testId="pack-ai-unmatched-claims"
+            />
           )}
         </div>
       )}

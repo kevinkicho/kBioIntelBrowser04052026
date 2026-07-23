@@ -16,6 +16,8 @@ import {
   resetLocalFunnel,
   type LocalFunnelSnapshot,
 } from '@/lib/analytics/localFunnel'
+import { HelperTip } from '@/components/ui/HelperTip'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 const SURFACE_LABELS: Record<PromptSurface, string> = {
   molecule_copilot: 'Molecule copilot',
@@ -192,97 +194,86 @@ export default function HowItWorksPage() {
             className="max-w-3xl text-[13px] leading-relaxed text-slate-400"
             data-testid="how-overview"
           >
-            <p className="text-[15px] leading-relaxed text-slate-300">
-              BioIntel is a solo discovery workbench over <strong className="font-medium text-slate-200">free public APIs</strong>.
-              Of-record ranking is always deterministic. AI (your Ollama key) only runs{' '}
-              <strong className="font-medium text-slate-200">claim-bound</strong> on packs, research
-              hypotheses, and profile copilot — never in the Discover rank path.
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <h1 className="text-[15px] font-semibold text-slate-100">How BioIntel works</h1>
+              <HelperTip
+                content="BioIntel is a solo discovery workbench over free public APIs. Of-record ranking is always deterministic. AI (your Ollama key) only runs claim-bound on packs, research hypotheses, and profile copilot — never in the Discover rank path."
+                label="About BioIntel"
+                testId="how-overview-lede-help"
+                maxWidth="22rem"
+              />
+            </div>
 
             <h2 className="mt-8 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Product law
             </h2>
-            <dl className="divide-y divide-slate-800/80 border-y border-slate-800/80">
+            <ul className="flex flex-wrap gap-2">
               {PRODUCT_LAW_ROWS.map(([term, detail]) => (
-                <div
-                  key={term}
-                  className="grid gap-1 py-2.5 sm:grid-cols-[9.5rem_1fr] sm:gap-4"
-                >
-                  <dt className="text-[12px] font-medium text-slate-200">{term}</dt>
-                  <dd className="text-[12px] text-slate-400 leading-snug">{detail}</dd>
-                </div>
+                <li key={term}>
+                  <HelperTip content={detail} label={term} testId={`how-law-${term}`}>
+                    <span className="cursor-help rounded-full border border-slate-700 bg-slate-900/50 px-2.5 py-1 text-[11px] font-medium text-slate-200">
+                      {term}
+                    </span>
+                  </HelperTip>
+                </li>
               ))}
-            </dl>
+            </ul>
 
             <h2 className="mt-8 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Two paths
             </h2>
-            <p className="mb-3 text-[12px] text-slate-500">
-              Everything in the product is either a deterministic free-API pipeline or a gated AI
-              surface. They never write each other’s of-record scores.
-            </p>
-            <div className="grid gap-6 sm:grid-cols-2 sm:gap-8">
-              <div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="flex flex-wrap items-center gap-1.5">
                 <p className="text-[12px] font-semibold text-emerald-300/90">Discover ranking</p>
-                <p className="mt-1 text-[12px] text-slate-400 leading-relaxed">
-                  Disease resolve → targets → gather candidates → PubChem identity for top-N →
-                  weighted multi-axis score → optional openFDA / literature harvest. Rubric
-                  weights are yours; the engine never invents axes.
-                </p>
-                <p className="mt-2 text-[11px]">
-                  <Link href="/discover" className="text-indigo-400 hover:underline">
-                    Open Discover
-                  </Link>
-                  <span className="text-slate-600"> · </span>
-                  <button
-                    type="button"
-                    onClick={() => setTab('algorithms')}
-                    className="text-indigo-400 hover:underline"
-                  >
-                    Algorithms tab
-                  </button>
-                </p>
+                <HelperTip
+                  content="Disease resolve → targets → gather candidates → PubChem identity for top-N → weighted multi-axis score → optional openFDA / literature harvest. Rubric weights are yours; the engine never invents axes. Everything is either a deterministic free-API pipeline or a gated AI surface — they never write each other's of-record scores."
+                  label="About Discover ranking"
+                  testId="how-discover-path-help"
+                />
+                <Link href="/discover" className="text-[11px] text-indigo-400 hover:underline">
+                  Open
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setTab('algorithms')}
+                  className="text-[11px] text-indigo-400 hover:underline"
+                >
+                  Algorithms
+                </button>
               </div>
-              <div>
+              <div className="flex flex-wrap items-center gap-1.5">
                 <p className="text-[12px] font-semibold text-indigo-300/90">AI (BYOM Ollama)</p>
-                <p className="mt-1 text-[12px] text-slate-400 leading-relaxed">
-                  Profile copilot, pack AI, RH seed, disease intelligence. Prompts inject retrieved
-                  public data only. System rules require panel citations; deep synthesis is refused
-                  when evidence is thin ({COPILOT_COMPLETENESS_GATE.minPanelsWithData}+ panels with
-                  data, ≥{Math.round(COPILOT_COMPLETENESS_GATE.minCompletenessRatio * 100)}%
-                  completeness).
-                </p>
-                <p className="mt-2 text-[11px]">
-                  <button
-                    type="button"
-                    onClick={() => setTab('prompts')}
-                    className="text-indigo-400 hover:underline"
-                  >
-                    AI prompts tab
-                  </button>
-                </p>
+                <HelperTip
+                  content={`Profile copilot, pack AI, RH seed, disease intelligence. Prompts inject retrieved public data only. System rules require panel citations; deep synthesis is refused when evidence is thin (${COPILOT_COMPLETENESS_GATE.minPanelsWithData}+ panels with data, ≥${Math.round(COPILOT_COMPLETENESS_GATE.minCompletenessRatio * 100)}% completeness).`}
+                  label="About AI path"
+                  testId="how-ai-path-help"
+                />
+                <button
+                  type="button"
+                  onClick={() => setTab('prompts')}
+                  className="text-[11px] text-indigo-400 hover:underline"
+                >
+                  Prompts
+                </button>
               </div>
             </div>
 
             <h2 className="mt-8 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Discover pipeline
             </h2>
-            <p className="mb-3 text-[12px] text-slate-500">
-              Rank path end-to-end (wall-time notes are educational, not live timers).
-            </p>
-            <ol className="space-y-0 border-l border-slate-800 pl-4">
+            <ol className="flex flex-wrap gap-2">
               {DISCOVER_PIPELINE_STAGES.map((s, i) => (
-                <li key={s.id} className="relative pb-3 last:pb-0">
-                  <span
-                    className="absolute -left-4 top-1.5 h-1.5 w-1.5 -translate-x-[3.5px] rounded-full bg-indigo-500/70"
-                    aria-hidden
-                  />
-                  <span className="text-[10px] font-mono text-slate-600">{i + 1}.</span>{' '}
-                  <span className="text-[12px] font-medium text-slate-200">{s.title}</span>
-                  <span className="text-[12px] text-slate-500"> — {s.short}</span>
-                  <span className="mt-0.5 block text-[10px] text-slate-600">
-                    {effortLabel(s.effort)} · {s.sources.join(' · ')}
-                  </span>
+                <li key={s.id}>
+                  <HelperTip
+                    content={`${s.short}\n\n${s.detail || ''}\n\n${effortLabel(s.effort)} · ${s.sources.join(' · ')}`}
+                    label={s.title}
+                    testId={`how-pipeline-${s.id}`}
+                    maxWidth="20rem"
+                  >
+                    <span className="cursor-help rounded-lg border border-slate-800 bg-slate-950/50 px-2 py-1 text-[11px] text-slate-200">
+                      <span className="font-mono text-slate-600">{i + 1}.</span> {s.title}
+                    </span>
+                  </HelperTip>
                 </li>
               ))}
             </ol>
@@ -290,22 +281,30 @@ export default function HowItWorksPage() {
             <h2 className="mt-8 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               AI system rules
             </h2>
-            <p className="text-[12px] text-slate-400 leading-relaxed">
-              {COPILOT_SYSTEM_RULES_SUMMARY.join(' ')}{' '}
-              <span className="text-slate-500">
-                Completeness gate: {COPILOT_COMPLETENESS_GATE.description}
-              </span>
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[12px] text-slate-300">Rules + completeness gate</span>
+              <HelperTip
+                content={`${COPILOT_SYSTEM_RULES_SUMMARY.join(' ')}\n\nCompleteness gate: ${COPILOT_COMPLETENESS_GATE.description}`}
+                label="AI system rules"
+                testId="how-ai-rules-help"
+                maxWidth="22rem"
+              />
+            </div>
 
             <h2 className="mt-8 mb-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
               Out of scope
             </h2>
-            <p className="text-[12px] text-slate-500 leading-relaxed">
-              {NOT_WIRED.join('; ')}. UI empty states use opacity ~0.3 so filled signal stands out.
-            </p>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="text-[12px] text-slate-300">What we do not ship</span>
+              <HelperTip
+                content={`${NOT_WIRED.join('; ')}. UI empty states use opacity ~0.3 so filled signal stands out.`}
+                label="Out of scope"
+                testId="how-oos-help"
+                maxWidth="22rem"
+              />
+            </div>
 
-            <p className="mt-8 text-[11px] text-slate-600">
-              For your own completion metrics, see{' '}
+            <div className="mt-8 flex flex-wrap items-center gap-2 text-[11px] text-slate-500">
               <button
                 type="button"
                 onClick={() => setTab('funnel')}
@@ -313,82 +312,83 @@ export default function HowItWorksPage() {
               >
                 Your loop
               </button>
-              . Source of truth:{' '}
-              <code className="text-slate-500">docs/design/discovery-workbench-*.md</code>,{' '}
-              <code className="text-slate-500">src/lib/discovery/</code>,{' '}
-              <code className="text-slate-500">src/lib/ai/</code>.
-            </p>
+              <HelperTip
+                content="Source of truth: docs/design/discovery-workbench-*.md, src/lib/discovery/, src/lib/ai/."
+                label="Source of truth"
+                testId="how-sot-help"
+              />
+            </div>
           </article>
         )}
 
         {tab === 'algorithms' && (
-          <div className="space-y-3" data-testid="how-algorithms">
-            <p className="text-[12px] text-slate-500 mb-2">
-              Each card is a real code path. Expand for steps and source files.
-            </p>
+          <div className="space-y-2" data-testid="how-algorithms">
+            <div className="mb-2 flex flex-wrap items-center gap-1.5">
+              <h2 className="text-sm font-semibold text-slate-100">Algorithms</h2>
+              <HelperTip
+                content="Each card is a real code path. Hover title for summary; open for step list and code areas."
+                label="About algorithms"
+                testId="how-algorithms-help"
+              />
+            </div>
             {ALGORITHM_CATALOG.map((algo) => {
               const open = openAlgo === algo.id
+              const body = [
+                algo.summary,
+                'Steps:',
+                ...algo.steps.map((st, i) => `${i + 1}. ${st}`),
+                'Code areas:',
+                ...algo.codeAreas,
+              ].join('\n')
               return (
                 <div
                   key={algo.id}
                   id={algo.id}
                   className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden scroll-mt-20"
                 >
-                  <button
-                    type="button"
-                    onClick={() => setOpenAlgo(open ? null : algo.id)}
-                    className="flex w-full items-start gap-3 px-4 py-3 text-left hover:bg-slate-800/30"
-                    aria-expanded={open}
-                  >
-                    <span className="min-w-0 flex-1">
-                      <span className="flex flex-wrap items-center gap-2">
-                        <span className="text-sm font-semibold text-slate-100">{algo.title}</span>
-                        <span
-                          className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase ${
-                            algo.usesLlm
-                              ? 'border-indigo-800/50 text-indigo-300 bg-indigo-950/40'
-                              : 'border-emerald-800/50 text-emerald-300 bg-emerald-950/40'
-                          }`}
-                        >
-                          {algo.usesLlm ? 'Uses LLM' : 'No LLM'}
+                  <div className="flex w-full items-center gap-2 px-4 py-3">
+                    <HelperTip content={body} label={algo.title} maxWidth="22rem" testId={`how-algo-${algo.id}`}>
+                      <span className="min-w-0 flex-1 cursor-help text-left">
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-semibold text-slate-100">{algo.title}</span>
+                          <span
+                            className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold uppercase ${
+                              algo.usesLlm
+                                ? 'border-indigo-800/50 text-indigo-300 bg-indigo-950/40'
+                                : 'border-emerald-800/50 text-emerald-300 bg-emerald-950/40'
+                            }`}
+                          >
+                            {algo.usesLlm ? 'Uses LLM' : 'No LLM'}
+                          </span>
+                          <span className="text-[9px] text-slate-600 uppercase">{algo.area}</span>
                         </span>
-                        <span className="text-[9px] text-slate-600 uppercase">{algo.area}</span>
                       </span>
-                      <span className="mt-0.5 block text-[12px] text-slate-500 leading-snug">
-                        {algo.summary}
-                      </span>
-                    </span>
-                    <span className={`text-slate-500 ${open ? 'rotate-180' : ''}`}>▾</span>
-                  </button>
+                    </HelperTip>
+                    <button
+                      type="button"
+                      onClick={() => setOpenAlgo(open ? null : algo.id)}
+                      className="shrink-0 text-[10px] text-slate-500 hover:text-slate-300"
+                      aria-expanded={open}
+                    >
+                      {open ? 'Hide steps' : 'Steps'}
+                    </button>
+                  </div>
                   {open && (
-                    <div className="border-t border-slate-800 px-4 py-3 space-y-3">
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase text-slate-500 mb-1.5">
-                          Steps
-                        </p>
-                        <ol className="list-decimal list-inside space-y-1 text-[12px] text-slate-400">
-                          {algo.steps.map((st) => (
-                            <li key={st} className="leading-snug">
-                              {st}
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                      <div>
-                        <p className="text-[10px] font-semibold uppercase text-slate-500 mb-1.5">
-                          Code areas
-                        </p>
-                        <ul className="space-y-0.5">
-                          {algo.codeAreas.map((c) => (
-                            <li
-                              key={c}
-                              className="font-mono text-[10px] text-cyan-600/90 break-all"
-                            >
-                              {c}
-                            </li>
-                          ))}
-                        </ul>
-                      </div>
+                    <div className="border-t border-slate-800 px-4 py-2 flex flex-wrap gap-1.5">
+                      {algo.steps.map((st, i) => (
+                        <HelperTip key={st} content={st} label={`Step ${i + 1}`}>
+                          <span className="cursor-help rounded border border-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">
+                            {i + 1}
+                          </span>
+                        </HelperTip>
+                      ))}
+                      {algo.codeAreas.map((c) => (
+                        <StyledTooltip key={c} content={c}>
+                          <span className="cursor-help rounded border border-slate-800 px-1.5 py-0.5 font-mono text-[9px] text-cyan-600/90">
+                            path
+                          </span>
+                        </StyledTooltip>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -399,12 +399,15 @@ export default function HowItWorksPage() {
 
         {tab === 'prompts' && (
           <div className="space-y-2" data-testid="how-prompts">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <p className="text-[12px] text-slate-500 max-w-3xl leading-relaxed">
-                Dense catalog of modes sent to your Ollama model. User messages always include{' '}
-                <em className="text-slate-400">retrieved public data</em> — not free invention.
-                Expand a row for inputs, constraints, and system excerpts.
-              </p>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <h2 className="text-sm font-semibold text-slate-100">AI prompts</h2>
+                <HelperTip
+                  content="Dense catalog of modes sent to your Ollama model. User messages always include retrieved public data — not free invention. Expand a row for inputs, constraints, and system excerpts."
+                  label="About prompts catalog"
+                  testId="how-prompts-help"
+                />
+              </div>
               <input
                 type="search"
                 value={promptQuery}
