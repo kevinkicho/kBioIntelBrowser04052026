@@ -314,8 +314,29 @@ export async function clientFetch(
     return response
   } catch (error) {
     const duration = Math.round(performance.now() - start)
+    const aborted = isAbortError(error)
+    const timeoutAbort =
+      aborted &&
+      error instanceof Error &&
+      /timed out/i.test(error.message)
+
+    // Intentional cancels (SPA leave, category remount, React Strict Mode
+    // double-invoke) are not product failures. Logging them with console.error
+    // dumps multi-thousand-frame React stacks that look like "stack overflow".
+    if (aborted && !timeoutAbort) {
+      if (IS_DEV) {
+        console.debug(
+          `%c· cancelled %c${ms(duration)}`,
+          DIM_STYLE,
+          TIME_STYLE,
+        )
+        console.groupEnd()
+      }
+      throw error
+    }
 
     const source = metricSource(url)
+    const errMsg = error instanceof Error ? error.message : String(error)
 
     if (source) {
       enqueueMetric({
@@ -323,18 +344,31 @@ export async function clientFetch(
         endpoint: url,
         status: 0,
         duration_ms: duration,
-        error: error instanceof Error ? error.message : String(error),
+        error: errMsg,
         has_data: false,
       })
     }
 
     logFetchOutcome(url, method, 0, duration, false)
-    if (IS_DEV) console.error(
-      `%c✗ Network error %c${ms(duration)}`,
-      ERR_STYLE, TIME_STYLE,
-      error,
-    )
-    if (IS_DEV) console.groupEnd()
+    if (IS_DEV) {
+      if (timeoutAbort) {
+        // Message only — avoid attaching the Error object (huge React frames)
+        console.warn(
+          `%c✗ Timeout %c${ms(duration)} %c${errMsg}`,
+          ERR_STYLE,
+          TIME_STYLE,
+          DIM_STYLE,
+        )
+      } else {
+        console.error(
+          `%c✗ Network error %c${ms(duration)} %c${errMsg}`,
+          ERR_STYLE,
+          TIME_STYLE,
+          DIM_STYLE,
+        )
+      }
+      console.groupEnd()
+    }
     throw error
   }
 }
