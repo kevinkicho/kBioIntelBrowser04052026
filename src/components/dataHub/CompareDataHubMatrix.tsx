@@ -48,7 +48,7 @@ export function CompareDataHubMatrix({
 
   const sections = useMemo(() => {
     const order: string[] = []
-    const map = new Map<string, { title: string; rows: typeof matrix.rows }>()
+    const map = new Map<string, { title: string; rows: CompareHubMatrix['rows'] }>()
     for (const r of filteredRows) {
       if (hideEmpty && r.cells.every((c) => c.empty)) continue
       if (!map.has(r.sectionId)) {

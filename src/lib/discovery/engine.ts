@@ -533,7 +533,6 @@ export async function rankCandidatesForDisease(
 
   // Always densify top-K (safety + novelty free APIs) — denser shortlist
   let scorePhase: 'cheap' | 'full' = 'cheap'
-  const densifyStart = Date.now()
   const densify = await densifyShortlist({
     candidates: sorted,
     scoreByName,
