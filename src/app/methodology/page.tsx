@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import Link from 'next/link'
+import { ResearchKitDiffPanel } from '@/components/dataHub/ResearchKitDiffPanel'
 
 export const metadata: Metadata = {
   title: 'How we present data · BioIntel',
@@ -73,12 +74,20 @@ const EXPORTS = [
     use: 'Spreadsheet or notebook import of Fact · Value · Source columns for one entity.',
   },
   {
-    name: 'Research kit',
-    use: 'Multi-file: hub CSV, sources.json, optional claims.md, README, manifest — lab notebook starter pack.',
+    name: 'Research kit (single-file bundle)',
+    use: 'biointel-research-kit-bundle JSON: hub CSV, sources.json, optional claims.md, prefs, README — lab notebook starter. Also via CLI: biointel research kit --cid N.',
   },
   {
-    name: 'Compare data hub CSV / TSV',
-    use: 'Side-by-side matrix across 2–4 CIDs for the same fact ids.',
+    name: 'Monday pack',
+    use: 'One-shot lab-meeting JSON: research kit + agenda bullets + methodology pointer + honesty rules.',
+  },
+  {
+    name: 'Cite (per fact)',
+    use: 'Clipboard citation: fact, value, source, URL, session date — for lab notebooks.',
+  },
+  {
+    name: 'Compare / cohort data hub CSV / TSV',
+    use: 'Side-by-side matrix across CIDs for the same fact ids (compare page + cohort page).',
   },
   {
     name: 'Evidence pack JSON / MD',
@@ -87,6 +96,30 @@ const EXPORTS = [
   {
     name: 'API sources manifest',
     use: 'docs/api-sources-manifest.json — name, org, docs URL, endpoint for all free sources.',
+  },
+] as const
+
+const CHANGELOG = [
+  {
+    when: '2026-04',
+    items: [
+      'Data hub ledger on molecule / gene / disease / org with Fact · Value · Source · Open',
+      'Source directory, research kit single-file bundle, Research view + gene Research tab',
+      'Discover mini hub; compare side-by-side data hub matrix; public /methodology',
+      'Saved research-view prefs (localStorage) with kit import/export',
+    ],
+  },
+  {
+    when: '2026-04 (presentation rules)',
+    items: [
+      'Cite fact clipboard + Monday pack + session sample watermark',
+      'Research kit bundle diff (methodology tool + pure lib)',
+      'A-tier filter for hub rows; research shelves (solo-local pin lists)',
+      'Lit year histogram + grant landscape strip on Research view',
+      'Disease → Discover target chips; cohort of-record data hub matrix',
+      'CLI: biointel research kit --cid; API GET /api/molecule/:id/research-kit',
+      'Discover candidate “Open Research view” deep-link (?view=research)',
+    ],
   },
 ] as const
 
@@ -172,7 +205,7 @@ export default function MethodologyPage() {
           </div>
         </section>
 
-        <section className="mb-8">
+        <section id="honesty" className="mb-8 scroll-mt-20">
           <h2 className="mb-3 text-sm font-semibold text-slate-100">Honesty rules</h2>
           <dl className="space-y-3">
             {RULES.map((r) => (
@@ -214,6 +247,33 @@ export default function MethodologyPage() {
           </ul>
         </section>
 
+        <section id="kit-diff" className="mb-8 scroll-mt-20">
+          <ResearchKitDiffPanel />
+        </section>
+
+        <section id="changelog" className="mb-8 scroll-mt-20">
+          <h2 className="mb-3 text-sm font-semibold text-slate-100">
+            Presentation-rules changelog
+          </h2>
+          <div className="space-y-4">
+            {CHANGELOG.map((block) => (
+              <div
+                key={block.when}
+                className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2.5"
+              >
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-indigo-400/90">
+                  {block.when}
+                </p>
+                <ul className="mt-2 list-disc space-y-1 pl-4 text-[12px] leading-relaxed text-slate-400">
+                  {block.items.map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+        </section>
+
         <section className="mb-8 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <h2 className="text-sm font-semibold text-slate-100">Where to look in the product</h2>
           <ul className="mt-3 space-y-1.5 text-[13px] text-slate-400">
@@ -234,6 +294,12 @@ export default function MethodologyPage() {
                 Discover
               </Link>
               {' — '}Mini research facts on candidate cards (rank remains deterministic)
+            </li>
+            <li>
+              <Link href="/cohort" className="text-indigo-300 hover:underline">
+                Cohort
+              </Link>
+              {' — '}Of-record data hub matrix + assistive heatmap for 2–10 molecules
             </li>
             <li>
               <Link href="/how-it-works" className="text-indigo-300 hover:underline">

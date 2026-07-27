@@ -60,13 +60,24 @@ export function richnessProxy(c: MoleculeCandidate): number {
   if (c.identity.inchiKey) score += 2
   if (c.scores?.scorePhase === 'full') score += 3
   else if (c.scores) score += 1
-  score += Math.min(5, c.evidenceBreadthSources?.length ?? 0)
+  // Prefer candidates with broader free-API gather (proxy for hub-filled domains)
+  const breadth = c.evidenceBreadthSources?.length ?? 0
+  score += Math.min(5, breadth)
+  if (breadth >= 3) score += 1.5
+  if (breadth >= 5) score += 1
   const axes = c.scores?.axes
   const axisStatus = c.scores?.axisStatus
   if (axes) {
     for (const k of ['efficacy', 'clinicalStage', 'safety', 'novelty', 'identityTrust'] as const) {
       if (typeof axes[k] === 'number' && axisStatus?.[k] !== 'not-retrieved') score += 0.5
     }
+  }
+  // Hub-friendly clinical / identity axes when retrieved
+  if (typeof axes?.clinicalStage === 'number' && axisStatus?.clinicalStage !== 'not-retrieved') {
+    score += 0.5
+  }
+  if (typeof axes?.identityTrust === 'number' && axisStatus?.identityTrust !== 'not-retrieved') {
+    score += 0.5
   }
   return score
 }

@@ -99,11 +99,28 @@ Bundle kind `biointel-research-kit-bundle` embeds:
 |-------|------|
 | Builder | `buildCompareHubMatrix` / `compareBagsFromMoleculeData` |
 | UI | `CompareDataHubMatrix` on `/compare` when ≥2 CIDs load |
+| Cohort | Same matrix on `/cohort` when ≥2 molecules (of-record above heatmap) |
 | Export | CSV/TSV of fact × molecule matrix |
 
 ## Methodology page (P2)
 
-Public citable page: **`/methodology`** (“How we present data”) — of-record layers, honesty rules, exports, product law. Linked from header (**Data methods**), homepage, how-it-works, compare footer.
+Public citable page: **`/methodology`** (“How we present data”) — of-record layers, honesty rules, exports, product law, kit-diff tool, presentation-rules changelog. Linked from header (**Data methods**), homepage, how-it-works, compare footer. Anchors: `#honesty`, `#kit-diff`, `#changelog`.
+
+## Presentation extras (P3)
+
+| Capability | Code | Notes |
+|------------|------|-------|
+| Cite fact | `citeFact.ts` + Cite button on ledger rows | Clipboard lab-notebook citation |
+| Monday pack | `mondayPack.ts` + ledger button | Kit + agenda + honesty + methodology pointer |
+| Sample watermark | `ResearchSampleWatermark` | Session fact/source counts; not universe totals |
+| Kit bundle diff | `diffResearchKits.ts` + `ResearchKitDiffPanel` | Session A vs B of-record fact changes |
+| A-tier filter | `aTier.ts` | Core/A-tier sources only (toggle on ledger) |
+| Research shelves | `researchShelves.ts` + panel | Solo-local pin lists; kit export timestamps |
+| Lit year hist + grants | `ResearchFocusView` + `GrantLandscapeStrip` | Assistive research surface |
+| Disease handoff chips | disease detail page | Discover · target + Research · molecule |
+| Discover research deep-link | CandidateCard `?view=research` | Opens Research view on profile |
+| CLI research kit | `biointel research kit --cid` | `GET /api/molecule/:id/research-kit` |
+| Pack density | `richnessProxy` | Hub-friendly breadth + axis boost for multi-partition fill |
 
 ## Saved research view prefs (P3+)
 

@@ -44,6 +44,22 @@ test.describe('BioIntel smoke', () => {
     await expect(page.getByRole('heading', { name: /Cohort/i })).toBeVisible()
   })
 
+  test('methodology page shows honesty rules and kit diff', async ({ page }) => {
+    await page.goto('/methodology')
+    await expect(page.getByRole('heading', { name: /How BioIntel presents/i })).toBeVisible()
+    await expect(page.locator('#honesty')).toBeVisible()
+    await expect(page.getByTestId('research-kit-diff')).toBeVisible()
+    await expect(page.locator('#changelog')).toBeVisible()
+  })
+
+  test('research view deep-link shows data hub on aspirin', async ({ page }) => {
+    await page.goto('/molecule/2244?view=research')
+    await expect(page.getByText(/CID:2244/)).toBeVisible({ timeout: 60_000 })
+    // Of-record data hub ledger mounts (full or research surface)
+    const hub = page.getByTestId('molecule-data-hub').or(page.getByTestId('data-hub-ledger'))
+    await expect(hub.first()).toBeVisible({ timeout: 60_000 })
+  })
+
   test('analytics page loads', async ({ page }) => {
     await page.goto('/analytics')
     await expect(page).toHaveURL(/\/analytics/)

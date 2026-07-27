@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import Link from 'next/link'
 import { MoleculePicker } from '@/components/cohort/MoleculePicker'
 import { MatrixView } from '@/components/cohort/MatrixView'
+import { CompareDataHubMatrix } from '@/components/dataHub/CompareDataHubMatrix'
 import { fetchCategoryData, type CategoryLoadState } from '@/lib/fetchCategory'
 import { COHORT_ATTRIBUTES, requiredCategories } from '@/lib/cohort/attributes'
 import { buildMatrix } from '@/lib/cohort/buildMatrix'
@@ -16,6 +17,12 @@ import {
 import type { Molecule, SavedCohort } from '@/lib/cohort/types'
 import type { CategoryId } from '@/lib/categoryConfig'
 import { downloadFile } from '@/lib/exportData'
+import {
+  buildCompareHubMatrix,
+  buildLedgerForCompare,
+  compareBagsFromMoleculeData,
+  type CompareHubColumn,
+} from '@/lib/dataHub'
 
 const MIN_MOLECULES = 2
 const MAX_MOLECULES = 10
@@ -164,6 +171,26 @@ export function CohortClient() {
     () => buildMatrix(molecules, COHORT_ATTRIBUTES, dataByCid),
     [molecules, dataByCid],
   )
+
+  /** Of-record side-by-side data hub (same builder as /compare). */
+  const cohortHubMatrix = useMemo(() => {
+    if (molecules.length < MIN_MOLECULES) return null
+    const columns: CompareHubColumn[] = molecules.map((m) => {
+      const bags = compareBagsFromMoleculeData(
+        (dataByCid[m.cid] ?? {}) as Parameters<typeof compareBagsFromMoleculeData>[0],
+      )
+      const ledger = buildLedgerForCompare(
+        { cid: m.cid, name: m.name || `CID ${m.cid}` },
+        bags,
+      )
+      return {
+        subjectId: String(m.cid),
+        subjectLabel: m.name || `CID ${m.cid}`,
+        ledger,
+      }
+    })
+    return buildCompareHubMatrix(columns)
+  }, [molecules, dataByCid])
 
   const handleExportCsv = useCallback(() => {
     if (molecules.length === 0) return
@@ -317,6 +344,20 @@ export function CohortClient() {
                 Cancel
               </button>
             </form>
+          )}
+
+          {cohortHubMatrix && molecules.length >= MIN_MOLECULES && (
+            <div className="min-w-0" data-testid="cohort-data-hub">
+              <CompareDataHubMatrix matrix={cohortHubMatrix} className="mb-2" />
+              <p className="mb-4 text-[10px] text-slate-600">
+                Of-record Fact × molecule matrix from free public APIs loaded for this cohort.
+                See{' '}
+                <Link href="/methodology" className="text-indigo-400 hover:underline">
+                  how we present data
+                </Link>
+                . Heatmap below is assistive attribute scoring.
+              </p>
+            </div>
           )}
 
           <MatrixView

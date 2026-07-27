@@ -230,6 +230,17 @@ export function CandidateCard({
     [identity],
   )
 
+  const researchHref = hasCid
+    ? buildMoleculeLinkUrl({
+        cid: candidate.cid!,
+        rank,
+        diseaseName,
+        score: compositeScore,
+        scores: scores ?? null,
+        view: 'research',
+      })
+    : null
+
   const profileHref = hasCid
     ? buildMoleculeLinkUrl({
         cid: candidate.cid!,
@@ -393,15 +404,27 @@ export function CandidateCard({
     >
       {cardContent}
       {profileHref ? (
-        <Link
-          href={profileHref}
-          className="mt-3 text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
-        >
-          View full profile
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-        </Link>
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          {researchHref && (
+            <Link
+              href={researchHref}
+              className="text-xs text-sky-400 hover:text-sky-300 transition-colors flex items-center gap-1"
+              data-testid={`candidate-research-link-${rank}`}
+            >
+              Open Research view
+              <span aria-hidden>→</span>
+            </Link>
+          )}
+          <Link
+            href={profileHref}
+            className="text-xs text-indigo-400 hover:text-indigo-300 transition-colors flex items-center gap-1"
+          >
+            View full profile
+            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+          </Link>
+        </div>
       ) : (
         <p className="mt-2 text-[10px] text-slate-600">No PubChem CID — limited data available</p>
       )}

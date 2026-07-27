@@ -139,6 +139,9 @@ Commands:
   molecule similar <cid>       GET similar
   molecule vendors <cid>       GET vendors
 
+  research kit --cid <n> [--out file.json] [--categories a,b]
+                           Build of-record research kit bundle (needs app running)
+
   orphanet genes --q <disease> GET Orphanet gene pins
 
   logs tail [--n 40]           Last N lines of today's agent JSONL
@@ -156,9 +159,49 @@ Examples:
   npm run biointel -- health
   npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR
   npm run biointel -- molecule category 3080836 pharmaceutical
+  npm run biointel -- research kit --cid 2244 --out kit.json
   npm run biointel -- logs tail --n 20
   npm run biointel -- gate
 `)
+}
+
+/**
+ * research kit --cid N [--out path] [--categories molecular-chemical,...]
+ * Hits GET /api/molecule/:cid/research-kit and writes/prints the bundle.
+ */
+async function cmdResearch(sub, flags) {
+  if (sub !== 'kit') {
+    die('research subcommands: kit\n  research kit --cid <n> [--out file.json]')
+  }
+  const cid = flags.cid || flags.c
+  if (!cid || cid === true) die('research kit requires --cid <pubchemCid>')
+  const qs = new URLSearchParams()
+  if (flags.categories && flags.categories !== true) {
+    qs.set('categories', String(flags.categories))
+  }
+  const path =
+    `/api/molecule/${encodeURIComponent(String(cid))}/research-kit` +
+    (qs.toString() ? `?${qs}` : '')
+  console.error(`biointel: fetching research kit for CID ${cid}…`)
+  const { data } = await httpJson('GET', path)
+  if (!data || data.kind !== 'biointel-research-kit-bundle') {
+    die('unexpected response (expected biointel-research-kit-bundle)')
+  }
+  const out = flags.out || flags.o
+  if (out && out !== true) {
+    const outPath = path.isAbsolute(String(out))
+      ? String(out)
+      : path.resolve(process.cwd(), String(out))
+    fs.writeFileSync(outPath, JSON.stringify(data, null, 2), 'utf8')
+    console.log(`wrote ${outPath}`)
+    if (data.meta) {
+      console.log(
+        `facts≈${data.meta.factCount} sources≈${data.meta.sourceCount} loaded=${(data.meta.categoriesLoaded || []).join(',')}`,
+      )
+    }
+    return
+  }
+  printJson(data)
 }
 
 function cmdVersion() {
@@ -471,6 +514,13 @@ async function main() {
         if (!sub) die('molecule subcommands: get | category | pipeline | similar | vendors')
         const after = parseArgs(rest.slice(1))
         await cmdMolecule(sub, after.positionals, after.flags)
+        break
+      }
+      case 'research': {
+        const sub = rest[0]
+        if (!sub) die('research subcommands: kit')
+        const after = parseArgs(rest.slice(1))
+        await cmdResearch(sub, after.flags)
         break
       }
       case 'orphanet': {

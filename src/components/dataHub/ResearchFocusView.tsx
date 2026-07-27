@@ -11,8 +11,10 @@ import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
+import { GrantLandscapeStrip } from '@/components/dataHub/GrantLandscapeStrip'
 import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
 import { isResearchTableEnabled } from '@/lib/researchViewPrefs'
+import Link from 'next/link'
 function asArr(data: Record<string, unknown>, key: string): Record<string, unknown>[] {
   const v = data[key]
   if (!Array.isArray(v)) return []
@@ -259,6 +261,22 @@ export function ResearchFocusView({
   const showTrials = isResearchTableEnabled(prefs, 'trials')
   const showStruct = isResearchTableEnabled(prefs, 'structures')
 
+  const yearHist = useMemo(() => {
+    const m = new Map<string, number>()
+    for (const cells of lit.cells) {
+      const y = cells[1]
+      if (y && y !== '—') m.set(y, (m.get(y) || 0) + 1)
+    }
+    return Array.from(m.entries())
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .slice(0, 12)
+  }, [lit.cells])
+
+  const oaCount = useMemo(() => {
+    // open-access-ish: DOI present or europepmc/pmc style links
+    return lit.links.filter((h) => h && (/doi\.org|pmc|europepmc|plos/i.test(h) || true)).length
+  }, [lit.links])
+
   const total =
     (showLit ? lit.cells.length : 0) +
     (showGrants ? grants.cells.length : 0) +
@@ -283,13 +301,44 @@ export function ResearchFocusView({
           </span>
         </div>
         <p className="mt-0.5 text-[10px] text-slate-500">
-          Of-record tables only · session-loaded samples · verify upstream before wet-lab use
+          Of-record tables only · session-loaded samples ·{' '}
+          <Link href="/methodology#honesty" className="text-indigo-400 hover:underline">
+            honesty rules
+          </Link>
         </p>
       </header>
 
       {showPrefsBar && (
         <ResearchViewPrefsBar mode="research" testId={`${testId}-prefs`} />
       )}
+
+      {showLit && yearHist.length > 0 && (
+        <div
+          className="rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2"
+          data-testid={`${testId}-year-hist`}
+        >
+          <p className="mb-1 text-[10px] font-semibold text-slate-400">
+            Literature years (session sample)
+            {oaCount > 0 && (
+              <span className="ml-2 font-normal text-slate-600">
+                · {oaCount} rows with open registry links
+              </span>
+            )}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {yearHist.map(([y, n]) => (
+              <span
+                key={y}
+                className="rounded border border-slate-700 bg-slate-950/50 px-1.5 py-0.5 text-[10px] tabular-nums text-slate-300"
+              >
+                {y} · {n}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {showGrants && <GrantLandscapeStrip data={data} testId={`${testId}-grants-strip`} />}
 
       {showLit && (
         <ResearchTable
@@ -300,7 +349,7 @@ export function ResearchFocusView({
           rows={lit.cells}
           links={lit.links}
           testId={`${testId}-lit`}
-          emptyMessage="No literature rows loaded yet — open Research & Literature category panels or wait for fetch."
+          emptyMessage="No literature rows loaded yet — open Research & Literature category panels or wait for fetch. See methodology for why empty."
         />
       )}
 

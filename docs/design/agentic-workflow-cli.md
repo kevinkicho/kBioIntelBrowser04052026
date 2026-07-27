@@ -165,6 +165,7 @@ Implementation: `scripts/biointel-cli.js` · npm: `npm run biointel -- <cmd>` ·
 | Harvest safety | `npm run biointel -- discover harvest --names "Tafamidis,Diflunisal" --safety` |
 | Molecule shell | `npm run biointel -- molecule get 208901` |
 | Category pack | `npm run biointel -- molecule category 208901 pharmaceutical` |
+| Research kit | `npm run biointel -- research kit --cid 2244 --out kit.json` |
 | Orphanet pins | `npm run biointel -- orphanet genes --q "ATTR amyloidosis"` |
 | Activity logs | `npm run biointel -- logs tail --n 40` · `logs grep product\.` |
 | Quality gate | `npm run biointel -- gate` |

@@ -87,6 +87,8 @@ export interface BuildMoleculeLinkUrlInput {
   /** Optional full ScoreVector; attached only when encoded JSON ≤ ~1500 chars. */
   scores?: ScoreVector | null
   projectId?: string | null
+  /** Profile view: research | panels | graph */
+  view?: 'research' | 'panels' | 'graph' | null
 }
 
 /**
@@ -103,6 +105,9 @@ export function buildMoleculeLinkUrl(input: BuildMoleculeLinkUrlInput): string {
   })
   if (input.projectId) {
     params.set('project', input.projectId)
+  }
+  if (input.view) {
+    params.set('view', input.view)
   }
   if (input.scores) {
     try {

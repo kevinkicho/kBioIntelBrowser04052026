@@ -207,11 +207,56 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
                 </div>
               )}
 
+              {(topTargetSymbols.length > 0 ||
+                dedupedMolecules.some((m) => m.cid != null && m.cid > 0)) && (
+                <div
+                  className="mb-4 flex flex-wrap items-center gap-2"
+                  data-testid="disease-discover-handoff-chips"
+                >
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500">
+                    Research handoff
+                  </span>
+                  {topTargetSymbols.slice(0, 6).map((sym) => {
+                    const href = buildDiscoverHref({
+                      q: diseaseName,
+                      diseaseId: id,
+                      targets: [sym],
+                    })
+                    return (
+                      <Link
+                        key={sym}
+                        href={href}
+                        className="rounded-full border border-sky-800/50 bg-sky-950/40 px-2.5 py-0.5 text-[11px] font-medium text-sky-300 transition-colors hover:border-sky-600 hover:text-sky-200"
+                        data-testid={`disease-handoff-target-${sym}`}
+                        title={`Discover with target ${sym}`}
+                      >
+                        Discover · {sym}
+                      </Link>
+                    )
+                  })}
+                  {dedupedMolecules
+                    .filter((m) => m.cid != null && m.cid > 0)
+                    .slice(0, 4)
+                    .map((m) => (
+                      <Link
+                        key={m.cid}
+                        href={`/molecule/${m.cid}?view=research`}
+                        className="rounded-full border border-indigo-800/50 bg-indigo-950/30 px-2.5 py-0.5 text-[11px] font-medium text-indigo-300 transition-colors hover:border-indigo-600 hover:text-indigo-200"
+                        data-testid={`disease-handoff-molecule-${m.cid}`}
+                        title={`Open research view for ${m.name}`}
+                      >
+                        Research · {m.name || `CID ${m.cid}`}
+                      </Link>
+                    ))}
+                </div>
+              )}
+
               <DataHubLedgerView
                 ledger={diseaseDataHub}
                 className="mb-4 mt-2"
                 testId="disease-data-hub"
                 density="full"
+                contextLabel={diseaseName}
               />
 
               <CrossSourceStrip

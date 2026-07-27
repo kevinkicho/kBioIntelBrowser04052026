@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react'
+import Link from 'next/link'
 import type { DataHubLedger, DataHubRow } from '@/lib/dataHub'
 import {
   buildSourceDirectory,
@@ -16,6 +17,9 @@ import {
   isDataHubValueEmpty,
   type DataHubExportFormat,
 } from '@/lib/dataHub'
+import { copyDataHubFactCitation, ledgerSampleStats } from '@/lib/dataHub/citeFact'
+import { downloadMondayPack } from '@/lib/dataHub/mondayPack'
+import { filterHubRowsATier } from '@/lib/dataHub/aTier'
 import type { EvidenceClaim } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import { emptyDataClass } from '@/lib/summaryEmpty'
@@ -25,8 +29,11 @@ import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { SourceDirectoryPanel } from '@/components/dataHub/SourceDirectoryPanel'
 import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
+import { ResearchSampleWatermark } from '@/components/dataHub/ResearchSampleWatermark'
+import { ResearchShelvesPanel } from '@/components/dataHub/ResearchShelvesPanel'
 import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
 import { isHubDomainEnabled } from '@/lib/researchViewPrefs'
+import { markShelfKitExported, loadResearchShelves } from '@/lib/researchShelves'
 
 export interface DataHubLedgerProps {
   ledger: DataHubLedger
@@ -47,6 +54,10 @@ export interface DataHubLedgerProps {
   showPrefsBar?: boolean
   /** Apply saved hub domain filters (default true) */
   respectDomainPrefs?: boolean
+  /** Disease / context for Monday pack title */
+  contextLabel?: string | null
+  /** Show research shelves pin UI */
+  showShelves?: boolean
 }
 
 function stableHref(url?: string): string | null {
@@ -59,17 +70,35 @@ function stableHref(url?: string): string | null {
 function RowActions({
   row,
   onOpenPanel,
+  subjectLabel,
+  subjectId,
 }: {
   row: DataHubRow
   onOpenPanel?: (categoryId: string, panelId: string) => void
+  subjectLabel?: string
+  subjectId?: string
 }) {
   const href = stableHref(row.sourceUrl)
   const canPanel = Boolean(row.panelId && row.categoryId && onOpenPanel)
-  if (!href && !canPanel) {
-    return <span className="text-[10px] text-slate-600">—</span>
-  }
+  const [copied, setCopied] = useState(false)
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
+      <button
+        type="button"
+        onClick={() => {
+          void copyDataHubFactCitation(row, { subjectLabel, subjectId }).then((ok) => {
+            if (ok) {
+              setCopied(true)
+              window.setTimeout(() => setCopied(false), 1500)
+            }
+          })
+        }}
+        className="rounded border border-slate-700 bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-300 hover:border-slate-500"
+        data-testid={`data-hub-cite-${row.id}`}
+        title="Copy citation for lab notebook"
+      >
+        {copied ? 'Copied' : 'Cite'}
+      </button>
       {canPanel && (
         <button
           type="button"
@@ -97,6 +126,14 @@ function RowActions({
           Source ↗
         </a>
       )}
+      {!href && !canPanel && (
+        <Link
+          href="/methodology#honesty"
+          className="text-[9px] text-slate-600 hover:text-slate-400"
+        >
+          ?
+        </Link>
+      )}
     </span>
   )
 }
@@ -113,13 +150,17 @@ export function DataHubLedgerView({
   showResearchKit,
   showPrefsBar,
   respectDomainPrefs = true,
+  contextLabel,
+  showShelves = true,
 }: DataHubLedgerProps) {
   const { prefs, patch, hydrated } = useResearchViewPrefs()
   const [hideEmpty, setHideEmpty] = useState(hideEmptyProp)
   const [kitBusy, setKitBusy] = useState(false)
+  const [aTierOnly, setATierOnly] = useState(false)
   const showDir = showSourceDirectory ?? density === 'full'
   const showKit = showResearchKit ?? density === 'full'
   const showBar = showPrefsBar ?? density === 'full'
+  const showShelf = showShelves && density === 'full'
 
   // Sync hideEmpty from saved prefs when prefs change (e.g. prefs bar checkbox)
   useEffect(() => {
@@ -140,10 +181,19 @@ export function DataHubLedgerView({
 
   const directory = useMemo(() => buildSourceDirectory(ledger), [ledger])
 
+  const identityTrustLine = useMemo(() => {
+    const ids = ['id-cid', 'id-inchikey', 'key-chembl', 'key-chebi', 'id-formula']
+    const parts = ids
+      .map((id) => byId.get(id))
+      .filter((r): r is DataHubRow => Boolean(r) && !isDataHubValueEmpty(r!.value))
+      .map((r) => `${r.fact.replace(/ \(sample\)/i, '')}: ${r.value}`)
+    return parts.slice(0, 4).join(' · ')
+  }, [byId])
+
   const visibleSections = useMemo(() => {
     return ledger.sections
       .map((sec) => {
-        const rows = sec.rowIds
+        let rows = sec.rowIds
           .map((id) => byId.get(id))
           .filter((r): r is DataHubRow => Boolean(r))
           .filter((r) => {
@@ -153,12 +203,16 @@ export function DataHubLedgerView({
             if (hideEmpty && isDataHubValueEmpty(r.value)) return false
             return true
           })
+        rows = filterHubRowsATier(rows, aTierOnly).filter(
+          (r) => !(hideEmpty && isDataHubValueEmpty(r.value)),
+        )
         return { sec, rows }
       })
       .filter(({ rows }) => rows.length > 0)
-  }, [ledger.sections, byId, hideEmpty, prefs, respectDomainPrefs])
+  }, [ledger.sections, byId, hideEmpty, prefs, respectDomainPrefs, aTierOnly])
 
-  const filledCount = ledger.rows.filter((r) => !isDataHubValueEmpty(r.value)).length
+  const sample = ledgerSampleStats(ledger)
+  const filledCount = sample.factCount
 
   const exportHub = (format: DataHubExportFormat) => {
     const body = dataHubToDelimited(ledger, format, { includeEmpty: !hideEmpty })
@@ -175,9 +229,23 @@ export function DataHubLedgerView({
         includeEmpty: !hideEmpty,
         mode: 'single',
       })
+      const shelves = loadResearchShelves()
+      for (const s of shelves) {
+        markShelfKitExported(s.id, 'molecule', ledger.subjectId)
+      }
     } finally {
       setKitBusy(false)
     }
+  }
+
+  const exportMonday = () => {
+    downloadMondayPack({
+      ledger,
+      claims: claims ?? null,
+      includeEmpty: !hideEmpty,
+      contextLabel: contextLabel ?? null,
+      includePrefs: true,
+    })
   }
 
   return (
@@ -251,6 +319,30 @@ export function DataHubLedgerView({
               {kitBusy ? 'Exporting kit…' : 'Research kit'}
             </button>
           )}
+          {showKit && (
+            <button
+              type="button"
+              onClick={exportMonday}
+              className="rounded-md border border-violet-800/50 bg-violet-950/30 px-2 py-0.5 text-[10px] font-medium text-violet-200 hover:border-violet-600/50"
+              data-testid={`${testId}-monday-pack`}
+              title="Lab-meeting one-shot: kit + claims + agenda + methodology pointer"
+            >
+              Monday pack
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setATierOnly((v) => !v)}
+            className={`rounded-md border px-2 py-0.5 text-[10px] font-medium ${
+              aTierOnly
+                ? 'border-amber-700/50 bg-amber-950/40 text-amber-200'
+                : 'border-slate-700 text-slate-400'
+            }`}
+            data-testid={`${testId}-a-tier`}
+            title="Show core / A-tier sources only"
+          >
+            {aTierOnly ? 'A-tier on' : 'A-tier filter'}
+          </button>
           <button
             type="button"
             onClick={toggleHideEmpty}
@@ -266,6 +358,23 @@ export function DataHubLedgerView({
         </div>
       </div>
 
+      <div className="border-b border-slate-800/80 px-3 py-2 sm:px-4 space-y-2">
+        <ResearchSampleWatermark
+          factCount={sample.factCount}
+          sourceCount={sample.sourceCount}
+          testId={`${testId}-watermark`}
+        />
+        {identityTrustLine && (
+          <p
+            className="text-[10px] text-cyan-200/80"
+            data-testid={`${testId}-identity-trust`}
+          >
+            <span className="font-semibold text-cyan-300/90">Identity: </span>
+            {identityTrustLine}
+          </p>
+        )}
+      </div>
+
       {showBar && (
         <div className="border-b border-slate-800/80 px-3 py-2 sm:px-4">
           <ResearchViewPrefsBar
@@ -278,7 +387,10 @@ export function DataHubLedgerView({
 
       {visibleSections.length === 0 ? (
         <div className="px-3 py-6 text-center text-[11px] text-slate-500 sm:px-4">
-          No multi-source facts loaded yet. Categories still hydrating — identity rows appear first.
+          No multi-source facts loaded yet. Categories still hydrating — identity rows appear first.{' '}
+          <Link href="/methodology#honesty" className="text-indigo-400 hover:underline">
+            Why empty?
+          </Link>
         </div>
       ) : (
         <div className="divide-y divide-slate-800/80">
@@ -320,7 +432,12 @@ export function DataHubLedgerView({
                           </td>
                           <td className="py-1 pr-2 text-[10px] text-slate-400">{r.source}</td>
                           <td className="py-1">
-                            <RowActions row={r} onOpenPanel={onOpenPanel} />
+                            <RowActions
+                              row={r}
+                              onOpenPanel={onOpenPanel}
+                              subjectLabel={ledger.subjectLabel}
+                              subjectId={ledger.subjectId}
+                            />
                           </td>
                         </tr>
                       )
@@ -339,6 +456,18 @@ export function DataHubLedgerView({
             directory={directory}
             onOpenPanel={onOpenPanel}
             testId={`${testId}-sources`}
+          />
+        </div>
+      )}
+
+      {showShelf && (
+        <div className="border-t border-slate-800/80 p-3 sm:p-4">
+          <ResearchShelvesPanel
+            entityType="molecule"
+            entityId={ledger.subjectId}
+            entityLabel={ledger.subjectLabel}
+            href={`/molecule/${encodeURIComponent(ledger.subjectId)}?view=research`}
+            testId={`${testId}-shelves`}
           />
         </div>
       )}
