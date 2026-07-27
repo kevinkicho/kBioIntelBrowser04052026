@@ -42,7 +42,11 @@ export const DEFAULT_DISCOVERY_PREFERENCES: DiscoveryPreferences = {
   version: 1,
   rubricPreset: 'balanced',
   aeAggressiveness: 'soft-flag',
-  harvestTiming: 'board-promote',
+  /**
+   * Rank-time densify is always on for top-K in the engine.
+   * This pref still expands densify K when set to rank-time (full harvestK).
+   */
+  harvestTiming: 'rank-time',
   harvestTimingSticky: true,
   tourExampleSet: 'mixed',
   collaborationMode: 'solo-export',
@@ -225,9 +229,9 @@ export const PREFERENCE_TOOLTIPS = {
   },
   harvestTiming: {
     'board-promote':
-      'openFDA + literature after promote or “Load safety scores”. Protects fast cheap shortlist; safety/novelty null until loaded. Fast triage, large candidate sets.',
+      'Top-K densify (safety+novelty) still runs for the shortlist. Prefer this only to avoid expanding densify beyond top-K. Empty safety ≠ safe.',
     'rank-time':
-      'Harvest immediately after cheap score for top 15. +~8–12s typical; full axes on first list. Decision-ready list in one pass.',
+      'Always densify top-K at rank, and expand densify to full harvest K (~15). Decision-ready axes on first list. ~+seconds for free-API FAERS/EuropePMC.',
   },
   tourExampleSet: {
     mixed: 'Mixed rare + common disease examples for a broad audience.',

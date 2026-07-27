@@ -8,6 +8,8 @@ jest.mock('@/lib/diseaseSearch', () => ({
 }))
 jest.mock('@/lib/api/opentargets', () => ({
   getTargetsForDisease: jest.fn(),
+  getDiseaseById: jest.fn().mockResolvedValue(null),
+  getKnownDrugsForDisease: jest.fn().mockResolvedValue([]),
 }))
 jest.mock('@/lib/api/disgenet', () => ({
   getGenesByDisease: jest.fn(),
@@ -22,6 +24,21 @@ jest.mock('@/lib/api/clinicaltrials', () => ({
 jest.mock('@/lib/api/chembl-indications', () => ({
   getChemblIndicationsByName: jest.fn(),
 }))
+jest.mock('@/lib/api/chembl', () => ({
+  searchTargetsByName: jest.fn().mockResolvedValue([]),
+  getRelatedCompoundsByTarget: jest.fn().mockResolvedValue([]),
+}))
+jest.mock('@/lib/api/adverseevents', () => ({
+  getAdverseEventsByName: jest.fn().mockResolvedValue([]),
+}))
+jest.mock('@/lib/api/recalls', () => ({
+  getDrugRecallsByName: jest.fn().mockResolvedValue([]),
+}))
+jest.mock('@/lib/api/europepmc', () => ({
+  getLiteratureHitCount: jest.fn().mockResolvedValue(0),
+}))
+// ChEMBL / OT known-drugs gathers may hit network — keep empty
+
 
 import { searchDiseases, resolveMoleculesFromNames } from '@/lib/diseaseSearch'
 import { getTargetsForDisease } from '@/lib/api/opentargets'

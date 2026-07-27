@@ -451,8 +451,8 @@ export default function DiscoverPage() {
                         <StyledTooltip
                           content={
                             state.result.v2.scorePhase === 'full'
-                              ? 'Full phase: cheap multi-axis score plus safety/novelty harvest for top candidates.'
-                              : 'Cheap phase: multi-axis shortlist without rank-time AE harvest. Load safety scores or promote to board to fill safety/novelty.'
+                              ? 'Full phase: identity-first shortlist densified with free-API safety + novelty for top-K (empty safety ≠ safe).'
+                              : 'Cheap phase only (densify skipped). Prefer default densify path for honest safety status chips.'
                           }
                         >
                           <span className="inline-flex cursor-help rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-500">

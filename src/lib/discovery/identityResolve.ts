@@ -312,9 +312,17 @@ export function applyResolvedIdentities(
   rubric?: ScoreRubric,
 ): MoleculeCandidate[] {
   const scoreRubric = rubric ?? createDefaultScoreRubric('balanced')
+  // Match by name — shortlist may re-sort / de-dupe after identity fetch
+  const byName = new Map<string, ResolvedMoleculeIdentity>()
+  for (const r of resolved) {
+    if (r?.name) byName.set(r.name.toLowerCase(), r)
+  }
 
   return candidates.map((c, i) => {
-    const res = resolved[i]
+    const res =
+      byName.get(c.identity.name.toLowerCase()) ||
+      byName.get(c.identity.name.trim().toLowerCase()) ||
+      resolved[i]
     if (!res) return c
 
     const identity = toMoleculeIdentity(res)
@@ -341,6 +349,8 @@ export function applyResolvedIdentities(
         axes,
         axisStatus: { ...scores.axisStatus, identityTrust: 'computed' },
         composite: computeComposite(axes, scoreRubric),
+        // Preserve densify scorePhase (safety/novelty already on axes)
+        scorePhase: scores.scorePhase,
       }
     }
 

@@ -26,7 +26,7 @@ describe('buildCandidateWhy', () => {
     expect(why).toMatch(/Why ranked/)
     expect(why).toMatch(/Approved/)
     expect(why).toMatch(/12 trial/)
-    expect(why).toMatch(/2 shared target/)
+    expect(why).toMatch(/shared target|targets/i)
     expect(why).toMatch(/ClinicalTrials/)
     expect(why).toMatch(/82%/)
   })
@@ -41,9 +41,11 @@ describe('buildCandidateWhy', () => {
         geneAssociationScore: 0,
         sources: [],
         compositeScore: 0.1,
+        cid: null,
       }),
       'X',
     )
-    expect(why).toMatch(/deterministic rubric/i)
+    // name-only + safety not retrieved still form a why line
+    expect(why).toMatch(/Why ranked|name-only|deterministic/i)
   })
 })

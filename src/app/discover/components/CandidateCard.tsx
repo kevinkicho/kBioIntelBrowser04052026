@@ -20,7 +20,7 @@ import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
-import { buildCandidateWhy } from '@/lib/discovery/candidateWhy'
+import { buildCandidateWhy, buildCandidateWhyChips } from '@/lib/discovery/candidateWhy'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { DiscoverMiniHub } from '@/components/dataHub/DiscoverMiniHub'
 import { buildDiscoverCandidateCrossSource } from '@/lib/crossSource'
@@ -379,15 +379,40 @@ export function CandidateCard({
               title="Source coverage"
             />
           )}
-          <StyledTooltip content={buildCandidateWhy(candidate, diseaseName)}>
-            <p
-              className="mt-2 text-[11px] text-slate-500 leading-snug border-t border-slate-800/80 pt-2"
-              data-testid="candidate-why"
+          <div
+            className="mt-2 border-t border-slate-800/80 pt-2 space-y-1.5"
+            data-testid="candidate-why"
+          >
+            <p className="text-[10px] text-slate-600 font-medium">Why this row</p>
+            <div className="flex flex-wrap gap-1" data-testid="candidate-why-chips">
+              {buildCandidateWhyChips(candidate, {
+                diseaseName,
+                scores: domainCandidate?.scores,
+                domain: domainCandidate,
+              }).map((chip) => (
+                <span
+                  key={chip.id}
+                  data-chip={chip.id}
+                  className={`inline-flex items-center rounded-full border px-1.5 py-0.5 text-[9px] font-medium ${
+                    chip.tone === 'warn'
+                      ? 'border-amber-800/50 bg-amber-950/40 text-amber-200/90'
+                      : chip.tone === 'evidence'
+                        ? 'border-slate-600/60 bg-slate-800/70 text-slate-300'
+                        : 'border-slate-700/50 bg-slate-900/50 text-slate-500'
+                  }`}
+                >
+                  {chip.label}
+                </span>
+              ))}
+            </div>
+            <StyledTooltip
+              content={buildCandidateWhy(candidate, diseaseName, domainCandidate?.scores)}
             >
-              <span className="text-slate-600 font-medium">Why this row: </span>
-              {buildCandidateWhy(candidate, diseaseName)}
-            </p>
-          </StyledTooltip>
+              <p className="text-[10px] text-slate-500 leading-snug line-clamp-2 cursor-help">
+                {buildCandidateWhy(candidate, diseaseName, domainCandidate?.scores)}
+              </p>
+            </StyledTooltip>
+          </div>
         </div>
       </div>
     </>

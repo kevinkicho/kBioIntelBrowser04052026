@@ -3,6 +3,7 @@
 import type { RankResult } from '@/lib/candidateRanker'
 import type { AiRankResult } from '@/lib/ai/aiRank'
 import { downloadFile } from '@/lib/exportData'
+import { exportDiscoverShortlistCsv } from '@/lib/discovery/shortlistExport'
 
 interface Props {
   result: RankResult
@@ -15,54 +16,7 @@ function slugify(name: string): string {
 }
 
 function exportCsv(result: RankResult): string {
-  const lines: string[] = []
-
-  lines.push(`# Discover results for: ${result.diseaseName}`)
-  lines.push(`# Disease ID: ${result.diseaseId ?? 'N/A'}`)
-  lines.push(`# Therapeutic areas: ${result.therapeuticAreas.join('; ')}`)
-  lines.push(`# Genes analyzed: ${result.genes.length}`)
-  lines.push(`# Candidates: ${result.candidates.length}`)
-  lines.push('')
-
-  const headers = [
-    'rank',
-    'name',
-    'cid',
-    'compositeScore',
-    'confidence',
-    'clinicalPhase',
-    'clinicalPhaseRaw',
-    'geneAssociationScore',
-    'geneScoreRaw',
-    'sharedTargetRatio',
-    'sharedTargetCountRaw',
-    'trialCountNorm',
-    'trialCountRaw',
-    'sources',
-  ]
-  lines.push(headers.join(','))
-
-  result.candidates.forEach((c, i) => {
-    const row = [
-      i + 1,
-      `"${c.name.replace(/"/g, '""')}"`,
-      c.cid ?? '',
-      c.compositeScore.toFixed(4),
-      c.confidence,
-      c.clinicalPhase.toFixed(4),
-      c.clinicalPhaseRaw,
-      c.geneAssociationScore.toFixed(4),
-      c.geneScoreRaw?.toFixed(4) ?? '',
-      c.sharedTargetRatio.toFixed(4),
-      c.sharedTargetCountRaw,
-      c.trialCountNorm.toFixed(4),
-      c.trialCountRaw,
-      `"${c.sources.join('; ')}"`,
-    ]
-    lines.push(row.join(','))
-  })
-
-  return lines.join('\n')
+  return exportDiscoverShortlistCsv(result)
 }
 
 function exportJson(result: RankResult, aiRankResult?: AiRankResult | null): string {

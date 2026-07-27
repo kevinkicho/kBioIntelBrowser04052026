@@ -30,6 +30,17 @@ export {
   OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
   type RankCandidatesOptions,
 } from './engine'
+export { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
+export {
+  sortCandidatesIdentityFirst,
+  dedupeCandidatesByIdentity,
+} from './identitySort'
+export {
+  buildCandidateWhy,
+  buildCandidateWhyChips,
+  type CandidateWhyChip,
+} from './candidateWhy'
+export { exportDiscoverShortlistCsv } from './shortlistExport'
 export { makeSourceStatus, withSourceStatus } from './sourceStatus'
 export {
   gatherDiseaseGenes,

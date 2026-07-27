@@ -18,7 +18,7 @@ describe('discovery preferences pure functions', () => {
   describe('parseDiscoveryPreferences', () => {
     it('returns defaults for null/garbage', () => {
       expect(parseDiscoveryPreferences(null).rubricPreset).toBe('balanced')
-      expect(parseDiscoveryPreferences(undefined).harvestTiming).toBe('board-promote')
+      expect(parseDiscoveryPreferences(undefined).harvestTiming).toBe('rank-time')
       expect(parseDiscoveryPreferences('nope').aeAggressiveness).toBe('soft-flag')
       expect(parseDiscoveryPreferences({}).version).toBe(1)
     })
@@ -185,7 +185,7 @@ describe('discovery preferences pure functions', () => {
     it('covers all preset and policy options including tour sets', () => {
       expect(PREFERENCE_TOOLTIPS.rubricPreset.balanced).toMatch(/equal/i)
       expect(PREFERENCE_TOOLTIPS.aeAggressiveness['soft-flag']).toMatch(/FAERS/i)
-      expect(PREFERENCE_TOOLTIPS.harvestTiming['board-promote']).toMatch(/cheap|fast/i)
+      expect(PREFERENCE_TOOLTIPS.harvestTiming['board-promote']).toMatch(/densify|top-K|safe/i)
       expect(PREFERENCE_TOOLTIPS.tourExampleSet.mixed).toMatch(/rare|common/i)
       expect(PREFERENCE_TOOLTIPS.tourExampleSet['common-only']).toMatch(/data/i)
       expect(PREFERENCE_TOOLTIPS.tourExampleSet['rare-only']).toMatch(/rare/i)
@@ -197,7 +197,7 @@ describe('discovery preferences pure functions', () => {
       expect(DEFAULT_DISCOVERY_PREFERENCES.version).toBe(1)
       expect(DEFAULT_DISCOVERY_PREFERENCES.rubricPreset).toBe('balanced')
       expect(DEFAULT_DISCOVERY_PREFERENCES.aeAggressiveness).toBe('soft-flag')
-      expect(DEFAULT_DISCOVERY_PREFERENCES.harvestTiming).toBe('board-promote')
+      expect(DEFAULT_DISCOVERY_PREFERENCES.harvestTiming).toBe('rank-time')
       expect(DEFAULT_DISCOVERY_PREFERENCES.harvestTimingSticky).toBe(true)
       expect(DEFAULT_DISCOVERY_PREFERENCES.tourExampleSet).toBe('mixed')
       expect(DEFAULT_DISCOVERY_PREFERENCES.collaborationMode).toBe('solo-export')
@@ -213,7 +213,7 @@ describe('discovery preferences pure functions', () => {
     it('load returns defaults when empty', () => {
       const p = loadDiscoveryPreferences()
       expect(p.rubricPreset).toBe('balanced')
-      expect(p.harvestTiming).toBe('board-promote')
+      expect(p.harvestTiming).toBe('rank-time')
       expect(p.tourExampleSet).toBe('mixed')
     })
 
@@ -244,7 +244,7 @@ describe('discovery preferences pure functions', () => {
     it('resetDiscoveryPreferences restores defaults', () => {
       updateDiscoveryPreferences({ harvestTiming: 'rank-time', tourExampleSet: 'rare-only' })
       const reset = resetDiscoveryPreferences()
-      expect(reset.harvestTiming).toBe('board-promote')
+      expect(reset.harvestTiming).toBe('rank-time')
       expect(reset.tourExampleSet).toBe('mixed')
       expect(loadDiscoveryPreferences().tourExampleSet).toBe('mixed')
     })

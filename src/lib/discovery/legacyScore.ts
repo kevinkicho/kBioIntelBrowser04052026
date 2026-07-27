@@ -41,6 +41,8 @@ export interface ScoreInputs {
   topTargetCount: number
   indications: { meshHeading: string; efoTerm: string; maxPhaseForIndication: number }[]
   sources: string[]
+  /** Optional 0–1 ChEMBL activity / max-phase proxy from by-target gather */
+  chemblActivityTerm?: number | null
 }
 
 /** Build one legacy CandidateMolecule with the original composite formula. */
@@ -66,15 +68,33 @@ export function scoreLegacyCandidate(input: ScoreInputs): CandidateMolecule {
     : 0
   const sharedTargetRatio = Math.min(1, sharedTargetCount / Math.min(topTargetCount, 10))
 
-  const trialCountNorm = normalizeLog(trialCount, maxTrialCount)
   const clinicalPhase = matchIndication(diseaseName, indications)
   const clinicalPhaseNorm = clinicalPhase / 4
+  // Disease-matched: trials already condition-scoped; boost when indication phase also hits
+  let trialCountNorm = normalizeLog(trialCount, maxTrialCount)
+  if (trialCount > 0 && clinicalPhase > 0) {
+    trialCountNorm = Math.min(1, trialCountNorm * 1.12 + 0.04)
+  }
+
+  // Optional ChEMBL activity proxy (0–1) from gather
+  const chemblBoost =
+    typeof (input as ScoreInputs & { chemblActivityTerm?: number }).chemblActivityTerm ===
+    'number'
+      ? Math.min(
+          0.15,
+          Math.max(
+            0,
+            (input as ScoreInputs & { chemblActivityTerm?: number }).chemblActivityTerm || 0,
+          ) * 0.15,
+        )
+      : 0
 
   const compositeScore =
     W_CLINICAL_PHASE * clinicalPhaseNorm +
     W_GENE_ASSOCIATION * geneAssociationScore +
     W_SHARED_TARGET * sharedTargetRatio +
-    W_TRIAL_COUNT * trialCountNorm
+    W_TRIAL_COUNT * trialCountNorm +
+    chemblBoost
 
   const uniqueSources = Array.from(new Set(sources))
 

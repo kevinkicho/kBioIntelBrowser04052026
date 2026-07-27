@@ -16,10 +16,8 @@ import { assessIdentityTrust } from '../domain/identity'
 import type { DiscoveryPreferencesSnapshot } from './preferences'
 import { scoreLegacyCandidate, sortCandidates } from './legacyScore'
 import { buildScoreVector } from './scoreAxes'
-import {
-  harvestCandidateAxes,
-  HARVEST_K_DEFAULT,
-} from './harvest'
+import { HARVEST_K_DEFAULT } from './harvest'
+import { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
 import {
   applyResolvedIdentities,
   DEFAULT_IDENTITY_TOP_N,
@@ -27,6 +25,11 @@ import {
   resolveIdentitiesBatch,
   type IdentityResolveInput,
 } from './identityResolve'
+import {
+  dedupeCandidatesByIdentity,
+  sortCandidatesIdentityFirst,
+  type IdentitySortMeta,
+} from './identitySort'
 import type { DiseaseEntity } from '../domain/entities'
 import {
   gatherDiseaseGenes,
@@ -66,11 +69,18 @@ export interface RankEngineOptions {
   diseaseId?: string
   /** Gene symbols pinned via deep-link targets=. */
   targets?: string[]
-  /** If true, harvest safety for top-K after cheap score. */
+  /**
+   * If true, densify additional K beyond always-on top densify
+   * (legacy rank-time harvest preference — densify already runs for top-K).
+   */
   runSafetyHarvest?: boolean
-  /** If true, harvest novelty for top-K after cheap score. */
+  /** If true, densify novelty for rank-time harvest preference. */
   runNoveltyHarvest?: boolean
   harvestK?: number
+  /** Always densify top-K (default true). Tests may set false. */
+  alwaysDensify?: boolean
+  /** K for always-on densify (default DENSIFY_K_DEFAULT). */
+  densifyK?: number
 }
 
 /** Alias for facade re-exports (PR6b name). */
@@ -191,8 +201,12 @@ function emptyRankResult(
 function cheapScoreVector(
   c: CandidateMolecule,
   rubric: ScoreRubric,
+  extras?: { chemblActivityTerm?: number | null; identityTrust?: number | null },
 ): ScoreVector {
-  const trust = assessIdentityTrust({ cid: c.cid, name: c.name })
+  const trust =
+    extras?.identityTrust != null
+      ? { axisValue: extras.identityTrust }
+      : assessIdentityTrust({ cid: c.cid, name: c.name })
   return buildScoreVector({
     rubric,
     scorePhase: 'cheap',
@@ -202,6 +216,7 @@ function cheapScoreVector(
       maxPhase: c.clinicalPhaseRaw,
       trialNorm: c.trialCountNorm,
       identityTrust: trust.axisValue,
+      chemblActivityTerm: extras?.chemblActivityTerm ?? null,
       sources: c.sources,
     },
   })
@@ -225,6 +240,8 @@ export async function rankCandidatesForDisease(
   const runSafetyHarvest = options.runSafetyHarvest === true
   const runNoveltyHarvest = options.runNoveltyHarvest === true
   const harvestK = Math.min(options.harvestK ?? HARVEST_K_DEFAULT, limit)
+  const alwaysDensify = options.alwaysDensify !== false
+  const densifyK = Math.min(options.densifyK ?? DENSIFY_K_DEFAULT, limit)
   const pinnedId = options.diseaseId?.trim() || undefined
   const pinnedTargets = (options.targets ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 10)
 
@@ -238,6 +255,7 @@ export async function rankCandidatesForDisease(
     gather?: number
     cheapScore?: number
     safetyHarvest?: number
+    densify?: number
     identity?: number
     total?: number
   } = {}
@@ -355,6 +373,20 @@ export async function rankCandidatesForDisease(
   const moleculesFromTrials = trialGather.drugCounts
   const knownDrugNames = knownDrugsGather.names
   const chemblByTargetNames = chemblByTargetGather.names
+  /** Best ChEMBL activity proxy per name (0–1) from by-target gather */
+  const chemblActivityByName = new Map<string, number>()
+  for (const m of chemblByTargetGather.molecules) {
+    const key = m.name.toLowerCase()
+    let term = 0
+    if (m.maxPhase > 0) term = Math.max(term, Math.min(1, m.maxPhase / 4))
+    if (m.activityValue != null && Number.isFinite(m.activityValue) && m.activityValue > 0) {
+      // crude pActivity-like: lower nM-ish → higher (capped)
+      const p = Math.min(1, Math.max(0, (9 - Math.log10(m.activityValue + 1e-9)) / 9))
+      term = Math.max(term, p)
+    }
+    const prev = chemblActivityByName.get(key) ?? 0
+    if (term > prev) chemblActivityByName.set(key, term)
+  }
 
   const { names: moleculeNamesFromDisease } = moleculeNamesFromDiseaseResult(primaryDisease)
 
@@ -389,8 +421,8 @@ export async function rankCandidatesForDisease(
 
   const cheapStart = Date.now()
   const candidates: CandidateMolecule[] = []
-  /** name → multi-axis ScoreVector (cheap, then optionally full) */
-  const scoreByName = new Map<string, ScoreVector>()
+  /** name → multi-axis ScoreVector (cheap, then densified) */
+  let scoreByName = new Map<string, ScoreVector>()
 
   for (const name of moleculeArray) {
     const lowerName = name.toLowerCase()
@@ -399,6 +431,7 @@ export async function rankCandidatesForDisease(
     const trialCount =
       moleculesFromTrials.get(name) ?? moleculesFromTrials.get(lowerName) ?? 0
     const indications = indicationMap.get(name) ?? []
+    const chemblActivityTerm = chemblActivityByName.get(lowerName) ?? null
 
     const sources: string[] = []
     if (targetMol) sources.push('DGIdb')
@@ -424,9 +457,10 @@ export async function rankCandidatesForDisease(
       topTargetCount,
       indications,
       sources,
+      chemblActivityTerm,
     })
 
-    const multi = cheapScoreVector(legacy, rubric)
+    const multi = cheapScoreVector(legacy, rubric, { chemblActivityTerm })
     scoreByName.set(lowerName, multi)
 
     candidates.push({
@@ -438,43 +472,8 @@ export async function rankCandidatesForDisease(
   let sorted = sortCandidates(candidates).slice(0, limit)
   timing.cheapScore = Date.now() - cheapStart
 
-  let scorePhase: 'cheap' | 'full' = 'cheap'
-
-  if ((runSafetyHarvest || runNoveltyHarvest) && sorted.length > 0) {
-    const harvestStart = Date.now()
-    const top = sorted.slice(0, harvestK)
-    const harvest = await harvestCandidateAxes(
-      top.map((c) => ({
-        name: c.name,
-        scores: scoreByName.get(c.name.toLowerCase()) ?? cheapScoreVector(c, rubric),
-        phaseNorm: c.clinicalPhase,
-        clinicalStage:
-          scoreByName.get(c.name.toLowerCase())?.axes.clinicalStage ?? c.clinicalPhase,
-      })),
-      {
-        runSafety: runSafetyHarvest,
-        runNovelty: runNoveltyHarvest,
-        rubric,
-      },
-    )
-    sourceStatuses.push(...harvest.sourceStatuses)
-    warnings.push(...harvest.warnings)
-    timing.safetyHarvest = Date.now() - harvestStart
-    scorePhase = 'full'
-
-    for (const h of harvest.candidates) {
-      scoreByName.set(h.name.toLowerCase(), h.scores)
-    }
-
-    sorted = sorted.map((c) => {
-      const s = scoreByName.get(c.name.toLowerCase())
-      if (!s) return c
-      return { ...c, compositeScore: s.composite }
-    })
-    sorted = sortCandidates(sorted)
-  }
-
-  // Stage 3 — batch identity (InChIKey + IdentityTrust) for top-N shortlist
+  // Stage 3 — identity first (before densify) so trust/CID rank higher
+  const identityStart = Date.now()
   const identityInputs: IdentityResolveInput[] = sorted.map((c) => ({
     name: c.name,
     cid: c.cid,
@@ -491,6 +490,124 @@ export async function rankCandidatesForDisease(
     },
   )
   sourceStatuses.push(identityLookup.status)
+  timing.identity = Date.now() - identityStart
+
+  const metaByName = new Map<string, IdentitySortMeta>()
+  for (let i = 0; i < sorted.length; i++) {
+    const c = sorted[i]!
+    const r = identityLookup.value.resolved[i]
+    const trust = assessIdentityTrust({
+      cid: r?.pubchemCid ?? c.cid,
+      inchiKey: r?.inchiKey,
+      name: c.name,
+    })
+    metaByName.set(c.name.toLowerCase(), {
+      cid: r?.pubchemCid ?? c.cid,
+      inchiKey: r?.inchiKey,
+      identityTrust: trust.axisValue,
+    })
+    // Patch CID + identityTrust into score vector
+    const s = scoreByName.get(c.name.toLowerCase())
+    if (s) {
+      const patched = cheapScoreVector(
+        { ...c, cid: r?.pubchemCid ?? c.cid },
+        rubric,
+        {
+          chemblActivityTerm: chemblActivityByName.get(c.name.toLowerCase()) ?? null,
+          identityTrust: trust.axisValue,
+        },
+      )
+      // Keep harvest axes if already densified later — not yet; store cheap+trust
+      scoreByName.set(c.name.toLowerCase(), patched)
+      sorted[i] = {
+        ...c,
+        cid: r?.pubchemCid ?? c.cid,
+        compositeScore: patched.composite,
+      }
+    } else if (r?.pubchemCid) {
+      sorted[i] = { ...c, cid: r.pubchemCid }
+    }
+  }
+
+  sorted = sortCandidatesIdentityFirst(sorted, metaByName)
+
+  // Always densify top-K (safety + novelty free APIs) — denser shortlist
+  let scorePhase: 'cheap' | 'full' = 'cheap'
+  const densifyStart = Date.now()
+  const densify = await densifyShortlist({
+    candidates: sorted,
+    scoreByName,
+    rubric,
+    k: densifyK,
+    skip: !alwaysDensify,
+  })
+  timing.densify = densify.timingMs
+  timing.safetyHarvest = densify.timingMs
+  scoreByName = densify.scoreByName
+  sorted = densify.candidates
+  if (densify.harvest) {
+    sourceStatuses.push(...densify.harvest.sourceStatuses)
+  }
+  warnings.push(...densify.warnings)
+  if (!densify.skipped && densify.densifiedCount > 0) {
+    scorePhase = 'full'
+    warnings.push(
+      `Densified top ${densify.densifiedCount} candidates (safety + novelty). Empty safety ≠ safe.`,
+    )
+  }
+
+  // Optional expanded harvest when user prefers rank-time for larger K
+  if (
+    alwaysDensify &&
+    (runSafetyHarvest || runNoveltyHarvest) &&
+    harvestK > densifyK &&
+    sorted.length > densifyK
+  ) {
+    const extra = await densifyShortlist({
+      candidates: sorted.slice(densifyK),
+      scoreByName,
+      rubric,
+      k: harvestK - densifyK,
+      skip: false,
+    })
+    scoreByName = extra.scoreByName
+    const head = sorted.slice(0, densifyK)
+    const tail = extra.candidates
+    sorted = [...head, ...tail]
+    if (extra.harvest) sourceStatuses.push(...extra.harvest.sourceStatuses)
+    warnings.push(...extra.warnings)
+    timing.densify = (timing.densify || 0) + extra.timingMs
+    timing.safetyHarvest = (timing.safetyHarvest || 0) + extra.timingMs
+  } else if (!alwaysDensify && (runSafetyHarvest || runNoveltyHarvest)) {
+    const extra = await densifyShortlist({
+      candidates: sorted,
+      scoreByName,
+      rubric,
+      k: harvestK,
+      skip: false,
+    })
+    scoreByName = extra.scoreByName
+    sorted = extra.candidates
+    if (extra.harvest) sourceStatuses.push(...extra.harvest.sourceStatuses)
+    warnings.push(...extra.warnings)
+    scorePhase = extra.skipped ? scorePhase : 'full'
+    timing.densify = (timing.densify || 0) + extra.timingMs
+    timing.safetyHarvest = extra.timingMs
+  }
+
+  // InChIKey / CID de-dupe then re-sort identity-first
+  const deduped = dedupeCandidatesByIdentity(sorted, metaByName)
+  if (deduped.removed > 0) {
+    warnings.push(`Merged ${deduped.removed} duplicate candidate(s) by InChIKey/CID.`)
+  }
+  sorted = sortCandidatesIdentityFirst(deduped.candidates, metaByName).slice(0, limit)
+
+  // Refresh composites after densify
+  sorted = sorted.map((c) => {
+    const s = scoreByName.get(c.name.toLowerCase())
+    return s ? { ...c, compositeScore: s.composite } : c
+  })
+  sorted = sortCandidatesIdentityFirst(sorted, metaByName)
 
   const rank: RankResult = {
     query,
@@ -518,12 +635,34 @@ export async function rankCandidatesForDisease(
   }
   v2.candidates = applyResolvedIdentities(v2.candidates, identityLookup.value.resolved)
 
+  // Re-apply densified scores after identity map (identity map may reset vectors)
+  for (const mc of v2.candidates) {
+    const s = scoreByName.get(mc.identity.name.toLowerCase())
+    if (s) {
+      // Preserve densified safety/novelty; refresh identityTrust axis from resolved identity
+      const trust = assessIdentityTrust({
+        cid: mc.identity.pubchemCid,
+        inchiKey: mc.identity.inchiKey,
+        name: mc.identity.name,
+      })
+      mc.scores = {
+        ...s,
+        axes: { ...s.axes, identityTrust: trust.axisValue },
+        axisStatus: {
+          ...s.axisStatus,
+          identityTrust: trust.axisValue != null ? 'computed' : s.axisStatus.identityTrust,
+        },
+        scorePhase: s.scorePhase,
+      }
+    }
+  }
+
   const warningSet = new Set([...v2.warnings, ...warnings])
   v2.warnings = Array.from(warningSet)
   timing.total = Date.now() - timingStart
   v2.timingMs = {
     ...timing,
-    identity: identityLookup.status.duration_ms ?? identityLookup.value.durationMs,
+    identity: timing.identity ?? identityLookup.status.duration_ms ?? identityLookup.value.durationMs,
   }
 
   v2.needsDiseaseConfirmation = false

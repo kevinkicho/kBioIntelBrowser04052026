@@ -53,7 +53,8 @@ describe('boardHarvest', () => {
     expect(candidateNeedsHarvest(baseCandidate({ scores }))).toBe(false)
   })
 
-  test('harvestTimingIsBoardPromote defaults true without snapshot', () => {
+  test('harvestTimingIsBoardPromote follows default prefs (rank-time densify)', () => {
+    // Default harvestTiming is rank-time (always densify top-K at Discover)
     expect(
       harvestTimingIsBoardPromote({
         schemaVersion: 1,
@@ -65,6 +66,6 @@ describe('boardHarvest', () => {
         createdAt: '',
         updatedAt: '',
       }),
-    ).toBe(true)
+    ).toBe(false)
   })
 })

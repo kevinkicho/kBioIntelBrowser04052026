@@ -18,6 +18,7 @@ export type DiscoveryTimingStage =
   | 'identity'
   | 'cheapScore'
   | 'safetyHarvest'
+  | 'densify'
   | 'total'
 
 /**
