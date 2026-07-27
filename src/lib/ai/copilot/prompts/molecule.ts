@@ -1,6 +1,11 @@
 import type { MoleculeContext } from '@/lib/ai/copilot/context'
 import { contextToPromptBlock } from '@/lib/ai/copilot/context'
 import { formatRetrievalSummary, type RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import { computeEvidenceGrounding } from '@/lib/ai/copilot/evidenceDensity'
+import {
+  buildSafetyEvidencePack,
+  buildSynthesisEvidencePack,
+} from '@/lib/ai/copilot/evidencePack'
 import type { SessionMoleculeSummary } from './types'
 import {
   SYSTEM_PROMPT,
@@ -27,7 +32,8 @@ export function buildAutoInsightPrompt(context: MoleculeContext, snapshot: Retri
     userPrompts.push(`GOOD EXAMPLE: "Polypharmacology across COX-1/COX-2 [chembl] explains nausea (200 reports) [adverse-events] via gastric COX-1; boxed warning [recalls] is consistent with that mechanism."`)
     userPrompts.push('')
   }
-  userPrompts.push(contextToBulletSummary(context))
+  const g = computeEvidenceGrounding(context, snapshot)
+  userPrompts.push(buildSynthesisEvidencePack(context, g))
 
   if (interesting.length > 0) {
     userPrompts.push('')
@@ -43,23 +49,26 @@ export function buildAutoInsightPrompt(context: MoleculeContext, snapshot: Retri
   }
 
   userPrompts.push('')
-  userPrompts.push("IMPORTANT: Your insights should teach a researcher something they wouldn't get from just reading the counts. Synthesize across domains.")
+  userPrompts.push(
+    'OUTPUT: 3 bullets max. Each bullet = one named-row connection with [panel] tags + values. If you cannot cite two concrete rows, refuse with gaps only.',
+  )
 
   return { system: SYSTEM_PROMPT, user: userPrompts.join('\n') }
 }
 
 export function buildExecutiveBriefPrompt(context: MoleculeContext, snapshot: RetrievalSnapshot): { system: string; user: string } {
   const gate = shouldRefuseDeepSynthesis(context) ? `${buildLowCompletenessGuard(context)}\n\n` : ''
-  const user = `${gate}Write an executive intelligence brief for ${context.identity.name} (CID ${context.identity.cid}). This is for a scientist who needs to make a decision about this molecule. Cite panel keys [like-this] for every claim. Structure it as:
+  const g = computeEvidenceGrounding(context, snapshot)
+  const user = `${gate}Write a SHORT executive brief for ${context.identity.name} (CID ${context.identity.cid}). Every bullet MUST cite a named row from the pack (NCT id, target+pChEMBL, AE name+count). No count-only sentences.
 
-1. CLASSIFICATION: What is this molecule really? (based only on loaded MoA/target data)
-2. KEY ASSETS: Top 2-3 scientific strengths with [panel] citations
-3. KEY RISKS: Top 2-3 concerns with [panel] citations
-4. UNMET OPPORTUNITY: Only if evidence supports a hypothesis; otherwise list missing panels
-5. DATA CONFIDENCE: Based on ${context.dataCompleteness.panelsWithData}/${context.dataCompleteness.totalPanels} panels, what are we most uncertain about?
+Structure:
+1. CLASSIFICATION — from MoA/target rows only
+2. KEY ASSETS — 2 bullets with values + [panel]
+3. KEY RISKS — 2 bullets with values + [panel]
+4. GAPS — what to load next (category ids)
+5. CONFIDENCE — what is uncertain given grounding
 
-Data:
-${contextToBulletSummary(context)}
+${buildSynthesisEvidencePack(context, g)}
 
 ${formatRetrievalSummary(snapshot)}`
 
@@ -86,52 +95,26 @@ Be specific and scientific.`
 }
 
 export function buildSafetyDeepDivePrompt(context: MoleculeContext): { system: string; user: string } {
-  const aeTopList = context.rich.topAdverseEvents.slice(0, 10).map(ae => `${ae.reactionName} (${ae.count} reports, ${ae.serious} serious)`).join('; ')
-  const recallList = context.rich.recallDetails.map(r => `[${r.classification}] ${r.reason} (Firm: ${r.recallingFirm}, ${r.recallDate})`).join('; ')
-  const drugIntList = context.rich.drugInteractionDetails.slice(0, 6).map(di => `${di.drugName} [${di.severity}]: ${di.description.slice(0, 100)}`).join('; ')
-  const siderList = context.rich.siderSideEffects.slice(0, 10).join(', ')
+  const pack = buildSafetyEvidencePack(context)
+  const user = `Safety deep-dive for ${context.identity.name} using ONLY the evidence pack below.
 
-  const user = `Perform a rigorous safety deep-dive for ${context.identity.name}.
+OUTPUT FORMAT (strict):
+1) MoA summary — named mechanisms/targets only
+2) AE table markdown: | reaction | reports | serious | on-target? | note |
+   - Mark on-target only when pack supports a lexical/MoA link; else "unexplained"
+3) Unexplained AE list
+4) Recalls / boxed warning (facts only)
+5) What to load next if bag is thin
 
-IMPORTANT: Do NOT just list AEs, recalls, and interactions separately. You must CONNECT safety signals to the mechanism of action. Every AE you mention should be explained: is it mechanism-related (on-target) or off-target? Why?
+FAERS counts = reports not incidence. Not clinical decision support.
+Prefer Safety memo task for deterministic tables; this mode is for denser narrative only when pack is rich.
 
-Overall risk rating: ${context.safety.overallRisk.toUpperCase()}
-Adverse events: ${context.safety.adverseEventCount} total (${context.safety.seriousEventCount} serious)
-Boxed warning: ${context.safety.hasBoxedWarning ? 'YES' : 'No'}
-Recalls: ${context.safety.recallCount}
-Drug interactions: ${context.safety.knownInteractions}
-GHS hazards: ${context.safety.ghsHazardCount}
-Pharmacogenomic genes: ${context.rich.pharmacogenomicGenes.join(', ') || 'none identified'}
+${pack}
 
-SPECIFIC ADVERSE EVENTS (top by frequency):
-${aeTopList || 'No specific AE data'}
-
-RECALLS:
-${recallList || 'No recalls'}
-
-DRUG-DRUG INTERACTIONS:
-${drugIntList || 'No interaction details'}
-
-SIDER SIDE EFFECTS:
-${siderList || 'No SIDER data'}
-
-GHS HAZARD STATEMENTS:
-${context.rich.ghsHazardStatements.join('; ') || 'None'}
-
-Clinical context:
-- ${context.clinical.totalTrials} trials (${context.clinical.recruitingTrials} recruiting)
-- Indications: ${context.rich.indicationDetails.slice(0, 5).map(i => `${i.condition} (phase ${i.maxPhase === -1 ? 'unknown' : i.maxPhase})`).join(', ') || 'none found'}
-
-Biological context:
-- Mechanisms: ${context.rich.mechanismDetails.map(m => `${m.mechanismOfAction} -> ${m.targetName}`).join('; ') || 'none'}
-- Targets: ${context.biological.knownTargets} known
-
-Assess:
-1. What is the most concerning safety signal and what is its likely pharmacological mechanism? (Connect AEs to the drug's known targets and MoA)
-2. Are the adverse events consistent with the known mechanism of action, or do they suggest off-target effects?
-3. Which drug interactions are most clinically significant and why?
-4. If pharmacogenomic data exists, which variants should a clinician test for before prescribing?
-5. What monitoring or risk mitigation would you recommend based on this profile?`
+Overall risk heuristic: ${context.safety.overallRisk.toUpperCase()}
+Boxed warning flag: ${context.safety.hasBoxedWarning ? 'YES' : 'No'}
+GHS: ${context.rich.ghsHazardStatements.slice(0, 8).join('; ') || 'none'}
+Trials in bag: ${context.clinical.totalTrials}`
 
   return { system: SYSTEM_PROMPT, user }
 }

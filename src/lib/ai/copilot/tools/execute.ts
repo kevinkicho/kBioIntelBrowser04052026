@@ -42,18 +42,31 @@ function isCategoryId(id: string): id is CategoryId {
   return (MOLECULE_CATEGORY_IDS as string[]).includes(id)
 }
 
-function sampleArray(val: unknown, n = 5): unknown[] {
+/** Denser panel samples for agent tools — prefer registry ids over empty shells. */
+function sampleArray(val: unknown, n = 12): unknown[] {
   if (!Array.isArray(val)) return []
   return val.slice(0, n).map((row) => {
     if (!row || typeof row !== 'object') return row
     const o = row as Record<string, unknown>
     const pick: Record<string, unknown> = {}
     let i = 0
-    for (const [k, v] of Object.entries(o)) {
-      if (k.startsWith('_')) continue
+    // Prefer id-like keys first
+    const keys = Object.keys(o).filter((k) => !k.startsWith('_'))
+    const preferred = keys.filter((k) =>
+      /id|name|title|nct|pmid|doi|target|phase|status|value|pchembl|reaction|count|serious/i.test(
+        k,
+      ),
+    )
+    const rest = keys.filter((k) => !preferred.includes(k))
+    for (const k of [...preferred, ...rest]) {
+      const v = o[k]
       if (typeof v === 'object' && v !== null && !Array.isArray(v)) continue
-      pick[k] = typeof v === 'string' ? v.slice(0, 120) : v
-      if (++i >= 8) break
+      if (Array.isArray(v)) {
+        pick[k] = v.slice(0, 4).map((x) => (typeof x === 'string' ? x.slice(0, 80) : x))
+      } else {
+        pick[k] = typeof v === 'string' ? v.slice(0, 160) : v
+      }
+      if (++i >= 14) break
     }
     return pick
   })

@@ -128,6 +128,10 @@ export function resolveInsightPrompt(input: ResolveInsightPromptInput): InsightP
       return buildSuggestNextPrompt(context)
     case 'hypothesis_seed':
       return buildHypothesisSeedPrompt(context, input.researchQuestion ?? '')
+    case 'safety_memo':
+    case 'next_actions':
+      // Deterministic paths — prompt only used if caller falls through to LLM
+      return buildGapAnalysisPrompt(context, snapshot)
     default:
       return buildAutoInsightPrompt(context, snapshot)
   }
@@ -138,6 +142,8 @@ export function isCopilotTaskMode(mode: PromptMode): boolean {
     mode === 'prior_art_query' ||
     mode === 'differential_safety' ||
     mode === 'suggest_next' ||
-    mode === 'hypothesis_seed'
+    mode === 'hypothesis_seed' ||
+    mode === 'safety_memo' ||
+    mode === 'next_actions'
   )
 }

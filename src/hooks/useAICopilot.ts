@@ -42,12 +42,30 @@ import {
   validateTaskModeOutput,
   type CopilotTaskPayload,
 } from '@/lib/ai/copilot/validateTaskMode'
+import {
+  buildFailClosedMessage,
+  computeEvidenceGrounding,
+  modeRequiresDeepDensity,
+  type EvidenceGroundingStats,
+} from '@/lib/ai/copilot/evidenceDensity'
+import {
+  buildDeterministicNextActions,
+  buildDeterministicPriorArtQuery,
+  buildDeterministicSafetyMemo,
+  formatSafetyMemoAsText,
+} from '@/lib/ai/aiTasks/deterministicArtifacts'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 
 export interface CopilotTaskResult {
   /** Structured payload that survived validation; UI may render specially. */
-  kind: 'prior_art' | 'diff_safety' | 'suggest_next' | 'hypothesis_seed'
+  kind:
+    | 'prior_art'
+    | 'diff_safety'
+    | 'suggest_next'
+    | 'hypothesis_seed'
+    | 'safety_memo'
+    | 'next_actions'
   data: CopilotTaskPayload
 }
 
@@ -199,14 +217,62 @@ export function useAICopilot(
     version: string
   } | null>(null)
 
+  const grounding: EvidenceGroundingStats = useMemo(
+    () =>
+      computeEvidenceGrounding(
+        context,
+        snapshot,
+        categoryStatus as Partial<Record<CategoryId, string>>,
+      ),
+    [context, snapshot, categoryStatus],
+  )
+
+  const finishDeterministicTask = useCallback(
+    (
+      mode: PromptMode,
+      task: CopilotTaskPayload,
+      content: string,
+      promptNote: string,
+    ) => {
+      const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: msgId,
+          role: 'assistant',
+          content,
+          mode,
+          timestamp: Date.now(),
+          task,
+        },
+      ])
+      setLastPrompt({
+        mode,
+        system: 'deterministic-artifact (no LLM)',
+        user: promptNote,
+        at: Date.now(),
+        version: 'evidenceFirst@v1',
+      })
+      void persistAiGeneration({
+        kind: 'copilot',
+        mode,
+        content,
+        context: {
+          name: identity.name,
+          cid: identity.cid || undefined,
+          geneSymbol: identity.geneSymbol,
+        },
+        model: 'deterministic',
+        ollamaUrl: ai.ollamaUrl,
+        task,
+        promptSystem: 'deterministic-artifact',
+        promptUser: promptNote,
+      })
+    },
+    [ai.ollamaUrl, identity.cid, identity.geneSymbol, identity.name],
+  )
+
   const generateInsight = useCallback(async (mode: PromptMode, opts: GenerateInsightOptions = {}) => {
-    if (!aiAvailable) {
-      const recent = messagesRef.current.slice(-3)
-      if (!recent.some(m => m.content.includes('AI is not available'))) {
-        addMessage('system', 'AI is not available. Connect Ollama to enable AI insights.', mode)
-      }
-      return
-    }
     if (!isDiseaseContext && !isGeneContext && context.identity.cid === 0) {
       addMessage('system', 'No entity loaded. Search for a molecule, disease, or gene first.', mode)
       return
@@ -216,6 +282,140 @@ export function useAICopilot(
     const isTaskMode = isCopilotTaskMode(mode)
     if (isTaskMode && (isDiseaseContext || isGeneContext)) {
       addMessage('system', `The "${mode.replace(/_/g, ' ')}" task is only available for molecule entities.`, mode)
+      return
+    }
+
+    // ── Deterministic job artifacts (no LLM) ─────────────────────────────
+    if (!isDiseaseContext && !isGeneContext && mode === 'safety_memo') {
+      const memo = buildDeterministicSafetyMemo(context)
+      const text = formatSafetyMemoAsText(memo)
+      finishDeterministicTask(
+        mode,
+        {
+          kind: 'safety_memo',
+          text,
+          title: memo.title,
+          rowCount: memo.rows.length,
+          unexplainedCount: memo.unexplained.length,
+          deterministic: true,
+        },
+        text,
+        `safety_memo rows=${memo.rows.length} grounding=${grounding.badgeLine}`,
+      )
+      return
+    }
+
+    if (!isDiseaseContext && !isGeneContext && mode === 'next_actions') {
+      const { entities, actions } = buildDeterministicNextActions(
+        context,
+        grounding,
+        categoryStatus as Partial<Record<CategoryId, string>>,
+      )
+      const text = [
+        'Next actions (deterministic from free-API bags + gaps):',
+        ...actions.map((a) => `• ${a.action} — ${a.why}`),
+        entities.length ? 'Entities from named rows:' : '',
+        ...entities.map((e) => `• [${e.type}] ${e.name}: ${e.reason}`),
+        `Grounding: ${grounding.badgeLine}`,
+      ]
+        .filter(Boolean)
+        .join('\n')
+      finishDeterministicTask(
+        mode,
+        {
+          kind: 'next_actions',
+          entities,
+          actions,
+          text,
+          deterministic: true,
+        },
+        text,
+        `next_actions entities=${entities.length} actions=${actions.length}`,
+      )
+      return
+    }
+
+    if (!isDiseaseContext && !isGeneContext && mode === 'prior_art_query') {
+      const det = buildDeterministicPriorArtQuery(context)
+      if (det.query && (det.grounded || det.query.length > 8)) {
+        finishDeterministicTask(
+          mode,
+          {
+            kind: 'prior_art',
+            query: det.query,
+            notes: det.notes,
+            deterministic: true,
+          },
+          det.query,
+          `prior_art deterministic: ${det.notes.join('; ')}`,
+        )
+        return
+      }
+    }
+
+    if (!isDiseaseContext && !isGeneContext && mode === 'suggest_next') {
+      const { entities, actions } = buildDeterministicNextActions(
+        context,
+        grounding,
+        categoryStatus as Partial<Record<CategoryId, string>>,
+      )
+      if (entities.length >= 3) {
+        const text = entities.map((e) => `[${e.type}] ${e.name}: ${e.reason}`).join('\n')
+        finishDeterministicTask(
+          mode,
+          {
+            kind: 'suggest_next',
+            entities,
+            actions,
+            deterministic: true,
+          },
+          text,
+          `suggest_next deterministic n=${entities.length}`,
+        )
+        return
+      }
+    }
+
+    // ── Deep synthesis: fail closed when evidence is thin ────────────────
+    if (
+      !isDiseaseContext &&
+      !isGeneContext &&
+      modeRequiresDeepDensity(mode) &&
+      !grounding.canDeepSynthesize
+    ) {
+      addMessage('system', buildFailClosedMessage(grounding, mode), mode)
+      // Offer deterministic safety memo as useful fallback
+      if (mode === 'safety_deep_dive' || mode === 'auto_insight') {
+        const memo = buildDeterministicSafetyMemo(context)
+        if (memo.rows.length > 0 || memo.mechanisms.length > 0) {
+          const text = formatSafetyMemoAsText(memo)
+          finishDeterministicTask(
+            'safety_memo',
+            {
+              kind: 'safety_memo',
+              text,
+              title: memo.title,
+              rowCount: memo.rows.length,
+              unexplainedCount: memo.unexplained.length,
+              deterministic: true,
+            },
+            text,
+            `fallback safety_memo after fail-closed ${mode}`,
+          )
+        }
+      }
+      return
+    }
+
+    if (!aiAvailable) {
+      const recent = messagesRef.current.slice(-3)
+      if (!recent.some((m) => m.content.includes('AI is not available'))) {
+        addMessage(
+          'system',
+          'AI is not available. Connect Ollama for model synthesis, or use Safety memo / Next actions / Prior-art (deterministic).',
+          mode,
+        )
+      }
       return
     }
 
@@ -265,30 +465,44 @@ export function useAICopilot(
       researchQuestion: opts.researchQuestion,
     })
 
+    const groundedUser =
+      prompts.user +
+      (diseasePromptSuffix || '') +
+      `\n\n// GROUNDING BADGE: ${grounding.badgeLine}\n// Cite only named rows in the pack. Fail closed if thin.`
+
     setLastPrompt({
       mode,
       system: prompts.system,
-      user: prompts.user + (diseasePromptSuffix || ''),
+      user: groundedUser,
       at: Date.now(),
-      version: 'promptCatalog@v1',
+      version: 'evidenceFirst@v1',
     })
 
-    addMessage('system', `Generating ${mode.replace('_', ' ')}...`, mode)
+    addMessage(
+      'system',
+      `Generating ${mode.replace(/_/g, ' ')}… (grounded on ${grounding.badgeLine})`,
+      mode,
+    )
     const msgId = `msg-${Date.now()}-${messageIdRef.current++}`
-    setMessages(prev => [...prev, { id: msgId, role: 'assistant', content: '', mode, timestamp: Date.now() }])
+    setMessages((prev) => [
+      ...prev,
+      { id: msgId, role: 'assistant', content: '', mode, timestamp: Date.now() },
+    ])
 
     let fullContent = ''
     let streamError: string | null = null
     try {
       const chatMessages = [
         { role: 'system' as const, content: prompts.system },
-        { role: 'user' as const, content: prompts.user + diseasePromptSuffix },
+        { role: 'user' as const, content: groundedUser },
       ]
 
       for await (const token of ai.askAI(chatMessages)) {
         if (controller.signal.aborted) break
         fullContent += token
-        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, content: fullContent } : m))
+        setMessages((prev) =>
+          prev.map((m) => (m.id === msgId ? { ...m, content: fullContent } : m)),
+        )
       }
     } catch (err) {
       streamError = err instanceof Error ? err.message : String(err)
@@ -297,8 +511,6 @@ export function useAICopilot(
     const { content: finalContent, error: inlineError } = extractStreamError(fullContent)
     const msgError = streamError || inlineError
 
-    // Plan-06: validate task-mode outputs and either attach the structured
-    // payload or surface a polite "AI response was unclear" message.
     let taskPayload: CopilotMessage['task'] | undefined
     let validationError: string | undefined
     const rawForValidation = finalContent || fullContent
@@ -316,13 +528,19 @@ export function useAICopilot(
     }
 
     if (msgError || validationError || taskPayload || finalContent !== fullContent) {
-      setMessages(prev => prev.map(m => m.id === msgId ? {
-        ...m,
-        content: finalContent || fullContent,
-        ...(msgError ? { error: msgError } : {}),
-        ...(validationError ? { validationError } : {}),
-        ...(taskPayload ? { task: taskPayload } : {}),
-      } : m))
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === msgId
+            ? {
+                ...m,
+                content: finalContent || fullContent,
+                ...(msgError ? { error: msgError } : {}),
+                ...(validationError ? { validationError } : {}),
+                ...(taskPayload ? { task: taskPayload } : {}),
+              }
+            : m,
+        ),
+      )
     }
 
     const storedContent = finalContent || fullContent
@@ -343,13 +561,30 @@ export function useAICopilot(
         task: taskPayload,
         error: msgError || undefined,
         promptSystem: prompts.system,
-        promptUser: prompts.user + (diseasePromptSuffix || ''),
+        promptUser: groundedUser,
       })
     }
 
     isStreamingRef.current = false
     setIsStreaming(false)
-  }, [ai, aiAvailable, context, snapshot, addMessage, identity.name, identity.cid, identity.geneSymbol, isDiseaseContext, diseaseCtx, isGeneContext, geneCtx, diseasePromptSuffix])
+  }, [
+    ai,
+    aiAvailable,
+    context,
+    snapshot,
+    grounding,
+    categoryStatus,
+    addMessage,
+    finishDeterministicTask,
+    identity.name,
+    identity.cid,
+    identity.geneSymbol,
+    isDiseaseContext,
+    diseaseCtx,
+    isGeneContext,
+    geneCtx,
+    diseasePromptSuffix,
+  ])
 
   const buildToolContext = useCallback((): CopilotToolContext => {
     const act = actionsRef.current
@@ -654,21 +889,11 @@ export function useAICopilot(
     }
   }, [identity.cid, identity.geneSymbol, identity.name])
 
+  // Auto-insight disabled: early runs produced fluent fluff on thin bags.
+  // Users run job tasks or deep modes only when density badge is green.
   useEffect(() => {
     const loadedCount = Object.values(categoryStatus).filter((s) => s === 'loaded').length
-    if (loadedCount >= 3 && !autoInsightGenerated && aiAvailable) {
-      // Set immediately so re-renders / Strict Mode cannot schedule multiple autos
-      setAutoInsightGenerated(true)
-      const timer = setTimeout(() => {
-        generateInsightRef.current?.('auto_insight')
-      }, 150)
-      return () => clearTimeout(timer)
-    }
-  }, [categoryStatus, autoInsightGenerated, aiAvailable])
-
-  useEffect(() => {
-    const loadedCount = Object.values(categoryStatus).filter(s => s === 'loaded').length
-    if (loadedCount > prevLoadedCountRef.current + 1 && loadedCount <= 7) {
+    if (loadedCount > prevLoadedCountRef.current) {
       prevLoadedCountRef.current = loadedCount
     }
   }, [categoryStatus])
@@ -676,6 +901,7 @@ export function useAICopilot(
   return {
     snapshot,
     context,
+    grounding,
     contextBlock,
     isDiseaseContext,
     isGeneContext,

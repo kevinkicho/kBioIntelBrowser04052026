@@ -6,14 +6,25 @@
 
 | Surface | Path | Style |
 |---------|------|--------|
-| **Profile Copilot** | `components/ai/AICopilot.tsx` + `components/ai/copilot/*` | Open tools + profile context |
+| **Profile Copilot** | `components/ai/AICopilot.tsx` + `components/ai/copilot/*` | Job artifacts first; dense packs; fail-closed deep essays |
 | **Discover AI analysis** | `components/discover/AiAnalysisView.tsx` + `lib/ai/aiRank/*` | Opt-in reorder; validated keys |
 | **Board AI recommend** | `components/projects/BoardAiRecommend.tsx` | Non-of-record triage order |
 | **Disease Intelligence** | `components/disease/DiseaseIntelligencePanel.tsx` | Claim-bound disease prompts; user-triggered |
-| **Pack AI** | `components/evidence/PackAiPanel.tsx` + `lib/ai/contracts.ts` | Structured JSON over pack claims |
+| **Pack AI** | `components/evidence/PackAiPanel.tsx` + `lib/ai/contracts.ts` | Structured JSON; higher min claim thresholds |
 | **RH AI** | `components/evidence/RhAiPanel.tsx` + `lib/ai/rhContracts.ts` | Structured JSON over hypothesis claims |
 
 Do **not** merge Pack/RH prompt systems into Copilot tools. Share only runtime helpers.
+
+## Evidence-first rules (2026)
+
+| Rule | Implementation |
+|------|----------------|
+| No auto-insight on thin bags | Auto-insight disabled in `useAICopilot` |
+| Grounding badge | `computeEvidenceGrounding` → Insights tab |
+| Deep modes fail closed | `modeRequiresDeepDensity` + `buildFailClosedMessage` |
+| Deterministic jobs | `deterministicArtifacts`: prior-art, safety memo, next actions |
+| Dense packs | `evidencePack.ts` named NCT/pChEMBL/AE rows (not counts only) |
+| Pack brief threshold | `minClaimsForPackMode` executive ≥10, red-team ≥8 |
 
 ## Layout
 

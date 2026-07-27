@@ -263,7 +263,8 @@ export interface RichDataContext {
   pharmacogenomicGenes: string[]
 }
 
-export const DEFAULT_MAX_CONTEXT_CHARS = 12000
+/** Raised so named evidence rows (NCT, pChEMBL, AE) fit — still truncated per pack builders. */
+export const DEFAULT_MAX_CONTEXT_CHARS = 24000
 
 export interface DiseaseContext {
   query: string

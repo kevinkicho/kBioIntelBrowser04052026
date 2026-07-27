@@ -50,8 +50,20 @@ export function TaskBubble({ task, rawContent }: { task: NonNullable<CopilotMess
   if (task.kind === 'prior_art') {
     return (
       <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
-        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">Prior-art query</p>
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">
+          Prior-art query
+          {task.deterministic && (
+            <span className="ml-1.5 font-normal normal-case text-emerald-500/90">· deterministic</span>
+          )}
+        </p>
         <code className="block font-mono text-[11px] bg-slate-950/60 border border-slate-800/40 rounded p-2 text-emerald-300 whitespace-pre-wrap break-words">{task.query}</code>
+        {task.notes && task.notes.length > 0 && (
+          <ul className="mt-1.5 space-y-0.5 text-[10px] text-slate-500">
+            {task.notes.map((n) => (
+              <li key={n}>• {n}</li>
+            ))}
+          </ul>
+        )}
         <div className="flex gap-2 mt-2">
           <button
             type="button"
@@ -81,6 +93,68 @@ export function TaskBubble({ task, rawContent }: { task: NonNullable<CopilotMess
     )
   }
 
+  if (task.kind === 'safety_memo') {
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">
+          {task.title}
+          <span className="ml-1.5 font-normal normal-case text-emerald-500/90">· deterministic</span>
+        </p>
+        <p className="text-[10px] text-slate-500 mb-1.5">
+          {task.rowCount} AE rows · {task.unexplainedCount} unexplained by MoA tokens · reports ≠ incidence
+        </p>
+        <pre className="text-[10px] whitespace-pre-wrap font-mono text-slate-400 max-h-64 overflow-y-auto bg-slate-950/50 rounded p-2 border border-slate-800/40">
+          {task.text}
+        </pre>
+        <button
+          type="button"
+          onClick={() => { navigator.clipboard?.writeText(task.text).catch(() => {}) }}
+          className="mt-2 text-[10px] text-slate-400 hover:text-indigo-300"
+        >
+          Copy memo
+        </button>
+      </div>
+    )
+  }
+
+  if (task.kind === 'next_actions') {
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">
+          Next actions
+          <span className="ml-1.5 font-normal normal-case text-emerald-500/90">· deterministic</span>
+        </p>
+        {task.actions.length > 0 && (
+          <ul className="space-y-1 mb-2">
+            {task.actions.map((a, i) => (
+              <li key={i} className="text-[11px]">
+                <span className="font-medium text-slate-200">{a.action}</span>
+                <span className="text-slate-500"> — {a.why}</span>
+              </li>
+            ))}
+          </ul>
+        )}
+        {task.entities.length > 0 && (
+          <ul className="space-y-1.5">
+            {task.entities.map((e, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className={`shrink-0 inline-block px-1.5 py-0.5 rounded text-[9px] font-medium uppercase tracking-wider ${
+                  e.type === 'molecule' ? 'bg-purple-900/40 text-purple-300' :
+                  e.type === 'gene' ? 'bg-emerald-900/40 text-emerald-300' :
+                  'bg-cyan-900/40 text-cyan-300'
+                }`}>{e.type}</span>
+                <div>
+                  <p className="text-xs font-medium text-slate-200">{e.name}</p>
+                  <p className="text-[10px] text-slate-400">{e.reason}</p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    )
+  }
+
   if (task.kind === 'diff_safety') {
     return (
       <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
@@ -99,7 +173,12 @@ export function TaskBubble({ task, rawContent }: { task: NonNullable<CopilotMess
   if (task.kind === 'suggest_next') {
     return (
       <div className="rounded-lg px-3 py-2 text-xs leading-relaxed bg-slate-900/40 border border-slate-800/30 text-slate-300">
-        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">Suggested next entities</p>
+        <p className="text-[10px] uppercase tracking-wider text-indigo-400 font-semibold mb-1.5">
+          Suggested next entities
+          {task.deterministic && (
+            <span className="ml-1.5 font-normal normal-case text-emerald-500/90">· from bag</span>
+          )}
+        </p>
         <ul className="space-y-1.5">
           {task.entities.map((e, i) => (
             <li key={i} className="flex items-start gap-2">
@@ -115,6 +194,13 @@ export function TaskBubble({ task, rawContent }: { task: NonNullable<CopilotMess
             </li>
           ))}
         </ul>
+        {task.actions && task.actions.length > 0 && (
+          <ul className="mt-2 border-t border-slate-800/50 pt-2 space-y-0.5 text-[10px] text-slate-500">
+            {task.actions.map((a, i) => (
+              <li key={i}>→ {a.action}: {a.why}</li>
+            ))}
+          </ul>
+        )}
       </div>
     )
   }

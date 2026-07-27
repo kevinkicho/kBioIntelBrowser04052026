@@ -11,7 +11,7 @@ import type { PromptMode } from '@/lib/ai/copilot/prompts'
 import { isCopilotTaskMode } from './resolveInsightPrompt'
 
 export type CopilotTaskPayload =
-  | { kind: 'prior_art'; query: string }
+  | { kind: 'prior_art'; query: string; notes?: string[]; deterministic?: boolean }
   | {
       kind: 'diff_safety'
       text: string
@@ -19,8 +19,28 @@ export type CopilotTaskPayload =
       currentName: string
       otherName: string
     }
-  | { kind: 'suggest_next'; entities: SuggestedEntity[] }
+  | {
+      kind: 'suggest_next'
+      entities: SuggestedEntity[]
+      actions?: Array<{ action: string; why: string; categoryId?: string }>
+      deterministic?: boolean
+    }
   | { kind: 'hypothesis_seed'; filters: Filter[]; url: string }
+  | {
+      kind: 'safety_memo'
+      text: string
+      title: string
+      rowCount: number
+      unexplainedCount: number
+      deterministic: boolean
+    }
+  | {
+      kind: 'next_actions'
+      entities: SuggestedEntity[]
+      actions: Array<{ action: string; why: string; categoryId?: string }>
+      text: string
+      deterministic: boolean
+    }
 
 export interface ValidateTaskModeInput {
   mode: PromptMode

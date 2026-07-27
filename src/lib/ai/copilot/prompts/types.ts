@@ -27,3 +27,7 @@ export type PromptMode =
   | 'differential_safety'
   | 'suggest_next'
   | 'hypothesis_seed'
+  /** Deterministic AE×MoA table artifact (preferred over essay safety dive when thin) */
+  | 'safety_memo'
+  /** Deterministic load-next + entity suggestions (no LLM) */
+  | 'next_actions'

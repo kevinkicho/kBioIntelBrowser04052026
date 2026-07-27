@@ -230,17 +230,21 @@ export function packModePromptPreview(
   }
 }
 
+/** Fail closed: refuse board-style briefs until pack has real claim density. */
 export function minClaimsForPackMode(mode: PackAiMode): number {
   switch (mode) {
     case 'pack_gap_analysis':
+      return 3
     case 'pack_custom_prompt':
-      return 0
+      return 5
     case 'pack_executive_brief':
+      return 10
     case 'pack_next_experiment':
+      return 8
     case 'pack_red_team':
-      return 3
+      return 8
     default:
-      return 3
+      return 8
   }
 }
 

@@ -225,7 +225,7 @@ export function extractRichData(d: Record<string, unknown>): RichDataContext {
   }))
 
   const trialArr = safeArr(d.clinicalTrials)
-  const trialDetails = trialArr.slice(0, 12).map(t => ({
+  const trialDetails = trialArr.slice(0, 20).map(t => ({
     nctId: safeStr(t?.nctId),
     title: safeStr(t?.title),
     phase: safeStr(t?.phase),
@@ -325,8 +325,8 @@ export function extractRichData(d: Record<string, unknown>): RichDataContext {
     })
     .filter((i) => i.condition.length > 0)
 
-  const litArr = safeArr(d.literature).slice(0, 8)
-  const semArr = safeArr(d.semanticPapers).slice(0, 5)
+  const litArr = safeArr(d.literature).slice(0, 15)
+  const semArr = safeArr(d.semanticPapers).slice(0, 8)
   const publicationDetails: PublicationDetail[] = []
   for (const l of litArr) {
     publicationDetails.push({

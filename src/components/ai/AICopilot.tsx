@@ -205,6 +205,7 @@ function AICopilotInner({
                 isDiseaseContext={!!copilot.isDiseaseContext}
                 isGeneContext={!!copilot.isGeneContext}
                 previousMolecules={sessionHistory.getRecentMolecules(8).filter(m => m.name !== identity.name).map(m => m.name)}
+                grounding={copilot.grounding}
               />
             )}
 
