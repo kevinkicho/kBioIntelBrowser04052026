@@ -1,10 +1,12 @@
 # BioIntel Explorer
 
-A public open-science web portal that aggregates molecular, pharmaceutical, clinical, regulatory, and structural biology data from **~50 production-grade free public APIs** (plus experimental panels) into a unified molecule profile page across **9 categories**.
+A free public-API **research data hub** and discovery workbench for small molecules, targets, and diseases. Aggregates molecular, pharmaceutical, clinical, regulatory, and literature evidence into of-record multi-source views — plus a full multi-panel profile when you need depth.
+
+**Research workspace default:** molecule profiles lead with a **Data hub** (Fact · Value · Source · Open), a **Research** view (literature · grants · trials · structures), exports (CSV/TSV + single-file **research kit**), and a public [methodology](/methodology) page. Optional AI is claim-bound / non-of-record. **Discover ranking stays deterministic** (no LLM in the of-record rank path).
 
 Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI. When multiple PubChem CIDs match (salts, isomers), you pick the correct structure. Category fetches use structure-stable identifiers (InChIKey, CAS, CID, UniChem/ChEMBL crosswalk) by default — then browse by category, compare side-by-side, or explore relationships through an interactive network graph.
 
-> **Honesty note:** Panel count is large, but scientific trust depends on **A-tier sources** (PubChem, ChEMBL, openFDA, ClinicalTrials.gov, UniProt, literature). Some long-tail panels are experimental, rate-limited, or disabled (see NIH High-Impact). Empty panels may mean true absence, timeout, or a disabled source — check the status badge.
+> **Honesty note:** Panel count is large, but scientific trust depends on **A-tier sources** (PubChem, ChEMBL, openFDA, ClinicalTrials.gov, UniProt, literature). Hub and research tables show **session samples**, not universe counts. Empty panels may mean true absence, timeout, or a disabled source — check the status badge. Not for clinical or regulatory decision support.
 
 ![BioIntel Explorer homepage](screenshots/homepage.png)
 

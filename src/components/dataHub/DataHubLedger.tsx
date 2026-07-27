@@ -173,6 +173,7 @@ export function DataHubLedgerView({
         ledger,
         claims: claims ?? null,
         includeEmpty: !hideEmpty,
+        mode: 'single',
       })
     } finally {
       setKitBusy(false)
@@ -197,7 +198,7 @@ export function DataHubLedgerView({
                 'Each row is a value retrieved from a free public API with its source name.',
                 'Open Panel for the siloed full table; Source opens the primary registry when a deep link exists.',
                 'Export CSV/TSV for lab notebooks — of-record facts only, not AI narrative.',
-                'Research kit + prefs downloads hub CSV, sources, optional claims, research-view-prefs.json, README.',
+                'Research kit downloads one JSON bundle (hub CSV, sources, optional claims, prefs, README).',
                 'Not model-generated. Not for clinical or regulatory decisions.',
                 ...(ledger.notes || []),
               ].join('\n\n')}
@@ -245,9 +246,9 @@ export function DataHubLedgerView({
               disabled={kitBusy}
               className="rounded-md border border-sky-800/50 bg-sky-950/30 px-2 py-0.5 text-[10px] font-medium text-sky-200 hover:border-sky-600/50 disabled:opacity-50"
               data-testid={`${testId}-export-kit`}
-              title="Downloads data-hub CSV, sources.json, optional claims, README"
+              title="Single JSON bundle: hub CSV, sources, optional claims, research-view prefs, README"
             >
-              {kitBusy ? 'Exporting kit…' : 'Research kit + prefs'}
+              {kitBusy ? 'Exporting kit…' : 'Research kit'}
             </button>
           )}
           <button

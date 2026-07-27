@@ -238,6 +238,75 @@ export function researchViewPrefsExportPayload(
   }
 }
 
+export type ImportResearchViewPrefsResult =
+  | { ok: true; prefs: ResearchViewPrefs }
+  | { ok: false; error: string }
+
+/**
+ * Parse a research-view-prefs export, kit bundle, or raw prefs object.
+ * Does not write localStorage — call saveResearchViewPrefs / applyImport.
+ */
+export function parseImportedResearchViewPrefs(
+  raw: unknown,
+): ImportResearchViewPrefsResult {
+  if (raw == null) return { ok: false, error: 'Empty import' }
+  if (typeof raw === 'string') {
+    try {
+      raw = JSON.parse(raw)
+    } catch {
+      return { ok: false, error: 'Invalid JSON' }
+    }
+  }
+  if (!raw || typeof raw !== 'object') {
+    return { ok: false, error: 'Expected a JSON object' }
+  }
+  const o = raw as Record<string, unknown>
+
+  // Full research kit bundle
+  if (o.kind === 'biointel-research-kit-bundle' && o.files && typeof o.files === 'object') {
+    const files = o.files as Record<string, unknown>
+    const prefsRaw = files['research-view-prefs.json']
+    if (typeof prefsRaw === 'string') {
+      return parseImportedResearchViewPrefs(prefsRaw)
+    }
+    if (prefsRaw && typeof prefsRaw === 'object') {
+      return parseImportedResearchViewPrefs(prefsRaw)
+    }
+    return { ok: false, error: 'Bundle has no research-view-prefs.json' }
+  }
+
+  // Export payload shape
+  if (o.kind === 'biointel-research-view-prefs' && o.prefs) {
+    return { ok: true, prefs: parseResearchViewPrefs(o.prefs) }
+  }
+
+  // Raw prefs or partial
+  if (
+    Array.isArray(o.researchTables) ||
+    Array.isArray(o.hubDomains) ||
+    Array.isArray(o.geneResearchTables) ||
+    o.preferredProfileView != null ||
+    o.hideEmpty != null
+  ) {
+    return { ok: true, prefs: parseResearchViewPrefs(o) }
+  }
+
+  return {
+    ok: false,
+    error: 'Unrecognized prefs file (need research-view-prefs export or kit bundle)',
+  }
+}
+
+/** Parse + save imported prefs to localStorage. */
+export function importAndSaveResearchViewPrefs(
+  raw: unknown,
+): ImportResearchViewPrefsResult {
+  const result = parseImportedResearchViewPrefs(raw)
+  if (!result.ok) return result
+  saveResearchViewPrefs(result.prefs)
+  return result
+}
+
 export function toggleListItem<T extends string>(
   list: T[],
   item: T,

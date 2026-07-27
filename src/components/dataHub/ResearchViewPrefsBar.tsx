@@ -4,6 +4,7 @@
  * Pin research tables / hub domains; save solo-local presentation prefs.
  */
 
+import { useRef, useState } from 'react'
 import {
   GENE_RESEARCH_TABLE_DOMAINS,
   GENE_RESEARCH_TABLE_LABELS,
@@ -11,6 +12,7 @@ import {
   HUB_DOMAIN_ORDER,
   RESEARCH_TABLE_DOMAINS,
   RESEARCH_TABLE_LABELS,
+  importAndSaveResearchViewPrefs,
   toggleListItem,
   type GeneResearchTableDomain,
   type PreferredProfileView,
@@ -36,6 +38,24 @@ export function ResearchViewPrefsBar({
   compact = false,
 }: ResearchViewPrefsBarProps) {
   const { prefs, patch, reset, hydrated } = useResearchViewPrefs()
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [importMsg, setImportMsg] = useState<string | null>(null)
+
+  const onImportFile = async (file: File | null) => {
+    if (!file) return
+    try {
+      const text = await file.text()
+      const result = importAndSaveResearchViewPrefs(text)
+      if (!result.ok) {
+        setImportMsg(result.error)
+        return
+      }
+      setImportMsg('Imported prefs for this browser')
+      // Hook listens to custom event from saveResearchViewPrefs
+    } catch {
+      setImportMsg('Could not read file')
+    }
+  }
 
   if (!hydrated) {
     return (
@@ -63,11 +83,32 @@ export function ResearchViewPrefsBar({
           content={[
             'Pins which research tables and data-hub domains you see.',
             'Stored only in this browser (localStorage). Does not change Discover ranks or invent data.',
+            'Import a research-view-prefs.json or full research-kit bundle from another session.',
             'Empty selection is not allowed — at least one domain stays on.',
           ].join('\n\n')}
           label="About saved research view"
           testId={`${testId}-help`}
         />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          data-testid={`${testId}-import-input`}
+          onChange={(e) => {
+            const f = e.target.files?.[0] ?? null
+            void onImportFile(f)
+            e.target.value = ''
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          className="text-[10px] text-sky-400 hover:text-sky-300"
+          data-testid={`${testId}-import`}
+        >
+          Import prefs
+        </button>
         <button
           type="button"
           onClick={() => reset()}
@@ -77,6 +118,14 @@ export function ResearchViewPrefsBar({
           Reset defaults
         </button>
       </div>
+      {importMsg && (
+        <p
+          className="mb-1.5 text-[10px] text-slate-400"
+          data-testid={`${testId}-import-msg`}
+        >
+          {importMsg}
+        </p>
+      )}
 
       {showResearch && (
         <div className="mb-2">

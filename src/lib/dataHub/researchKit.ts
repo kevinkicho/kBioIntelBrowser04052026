@@ -22,6 +22,8 @@ import {
 } from './exportDataHub'
 import type { DataHubLedger } from './types'
 
+export type ResearchKitDownloadMode = 'single' | 'multi'
+
 export interface ResearchKitInput {
   ledger: DataHubLedger
   /** Optional claim-bound statements (from extractors / pack) */
@@ -35,6 +37,10 @@ export interface ResearchKitInput {
    * Pass false to skip; pass an object to use explicit prefs instead of localStorage.
    */
   includePrefs?: boolean | ResearchViewPrefs
+  /**
+   * Download mode: single JSON bundle (default, browser-friendly) or multi-file.
+   */
+  mode?: ResearchKitDownloadMode
 }
 
 export interface ResearchKitManifest {
@@ -47,6 +53,26 @@ export interface ResearchKitManifest {
   sourceCount: number
   factCount: number
   claimCount: number
+  honesty: string[]
+  /** Present when exported as a single-file bundle */
+  bundle?: boolean
+}
+
+/** Single-file research kit for lab handoff (no multi-download). */
+export interface ResearchKitBundle {
+  schemaVersion: 1
+  kind: 'biointel-research-kit-bundle'
+  subjectId: string
+  subjectLabel: string
+  exportedAt: string
+  manifest: ResearchKitManifest
+  files: {
+    'data-hub.csv': string
+    'sources.json': string
+    'claims.md'?: string
+    'research-view-prefs.json'?: string
+    'README.md': string
+  }
   honesty: string[]
 }
 
@@ -128,10 +154,11 @@ export function buildResearchKitReadme(
     '',
     '## How to use',
     '',
-    '1. Open the CSV in a spreadsheet or notebook for of-record public facts.',
-    '2. Use `sources.json` for API docs links and per-source fact counts on this page session.',
-    '3. Claims (if present) are extractor statements with provenance — cite primary registries for grants.',
-    '4. If present, `research-view-prefs.json` is a solo-local presentation pin snapshot (domains / hide-empty / default view). Import is manual; it does not change Discover ranks.',
+    '1. Prefer the single-file `*-bundle.json` download (default). Open it as JSON or extract embedded CSV fields.',
+    '2. Open `data-hub.csv` (or the embedded field) in a spreadsheet for of-record public facts.',
+    '3. Use `sources.json` for API docs links and per-source fact counts on this page session.',
+    '4. Claims (if present) are extractor statements with provenance — cite primary registries for grants.',
+    '5. Import `research-view-prefs.json` (or the full bundle) via the Research view “Import prefs” control — presentation pins only; does not change Discover ranks.',
     '',
     '## Honesty',
     '',
@@ -168,11 +195,18 @@ export function buildResearchKitManifest(
   }
 }
 
-/**
- * Trigger multi-file research kit download in the browser.
- * Includes research-view prefs JSON by default for lab handoff.
- */
-export async function downloadResearchKit(input: ResearchKitInput): Promise<ResearchKitManifest> {
+function resolveKitParts(input: ResearchKitInput): {
+  base: string
+  files: string[]
+  hubCsv: string
+  sourcesJson: string
+  claimsMd: string | null
+  prefsJson: string | null
+  readme: string
+  manifest: ResearchKitManifest
+  claimList: EvidenceClaim[]
+  prefsObj: ResearchViewPrefs | null
+} {
   const { ledger, claims, notes, includeEmpty, includePrefs = true } = input
   const base = kitBase(ledger)
   const hubCsvName = `${base}-data-hub.csv`
@@ -181,6 +215,7 @@ export async function downloadResearchKit(input: ResearchKitInput): Promise<Rese
   const readmeName = `${base}-README.md`
   const manifestName = `${base}-manifest.json`
   const claimsName = `${base}-claims.md`
+  const bundleName = `${base}-bundle.json`
 
   const claimList = claims ? [...claims] : []
   const wantPrefs = includePrefs !== false
@@ -191,10 +226,17 @@ export async function downloadResearchKit(input: ResearchKitInput): Promise<Rese
         ? loadResearchViewPrefs()
         : null
 
-  const files = [hubCsvName, sourcesName]
-  if (claimList.length > 0) files.push(claimsName)
-  if (prefsObj) files.push(prefsName)
-  files.push(readmeName, manifestName)
+  const mode = input.mode ?? 'single'
+  const files =
+    mode === 'single'
+      ? [bundleName]
+      : (() => {
+          const f = [hubCsvName, sourcesName]
+          if (claimList.length > 0) f.push(claimsName)
+          if (prefsObj) f.push(prefsName)
+          f.push(readmeName, manifestName)
+          return f
+        })()
 
   const hubCsv = dataHubToDelimited(ledger, 'csv', { includeEmpty: !!includeEmpty })
   const sourcesJson = buildResearchKitSourcesJson(ledger)
@@ -205,31 +247,103 @@ export async function downloadResearchKit(input: ResearchKitInput): Promise<Rese
   const prefsJson = prefsObj
     ? JSON.stringify(researchViewPrefsExportPayload(prefsObj), null, 2)
     : null
-  const readme = buildResearchKitReadme(ledger, files, notes)
-  const manifest = buildResearchKitManifest(ledger, files, claimList.length)
+  // README lists logical parts for single-file mode
+  const logicalFiles =
+    mode === 'single'
+      ? [
+          'data-hub.csv (inside bundle)',
+          'sources.json (inside bundle)',
+          ...(claimsMd ? ['claims.md (inside bundle)'] : []),
+          ...(prefsJson ? ['research-view-prefs.json (inside bundle)'] : []),
+          'README.md (inside bundle)',
+          bundleName,
+        ]
+      : files
+  const readme = buildResearchKitReadme(ledger, logicalFiles, notes)
+  const manifest = buildResearchKitManifest(ledger, logicalFiles, claimList.length)
+  if (mode === 'single') manifest.bundle = true
 
-  // Stagger downloads so browsers do not coalesce them
-  downloadFile(hubCsv, hubCsvName, dataHubMime('csv'))
+  return {
+    base,
+    files,
+    hubCsv,
+    sourcesJson,
+    claimsMd,
+    prefsJson,
+    readme,
+    manifest,
+    claimList,
+    prefsObj,
+  }
+}
+
+/** Build a single-file research kit bundle (pure). */
+export function buildResearchKitBundle(input: ResearchKitInput): ResearchKitBundle {
+  const parts = resolveKitParts({ ...input, mode: 'single' })
+  const files: ResearchKitBundle['files'] = {
+    'data-hub.csv': parts.hubCsv,
+    'sources.json': parts.sourcesJson,
+    'README.md': parts.readme,
+  }
+  if (parts.claimsMd) files['claims.md'] = parts.claimsMd
+  if (parts.prefsJson) files['research-view-prefs.json'] = parts.prefsJson
+
+  return {
+    schemaVersion: 1,
+    kind: 'biointel-research-kit-bundle',
+    subjectId: input.ledger.subjectId,
+    subjectLabel: input.ledger.subjectLabel,
+    exportedAt: new Date().toISOString(),
+    manifest: parts.manifest,
+    files,
+    honesty: parts.manifest.honesty,
+  }
+}
+
+/**
+ * Download research kit in the browser.
+ * Default: single JSON bundle (reliable). Pass mode:'multi' for separate files.
+ */
+export async function downloadResearchKit(input: ResearchKitInput): Promise<ResearchKitManifest> {
+  const mode = input.mode ?? 'single'
+  const parts = resolveKitParts({ ...input, mode })
+
+  if (mode === 'single') {
+    const bundle = buildResearchKitBundle(input)
+    downloadFile(
+      JSON.stringify(bundle, null, 2),
+      `${parts.base}-bundle.json`,
+      'application/json;charset=utf-8',
+    )
+    return parts.manifest
+  }
+
+  // Multi-file (legacy / advanced)
+  downloadFile(parts.hubCsv, `${parts.base}-data-hub.csv`, dataHubMime('csv'))
   await sleep(180)
-  downloadFile(sourcesJson, sourcesName, 'application/json;charset=utf-8')
+  downloadFile(parts.sourcesJson, `${parts.base}-sources.json`, 'application/json;charset=utf-8')
   await sleep(180)
-  if (claimsMd) {
-    downloadFile(claimsMd, claimsName, 'text/markdown;charset=utf-8')
+  if (parts.claimsMd) {
+    downloadFile(parts.claimsMd, `${parts.base}-claims.md`, 'text/markdown;charset=utf-8')
     await sleep(180)
   }
-  if (prefsJson) {
-    downloadFile(prefsJson, prefsName, 'application/json;charset=utf-8')
+  if (parts.prefsJson) {
+    downloadFile(
+      parts.prefsJson,
+      `${parts.base}-research-view-prefs.json`,
+      'application/json;charset=utf-8',
+    )
     await sleep(180)
   }
-  downloadFile(readme, readmeName, 'text/markdown;charset=utf-8')
+  downloadFile(parts.readme, `${parts.base}-README.md`, 'text/markdown;charset=utf-8')
   await sleep(180)
   downloadFile(
-    JSON.stringify(manifest, null, 2),
-    manifestName,
+    JSON.stringify(parts.manifest, null, 2),
+    `${parts.base}-manifest.json`,
     'application/json;charset=utf-8',
   )
 
-  return manifest
+  return parts.manifest
 }
 
 function sleep(ms: number): Promise<void> {

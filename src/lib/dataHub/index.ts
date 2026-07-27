@@ -39,6 +39,7 @@ export {
 } from './exportDataHub'
 export {
   downloadResearchKit,
+  buildResearchKitBundle,
   buildResearchKitSourcesJson,
   buildResearchKitClaimsMarkdown,
   buildResearchKitReadme,
@@ -46,6 +47,8 @@ export {
   researchKitBaseName,
   type ResearchKitInput,
   type ResearchKitManifest,
+  type ResearchKitBundle,
+  type ResearchKitDownloadMode,
 } from './researchKit'
 export {
   buildDiscoverMiniHub,

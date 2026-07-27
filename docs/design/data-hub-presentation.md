@@ -69,13 +69,29 @@ When category bags fill: ChEMBL, ChEBI, DrugBank xref, RxCUI, ATC, UNII/GSRS, Un
 
 ### Research kit files
 
+**Default (single-file bundle — browser-friendly):**
+
 ```
-biointel-research-kit-{slug}-{id}-data-hub.csv
-biointel-research-kit-{slug}-{id}-sources.json
-biointel-research-kit-{slug}-{id}-claims.md   # when claims present
-biointel-research-kit-{slug}-{id}-README.md
-biointel-research-kit-{slug}-{id}-manifest.json
+biointel-research-kit-{slug}-{id}-bundle.json
 ```
+
+Bundle kind `biointel-research-kit-bundle` embeds:
+
+- `data-hub.csv`, `sources.json`, optional `claims.md`, `research-view-prefs.json`, `README.md`
+
+**Optional multi-file mode** (`mode: 'multi'`) still supported for advanced export.
+
+### Prefs import
+
+- UI: **Import prefs** on `ResearchViewPrefsBar` (file picker)
+- Accepts: `biointel-research-view-prefs` export, raw prefs object, or full kit bundle
+- Code: `parseImportedResearchViewPrefs` / `importAndSaveResearchViewPrefs`
+
+### Molecule hub modular layout
+
+- `moleculeHubShared.ts` — helpers + identity type  
+- `moleculeHubSections.ts` — section builders (`buildMoleculeHubParts`)  
+- `buildMoleculeDataHub.ts` — thin orchestrator + notes  
 
 ## Compare side-by-side hub (P2)
 
@@ -98,5 +114,6 @@ Public citable page: **`/methodology`** (“How we present data”) — of-recor
 | Pins | Molecule research tables; hub domains; **gene** tables (drugs/diseases/variants/pathways) |
 | Other | `hideEmpty`, `preferredProfileView` (research\|panels), `tableRowLimit` |
 | UI | Research view, Data hub, **Compare matrix**, **Gene Research tab** |
-| Kit handoff | Research kit includes `*-research-view-prefs.json` by default |
-| Does not | Change Discover of-record ranks; invent facts; sync across devices |
+| Kit handoff | Single-file bundle includes prefs; **Import prefs** restores pins in-app |
+| Gate | `npm run test:gate` includes dataHub / researchViewPrefs patterns |
+| Does not | Change Discover of-record ranks; invent facts; multi-tenant sync |

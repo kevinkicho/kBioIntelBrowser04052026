@@ -1,6 +1,7 @@
 import {
   buildDiscoverMiniHub,
   buildMoleculeDataHub,
+  buildResearchKitBundle,
   buildResearchKitClaimsMarkdown,
   buildResearchKitManifest,
   buildResearchKitReadme,
@@ -105,6 +106,19 @@ describe('research capabilities P0–P1', () => {
     expect(researchViewPrefsExportPayload(DEFAULT_RESEARCH_VIEW_PREFS).kind).toBe(
       'biointel-research-view-prefs',
     )
+
+    const bundle = buildResearchKitBundle({
+      ledger,
+      claims,
+      includeEmpty: false,
+      includePrefs: DEFAULT_RESEARCH_VIEW_PREFS,
+    })
+    expect(bundle.kind).toBe('biointel-research-kit-bundle')
+    expect(bundle.files['data-hub.csv']).toContain('fact')
+    expect(bundle.files['sources.json']).toBeTruthy()
+    expect(bundle.files['README.md']).toMatch(/research kit/i)
+    expect(bundle.files['research-view-prefs.json']).toMatch(/biointel-research-view-prefs/)
+    expect(bundle.files['claims.md']).toMatch(/PTGS1/)
   })
 
   it('discover mini hub surfaces identity and research gather facts', () => {

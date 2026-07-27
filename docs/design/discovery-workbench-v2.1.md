@@ -8,6 +8,7 @@
 **Status:** **Implemented on main** (as-built Rev 1.2 — 2026-07-17). Draft Rev 1.1 design retained as SSOT; residual polish only (persona one-click UI shipped; share/e2e/gate already on main).  
 **Constraint law (binding):** Free public APIs only; evidence-first; no regulatory decision support; solo + file export default (share optional); deterministic ranking without LLM; **AI only claim-bound on packs/hypotheses** (no free-form Discover ranking rationales)  
 **Beachhead (default recommendation):** Target-led small-molecule **repurposing / early candidate triage**, with **selectable rare-disease lab persona** for tour, Orphanet depth, and example packs (see §0.2, KD-V21-1)  
+**Presentation default (shipped):** **Research workspace** surfaces of-record multi-source facts first (Data hub · Research view · methodology), with full panels and optional AI as secondary — see `docs/design/data-hub-presentation.md` and `/methodology`  
 **Canonical project copy (when promoted):** `docs/design/discovery-workbench-v2.1.md`  
 **Companion (agent workflow):** `docs/design/agentic-workflow-cli.md` (promoted) · root `AGENTS.md`  
 **Predecessors:**  
@@ -21,6 +22,17 @@
 > **When a bioengineer opens BioIntel, they leave with a shortlist they trust, a cited pack, a written hypothesis, and a concrete Monday experiment — not a pile of panels.**
 
 v2 **closed the loop in code**. v2.1 **proves the loop works for a human**, hardens quality where the loop is thin, deepens the rare-disease beachhead without breadth tax, and makes engineering/agent work reliable on main.
+
+### 0.0 Research workspace default (post-v2.1 presentation)
+
+Default casual molecule browse opens **Research** view (saved preference may choose Panels). Of-record order:
+
+1. **Data hub** (Fact · Value · Source · Open) + source directory + research kit (single JSON bundle)  
+2. **Research tables** (literature · grants · trials · structures) with solo-local pins  
+3. Siloed panels / network  
+4. Derived assistive (charts, digests, copilot) — labeled non-of-record  
+
+Discover rank remains deterministic; AI analysis remains optional and labeled.
 
 ### 0.1 North-star outcome loop (shipped)
 
