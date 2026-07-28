@@ -10,7 +10,7 @@ import {
   type PackAiMode,
   type PackAiRequest,
 } from '@/lib/ai/contracts'
-import { validatePackAiOutput } from '@/lib/ai/validateOutput'
+import { runPackAiValidatePipeline } from '@/lib/pipeline/packAiValidatePipeline'
 
 const MODES = new Set<PackAiMode>([
   'pack_executive_brief',
@@ -117,7 +117,12 @@ export async function POST(request: NextRequest) {
     })
   }
 
-  const validated = validatePackAiOutput(raw, ctx.claimIdAllowlist, mode)
+  // Claim-bound validation pipeline (allowlist → parse → refuse-or-pass)
+  const { validation: validated, pipeline } = await runPackAiValidatePipeline({
+    rawModelText: raw,
+    claimIdAllowlist: ctx.claimIdAllowlist,
+    mode,
+  })
   return NextResponse.json({
     ok: validated.ok,
     mode,
@@ -125,5 +130,14 @@ export async function POST(request: NextRequest) {
     refused: validated.refused,
     refuseReason: validated.refuseReason,
     validationErrors: validated.errors,
+    pipeline: {
+      ok: pipeline.ok,
+      degraded: pipeline.degraded,
+      stages: pipeline.stages.map((s) => ({
+        id: s.id,
+        status: s.status,
+        ms: s.ms,
+      })),
+    },
   })
 }

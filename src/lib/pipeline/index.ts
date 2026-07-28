@@ -29,3 +29,15 @@ export {
   runPackExtractPipeline,
   type PackExtractPipelineResult,
 } from './packExtractPipeline'
+export {
+  runRankSimilarityExpandPipeline,
+  runBoardSimilarityExpandPipeline,
+  runServerSimilarityExpand,
+  type RankSimilarityPipelineResult,
+} from './similarityExpandPipeline'
+export {
+  runPackAiValidatePipeline,
+  claimAllowlistFromPack,
+  type PackAiValidatePipelineInput,
+  type PackAiValidatePipelineResult,
+} from './packAiValidatePipeline'

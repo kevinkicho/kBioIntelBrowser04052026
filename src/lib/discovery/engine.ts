@@ -30,7 +30,7 @@ import {
   sortCandidatesIdentityFirst,
   type IdentitySortMeta,
 } from './identitySort'
-import { expandRankShortlistBySimilarity } from './similarityExpand'
+import { runRankSimilarityExpandPipeline } from '@/lib/pipeline/similarityExpandPipeline'
 import type { DiseaseEntity } from '../domain/entities'
 import {
   gatherDiseaseGenes,
@@ -585,43 +585,53 @@ export async function rankCandidatesForDisease(
 
   sorted = sortCandidatesIdentityFirst(sorted, metaByName)
 
-  // Post-CID similarity expand (bounded PubChem 2D neighbors + novelty penalty)
+  // Post-CID similarity expand (bounded PubChem 2D neighbors + novelty penalty).
+  // Pipeline: optional + timed — never fails cheap shortlist.
   if (options.similarityExpand !== false && sorted.some((c) => c.cid != null && c.cid > 0)) {
-    try {
-      const sim = await expandRankShortlistBySimilarity(sorted, {
-        existingNames: new Set(
-          Array.from(allMoleculeNames).map((n) => n.toLowerCase()).concat(
-            sorted.map((c) => c.name.toLowerCase()),
-          ),
+    const sim = await runRankSimilarityExpandPipeline({
+      shortlist: sorted,
+      existingNames: new Set(
+        Array.from(allMoleculeNames).map((n) => n.toLowerCase()).concat(
+          sorted.map((c) => c.name.toLowerCase()),
         ),
-      })
-      warnings.push(...sim.warnings)
-      if (sim.added > 0) {
-        for (const c of sim.candidates) {
-          const multi = cheapScoreVector(c, rubric, {
-            identityTrust: assessIdentityTrust({ cid: c.cid, name: c.name }).axisValue,
-          })
-          // Apply novelty penalty already in composite; store vector
-          multi.composite = c.compositeScore
-          scoreByName.set(c.name.toLowerCase(), multi)
-          metaByName.set(c.name.toLowerCase(), {
-            cid: c.cid,
-            identityTrust: multi.axes.identityTrust ?? 0.4,
-          })
-        }
-        sorted = sortCandidatesIdentityFirst(
-          [...sorted, ...sim.candidates],
-          metaByName,
-        ).slice(0, limit)
-        sourceStatuses.push({
-          source: 'PubChem (similarity expand)',
-          status: 'loaded',
-          has_data: true,
-          duration_ms: 0,
+      ),
+      timeoutMs: 12_000,
+    })
+    warnings.push(...sim.warnings)
+    if (sim.pipeline.warnings.length) {
+      // already mirrored in sim.warnings for expand path
+    }
+    if (sim.added > 0) {
+      for (const c of sim.candidates) {
+        const multi = cheapScoreVector(c, rubric, {
+          identityTrust: assessIdentityTrust({ cid: c.cid, name: c.name }).axisValue,
+        })
+        // Apply novelty penalty already in composite; store vector
+        multi.composite = c.compositeScore
+        scoreByName.set(c.name.toLowerCase(), multi)
+        metaByName.set(c.name.toLowerCase(), {
+          cid: c.cid,
+          identityTrust: multi.axes.identityTrust ?? 0.4,
         })
       }
-    } catch {
-      warnings.push('Similarity expand skipped (upstream error).')
+      sorted = sortCandidatesIdentityFirst(
+        [...sorted, ...sim.candidates],
+        metaByName,
+      ).slice(0, limit)
+      sourceStatuses.push({
+        source: 'PubChem (similarity expand)',
+        status: 'loaded',
+        has_data: true,
+        duration_ms:
+          sim.pipeline.stages.find((s) => s.id === 'expand_neighbors')?.ms ?? 0,
+      })
+    } else if (sim.pipeline.degraded) {
+      sourceStatuses.push({
+        source: 'PubChem (similarity expand)',
+        status: 'empty',
+        has_data: false,
+        duration_ms: 0,
+      })
     }
   }
 

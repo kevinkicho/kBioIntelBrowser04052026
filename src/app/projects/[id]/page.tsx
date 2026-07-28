@@ -326,19 +326,16 @@ export default function ProjectBoardPage() {
     }
     setExpandBusy(c.candidateId)
     try {
-      const res = await fetch('/api/discover/similarity', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ seedCid: cid, max: 5 }),
+      const { runBoardSimilarityExpandPipeline } = await import(
+        '@/lib/pipeline/similarityExpandPipeline'
+      )
+      const { neighbors } = await runBoardSimilarityExpandPipeline({
+        seedCid: cid,
+        max: 5,
       })
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}))
-        throw new Error(err.error ?? `Expand failed (${res.status})`)
-      }
-      const data = (await res.json()) as { neighbors: MoleculeCandidate[] }
       let added = 0
       let latest = project
-      for (const n of data.neighbors ?? []) {
+      for (const n of neighbors) {
         const r = addCandidateAndSave(id, n)
         if (r.ok) {
           added++
