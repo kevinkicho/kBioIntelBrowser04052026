@@ -18,6 +18,7 @@ import { scoreLegacyCandidate, sortCandidates } from './legacyScore'
 import { buildScoreVector } from './scoreAxes'
 import { HARVEST_K_DEFAULT } from './harvest'
 import { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
+import { getDensifyBudgets } from './densifyBudgets'
 import {
   applyResolvedIdentities,
   DEFAULT_IDENTITY_TOP_N,
@@ -252,8 +253,11 @@ export async function rankCandidatesForDisease(
   const harvestK = Math.min(options.harvestK ?? HARVEST_K_DEFAULT, limit)
   const alwaysDensify = options.alwaysDensify !== false
   const rareBoost = options.rareDiseaseBoost === true
+  const densifyBudgets = getDensifyBudgets()
   const densifyK = Math.min(
-    options.densifyK ?? (rareBoost ? 6 : DENSIFY_K_DEFAULT),
+    options.densifyK ??
+      (rareBoost ? densifyBudgets.densifyKRare : densifyBudgets.densifyK) ??
+      (rareBoost ? 6 : DENSIFY_K_DEFAULT),
     limit,
   )
   const mustHitPins = options.mustHitPinnedTargets === true
@@ -595,7 +599,7 @@ export async function rankCandidatesForDisease(
           sorted.map((c) => c.name.toLowerCase()),
         ),
       ),
-      timeoutMs: 12_000,
+      timeoutMs: densifyBudgets.similarityTimeoutMs,
     })
     warnings.push(...sim.warnings)
     if (sim.pipeline.warnings.length) {

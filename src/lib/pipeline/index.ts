@@ -52,3 +52,17 @@ export {
   categorySchedulerSnapshot,
   resetCategorySchedulerForTests,
 } from './categoryFetchScheduler'
+export {
+  recordRequestMetric,
+  getRequestMetrics,
+  clearRequestMetrics,
+  snapshotRequestMetrics,
+  subscribeRequestMetrics,
+  type RequestMetricEvent,
+  type RequestMetricsSnapshot,
+} from './requestMetrics'
+export {
+  getDensifyBudgets,
+  resolveDensifyBudgets,
+  type DensifyBudgets,
+} from '../discovery/densifyBudgets'

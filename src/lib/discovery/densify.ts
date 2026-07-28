@@ -11,19 +11,19 @@ import {
   type HarvestResult,
 } from './harvest'
 import {
-  BREADTH_CONCURRENCY,
   harvestBreadthBatch,
   mergeLitHitProxy,
   type BreadthHarvestOpts,
   type BreadthHarvestRow,
 } from './densifyBreadth'
+import { getDensifyBudgets } from './densifyBudgets'
 import { mergeHarvestIntoScoreVector, scoreNovelty } from './scoreAxes'
 import type { CandidateMolecule } from './types'
 
-/** Default K for always-on densify (investigation shortlist, not full universe). */
+/** Default K for always-on densify (overridden by env budgets on cloud). */
 export const DENSIFY_K_DEFAULT = 10
 
-/** Soft timeout budget per densify candidate (ms) — keep rank responsive. */
+/** Soft timeout budgets — prefer getDensifyBudgets() at runtime. */
 export const DENSIFY_SAFETY_TIMEOUT_MS = 3500
 export const DENSIFY_NOVELTY_TIMEOUT_MS = 2500
 
@@ -32,11 +32,11 @@ export interface DensifyInput {
   /** name(lower) → cheap ScoreVector */
   scoreByName: Map<string, ScoreVector>
   rubric: ScoreRubric
-  /** Max candidates to densify (default DENSIFY_K_DEFAULT) */
+  /** Max candidates to densify (default from densify budgets) */
   k?: number
   /** Opt out (tests / ultra-cheap path) */
   skip?: boolean
-  /** Opt out multi-source breadth (tests / ultra-cheap) */
+  /** Opt out multi-source breadth (default from densify budgets on cloud) */
   skipBreadth?: boolean
 }
 
@@ -62,12 +62,17 @@ export interface DensifyResult {
 export async function densifyShortlist(input: DensifyInput): Promise<DensifyResult> {
   const start = Date.now()
   const warnings: string[] = []
+  const budgets = getDensifyBudgets()
   const k = Math.min(
-    Math.max(1, input.k ?? DENSIFY_K_DEFAULT),
+    Math.max(1, input.k ?? budgets.densifyK),
     input.candidates.length,
   )
   const scoreByName = new Map(input.scoreByName)
   const breadthByName = new Map<string, BreadthHarvestRow>()
+  const skipBreadth =
+    input.skipBreadth !== undefined
+      ? input.skipBreadth
+      : budgets.skipBreadthByDefault
 
   if (input.skip || input.candidates.length === 0 || k === 0) {
     return {
@@ -98,9 +103,9 @@ export async function densifyShortlist(input: DensifyInput): Promise<DensifyResu
         runSafety: true,
         runNovelty: true,
         rubric: input.rubric,
-        concurrency: HARVEST_CONCURRENCY,
-        safetyTimeoutMs: DENSIFY_SAFETY_TIMEOUT_MS,
-        noveltyTimeoutMs: DENSIFY_NOVELTY_TIMEOUT_MS,
+        concurrency: Math.min(HARVEST_CONCURRENCY, budgets.harvestConcurrency),
+        safetyTimeoutMs: budgets.safetyTimeoutMs,
+        noveltyTimeoutMs: budgets.noveltyTimeoutMs,
       },
     )
   } catch {
@@ -126,7 +131,7 @@ export async function densifyShortlist(input: DensifyInput): Promise<DensifyResu
   }
 
   // Multi-source free-API breadth (skip EuropePMC re-fetch; reuse novelty hits)
-  if (!input.skipBreadth && top.length > 0) {
+  if (!skipBreadth && top.length > 0) {
     const optsByName = new Map<string, BreadthHarvestOpts>()
     for (const h of harvest.candidates) {
       optsByName.set(h.name.toLowerCase(), {
@@ -137,7 +142,7 @@ export async function densifyShortlist(input: DensifyInput): Promise<DensifyResu
     try {
       const breadth = await harvestBreadthBatch(
         top.map((c) => c.name),
-        BREADTH_CONCURRENCY,
+        budgets.breadthConcurrency,
         optsByName,
       )
       for (const [key, row] of Array.from(breadth.entries())) {
@@ -181,6 +186,10 @@ export async function densifyShortlist(input: DensifyInput): Promise<DensifyResu
     } catch {
       warnings.push('Breadth densify failed (non-fatal); FAERS + EuropePMC densify retained.')
     }
+  } else if (skipBreadth) {
+    warnings.push(
+      `Breadth densify skipped (${budgets.profile} budget — set DENSIFY_ENABLE_BREADTH=1 to force).`,
+    )
   }
 
   const candidates = input.candidates.map((c) => {

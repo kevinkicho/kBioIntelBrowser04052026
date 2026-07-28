@@ -393,6 +393,17 @@ export async function clientFetch(
     }
 
     logFetchOutcome(url, method, response.status, duration, response.ok)
+    // Operator metrics (local ring buffer — never network)
+    try {
+      void import('./pipeline/requestMetrics').then(({ recordRequestMetric }) => {
+        recordRequestMetric('fetch', `${method} ${url.slice(0, 100)}`, {
+          ms: duration,
+          status: response.status,
+        })
+      })
+    } catch {
+      /* ignore */
+    }
     if (response.ok) {
       if (IS_DEV) console.log(
         `%c← ${response.status} %c${ms(duration)}%c${sizeStr}`,
@@ -444,6 +455,17 @@ export async function clientFetch(
     }
 
     logFetchOutcome(url, method, 0, duration, false)
+    try {
+      void import('./pipeline/requestMetrics').then(({ recordRequestMetric }) => {
+        recordRequestMetric(
+          isInsufficientResourcesError(error) ? 'fetch_resource' : 'fetch_err',
+          `${method} ${url.slice(0, 100)}`,
+          { ms: duration, detail: errMsg.slice(0, 120) },
+        )
+      })
+    } catch {
+      /* ignore */
+    }
     if (IS_DEV) {
       // Never console.error(Error) — Chrome expands React fiber stacks (ol/or spam)
       if (timeoutAbort || isInsufficientResourcesError(error)) {

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { API_METADATA } from '@/lib/analytics/api-meta'
 import type { ApiMeta } from '@/lib/analytics/api-meta'
 import { ProductFunnelPanel } from '@/components/analytics/ProductFunnelPanel'
+import { RequestMetricsPanel } from '@/components/analytics/RequestMetricsPanel'
 import { productEventLabel } from '@/lib/productEvents'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
@@ -556,7 +557,12 @@ export default function AnalyticsPage() {
         </div>
 
         {/* Always show product funnel on overview (local + server product source) */}
-        {view === 'summary' && <ProductFunnelPanel />}
+        {view === 'summary' && (
+          <div className="mb-6 space-y-4">
+            <ProductFunnelPanel />
+            <RequestMetricsPanel />
+          </div>
+        )}
 
         {loading ? (
           <div className="text-center py-12 text-slate-500 animate-pulse">Loading analytics...</div>

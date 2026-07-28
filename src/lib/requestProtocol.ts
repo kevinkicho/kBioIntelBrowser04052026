@@ -184,6 +184,15 @@ export function markResourcePressure(ms = 20_000): void {
     if (w.timer) clearTimeout(w.timer)
     w.reject(new Error('request_gate_pressure'))
   }
+  try {
+    void import('./pipeline/requestMetrics').then(({ recordRequestMetric }) => {
+      recordRequestMetric('pressure', 'resource_pressure', {
+        detail: `cool-down ${ms}ms`,
+      })
+    })
+  } catch {
+    /* ignore */
+  }
 }
 
 export function underResourcePressure(): boolean {

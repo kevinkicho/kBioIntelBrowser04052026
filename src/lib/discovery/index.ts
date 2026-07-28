@@ -32,6 +32,11 @@ export {
 } from './engine'
 export { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
 export {
+  getDensifyBudgets,
+  resolveDensifyBudgets,
+  type DensifyBudgets,
+} from './densifyBudgets'
+export {
   harvestBreadthForName,
   harvestBreadthBatch,
   mergeLitHitProxy,

@@ -249,8 +249,9 @@ export async function POST(request: NextRequest) {
   }
 
   const timer = startApiTimer()
-  /** Server wall budget — densify is non-fatal inside engine; this is last resort. */
-  const RANK_SERVER_TIMEOUT_MS = 50_000
+  /** Server wall budget from densify env profile (local vs cloud). */
+  const { getDensifyBudgets } = await import('@/lib/discovery/densifyBudgets')
+  const RANK_SERVER_TIMEOUT_MS = getDensifyBudgets().rankServerTimeoutMs
   try {
     const result = await Promise.race([
       rankCandidatesForDisease(query, options),
