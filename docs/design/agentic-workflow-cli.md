@@ -161,7 +161,7 @@ Implementation: `scripts/biointel-cli.js` · npm: `npm run biointel -- <cmd>` ·
 |---|---|
 | Help / law | `npm run biointel -- help` · `… law` |
 | App up? | `npm run biointel -- health` |
-| **Tools catalog** | `npm run biointel -- tools list` · `tools playbook <id>` · `tools copilot` |
+| **Tools catalog** | `npm run biointel -- tools list` · `tools playbook <id>` · `tools copilot` · `tools suggest --goal evidence` |
 | Rank shortlist | `npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR` |
 | Harvest safety | `npm run biointel -- discover harvest --names "Tafamidis,Diflunisal" --safety` |
 | Molecule shell | `npm run biointel -- molecule get 208901` |

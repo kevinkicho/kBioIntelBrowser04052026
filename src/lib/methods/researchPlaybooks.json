@@ -229,9 +229,9 @@
       "summary": "Ops / product law / quality"
     },
     {
-      "cmd": "tools list | tools playbook <id>",
+      "cmd": "tools list | tools playbook <id> | tools suggest --goal <g>",
       "goal": "ops",
-      "summary": "This catalog + research playbooks"
+      "summary": "Catalog, playbooks, next-command suggest"
     }
   ],
   "copilotTools": [
@@ -247,5 +247,79 @@
     "get_pack_claims",
     "seed_research_hypothesis",
     "compare_board"
-  ]
+  ],
+  "goalMap": {
+    "discover": {
+      "playbookId": "disease_to_shortlist",
+      "stepOffset": 0,
+      "blurb": "Disease query → deterministic rank → densify → save to project."
+    },
+    "evidence": {
+      "playbookId": "cid_evidence_deep_dive",
+      "stepOffset": 0,
+      "blurb": "Profile categories → close gaps → ledger/kit → optional claim-bound AI."
+    },
+    "compare": {
+      "playbookId": "compare_and_choose",
+      "stepOffset": 0,
+      "blurb": "Session set → side-by-side hub → human board decision."
+    },
+    "pack": {
+      "playbookId": "board_pack_to_rh",
+      "stepOffset": 0,
+      "blurb": "Promote → pack extract → optional pack AI → RH seed."
+    },
+    "hypothesis": {
+      "playbookId": "board_pack_to_rh",
+      "stepOffset": 2,
+      "blurb": "From an existing pack: pack AI + claim-bound research hypothesis."
+    },
+    "export": {
+      "playbookId": "cid_evidence_deep_dive",
+      "stepOffset": 2,
+      "blurb": "Freeze of-record research kit for offline / grant / archive."
+    },
+    "ops": {
+      "playbookId": "agent_ops_loop",
+      "stepOffset": 0,
+      "blurb": "Health → research action → logs → quality gate."
+    }
+  },
+  "suggestCommands": {
+    "discover": [
+      "discover rank --q \"{{q}}\" --targets {{targets}}",
+      "discover densify --q \"{{q}}\"",
+      "logs grep product.discover"
+    ],
+    "evidence": [
+      "molecule get {{cid}}",
+      "molecule category {{cid}} pharmaceutical",
+      "research kit --cid {{cid}} --out kit.json"
+    ],
+    "compare": [
+      "molecule get {{cid}}",
+      "research kit --cid {{cid}} --out kit-a.json",
+      "tools playbook compare_and_choose"
+    ],
+    "pack": [
+      "tools playbook board_pack_to_rh",
+      "logs grep product.",
+      "health"
+    ],
+    "hypothesis": [
+      "tools playbook board_pack_to_rh",
+      "tools copilot",
+      "logs grep product."
+    ],
+    "export": [
+      "research kit --cid {{cid}} --out kit.json",
+      "molecule category {{cid}} pharmaceutical",
+      "logs tail --n 20"
+    ],
+    "ops": [
+      "health",
+      "tools suggest --goal discover --q \"{{q}}\"",
+      "gate"
+    ]
+  }
 }

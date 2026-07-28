@@ -42,6 +42,7 @@ import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { BoardClaimStrip } from '@/components/projects/BoardClaimStrip'
 import { BoardAiRecommend } from '@/components/projects/BoardAiRecommend'
+import { ResearchPlaybookTips } from '@/components/research/ResearchPlaybookTips'
 import { PackBuilder } from '@/components/evidence/PackBuilder'
 import { MultiPackContrastPicker } from '@/components/evidence/MultiPackContrastPicker'
 import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
@@ -604,29 +605,42 @@ export default function ProjectBoardPage() {
         )}
 
         {project.candidates.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-slate-700 px-6 py-16 text-center">
-            <h2 className="text-lg font-semibold text-slate-300 mb-2">Board is empty</h2>
-            <p className="text-sm text-slate-500 mb-4">
-              Save candidates from Discover with “Save to project”.
-            </p>
-            <Link
-              href="/discover"
-              className="inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-600"
-            >
-              Go to Discover
-            </Link>
+          <div
+            className="rounded-xl border border-dashed border-slate-700 px-6 py-10"
+            data-testid="board-empty-state"
+          >
+            <div className="mb-6 text-center">
+              <h2 className="text-lg font-semibold text-slate-300 mb-2">Board is empty</h2>
+              <p className="text-sm text-slate-500 mb-4">
+                Save candidates from Discover with “Save to project”, then promote → pack → RH.
+              </p>
+              <Link
+                href="/discover"
+                className="inline-flex rounded-lg bg-emerald-700 px-4 py-2 text-sm text-white hover:bg-emerald-600"
+              >
+                Go to Discover
+              </Link>
+            </div>
+            <div className="mx-auto max-w-3xl">
+              <ResearchPlaybookTips surface="board-empty" />
+            </div>
           </div>
         ) : (
-          <BoardTable
-            project={project}
-            onStatusChange={handleStatus}
-            onRemove={handleRemove}
-            signalRows={signalRows}
-            signalsLoading={signalsLoading}
-            harvestingIds={harvestingIds}
-            onExpandSimilar={(c) => void handleExpandSimilar(c)}
-            expandBusyId={expandBusy}
-          />
+          <>
+            <div className="mb-3">
+              <ResearchPlaybookTips surface="board-ready" compact />
+            </div>
+            <BoardTable
+              project={project}
+              onStatusChange={handleStatus}
+              onRemove={handleRemove}
+              signalRows={signalRows}
+              signalsLoading={signalsLoading}
+              harvestingIds={harvestingIds}
+              onExpandSimilar={(c) => void handleExpandSimilar(c)}
+              expandBusyId={expandBusy}
+            />
+          </>
         )}
 
         {/* Evidence packs — download-primary; board carries packIndex breadcrumbs only */}

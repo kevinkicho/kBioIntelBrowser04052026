@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import { DiscoveryState } from '../hooks/useDiscovery'
 import { ElapsedTimer } from '@/components/ui/ElapsedTimer'
 import {
@@ -88,14 +89,21 @@ export function DiscoveryProgress({ state }: Props) {
   )
 }
 
-export function EmptyState() {
+/** Empty shortlist + optional research playbook tips. */
+export function EmptyState({ tips }: { tips?: ReactNode } = {}) {
   return (
-    <div className="text-center py-16 px-4">
-      <div className="text-5xl mb-4">🔬</div>
-      <h3 className="text-lg font-semibold text-slate-300 mb-2">No candidates found</h3>
-      <p className="text-sm text-slate-500 max-w-md mx-auto">
-        Try a different disease name or check the spelling. Some rare diseases may have limited data in public databases.
-      </p>
+    <div className="py-10 px-4" data-testid="discover-empty-state">
+      <div className="text-center mb-6">
+        <div className="text-5xl mb-4" aria-hidden>
+          🔬
+        </div>
+        <h3 className="text-lg font-semibold text-slate-300 mb-2">No candidates found</h3>
+        <p className="text-sm text-slate-500 max-w-md mx-auto">
+          Try a different disease name or check the spelling. Some rare diseases may have limited
+          data in public databases. Empty gather ≠ absence of biology.
+        </p>
+      </div>
+      {tips ? <div className="mx-auto max-w-3xl">{tips}</div> : null}
     </div>
   )
 }

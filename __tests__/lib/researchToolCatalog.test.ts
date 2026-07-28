@@ -1,13 +1,19 @@
 import {
   COPILOT_RESEARCH_TOOLS,
+  GOAL_PLAYBOOK_MAP,
+  RESEARCH_GOALS,
   RESEARCH_PLAYBOOKS,
   RESEARCH_TOOLS,
   SURFACE_RESEARCH_TOOLS,
+  agentStepToCli,
   copilotToolNames,
   formatPlaybookPlain,
+  isResearchGoal,
+  playbookTipsForSurface,
   researchPlaybookById,
   researchToolsByChannel,
   researchToolsByGoal,
+  suggestResearchForGoal,
 } from '@/lib/methods/researchToolCatalog'
 import { COPILOT_TOOLS } from '@/lib/ai/copilot/tools/catalog'
 import playbooksJson from '@/lib/methods/researchPlaybooks.json'
@@ -85,5 +91,69 @@ describe('researchToolCatalog', () => {
     const plain = formatPlaybookPlain(pb!)
     expect(plain).toContain('Disease → deterministic shortlist')
     expect(plain).toContain('Law:')
+  })
+
+  test('suggestResearchForGoal returns runnable CLI for discover/evidence', () => {
+    const disc = suggestResearchForGoal('discover', {
+      limit: 3,
+      vars: { q: 'NSCLC', targets: 'EGFR' },
+    })
+    expect(disc.playbookId).toBe('disease_to_shortlist')
+    expect(disc.actions.length).toBeGreaterThanOrEqual(2)
+    expect(disc.actions.some((a) => a.cli?.includes('discover rank'))).toBe(true)
+    expect(disc.actions.some((a) => a.cli?.includes('NSCLC'))).toBe(true)
+
+    const ev = suggestResearchForGoal('evidence', {
+      limit: 3,
+      vars: { cid: '2244' },
+    })
+    expect(ev.playbookId).toBe('cid_evidence_deep_dive')
+    expect(ev.actions.some((a) => a.cli?.includes('2244') || a.agent?.includes('2244'))).toBe(
+      true,
+    )
+  })
+
+  test('every research goal maps to a known playbook', () => {
+    for (const g of RESEARCH_GOALS) {
+      expect(isResearchGoal(g)).toBe(true)
+      const m = GOAL_PLAYBOOK_MAP[g]
+      expect(researchPlaybookById(m.playbookId)).toBeDefined()
+      const s = suggestResearchForGoal(g, { limit: 3 })
+      expect(s.actions.length).toBeGreaterThan(0)
+    }
+  })
+
+  test('JSON goalMap aligns with TS GOAL_PLAYBOOK_MAP', () => {
+    const gm = playbooksJson.goalMap as Record<string, { playbookId: string }>
+    for (const g of RESEARCH_GOALS) {
+      expect(gm[g]?.playbookId).toBe(GOAL_PLAYBOOK_MAP[g].playbookId)
+    }
+  })
+
+  test('agentStepToCli normalizes common agent strings', () => {
+    expect(agentStepToCli('discover rank --q "…" --targets TTR', { q: 'CF', targets: 'CFTR' })).toContain(
+      'discover rank',
+    )
+    expect(agentStepToCli('research kit --cid n --out kit.json', { cid: '3080836' })).toContain(
+      '3080836',
+    )
+    expect(agentStepToCli('biointel health')).toBe('npm run biointel -- health')
+  })
+
+  test('playbook tips for Discover and board surfaces', () => {
+    for (const surface of [
+      'discover-idle',
+      'discover-empty',
+      'discover-results',
+      'board-empty',
+      'board-ready',
+    ] as const) {
+      const tips = playbookTipsForSurface(surface)
+      expect(tips.length).toBeGreaterThanOrEqual(1)
+      for (const t of tips) {
+        expect(researchPlaybookById(t.playbookId)).toBeDefined()
+        expect(t.href).toContain(t.playbookId)
+      }
+    }
   })
 })

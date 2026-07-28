@@ -6,6 +6,7 @@ import { useDiscovery } from './hooks/useDiscovery'
 import { DiscoveryHero } from './components/DiscoveryHero'
 import { DiseasePicker } from './components/DiseasePicker'
 import { DiscoveryProgress, EmptyState, ErrorState } from './components/DiscoveryProgress'
+import { ResearchPlaybookTips } from '@/components/research/ResearchPlaybookTips'
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
@@ -418,9 +419,12 @@ export default function DiscoverPage() {
         {state.status === 'success' && state.result && (
           <>
             {state.result.candidates.length === 0 ? (
-              <EmptyState />
+              <EmptyState tips={<ResearchPlaybookTips surface="discover-empty" />} />
             ) : (
               <>
+                <div className="mb-3">
+                  <ResearchPlaybookTips surface="discover-results" compact />
+                </div>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h2 className="text-xl font-semibold text-slate-100">
@@ -610,12 +614,18 @@ export default function DiscoverPage() {
         )}
 
         {state.status === 'idle' && (
-          <div className="py-12 text-center text-slate-600">
-            <p className="mb-2 text-lg">Enter a disease to discover candidate molecules</p>
-            <p className="text-sm">
-              We rank candidates using clinical trial data, genetic evidence, and drug-target
-              interactions. Open Preferences to set scoring rubric, AE mode, and harvest timing.
-            </p>
+          <div className="py-8">
+            <div className="mb-6 text-center text-slate-600">
+              <p className="mb-2 text-lg">Enter a disease to discover candidate molecules</p>
+              <p className="text-sm max-w-xl mx-auto">
+                We rank candidates using clinical trial data, genetic evidence, and drug-target
+                interactions. Open Preferences to set scoring rubric, AE mode, and harvest timing.
+                Ranking is deterministic free-API math — not an LLM.
+              </p>
+            </div>
+            <div className="mx-auto max-w-3xl">
+              <ResearchPlaybookTips surface="discover-idle" />
+            </div>
           </div>
         )}
       </div>

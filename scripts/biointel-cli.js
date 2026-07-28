@@ -160,6 +160,9 @@ Commands:
   tools list [--json]          Research tools for humans + agents
   tools playbook [id]          List playbooks or print one (scientific loops)
   tools copilot                Allowlisted profile copilot tool names
+  tools suggest --goal <g>     Next 2–3 commands for a research goal
+      goals: discover|evidence|compare|pack|hypothesis|export|ops
+      [--limit 3] [--q "…"] [--targets TTR] [--cid 2244] [--json]
 
 Examples:
   npm run biointel -- health
@@ -168,6 +171,8 @@ Examples:
   npm run biointel -- research kit --cid 2244 --out kit.json
   npm run biointel -- tools list
   npm run biointel -- tools playbook disease_to_shortlist
+  npm run biointel -- tools suggest --goal evidence --cid 2244
+  npm run biointel -- tools suggest --goal discover --q "NSCLC" --targets EGFR
   npm run biointel -- logs tail --n 20
   npm run biointel -- gate
 
@@ -234,13 +239,180 @@ function loadResearchToolsData() {
   }
 }
 
+/** Interpolate {{q}} {{targets}} {{cid}} in suggest templates. */
+function suggestInterpolate(template, flags) {
+  const q = flags.q && flags.q !== true ? String(flags.q) : 'ATTR amyloidosis'
+  const targets =
+    flags.targets && flags.targets !== true ? String(flags.targets) : 'TTR'
+  const cid = flags.cid && flags.cid !== true ? String(flags.cid) : '2244'
+  return String(template)
+    .replace(/\{\{q\}\}/g, q)
+    .replace(/\{\{targets\}\}/g, targets)
+    .replace(/\{\{cid\}\}/g, cid)
+}
+
 /**
- * tools list | tools playbook [id] | tools copilot
+ * Derive a runnable npm biointel command from a free-form agent step string.
+ */
+function agentStepToCli(agent, flags) {
+  const raw = suggestInterpolate(agent, flags).trim()
+  const lower = raw.toLowerCase()
+  if (lower.startsWith('npm run biointel')) return raw
+  if (lower.startsWith('biointel ')) {
+    return `npm run biointel -- ${raw.slice('biointel '.length)}`
+  }
+  const q = flags.q && flags.q !== true ? String(flags.q) : 'ATTR amyloidosis'
+  const targets =
+    flags.targets && flags.targets !== true ? String(flags.targets) : 'TTR'
+  const cid = flags.cid && flags.cid !== true ? String(flags.cid) : '2244'
+
+  if (/\bdiscover\s+rank\b/i.test(raw) || /rank\s+--q/i.test(raw)) {
+    return `npm run biointel -- discover rank --q "${q}" --targets ${targets}`
+  }
+  if (/\bdiscover\s+densify\b/i.test(raw) || (/\bdensify\b/i.test(raw) && /--q/i.test(raw))) {
+    return `npm run biointel -- discover densify --q "${q}"`
+  }
+  if (/\bdensify\b/i.test(raw)) {
+    return `npm run biointel -- discover densify --q "${q}"`
+  }
+  if (/\bresearch\s+kit\b/i.test(raw) || /\bkit\.json\b/i.test(raw)) {
+    return `npm run biointel -- research kit --cid ${cid} --out kit.json`
+  }
+  if (/\bmolecule\s+get\b/i.test(raw)) {
+    return `npm run biointel -- molecule get ${cid}`
+  }
+  if (/\bmolecule\s+category\b/i.test(raw)) {
+    return `npm run biointel -- molecule category ${cid} pharmaceutical`
+  }
+  if (/\borphanet\b/i.test(raw)) {
+    return `npm run biointel -- orphanet genes --q "${q}"`
+  }
+  if (/\blogs\s+grep\b/i.test(raw) || /product\.discover/i.test(raw)) {
+    return `npm run biointel -- logs grep product.discover`
+  }
+  if (/\blogs\s+tail\b/i.test(raw)) {
+    return `npm run biointel -- logs tail --n 40`
+  }
+  if (/\bhealth\b/i.test(raw)) return `npm run biointel -- health`
+  if (/\bgate\b/i.test(raw)) return `npm run biointel -- gate`
+  if (/\be2e\b/i.test(raw)) return `npm run biointel -- e2e auto`
+  if (/\btools\s+playbook\b/i.test(raw)) {
+    return `npm run biointel -- tools playbook disease_to_shortlist`
+  }
+  if (/\btools\s+list\b/i.test(raw)) return `npm run biointel -- tools list`
+  if (/\bharvest\b/i.test(raw)) {
+    return `npm run biointel -- discover harvest --names "Tafamidis,Diflunisal" --safety`
+  }
+  return null
+}
+
+/**
+ * tools list | playbook | copilot | suggest
  * Surfaces research tools so agents pick the right loop without thrash.
  */
 function cmdTools(sub, positionals, flags) {
   const data = loadResearchToolsData()
   const action = sub || 'list'
+
+  if (action === 'suggest') {
+    const goalRaw = flags.goal || flags.g || positionals[0]
+    if (!goalRaw || goalRaw === true) {
+      die(
+        'tools suggest requires --goal <discover|evidence|compare|pack|hypothesis|export|ops>\n' +
+          'Example: biointel tools suggest --goal evidence --cid 2244',
+      )
+    }
+    const goal = String(goalRaw).toLowerCase()
+    const goalMap = data.goalMap || {}
+    const mapping = goalMap[goal]
+    if (!mapping) {
+      die(
+        `unknown goal: ${goal}\nKnown: ${Object.keys(goalMap).join(', ') || 'discover,evidence,compare,pack,hypothesis,export,ops'}`,
+      )
+    }
+    const limit = Math.min(Math.max(parseInt(flags.limit || '3', 10) || 3, 1), 8)
+    const playbooks = data.playbooks || []
+    const pb = playbooks.find((p) => p.id === mapping.playbookId)
+    if (!pb) die(`playbook missing for goal ${goal}: ${mapping.playbookId}`)
+
+    // Prefer explicit suggestCommands when present
+    let actions = []
+    const templates = (data.suggestCommands && data.suggestCommands[goal]) || []
+    if (templates.length) {
+      actions = templates.slice(0, limit).map((t, i) => {
+        const cli = suggestInterpolate(t, flags)
+        const bare = cli.startsWith('npm ') ? cli : cli
+        const title =
+          bare
+            .replace(/^npm run biointel --\s*/i, '')
+            .split(/\s+/)
+            .slice(0, 3)
+            .join(' ') || `Step ${i + 1}`
+        return {
+          rank: i + 1,
+          title,
+          cli: cli.startsWith('npm ') ? cli : `npm run biointel -- ${cli}`,
+        }
+      })
+    } else {
+      const offset = mapping.stepOffset || 0
+      const steps = (pb.steps || []).slice(offset, offset + limit)
+      actions = steps.map((s, i) => {
+        const cli = s.agent ? agentStepToCli(s.agent, flags) : null
+        return {
+          rank: i + 1,
+          title: s.title,
+          human: s.human,
+          agent: s.agent ? suggestInterpolate(s.agent, flags) : undefined,
+          cli: cli || undefined,
+        }
+      })
+    }
+
+    // Pad with goal-tagged cliTools if thin
+    if (actions.filter((a) => a.cli).length < Math.min(2, limit)) {
+      for (const t of data.cliTools || []) {
+        if (actions.length >= limit) break
+        if (t.goal !== goal || !t.cmd) continue
+        const cli = `npm run biointel -- ${suggestInterpolate(t.cmd, flags)}`
+        if (actions.some((a) => a.cli === cli)) continue
+        actions.push({ rank: actions.length + 1, title: t.summary || t.cmd, cli })
+      }
+    }
+
+    const payload = {
+      goal,
+      blurb: mapping.blurb || pb.goal,
+      playbookId: pb.id,
+      playbookTitle: pb.title,
+      href: `/how-it-works#${pb.id}`,
+      actions: actions.slice(0, limit).map((a, i) => ({ ...a, rank: i + 1 })),
+      lawReminders: pb.lawReminders || [],
+    }
+
+    if (flags.json) {
+      printJson(payload)
+      return
+    }
+
+    console.log(`# tools suggest — goal=${goal}`)
+    console.log(`Playbook: ${pb.title} (${pb.id})`)
+    console.log(`${payload.blurb}`)
+    console.log(`UI: ${payload.href}`)
+    console.log('\nNext actions:')
+    for (const a of payload.actions) {
+      console.log(`  ${a.rank}. ${a.title}`)
+      if (a.human) console.log(`     Human: ${a.human}`)
+      if (a.cli) console.log(`     ${a.cli}`)
+      else if (a.agent) console.log(`     Agent: ${a.agent}`)
+    }
+    if (payload.lawReminders.length) {
+      console.log('\nLaw:')
+      for (const s of payload.lawReminders) console.log(`  • ${s}`)
+    }
+    console.log('\nDetail: biointel tools playbook ' + pb.id)
+    return
+  }
 
   if (action === 'copilot') {
     const names = data.copilotTools || []
@@ -334,7 +506,7 @@ function cmdTools(sub, positionals, flags) {
     return
   }
 
-  die('tools subcommands: list | playbook [id] | copilot')
+  die('tools subcommands: list | playbook [id] | copilot | suggest --goal <g>')
 }
 
 function cmdLaw() {

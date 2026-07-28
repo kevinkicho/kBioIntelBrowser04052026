@@ -68,6 +68,8 @@ npm run biointel -- law
 npm run biointel -- health
 npm run biointel -- tools list
 npm run biointel -- tools playbook disease_to_shortlist
+npm run biointel -- tools suggest --goal evidence --cid 2244
+npm run biointel -- tools suggest --goal discover --q "NSCLC" --targets EGFR
 npm run biointel -- tools copilot
 npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR
 npm run biointel -- molecule get 3080836

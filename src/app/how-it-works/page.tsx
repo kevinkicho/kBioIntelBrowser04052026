@@ -663,6 +663,12 @@ export default function HowItWorksPage() {
               Goal: faster, evidence-first research and engineering outcomes. Of-record work uses free public
               APIs and deterministic rank; AI tools are claim-bound and never rewrite Discover scores. Agents:{' '}
               <code className="text-slate-400">npm run biointel -- tools list</code>
+              {' · '}
+              <code className="text-slate-400">
+                tools suggest --goal evidence --cid 2244
+              </code>
+              . Humans also see playbook tips on Discover idle/empty/results and project board empty/ready
+              states.
             </p>
 
             <div className="flex flex-wrap gap-1.5" data-testid="how-tools-goal-filters">
