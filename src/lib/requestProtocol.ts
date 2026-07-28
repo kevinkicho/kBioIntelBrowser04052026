@@ -166,7 +166,30 @@ export function isInsufficientResourcesError(error: unknown): boolean {
       : typeof error === 'string'
         ? error
         : String(error)
+  // Do not treat generic AbortError as resources — only real socket exhaustion
+  if (/abort/i.test(msg) && !/insufficient/i.test(msg)) return false
   return /insufficient.?resources|ERR_INSUFFICIENT_RESOURCES|Failed to fetch/i.test(
     msg,
   )
+}
+
+/** After Chrome ERR_INSUFFICIENT_RESOURCES, cool down non-critical network. */
+let resourcePressureUntil = 0
+
+export function markResourcePressure(ms = 20_000): void {
+  resourcePressureUntil = Math.max(resourcePressureUntil, Date.now() + ms)
+  // Drop queued waiters so the tab can recover
+  while (waiters.length > 0) {
+    const w = waiters.shift()!
+    if (w.timer) clearTimeout(w.timer)
+    w.reject(new Error('request_gate_pressure'))
+  }
+}
+
+export function underResourcePressure(): boolean {
+  return Date.now() < resourcePressureUntil
+}
+
+export function clearResourcePressureForTests(): void {
+  resourcePressureUntil = 0
 }

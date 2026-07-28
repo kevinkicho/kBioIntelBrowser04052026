@@ -63,7 +63,11 @@ export default function DiscoverPage() {
   const router = useRouter()
   const initialQuery = searchParams.get('q') ?? ''
   const initialDiseaseId = searchParams.get('diseaseId') ?? undefined
-  const initialTargets = parseTargetsParam(searchParams.get('targets'))
+  const targetsParam = searchParams.get('targets')
+  const initialTargets = useMemo(
+    () => parseTargetsParam(targetsParam),
+    [targetsParam],
+  )
   const {
     state,
     search,
@@ -77,6 +81,9 @@ export default function DiscoverPage() {
   } = useDiscovery()
   /** Last URL key we already applied a rank for (history / deep-link / same-page nav). */
   const appliedUrlKey = useRef<string | null>(null)
+  /** Stable search ref so URL effect does not re-subscribe when hook identity is stable. */
+  const searchRef = useRef(search)
+  searchRef.current = search
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sessions, setSessions] = useState<DiscoverSessionSnapshot[]>([])
   const [aiRankResult, setAiRankResult] = useState<AiRankResult | null>(null)
@@ -115,9 +122,8 @@ export default function DiscoverPage() {
     searchParams.get('refresh') === '1' || searchParams.get('refresh') === 'true'
   const refreshToken = searchParams.get('_t')
 
-  // Deep link + search-history reopen: any change to q / diseaseId / targets must re-rank.
-  // Clear appliedUrlKey on cleanup so React Strict Mode remounts re-run rank after abort
-  // (otherwise URL stays filled while status is stuck idle with empty content).
+  // Deep link + search-history reopen: re-rank only when URL *content* changes.
+  // Do not depend on `search` / `searchParams` object identity (causes re-fire storms).
   useEffect(() => {
     if (!initialQuery && !initialDiseaseId && initialTargets.length === 0) return
 
@@ -132,14 +138,16 @@ export default function DiscoverPage() {
     appliedUrlKey.current = key
 
     let cancelled = false
-    void search(initialQuery || initialDiseaseId || '', {
+    void searchRef.current(initialQuery || initialDiseaseId || '', {
       diseaseId: initialDiseaseId,
       targets: initialTargets,
       forceRefresh,
     }).then(() => {
       if (cancelled) return
       if (forceRefresh) {
-        const next = new URLSearchParams(searchParams.toString())
+        const next = new URLSearchParams(
+          typeof window !== 'undefined' ? window.location.search : '',
+        )
         next.delete('refresh')
         next.delete('_t')
         const qs = next.toString()
@@ -149,19 +157,15 @@ export default function DiscoverPage() {
 
     return () => {
       cancelled = true
-      // Do NOT clear appliedUrlKey here — Strict Mode remount was causing
-      // duplicate /api/discover/rank POSTs and browser ERR_INSUFFICIENT_RESOURCES.
-      // Re-rank still runs when q/diseaseId/targets/refresh change (key changes).
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional: only URL primitives
   }, [
     initialQuery,
     initialDiseaseId,
-    initialTargets,
-    search,
+    targetsParam,
     forceRefresh,
     refreshToken,
     router,
-    searchParams,
   ])
 
   const scorePhase = state.result?.v2?.scorePhase ?? 'cheap'

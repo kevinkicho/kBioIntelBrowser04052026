@@ -6,6 +6,7 @@
  */
 
 import { logAgentActivity } from './agentActivityLog'
+import { underResourcePressure } from './requestProtocol'
 
 export type ProductEventName =
   | 'discover_started'
@@ -256,9 +257,13 @@ function flushProductAnalyticsBatch(): void {
     productAnalyticsTimer = null
   }
   if (!canSend() || productAnalyticsBatch.length === 0) return
+  // Drop network flush under browser socket pressure — localStorage queue remains
+  if (underResourcePressure()) {
+    productAnalyticsBatch.length = 0
+    return
+  }
   const batch = productAnalyticsBatch.splice(0, productAnalyticsBatch.length)
   try {
-    // Prefer sendBeacon when available (survives navigation, one body)
     const body = JSON.stringify(batch)
     if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
       const ok = navigator.sendBeacon(
@@ -279,6 +284,7 @@ function flushProductAnalyticsBatch(): void {
 }
 
 function enqueueProductAnalyticsMetric(metric: Record<string, unknown>): void {
+  if (underResourcePressure()) return
   if (productAnalyticsBatch.length >= PRODUCT_ANALYTICS_MAX) {
     productAnalyticsBatch.splice(0, productAnalyticsBatch.length - PRODUCT_ANALYTICS_MAX + 1)
   }

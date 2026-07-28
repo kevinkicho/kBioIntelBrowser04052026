@@ -135,6 +135,9 @@ export function useDiscovery() {
   const abortRef = useRef<AbortController | null>(null)
   /** Skip duplicate concurrent ranks for the same cache key (Strict Mode / URL churn). */
   const inflightRankKeyRef = useRef<string | null>(null)
+  /** Stable reads for search() — avoid identity churn that re-fires URL effects. */
+  const stateRef = useRef(state)
+  stateRef.current = state
   const prefsHydrated = useRef(false)
 
   useEffect(() => {
@@ -205,7 +208,8 @@ export function useDiscovery() {
       const trimmed = query.trim()
       const diseaseId = options?.diseaseId?.trim() || undefined
       const forceRefresh = Boolean(options?.forceRefresh)
-      const targets = (options?.targets ?? state.targets)
+      const live = stateRef.current
+      const targets = (options?.targets ?? live.targets)
         .map((t) => t.trim())
         .filter(Boolean)
         .slice(0, MAX_DISCOVER_TARGETS)
@@ -232,7 +236,7 @@ export function useDiscovery() {
       }
 
       const effectiveQuery = trimmed.length >= 2 ? trimmed : diseaseId!
-      const prefs = state.prefs
+      const prefs = live.prefs
       const flags = harvestFlagsFromPreferences(prefs)
       const stages = flags.runSafetyHarvest
         ? PROGRESS_STAGES_WITH_HARVEST
@@ -530,6 +534,9 @@ export function useDiscovery() {
         if (abortRef.current !== controller) return
         if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
 
+        const msg = err instanceof Error ? err.message : 'Search failed'
+        const resource =
+          /INSUFFICIENT_RESOURCES|Failed to fetch|resource pressure/i.test(msg)
         setState((prev) => ({
           ...prev,
           status: 'error',
@@ -538,12 +545,15 @@ export function useDiscovery() {
           result: null,
           diseaseCandidates: [],
           targets,
-          error: err instanceof Error ? err.message : 'Search failed',
+          error: resource
+            ? 'Browser ran out of network slots (too many open requests). Close extra tabs, hard-refresh (Ctrl+Shift+R), then search again.'
+            : msg,
           orphanetProvenance: null,
         }))
       }
     },
-    [advanceProgress, state.prefs, state.targets],
+    // state via stateRef — keep search identity stable so Discover URL effect does not re-fire
+    [advanceProgress],
   )
 
   const confirmDisease = useCallback(

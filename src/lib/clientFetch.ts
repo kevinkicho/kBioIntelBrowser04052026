@@ -1,6 +1,8 @@
 import {
   isInsufficientResourcesError,
+  markResourcePressure,
   singleFlightKey,
+  underResourcePressure,
   withRequestSlot,
   withSingleFlight,
 } from './requestProtocol'
@@ -60,8 +62,12 @@ const ANALYTICS_MAX_QUEUE = 80
 
 function flushAnalytics() {
   if (analyticsQueue.length === 0) return
+  // Under socket pressure: drop metrics entirely (local product queue still holds events)
+  if (underResourcePressure()) {
+    analyticsQueue.length = 0
+    return
+  }
   const batch = analyticsQueue.splice(0, analyticsQueue.length)
-  // Telemetry: drop if browser is already at concurrent cap (never block UX)
   void withRequestSlot(
     () =>
       fetch('/api/analytics', {
@@ -75,6 +81,7 @@ function flushAnalytics() {
 }
 
 function enqueueMetric(metric: Record<string, unknown>) {
+  if (underResourcePressure()) return
   if (analyticsQueue.length >= ANALYTICS_MAX_QUEUE) {
     analyticsQueue.splice(0, analyticsQueue.length - ANALYTICS_MAX_QUEUE + 1)
   }
@@ -259,31 +266,50 @@ export async function clientFetch(
     !init?.signal &&
     (url.includes('/api/discover/rank') || url.includes('/api/analytics'))
 
+  const isAnalytics = url.includes('/api/analytics')
+  const isDiscoverRank = url.includes('/api/discover/rank')
+
+  // Non-critical traffic yields under browser socket pressure
+  if (isAnalytics && underResourcePressure()) {
+    cleanupSignal()
+    throw new DOMException('Analytics deferred (resource pressure)', 'AbortError')
+  }
+
   const runNetwork = async (): Promise<Response> => {
     let lastError: unknown
+    // Rank gets one forced retry; others respect caller retries only
+    const attempts =
+      isDiscoverRank && retries === 0 ? 2 : maxAttempts
     try {
-      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      for (let attempt = 0; attempt < attempts; attempt++) {
         if (signal.aborted) {
           throw signal.reason instanceof Error
             ? signal.reason
             : new DOMException('Aborted', 'AbortError')
         }
         try {
-          // Concurrency gate — prevents Chrome ERR_INSUFFICIENT_RESOURCES
           const response = await withRequestSlot(
             () => fetch(input, fetchInit),
-            { timeoutMs: Math.max(timeoutMs || 40_000, 15_000) },
+            {
+              // Rank waits longer for a slot; telemetry drops if busy
+              timeoutMs: isDiscoverRank
+                ? Math.max(timeoutMs || 40_000, 20_000)
+                : isAnalytics
+                  ? 3_000
+                  : Math.max(timeoutMs || 40_000, 15_000),
+              dropIfBusy: isAnalytics,
+            },
           )
           if (
             response.ok ||
-            attempt === maxAttempts - 1 ||
+            attempt === attempts - 1 ||
             !shouldRetryStatus(response.status, retryStatuses)
           ) {
             return response
           }
           if (IS_DEV) {
             console.warn(
-              `%c↻ retry ${attempt + 1}/${retries} after ${response.status}`,
+              `%c↻ retry ${attempt + 1}/${attempts - 1} after ${response.status}`,
               ERR_STYLE,
             )
           }
@@ -292,24 +318,28 @@ export async function clientFetch(
         } catch (error) {
           lastError = error
           if (isAbortError(error)) throw error
-          // One delayed retry on browser socket exhaustion
-          if (
-            isInsufficientResourcesError(error) &&
-            attempt < maxAttempts - 1
-          ) {
-            if (IS_DEV) {
-              console.warn(
-                `%c↻ retry after insufficient resources`,
-                ERR_STYLE,
-              )
+          if (isInsufficientResourcesError(error)) {
+            markResourcePressure(20_000)
+            if (attempt < attempts - 1) {
+              if (IS_DEV) {
+                console.warn(
+                  `%c↻ browser resources low — cooling down then retry %c${url.slice(0, 80)}`,
+                  ERR_STYLE,
+                  DIM_STYLE,
+                )
+              }
+              await sleep(1500 + Math.random() * 1000)
+              continue
             }
-            await sleep(800 + Math.random() * 400)
-            continue
+            // Message-only throw so React doesn't dump multi-MB fiber stacks
+            throw new TypeError(
+              `net::ERR_INSUFFICIENT_RESOURCES (${method} ${url.slice(0, 120)})`,
+            )
           }
-          if (attempt === maxAttempts - 1) throw error
+          if (attempt === attempts - 1) throw error
           if (IS_DEV) {
             console.warn(
-              `%c↻ retry ${attempt + 1}/${retries} after network error`,
+              `%c↻ retry ${attempt + 1}/${attempts - 1} after network error`,
               ERR_STYLE,
             )
           }
@@ -415,16 +445,16 @@ export async function clientFetch(
 
     logFetchOutcome(url, method, 0, duration, false)
     if (IS_DEV) {
-      if (timeoutAbort) {
-        // Message only — avoid attaching the Error object (huge React frames)
+      // Never console.error(Error) — Chrome expands React fiber stacks (ol/or spam)
+      if (timeoutAbort || isInsufficientResourcesError(error)) {
         console.warn(
-          `%c✗ Timeout %c${ms(duration)} %c${errMsg}`,
+          `%c✗ ${timeoutAbort ? 'Timeout' : 'Resources'} %c${ms(duration)} %c${errMsg}`,
           ERR_STYLE,
           TIME_STYLE,
           DIM_STYLE,
         )
       } else {
-        console.error(
+        console.warn(
           `%c✗ Network error %c${ms(duration)} %c${errMsg}`,
           ERR_STYLE,
           TIME_STYLE,

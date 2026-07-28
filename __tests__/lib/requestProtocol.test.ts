@@ -1,12 +1,15 @@
 import {
   acquireRequestSlot,
+  clearResourcePressureForTests,
   clearSingleFlightForTests,
   isInsufficientResourcesError,
+  markResourcePressure,
   MAX_BROWSER_CONCURRENT,
   releaseRequestSlot,
   requestGateSnapshot,
   resetRequestGateForTests,
   singleFlightKey,
+  underResourcePressure,
   withRequestSlot,
   withSingleFlight,
 } from '@/lib/requestProtocol'
@@ -15,11 +18,13 @@ describe('requestProtocol', () => {
   beforeEach(() => {
     resetRequestGateForTests()
     clearSingleFlightForTests()
+    clearResourcePressureForTests()
   })
 
   afterEach(() => {
     resetRequestGateForTests()
     clearSingleFlightForTests()
+    clearResourcePressureForTests()
   })
 
   it('tracks concurrent slots under the cap', async () => {
@@ -99,5 +104,13 @@ describe('requestProtocol', () => {
       ),
     ).toBe(true)
     expect(isInsufficientResourcesError(new Error('AbortError'))).toBe(false)
+  })
+
+  it('resource pressure cool-down flag', () => {
+    expect(underResourcePressure()).toBe(false)
+    markResourcePressure(5_000)
+    expect(underResourcePressure()).toBe(true)
+    clearResourcePressureForTests()
+    expect(underResourcePressure()).toBe(false)
   })
 })
