@@ -13,6 +13,7 @@ import {
   type MoleculeIdentityInput,
 } from './moleculeHubShared'
 import type { DataHubRow, DataHubSection } from './types'
+import { buildNegativeEvidencePart } from './negativeEvidence'
 
 export function buildMoleculeHubParts(
   identity: MoleculeIdentityInput,
@@ -630,9 +631,15 @@ export function buildMoleculeHubParts(
   const pubmed = asArr(data, 'pubmedArticles')
   const openalex = asArr(data, 'openAlexWorks')
   const semantic = asArr(data, 'semanticPapers')
+  const arxiv = asArr(data, 'arxivPapers')
+  const crossref = asArr(data, 'crossRefWorks')
+  const nsf = asArr(data, 'nsfAwards')
+  const openaire = asArr(data, 'openAireProjects')
+  const citations = asArr(data, 'citationMetrics')
   const nih = asArr(data, 'nihGrants')
   const patents = asArr(data, 'patents')
-  const firstLit = lit[0] || pubmed[0] || openalex[0] || semantic[0]
+  const binding = asArr(data, 'bindingAffinities')
+  const firstLit = lit[0] || pubmed[0] || openalex[0] || semantic[0] || arxiv[0] || crossref[0]
   const secondLit = lit[1] || pubmed[1] || openalex[1]
   const firstGrant = nih[0]
   const secondGrant = nih[1]
@@ -682,6 +689,71 @@ export function buildMoleculeHubParts(
       panelId: 'openalex',
       categoryId: 'research-literature',
       domain: 'literature',
+    }),
+    row({
+      id: 'lit-semantic',
+      fact: 'Semantic Scholar papers',
+      value: semantic.length ? String(semantic.length) : null,
+      source: 'Semantic Scholar',
+      panelId: 'semantic-scholar',
+      categoryId: 'research-literature',
+      domain: 'literature',
+    }),
+    row({
+      id: 'lit-arxiv',
+      fact: 'arXiv papers',
+      value: arxiv.length ? String(arxiv.length) : null,
+      source: 'arXiv',
+      panelId: 'arxiv',
+      categoryId: 'research-literature',
+      domain: 'literature',
+      detail: 'Preprints — not peer-review status',
+    }),
+    row({
+      id: 'lit-crossref',
+      fact: 'Crossref works',
+      value: crossref.length ? String(crossref.length) : null,
+      source: 'Crossref',
+      panelId: 'crossref',
+      categoryId: 'research-literature',
+      domain: 'literature',
+    }),
+    row({
+      id: 'lit-nsf',
+      fact: 'NSF awards',
+      value: nsf.length ? String(nsf.length) : null,
+      source: 'NSF Awards',
+      panelId: 'nsf-awards',
+      categoryId: 'research-literature',
+      domain: 'literature',
+    }),
+    row({
+      id: 'lit-openaire',
+      fact: 'OpenAIRE projects',
+      value: openaire.length ? String(openaire.length) : null,
+      source: 'OpenAIRE',
+      panelId: 'openaire-projects',
+      categoryId: 'research-literature',
+      domain: 'literature',
+    }),
+    row({
+      id: 'lit-opencite',
+      fact: 'OpenCitations DOI metrics',
+      value: citations.length ? String(citations.length) : null,
+      source: 'OpenCitations',
+      panelId: 'opencitations',
+      categoryId: 'research-literature',
+      domain: 'literature',
+      detail: 'Citation counts for DOIs in session sample',
+    }),
+    row({
+      id: 'tg-bindingdb-n',
+      fact: 'BindingDB affinities',
+      value: binding.length ? String(binding.length) : null,
+      source: 'BindingDB',
+      panelId: 'bindingdb',
+      categoryId: 'bioactivity-targets',
+      domain: 'targets',
     }),
     row({
       id: 'lit-sample-title',
@@ -924,6 +996,13 @@ export function buildMoleculeHubParts(
   const clinicalSec = sections.find((s) => s.id === 'clinical')
   if (clinicalSec) {
     clinicalSec.rowIds.push(trialTitleRow.id, trialEnrollRow.id)
+  }
+
+  // Of-record negative evidence for empty free-API bags
+  const neg = buildNegativeEvidencePart(data)
+  if (neg.section && neg.rows.length > 0) {
+    all.push(...neg.rows)
+    sections.push(neg.section)
   }
 
   return { rows: all, sections }

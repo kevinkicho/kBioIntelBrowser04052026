@@ -75,7 +75,11 @@ const EXPORTS = [
   },
   {
     name: 'Research kit (single-file bundle)',
-    use: 'biointel-research-kit-bundle JSON: hub CSV, sources.json, optional claims.md, prefs, README — lab notebook starter. Also via CLI: biointel research kit --cid N.',
+    use: 'biointel-research-kit-bundle JSON: hub CSV, sources.json, optional claims.md, hub-claims-pack.json (board-pack handoff), content hash for re-open/diff, prefs, README. Also via CLI: biointel research kit --cid N.',
+  },
+  {
+    name: 'Hub claim graph → pack claims JSON',
+    use: 'Of-record claims derived 1:1 from hub facts (no LLM). Export from the claim graph panel for board-pack import.',
   },
   {
     name: 'Monday pack',
@@ -100,6 +104,16 @@ const EXPORTS = [
 ] as const
 
 const CHANGELOG = [
+  {
+    when: '2026-07',
+    items: [
+      'Content-hash of-record hub facts in ledger notes + research kit bundle',
+      'Negative evidence section for empty free-API bags (not “no association”)',
+      'Discover multi-source densify breadth (PatentsView/OpenAlex/BindingDB/Semantic Scholar/NIH)',
+      'Hub claim graph → pack claims JSON export; kit includes hub-claims-pack.json',
+      'Source utilization map for operators (gather vs densify vs hub surfaces)',
+    ],
+  },
   {
     when: '2026-04',
     items: [
@@ -175,6 +189,35 @@ export default function MethodologyPage() {
             <li>
               <span className="font-medium text-slate-200">Claim-bound optional AI</span> — packs and copilot cite
               allowlisted evidence only.
+            </li>
+          </ul>
+        </section>
+
+        <section id="api-breadth" className="mb-8 scroll-mt-20 rounded-xl border border-slate-800 bg-slate-900/40 p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-slate-100">Using more free APIs (not a handful)</h2>
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-400">
+            The catalog is ~131 free public sources. Surfaces use different subsets by design
+            (rank must stay fast and deterministic):
+          </p>
+          <ul className="mt-3 space-y-2 text-[12px] leading-relaxed text-slate-400">
+            <li>
+              <span className="font-medium text-slate-200">Discover gather</span> — disease→gene→drug
+              cheap signals (Open Targets, DGIdb, ClinicalTrials.gov, ChEMBL, PubChem, …).
+            </li>
+            <li>
+              <span className="font-medium text-slate-200">Discover densify (top-K)</span> — safety
+              (openFDA FAERS + recalls) plus multi-source novelty breadth: Europe PMC, PatentsView,
+              OpenAlex, BindingDB, Semantic Scholar, NIH RePORTER.
+            </li>
+            <li>
+              <span className="font-medium text-slate-200">Profile hub / Research kit</span> — broadest
+              of-record coverage: load category panels to fill bags; empty bags appear as{' '}
+              <em>Not retrieved / empty samples</em> (negative evidence, not “no association”).
+            </li>
+            <li>
+              <span className="font-medium text-slate-200">Content hash + claim graph</span> —
+              research kits embed a ledger content hash and hub-claims-pack.json for reproducible
+              re-open and board-pack handoff (no LLM).
             </li>
           </ul>
         </section>

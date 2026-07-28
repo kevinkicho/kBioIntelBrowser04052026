@@ -645,7 +645,7 @@ export async function rankCandidatesForDisease(
   if (!densify.skipped && densify.densifiedCount > 0) {
     scorePhase = 'full'
     warnings.push(
-      `Densified top ${densify.densifiedCount} candidates (safety + novelty). Empty safety ≠ safe.`,
+      `Densified top ${densify.densifiedCount} candidates (safety + multi-source novelty breadth). Empty safety ≠ safe.`,
     )
   }
 

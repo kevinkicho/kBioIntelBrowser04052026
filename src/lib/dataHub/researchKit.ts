@@ -21,6 +21,8 @@ import {
   dataHubToDelimited,
 } from './exportDataHub'
 import type { DataHubLedger } from './types'
+import { hashDataHubLedger } from './contentHash'
+import { hubClaimsPackToJson, hubLedgerToPackClaimsHandoff } from './hubClaimsToPack'
 
 export type ResearchKitDownloadMode = 'single' | 'multi'
 
@@ -65,6 +67,8 @@ export interface ResearchKitBundle {
   subjectId: string
   subjectLabel: string
   exportedAt: string
+  /** Of-record ledger content hash for re-open / kit-diff */
+  contentHash?: string
   manifest: ResearchKitManifest
   files: {
     'data-hub.csv': string
@@ -72,6 +76,7 @@ export interface ResearchKitBundle {
     'claims.md'?: string
     'research-view-prefs.json'?: string
     'README.md': string
+    'hub-claims-pack.json'?: string
   }
   honesty: string[]
 }
@@ -280,10 +285,13 @@ function resolveKitParts(input: ResearchKitInput): {
 /** Build a single-file research kit bundle (pure). */
 export function buildResearchKitBundle(input: ResearchKitInput): ResearchKitBundle {
   const parts = resolveKitParts({ ...input, mode: 'single' })
+  const contentHash = hashDataHubLedger(input.ledger)
+  const handoff = hubLedgerToPackClaimsHandoff(input.ledger)
   const files: ResearchKitBundle['files'] = {
     'data-hub.csv': parts.hubCsv,
     'sources.json': parts.sourcesJson,
     'README.md': parts.readme,
+    'hub-claims-pack.json': hubClaimsPackToJson(handoff),
   }
   if (parts.claimsMd) files['claims.md'] = parts.claimsMd
   if (parts.prefsJson) files['research-view-prefs.json'] = parts.prefsJson
@@ -294,9 +302,20 @@ export function buildResearchKitBundle(input: ResearchKitInput): ResearchKitBund
     subjectId: input.ledger.subjectId,
     subjectLabel: input.ledger.subjectLabel,
     exportedAt: new Date().toISOString(),
-    manifest: parts.manifest,
+    contentHash,
+    manifest: {
+      ...parts.manifest,
+      honesty: [
+        ...parts.manifest.honesty,
+        `Content hash: ${contentHash}`,
+        'Includes hub-claims-pack.json for board pack claim import',
+      ],
+    },
     files,
-    honesty: parts.manifest.honesty,
+    honesty: [
+      ...parts.manifest.honesty,
+      `Content hash: ${contentHash}`,
+    ],
   }
 }
 

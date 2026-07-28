@@ -104,6 +104,24 @@ export function buildCandidateWhyChips(
     })
   }
 
+  // Breadth densify free-API signals (when present on sources)
+  const srcJoin = candidate.sources.join(' ')
+  if (/PatentsView/i.test(srcJoin)) {
+    chips.push({ id: 'patents', label: 'patents sample', tone: 'evidence' })
+  }
+  if (/OpenAlex/i.test(srcJoin)) {
+    chips.push({ id: 'openalex', label: 'OpenAlex', tone: 'evidence' })
+  }
+  if (/BindingDB/i.test(srcJoin)) {
+    chips.push({ id: 'bindingdb', label: 'BindingDB', tone: 'evidence' })
+  }
+  if (/Semantic Scholar/i.test(srcJoin)) {
+    chips.push({ id: 's2', label: 'Semantic Scholar', tone: 'evidence' })
+  }
+  if (/NIH RePORTER/i.test(srcJoin)) {
+    chips.push({ id: 'nih', label: 'NIH grants', tone: 'evidence' })
+  }
+
   if (candidate.sources.length > 0) {
     chips.push({
       id: 'sources',

@@ -32,6 +32,13 @@ export {
 } from './engine'
 export { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
 export {
+  harvestBreadthForName,
+  harvestBreadthBatch,
+  mergeLitHitProxy,
+  BREADTH_CONCURRENCY,
+  type BreadthHarvestRow,
+} from './densifyBreadth'
+export {
   expandSimilarCandidates,
   expandRankShortlistBySimilarity,
   RANK_SIMILARITY_SEED_MAX,

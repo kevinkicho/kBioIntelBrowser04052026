@@ -10,6 +10,10 @@ import {
   buildHubClaimGraph,
   hubClaimGraphToMarkdown,
 } from '@/lib/dataHub/hubClaimGraph'
+import {
+  hubClaimsPackToJson,
+  hubLedgerToPackClaimsHandoff,
+} from '@/lib/dataHub/hubClaimsToPack'
 import { downloadFile } from '@/lib/exportData'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { ApiProvenanceChip } from '@/components/ui/ApiProvenanceChip'
@@ -73,6 +77,26 @@ export function HubClaimGraphPanel({
             }}
           >
             Export MD
+          </button>
+          <button
+            type="button"
+            className="rounded border border-emerald-800/40 bg-emerald-950/30 px-2 py-0.5 text-[10px] text-emerald-300"
+            data-testid={`${testId}-export-pack`}
+            title="Of-record claim list for board pack import (no LLM)"
+            onClick={() => {
+              const handoff = hubLedgerToPackClaimsHandoff(ledger)
+              const slug = ledger.subjectLabel
+                .toLowerCase()
+                .replace(/[^a-z0-9]+/g, '-')
+                .slice(0, 40)
+              downloadFile(
+                hubClaimsPackToJson(handoff),
+                `biointel-hub-claims-pack-${slug}-${ledger.subjectId}.json`,
+                'application/json;charset=utf-8',
+              )
+            }}
+          >
+            Export pack claims
           </button>
         </div>
       </div>

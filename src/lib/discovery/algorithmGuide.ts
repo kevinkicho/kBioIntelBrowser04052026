@@ -66,11 +66,20 @@ export const DISCOVER_PIPELINE_STAGES: DiscoverPipelineStage[] = [
   },
   {
     id: 'harvest',
-    title: 'Safety & novelty harvest (optional)',
-    short: 'Top-K openFDA AE/recalls + EuropePMC novelty when enabled.',
+    title: 'Safety & multi-source novelty densify',
+    short:
+      'Top-K openFDA AE/recalls + EuropePMC + PatentsView/OpenAlex/BindingDB/Semantic Scholar/NIH.',
     detail:
-      'Default harvestTiming is board/promote-time (faster first paint). Rank-time harvest re-scores top-15 with full safety/novelty axes.',
-    sources: ['openFDA', 'EuropePMC'],
+      'Always-on densify fills safety and multi-source novelty for the shortlist. Extra free-API breadth runs after FAERS+EuropePMC so more of the ~131 catalog powers of-record rank axes (still deterministic, no LLM).',
+    sources: [
+      'openFDA',
+      'EuropePMC',
+      'PatentsView',
+      'OpenAlex',
+      'BindingDB',
+      'Semantic Scholar',
+      'NIH RePORTER',
+    ],
     effort: 'heavier',
   },
 ]
