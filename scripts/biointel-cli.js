@@ -239,76 +239,28 @@ function loadResearchToolsData() {
   }
 }
 
-/** Interpolate {{q}} {{targets}} {{cid}} in suggest templates. */
+/**
+ * Interpolate {{q}} {{targets}} {{cid}} from export:research-catalog templates.
+ * Catalog is generated from TS suggestResearchForGoal — do not reimplement suggest here.
+ */
 function suggestInterpolate(template, flags) {
   const q = flags.q && flags.q !== true ? String(flags.q) : 'ATTR amyloidosis'
   const targets =
     flags.targets && flags.targets !== true ? String(flags.targets) : 'TTR'
   const cid = flags.cid && flags.cid !== true ? String(flags.cid) : '2244'
+  const projectId =
+    flags.projectId && flags.projectId !== true ? String(flags.projectId) : '<projectId>'
   return String(template)
     .replace(/\{\{q\}\}/g, q)
     .replace(/\{\{targets\}\}/g, targets)
     .replace(/\{\{cid\}\}/g, cid)
-}
-
-/**
- * Derive a runnable npm biointel command from a free-form agent step string.
- */
-function agentStepToCli(agent, flags) {
-  const raw = suggestInterpolate(agent, flags).trim()
-  const lower = raw.toLowerCase()
-  if (lower.startsWith('npm run biointel')) return raw
-  if (lower.startsWith('biointel ')) {
-    return `npm run biointel -- ${raw.slice('biointel '.length)}`
-  }
-  const q = flags.q && flags.q !== true ? String(flags.q) : 'ATTR amyloidosis'
-  const targets =
-    flags.targets && flags.targets !== true ? String(flags.targets) : 'TTR'
-  const cid = flags.cid && flags.cid !== true ? String(flags.cid) : '2244'
-
-  if (/\bdiscover\s+rank\b/i.test(raw) || /rank\s+--q/i.test(raw)) {
-    return `npm run biointel -- discover rank --q "${q}" --targets ${targets}`
-  }
-  if (/\bdiscover\s+densify\b/i.test(raw) || (/\bdensify\b/i.test(raw) && /--q/i.test(raw))) {
-    return `npm run biointel -- discover densify --q "${q}"`
-  }
-  if (/\bdensify\b/i.test(raw)) {
-    return `npm run biointel -- discover densify --q "${q}"`
-  }
-  if (/\bresearch\s+kit\b/i.test(raw) || /\bkit\.json\b/i.test(raw)) {
-    return `npm run biointel -- research kit --cid ${cid} --out kit.json`
-  }
-  if (/\bmolecule\s+get\b/i.test(raw)) {
-    return `npm run biointel -- molecule get ${cid}`
-  }
-  if (/\bmolecule\s+category\b/i.test(raw)) {
-    return `npm run biointel -- molecule category ${cid} pharmaceutical`
-  }
-  if (/\borphanet\b/i.test(raw)) {
-    return `npm run biointel -- orphanet genes --q "${q}"`
-  }
-  if (/\blogs\s+grep\b/i.test(raw) || /product\.discover/i.test(raw)) {
-    return `npm run biointel -- logs grep product.discover`
-  }
-  if (/\blogs\s+tail\b/i.test(raw)) {
-    return `npm run biointel -- logs tail --n 40`
-  }
-  if (/\bhealth\b/i.test(raw)) return `npm run biointel -- health`
-  if (/\bgate\b/i.test(raw)) return `npm run biointel -- gate`
-  if (/\be2e\b/i.test(raw)) return `npm run biointel -- e2e auto`
-  if (/\btools\s+playbook\b/i.test(raw)) {
-    return `npm run biointel -- tools playbook disease_to_shortlist`
-  }
-  if (/\btools\s+list\b/i.test(raw)) return `npm run biointel -- tools list`
-  if (/\bharvest\b/i.test(raw)) {
-    return `npm run biointel -- discover harvest --names "Tafamidis,Diflunisal" --safety`
-  }
-  return null
+    .replace(/\{\{projectId\}\}/g, projectId)
 }
 
 /**
  * tools list | playbook | copilot | suggest
  * Surfaces research tools so agents pick the right loop without thrash.
+ * suggestCommands come from TS via npm run export:research-catalog.
  */
 function cmdTools(sub, positionals, flags) {
   const data = loadResearchToolsData()
@@ -319,7 +271,8 @@ function cmdTools(sub, positionals, flags) {
     if (!goalRaw || goalRaw === true) {
       die(
         'tools suggest requires --goal <discover|evidence|compare|pack|hypothesis|export|ops>\n' +
-          'Example: biointel tools suggest --goal evidence --cid 2244',
+          'Example: biointel tools suggest --goal evidence --cid 2244\n' +
+          'Regenerate catalog: npm run export:research-catalog',
       )
     }
     const goal = String(goalRaw).toLowerCase()
@@ -335,50 +288,26 @@ function cmdTools(sub, positionals, flags) {
     const pb = playbooks.find((p) => p.id === mapping.playbookId)
     if (!pb) die(`playbook missing for goal ${goal}: ${mapping.playbookId}`)
 
-    // Prefer explicit suggestCommands when present
-    let actions = []
     const templates = (data.suggestCommands && data.suggestCommands[goal]) || []
-    if (templates.length) {
-      actions = templates.slice(0, limit).map((t, i) => {
-        const cli = suggestInterpolate(t, flags)
-        const bare = cli.startsWith('npm ') ? cli : cli
-        const title =
-          bare
-            .replace(/^npm run biointel --\s*/i, '')
-            .split(/\s+/)
-            .slice(0, 3)
-            .join(' ') || `Step ${i + 1}`
-        return {
-          rank: i + 1,
-          title,
-          cli: cli.startsWith('npm ') ? cli : `npm run biointel -- ${cli}`,
-        }
-      })
-    } else {
-      const offset = mapping.stepOffset || 0
-      const steps = (pb.steps || []).slice(offset, offset + limit)
-      actions = steps.map((s, i) => {
-        const cli = s.agent ? agentStepToCli(s.agent, flags) : null
-        return {
-          rank: i + 1,
-          title: s.title,
-          human: s.human,
-          agent: s.agent ? suggestInterpolate(s.agent, flags) : undefined,
-          cli: cli || undefined,
-        }
-      })
+    if (!templates.length) {
+      die(
+        `no suggestCommands for goal=${goal}. Run: npm run export:research-catalog`,
+      )
     }
-
-    // Pad with goal-tagged cliTools if thin
-    if (actions.filter((a) => a.cli).length < Math.min(2, limit)) {
-      for (const t of data.cliTools || []) {
-        if (actions.length >= limit) break
-        if (t.goal !== goal || !t.cmd) continue
-        const cli = `npm run biointel -- ${suggestInterpolate(t.cmd, flags)}`
-        if (actions.some((a) => a.cli === cli)) continue
-        actions.push({ rank: actions.length + 1, title: t.summary || t.cmd, cli })
+    const actions = templates.slice(0, limit).map((t, i) => {
+      const bare = suggestInterpolate(t, flags)
+      const title =
+        bare
+          .replace(/^npm run biointel --\s*/i, '')
+          .split(/\s+/)
+          .slice(0, 3)
+          .join(' ') || `Step ${i + 1}`
+      return {
+        rank: i + 1,
+        title,
+        cli: bare.startsWith('npm ') ? bare : `npm run biointel -- ${bare}`,
       }
-    }
+    })
 
     const payload = {
       goal,
@@ -386,7 +315,7 @@ function cmdTools(sub, positionals, flags) {
       playbookId: pb.id,
       playbookTitle: pb.title,
       href: `/how-it-works#${pb.id}`,
-      actions: actions.slice(0, limit).map((a, i) => ({ ...a, rank: i + 1 })),
+      actions,
       lawReminders: pb.lawReminders || [],
     }
 
@@ -402,15 +331,14 @@ function cmdTools(sub, positionals, flags) {
     console.log('\nNext actions:')
     for (const a of payload.actions) {
       console.log(`  ${a.rank}. ${a.title}`)
-      if (a.human) console.log(`     Human: ${a.human}`)
       if (a.cli) console.log(`     ${a.cli}`)
-      else if (a.agent) console.log(`     Agent: ${a.agent}`)
     }
     if (payload.lawReminders.length) {
       console.log('\nLaw:')
       for (const s of payload.lawReminders) console.log(`  • ${s}`)
     }
     console.log('\nDetail: biointel tools playbook ' + pb.id)
+    console.log('Catalog: npm run export:research-catalog  # after TS catalog edits')
     return
   }
 

@@ -1,6 +1,6 @@
 import type { MoleculeContext } from '@/lib/ai/copilot/context'
 import { contextToPromptBlock } from '@/lib/ai/copilot/context'
-import { formatRetrievalSummary, type RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import { formatRetrievalSummary, type RetrievalSnapshot } from '@/lib/ai/copilot/retrieval'
 import { computeEvidenceGrounding } from '@/lib/ai/copilot/evidenceDensity'
 import {
   buildSafetyEvidencePack,

@@ -16,7 +16,7 @@ import {
   DEFAULT_DEEP_THRESHOLDS,
 } from '@/lib/ai/copilot/evidenceDensity'
 import { buildMoleculeContext } from '@/lib/ai/copilot/context'
-import { buildRetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import { buildRetrievalSnapshot } from '@/lib/ai/copilot/retrieval'
 import { minClaimsForPackMode } from '@/lib/ai/contracts'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'

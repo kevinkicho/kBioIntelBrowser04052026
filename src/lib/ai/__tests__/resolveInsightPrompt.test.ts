@@ -3,7 +3,7 @@ import {
   resolveInsightPrompt,
 } from '../copilot/resolveInsightPrompt'
 import type { GeneContext, MoleculeContext } from '../copilot/context'
-import type { RetrievalSnapshot } from '../retrievalMonitor'
+import type { RetrievalSnapshot } from '../copilot/retrieval'
 
 function minimalCtx(): MoleculeContext {
   return {

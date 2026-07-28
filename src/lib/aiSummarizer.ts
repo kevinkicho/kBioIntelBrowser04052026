@@ -1,4 +1,4 @@
-import { extractRichData } from './ai/contextBuilder'
+import { extractRichData } from './ai/copilot/context'
 
 export interface BriefSection {
   title: string

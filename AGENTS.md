@@ -71,6 +71,7 @@ npm run biointel -- tools playbook disease_to_shortlist
 npm run biointel -- tools suggest --goal evidence --cid 2244
 npm run biointel -- tools suggest --goal discover --q "NSCLC" --targets EGFR
 npm run biointel -- tools copilot
+npm run export:research-catalog   # regenerate CLI JSON from TS after catalog edits
 npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR
 npm run biointel -- molecule get 3080836
 npm run biointel -- molecule category 3080836 pharmaceutical

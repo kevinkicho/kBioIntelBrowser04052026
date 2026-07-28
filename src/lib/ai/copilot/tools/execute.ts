@@ -5,7 +5,7 @@ import {
   formatRetrievalSummary,
   humanPanelTitle,
   type RetrievalSnapshot,
-} from '@/lib/ai/retrievalMonitor'
+} from '@/lib/ai/copilot/retrieval'
 import { sessionHistory } from '@/lib/sessionHistory'
 import { getProject } from '@/lib/project/store'
 import {

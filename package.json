@@ -22,6 +22,7 @@
     "test:e2e:live": "playwright test e2e/north-star-loop.spec.ts",
     "test:gate": "npx tsc --noEmit && npm test -- --testPathPatterns=\"productEvents|packClaims|rehydrateClaims|boardHarvest|m1Funnel|scoreAxes|mergeCandidate|packCache|discoverSessions|discoverUrl|preferences|searchHistory|profileRevisitCache|pubchem|localSession|PackBuilder.share|agentActivity|api-tracker.isolation|panelApiTrace|relatedMolecules|candidateWhy|faersLinks|identityShell|packRelatedMoleculesDensity|retrievalMonitor|copilotTools|agentLoop|dataHub|researchViewPrefs|researchCapabilities|compareHub|buildMoleculeDataHub|uiDensity|presentationExtras|evidenceFirst|densifyPipeline|rankIntegration|candidateWhy|aiProvenance|hubChangeAlerts|hubClaimGraph|similarityExpand\" --passWithNoTests",
     "export:api-sources": "node scripts/export-api-sources-manifest.js",
+    "export:research-catalog": "node scripts/export-research-catalog.js",
     "smoke:vendors": "node scripts/vendor-url-smoke.js",
     "logs:tail": "node scripts/biointel-cli.js logs tail --n 40",
     "test:live": "node scripts/test-live.js",

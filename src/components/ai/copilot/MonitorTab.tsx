@@ -7,7 +7,7 @@ import {
   filterGaps,
   type RetrievalGap,
   type RetrievalSnapshot,
-} from '@/lib/ai/retrievalMonitor'
+} from '@/lib/ai/copilot/retrieval'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 

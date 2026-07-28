@@ -1,7 +1,7 @@
 import { buildAutoInsightPrompt, buildSafetyDeepDivePrompt, buildMechanismAnalysisPrompt, buildRepurposingScanPrompt } from '@/lib/ai/copilot/prompts'
 import { buildMoleculeContext, contextToPromptBlock } from '@/lib/ai/copilot/context'
 import type { MoleculeContext } from '@/lib/ai/copilot/context'
-import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import type { RetrievalSnapshot } from '@/lib/ai/copilot/retrieval'
 
 const identity = { name: 'Aspirin', cid: 2244, molecularWeight: 180.16, inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N', iupacName: '2-acetoxybenzoic acid' }
 

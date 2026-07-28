@@ -2,7 +2,7 @@ import {
   buildRetrievalSnapshot,
   filterGaps,
   formatRetrievalSummary,
-} from '@/lib/ai/retrievalMonitor'
+} from '@/lib/ai/copilot/retrieval'
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { CategoryLoadState } from '@/lib/fetchCategory'
 

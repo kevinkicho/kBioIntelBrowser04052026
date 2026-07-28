@@ -61,14 +61,16 @@ src/hooks/useAICopilot.ts   # composes snapshot + insights + agentic ask
 src/components/ai/copilot/  # MonitorTab, InsightsTab, AskTab, Settings, bubbles
 ```
 
-## Compatibility shims
+## Import paths (shims removed)
 
-- `@/lib/ai/promptTemplates` → `copilot/prompts`
-- `@/lib/ai/contextBuilder` → `copilot/context`
-- `@/lib/ai/retrievalMonitor` → `copilot/retrieval`
-- `@/lib/ai/copilotTools` → `copilot/tools`
+Use only:
 
-Prefer new paths in new code; shims stay until call sites migrate.
+- `@/lib/ai/copilot/prompts`
+- `@/lib/ai/copilot/context`
+- `@/lib/ai/copilot/retrieval`
+- `@/lib/ai/copilot/tools`
+
+Legacy shims (`promptTemplates`, `contextBuilder`, `retrievalMonitor`, `copilotTools`) were deleted after call-site migration.
 
 ## Agent tools (Copilot Ask only)
 

@@ -5,7 +5,7 @@
 
 import type { CategoryId } from '@/lib/categoryConfig'
 import type { MoleculeContext } from './context/types'
-import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import type { RetrievalSnapshot } from '@/lib/ai/copilot/retrieval'
 import type { PromptMode } from './prompts/types'
 
 /** Core categories that must be loaded before deep synthesis. */

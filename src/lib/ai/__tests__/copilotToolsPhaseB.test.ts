@@ -3,7 +3,7 @@
  */
 
 import { executeCopilotTool, type CopilotToolContext } from '../copilot/tools/execute'
-import type { RetrievalSnapshot } from '../retrievalMonitor'
+import type { RetrievalSnapshot } from '../copilot/retrieval'
 import { createAndSaveProject, addCandidateAndSave, addPackIndexEntryAndSave } from '@/lib/project'
 import type { MoleculeCandidate } from '@/lib/domain'
 

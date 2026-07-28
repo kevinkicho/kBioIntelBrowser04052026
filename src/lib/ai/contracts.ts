@@ -1,6 +1,6 @@
 /**
  * Structured AI contracts for pack/discover modes (PR13).
- * Molecule free-text PromptModes remain unchanged in promptTemplates.ts.
+ * Molecule free-text PromptModes live in copilot/prompts (not this pack contracts file).
  */
 
 import type { EvidenceClaim, MoleculeCandidate, DiseaseEntity } from '@/lib/domain'

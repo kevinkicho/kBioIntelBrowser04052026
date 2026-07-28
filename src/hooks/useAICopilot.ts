@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
-import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/retrievalMonitor'
+import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/copilot/retrieval'
 import {
   buildAgentToolSystemAddendum,
   COPILOT_MAX_TOOL_STEPS,

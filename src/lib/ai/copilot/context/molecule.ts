@@ -1,5 +1,5 @@
 import type { CategoryId } from '@/lib/categoryConfig'
-import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import type { RetrievalSnapshot } from '@/lib/ai/copilot/retrieval'
 import type {
   DiseaseDetail,
   InteractionDetail,

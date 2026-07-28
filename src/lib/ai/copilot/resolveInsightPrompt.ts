@@ -4,7 +4,7 @@
  */
 
 import type { MoleculeContext, GeneContext } from '@/lib/ai/copilot/context'
-import type { RetrievalSnapshot } from '@/lib/ai/retrievalMonitor'
+import type { RetrievalSnapshot } from '@/lib/ai/copilot/retrieval'
 import {
   buildAutoInsightPrompt,
   buildExecutiveBriefPrompt,
