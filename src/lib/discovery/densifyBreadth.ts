@@ -11,8 +11,9 @@ import { getLiteratureHitCount } from '@/lib/api/europepmc'
 import { getSemanticPapersByName } from '@/lib/api/semantic-scholar'
 import { getNihGrantsByName } from '@/lib/api/nihreporter'
 
-export const BREADTH_CONCURRENCY = 3
-export const BREADTH_TIMEOUT_MS = 2800
+/** Keep low — densify already multiplies free-API sockets server-side. */
+export const BREADTH_CONCURRENCY = 2
+export const BREADTH_TIMEOUT_MS = 2500
 
 export interface BreadthHarvestOpts {
   /** Skip EuropePMC when densify already harvested novelty hits */

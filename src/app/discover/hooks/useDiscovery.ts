@@ -133,6 +133,8 @@ export function useDiscovery() {
 
   const progressRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const abortRef = useRef<AbortController | null>(null)
+  /** Skip duplicate concurrent ranks for the same cache key (Strict Mode / URL churn). */
+  const inflightRankKeyRef = useRef<string | null>(null)
   const prefsHydrated = useRef(false)
 
   useEffect(() => {
@@ -236,11 +238,28 @@ export function useDiscovery() {
         ? PROGRESS_STAGES_WITH_HARVEST
         : PROGRESS_STAGES_CHEAP
 
+      const cacheKey = discoverRankCacheKey({
+        q: trimmed.length >= 2 ? trimmed : diseaseId,
+        diseaseId,
+        targets,
+      })
+
+      // Already ranking this exact query — do not open another POST (socket storm)
+      if (
+        !forceRefresh &&
+        inflightRankKeyRef.current === cacheKey &&
+        abortRef.current &&
+        !abortRef.current.signal.aborted
+      ) {
+        return
+      }
+
       if (abortRef.current) abortRef.current.abort()
       if (progressRef.current) clearTimeout(progressRef.current)
 
       const controller = new AbortController()
       abortRef.current = controller
+      inflightRankKeyRef.current = cacheKey
 
       setState((prev) => ({
         ...prev,
@@ -262,12 +281,6 @@ export function useDiscovery() {
       emitProductEvent('discover_started', {
         hasDiseaseId: Boolean(diseaseId),
         targetCount: targets.length,
-      })
-
-      const cacheKey = discoverRankCacheKey({
-        q: trimmed.length >= 2 ? trimmed : diseaseId,
-        diseaseId,
-        targets,
       })
 
       try {
@@ -306,6 +319,7 @@ export function useDiscovery() {
               ...cached,
               generatedAt: cached.generatedAt || entry?.at || undefined,
             }
+            if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
             setState((prev) => ({
               ...prev,
               status: 'success',
@@ -476,6 +490,7 @@ export function useDiscovery() {
           },
         })
 
+        if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
         setState((prev) => ({
           ...prev,
           status: 'success',
@@ -496,6 +511,7 @@ export function useDiscovery() {
         if (err instanceof DOMException && err.name === 'AbortError') {
           // A newer search owns abortRef — leave UI to that request (do not force idle).
           if (abortRef.current !== controller) return
+          if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
           // Active request aborted with no replacement: stay on loading briefly only if
           // still the active controller; prefer idle so URL deep-link effect can re-fire.
           setState((prev) =>
@@ -512,6 +528,7 @@ export function useDiscovery() {
         }
         // Non-abort error after a newer search started — do not clobber
         if (abortRef.current !== controller) return
+        if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
 
         setState((prev) => ({
           ...prev,

@@ -1,3 +1,10 @@
+import {
+  isInsufficientResourcesError,
+  singleFlightKey,
+  withRequestSlot,
+  withSingleFlight,
+} from './requestProtocol'
+
 const IS_DEV = typeof process !== 'undefined' && process.env.NODE_ENV === 'development'
 
 /** Hard ceiling so hung TCP cannot pin the in-flight dedupe map forever. */
@@ -48,25 +55,45 @@ function getKey(input: RequestInfo | URL, init?: RequestInit): string {
 
 const analyticsQueue: Array<Record<string, unknown>> = []
 let analyticsFlushTimer: ReturnType<typeof setTimeout> | null = null
+const ANALYTICS_FLUSH_MS = 4000
+const ANALYTICS_MAX_QUEUE = 80
 
 function flushAnalytics() {
   if (analyticsQueue.length === 0) return
   const batch = analyticsQueue.splice(0, analyticsQueue.length)
-  fetch('/api/analytics', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(batch),
-  }).catch(() => {})
+  // Telemetry: drop if browser is already at concurrent cap (never block UX)
+  void withRequestSlot(
+    () =>
+      fetch('/api/analytics', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(batch),
+        keepalive: true,
+      }),
+    { dropIfBusy: true, timeoutMs: 2000 },
+  ).catch(() => {})
 }
 
 function enqueueMetric(metric: Record<string, unknown>) {
+  if (analyticsQueue.length >= ANALYTICS_MAX_QUEUE) {
+    analyticsQueue.splice(0, analyticsQueue.length - ANALYTICS_MAX_QUEUE + 1)
+  }
   analyticsQueue.push(metric)
   if (!analyticsFlushTimer) {
     analyticsFlushTimer = setTimeout(() => {
       analyticsFlushTimer = null
       flushAnalytics()
-    }, 5000)
+    }, ANALYTICS_FLUSH_MS)
   }
+}
+
+/** Flush pending clientFetch metrics (pagehide / tests). */
+export function flushClientFetchAnalytics(): void {
+  if (analyticsFlushTimer) {
+    clearTimeout(analyticsFlushTimer)
+    analyticsFlushTimer = null
+  }
+  flushAnalytics()
 }
 
 /** Status codes worth retrying (HMR race 404s, rate limits, flaky upstream). */
@@ -219,7 +246,20 @@ export async function clientFetch(
   )
   const fetchInit: RequestInit = { ...init, signal }
 
-  const promise = (async (): Promise<Response> => {
+  // POST single-flight only when no AbortSignal (shared waiters must not share aborts)
+  const bodyStr =
+    typeof init?.body === 'string'
+      ? init.body
+      : init?.body != null
+        ? null
+        : ''
+  const canSingleFlightPost =
+    method.toUpperCase() === 'POST' &&
+    typeof bodyStr === 'string' &&
+    !init?.signal &&
+    (url.includes('/api/discover/rank') || url.includes('/api/analytics'))
+
+  const runNetwork = async (): Promise<Response> => {
     let lastError: unknown
     try {
       for (let attempt = 0; attempt < maxAttempts; attempt++) {
@@ -229,7 +269,11 @@ export async function clientFetch(
             : new DOMException('Aborted', 'AbortError')
         }
         try {
-          const response = await fetch(input, fetchInit)
+          // Concurrency gate — prevents Chrome ERR_INSUFFICIENT_RESOURCES
+          const response = await withRequestSlot(
+            () => fetch(input, fetchInit),
+            { timeoutMs: Math.max(timeoutMs || 40_000, 15_000) },
+          )
           if (
             response.ok ||
             attempt === maxAttempts - 1 ||
@@ -243,13 +287,25 @@ export async function clientFetch(
               ERR_STYLE,
             )
           }
-          // Drain body so the connection can close cleanly before retry
           await response.arrayBuffer().catch(() => {})
           await sleep(retryDelayMs * 2 ** attempt + Math.random() * 150)
         } catch (error) {
           lastError = error
-          // Never retry user/system aborts or hard timeouts
           if (isAbortError(error)) throw error
+          // One delayed retry on browser socket exhaustion
+          if (
+            isInsufficientResourcesError(error) &&
+            attempt < maxAttempts - 1
+          ) {
+            if (IS_DEV) {
+              console.warn(
+                `%c↻ retry after insufficient resources`,
+                ERR_STYLE,
+              )
+            }
+            await sleep(800 + Math.random() * 400)
+            continue
+          }
           if (attempt === maxAttempts - 1) throw error
           if (IS_DEV) {
             console.warn(
@@ -264,6 +320,14 @@ export async function clientFetch(
     } finally {
       cleanupSignal()
     }
+  }
+
+  const promise = (async (): Promise<Response> => {
+    if (canSingleFlightPost && bodyStr != null) {
+      const sfKey = singleFlightKey(method, url, bodyStr)
+      return withSingleFlight(sfKey, runNetwork)
+    }
+    return runNetwork()
   })().finally(() => {
     if (isDedupable) {
       inFlight.delete(key)

@@ -244,6 +244,69 @@ function attachSessionId(
   }
 }
 
+/** Batched POSTs to /api/analytics — one socket for many product events. */
+const productAnalyticsBatch: Array<Record<string, unknown>> = []
+let productAnalyticsTimer: ReturnType<typeof setTimeout> | null = null
+const PRODUCT_ANALYTICS_FLUSH_MS = 1500
+const PRODUCT_ANALYTICS_MAX = 60
+
+function flushProductAnalyticsBatch(): void {
+  if (productAnalyticsTimer) {
+    clearTimeout(productAnalyticsTimer)
+    productAnalyticsTimer = null
+  }
+  if (!canSend() || productAnalyticsBatch.length === 0) return
+  const batch = productAnalyticsBatch.splice(0, productAnalyticsBatch.length)
+  try {
+    // Prefer sendBeacon when available (survives navigation, one body)
+    const body = JSON.stringify(batch)
+    if (typeof navigator !== 'undefined' && typeof navigator.sendBeacon === 'function') {
+      const ok = navigator.sendBeacon(
+        '/api/analytics',
+        new Blob([body], { type: 'application/json' }),
+      )
+      if (ok) return
+    }
+    void fetch('/api/analytics', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+      keepalive: true,
+    }).catch(() => {})
+  } catch {
+    // never throw
+  }
+}
+
+function enqueueProductAnalyticsMetric(metric: Record<string, unknown>): void {
+  if (productAnalyticsBatch.length >= PRODUCT_ANALYTICS_MAX) {
+    productAnalyticsBatch.splice(0, productAnalyticsBatch.length - PRODUCT_ANALYTICS_MAX + 1)
+  }
+  productAnalyticsBatch.push(metric)
+  if (!productAnalyticsTimer) {
+    productAnalyticsTimer = setTimeout(() => {
+      productAnalyticsTimer = null
+      flushProductAnalyticsBatch()
+    }, PRODUCT_ANALYTICS_FLUSH_MS)
+  }
+}
+
+/** Flush product telemetry (pagehide / tests). */
+export function flushProductAnalytics(): void {
+  flushProductAnalyticsBatch()
+}
+
+if (typeof window !== 'undefined') {
+  window.addEventListener('pagehide', () => {
+    flushProductAnalyticsBatch()
+  })
+  if (typeof document !== 'undefined') {
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flushProductAnalyticsBatch()
+    })
+  }
+}
+
 function postOnce(name: ProductEventName, props?: ProductEvent['props']): void {
   const withSession = attachSessionId(props)
   const ev: ProductEvent = {
@@ -259,23 +322,15 @@ function postOnce(name: ProductEventName, props?: ProductEvent['props']): void {
   })
   if (!canSend()) return
 
-  try {
-    void fetch('/api/analytics', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        source: 'product',
-        endpoint: name,
-        status: 200,
-        duration_ms: typeof withSession?.ms === 'number' ? withSession.ms : 0,
-        items_count: typeof withSession?.count === 'number' ? withSession.count : 1,
-        error: withSession ? JSON.stringify(withSession).slice(0, 500) : undefined,
-      }),
-      keepalive: true,
-    }).catch(() => {})
-  } catch {
-    // never throw
-  }
+  // Batch metrics — avoid one HTTP POST per stage/event (ERR_INSUFFICIENT_RESOURCES)
+  enqueueProductAnalyticsMetric({
+    source: 'product',
+    endpoint: name,
+    status: 200,
+    duration_ms: typeof withSession?.ms === 'number' ? withSession.ms : 0,
+    items_count: typeof withSession?.count === 'number' ? withSession.count : 1,
+    error: withSession ? JSON.stringify(withSession).slice(0, 500) : undefined,
+  })
 }
 
 /**

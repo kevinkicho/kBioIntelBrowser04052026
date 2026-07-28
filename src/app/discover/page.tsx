@@ -149,10 +149,9 @@ export default function DiscoverPage() {
 
     return () => {
       cancelled = true
-      // Allow remount / re-entry to rank this URL again after abort
-      if (appliedUrlKey.current === key) {
-        appliedUrlKey.current = null
-      }
+      // Do NOT clear appliedUrlKey here — Strict Mode remount was causing
+      // duplicate /api/discover/rank POSTs and browser ERR_INSUFFICIENT_RESOURCES.
+      // Re-rank still runs when q/diseaseId/targets/refresh change (key changes).
     }
   }, [
     initialQuery,

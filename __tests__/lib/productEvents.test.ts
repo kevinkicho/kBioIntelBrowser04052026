@@ -5,6 +5,7 @@ import {
   clearQueuedProductEvents,
   emitDiscoverStagesFromTimingMs,
   emitProductEvent,
+  flushProductAnalytics,
   productEventLabel,
   readQueuedProductEvents,
   summarizeProductEvents,
@@ -14,9 +15,12 @@ describe('productEvents clean-cut (canonical only)', () => {
   beforeEach(() => {
     localStorage.clear()
     jest.spyOn(global, 'fetch').mockResolvedValue({ ok: true } as Response)
+    jest.useFakeTimers()
   })
 
   afterEach(() => {
+    flushProductAnalytics()
+    jest.useRealTimers()
     jest.restoreAllMocks()
   })
 
@@ -101,5 +105,21 @@ describe('productEvents clean-cut (canonical only)', () => {
     const stages = readQueuedProductEvents().filter((e) => e.name === 'discover_stage')
     expect(stages.length).toBe(2)
     expect(stages.map((e) => e.props?.stage).sort()).toEqual(['cheapScore', 'disease'])
+  })
+
+  test('batches analytics POSTs instead of one fetch per event', () => {
+    const fetchMock = global.fetch as jest.Mock
+    fetchMock.mockClear()
+    emitProductEvent('discover_started')
+    emitProductEvent('discover_rank_completed', { count: 3 })
+    emitDiscoverStagesFromTimingMs({ disease: 1, gather: 2, total: 9 })
+    // Still in batch window — no network yet
+    expect(fetchMock).not.toHaveBeenCalled()
+    jest.advanceTimersByTime(2000)
+    flushProductAnalytics()
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string)
+    expect(Array.isArray(body)).toBe(true)
+    expect(body.length).toBeGreaterThanOrEqual(3)
   })
 })
