@@ -249,8 +249,18 @@ export async function POST(request: NextRequest) {
   }
 
   const timer = startApiTimer()
+  /** Server wall budget — densify is non-fatal inside engine; this is last resort. */
+  const RANK_SERVER_TIMEOUT_MS = 50_000
   try {
-    const result = await rankCandidatesForDisease(query, options)
+    const result = await Promise.race([
+      rankCandidatesForDisease(query, options),
+      new Promise<never>((_, reject) => {
+        setTimeout(
+          () => reject(new Error(`Rank engine timed out after ${RANK_SERVER_TIMEOUT_MS}ms`)),
+          RANK_SERVER_TIMEOUT_MS,
+        )
+      }),
+    ])
     logApiOutcome({
       route: '/api/discover/rank',
       method: 'POST',

@@ -20,17 +20,18 @@ import {
   mergeOrphanetGenesIntoTargets,
 } from '@/lib/discovery/discoverUrl'
 import {
-  clearCachedDiscoverRank,
   discoverRankCacheKey,
-  getCachedDiscoverRankEntry,
   recordSearch,
-  setCachedDiscoverRank,
 } from '@/lib/searchHistory'
 import type { ScoreVector } from '@/lib/domain/score'
 import {
   emitDiscoverStagesFromTimingMs,
   emitProductEvent,
 } from '@/lib/productEvents'
+import {
+  formatPipelineForUi,
+  runDiscoverRankPipeline,
+} from '@/lib/pipeline'
 
 /** Progressive stages aligned with design §5.1.2 (cheap shortlist + optional harvest). */
 const PROGRESS_STAGES_CHEAP = [
@@ -288,63 +289,6 @@ export function useDiscovery() {
       })
 
       try {
-        // Client-side rank cache (warm reopen from history sidebar)
-        if (!forceRefresh) {
-          const entry = getCachedDiscoverRankEntry(cacheKey)
-          const cached = entry?.data as RankResult | null
-          if (cached?.candidates && Array.isArray(cached.candidates)) {
-            if (progressRef.current) clearTimeout(progressRef.current)
-            emitProductEvent('discover_rank_completed', {
-              count: cached.candidates.length,
-              diseaseId: cached.diseaseId ?? diseaseId ?? null,
-              scorePhase: cached.v2?.scorePhase ?? 'cheap',
-              cached: true,
-            })
-            const href = buildDiscoverHistoryHref(effectiveQuery, diseaseId, targets)
-            recordSearch({
-              kind: 'discover',
-              query: effectiveQuery,
-              title: cached.diseaseName || effectiveQuery,
-              href,
-              meta: {
-                diseaseId: cached.diseaseId ?? diseaseId ?? null,
-                targetCount: targets.length,
-                candidateCount: cached.candidates.length,
-              },
-            })
-            const atLabel = entry?.at
-              ? (() => {
-                  const t = Date.parse(entry.at)
-                  return Number.isFinite(t) ? new Date(t).toLocaleString() : entry.at
-                })()
-              : null
-            // Preserve honest rank timestamp for provenance (generatedAt or cache store time)
-            const cachedResult: RankResult = {
-              ...cached,
-              generatedAt: cached.generatedAt || entry?.at || undefined,
-            }
-            if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
-            setState((prev) => ({
-              ...prev,
-              status: 'success',
-              progress: 100,
-              progressLabel: atLabel
-                ? `Cached rank (${atLabel}): ${cached.candidates.length} candidates for "${cached.diseaseName || effectiveQuery}"`
-                : `Cached: ${cached.candidates.length} candidates for "${cached.diseaseName || effectiveQuery}"`,
-              result: cachedResult,
-              diseaseCandidates: [],
-              diseaseId: cached.diseaseId ?? diseaseId ?? null,
-              targets,
-              error: null,
-              harvestStatus: cached.v2?.scorePhase === 'full' ? 'done' : 'idle',
-              orphanetProvenance: null,
-            }))
-            return
-          }
-        } else {
-          clearCachedDiscoverRank(cacheKey)
-        }
-
         const rubric = scoreRubricFromPreferences(prefs)
         const body = {
           q: trimmed.length >= 2 ? trimmed : undefined,
@@ -361,26 +305,55 @@ export function useDiscovery() {
           mustHitPinnedTargets: prefs.mustHitPinnedTargets,
         }
 
-        const res = await clientFetch('/api/discover/rank', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
+        // Staged reliable pipeline: cache → network (retry) → validate → store
+        const pipe = await runDiscoverRankPipeline({
+          cacheKey,
+          body,
+          forceRefresh,
           signal: controller.signal,
+          overallTimeoutMs: 55_000,
         })
-        if (!res.ok) {
-          const data = await res.json().catch(() => ({}))
-          throw new Error(data.error ?? data.message ?? `Request failed (${res.status})`)
-        }
-        const data: RankResult = await res.json()
         // Superseded by a newer search (or unmount abort) — do not clobber UI/cache
         if (controller.signal.aborted || abortRef.current !== controller) return
-        try {
-          setCachedDiscoverRank(cacheKey, data)
-        } catch {
-          /* ignore */
-        }
 
+        const data = pipe.result
         if (progressRef.current) clearTimeout(progressRef.current)
+
+        if (pipe.fromCache) {
+          emitProductEvent('discover_rank_completed', {
+            count: data.candidates.length,
+            diseaseId: data.diseaseId ?? diseaseId ?? null,
+            scorePhase: data.v2?.scorePhase ?? 'cheap',
+            cached: true,
+          })
+          const href = buildDiscoverHistoryHref(effectiveQuery, diseaseId, targets)
+          recordSearch({
+            kind: 'discover',
+            query: effectiveQuery,
+            title: data.diseaseName || effectiveQuery,
+            href,
+            meta: {
+              diseaseId: data.diseaseId ?? diseaseId ?? null,
+              targetCount: targets.length,
+              candidateCount: data.candidates.length,
+            },
+          })
+          if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
+          setState((prev) => ({
+            ...prev,
+            status: 'success',
+            progress: 100,
+            progressLabel: `Cached: ${data.candidates.length} candidates for "${data.diseaseName || effectiveQuery}" · ${formatPipelineForUi(pipe.pipeline)}`,
+            result: data,
+            diseaseCandidates: [],
+            diseaseId: data.diseaseId ?? diseaseId ?? null,
+            targets,
+            error: null,
+            harvestStatus: data.v2?.scorePhase === 'full' ? 'done' : 'idle',
+            orphanetProvenance: null,
+          }))
+          return
+        }
 
         if (needsConfirmation(data) && !diseaseId) {
           const candidates = extractDiseaseCandidates(data)
@@ -495,11 +468,12 @@ export function useDiscovery() {
         })
 
         if (inflightRankKeyRef.current === cacheKey) inflightRankKeyRef.current = null
+        const pipeLabel = formatPipelineForUi(pipe.pipeline)
         setState((prev) => ({
           ...prev,
           status: 'success',
           progress: 100,
-          progressLabel: `Found ${data.candidates.length} candidates for "${data.diseaseName}"`,
+          progressLabel: `Found ${data.candidates.length} candidates for "${data.diseaseName}" · ${pipeLabel}`,
           result: data,
           diseaseCandidates: [],
           diseaseId: finalDiseaseId,

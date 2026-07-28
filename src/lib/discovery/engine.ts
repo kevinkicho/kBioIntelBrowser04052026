@@ -625,15 +625,30 @@ export async function rankCandidatesForDisease(
     }
   }
 
-  // Always densify top-K (safety + novelty free APIs) — denser shortlist
+  // Always densify top-K (safety + novelty free APIs) — denser shortlist.
+  // Densify is non-fatal: cheap shortlist is always returned if densify throws.
   let scorePhase: 'cheap' | 'full' = 'cheap'
-  const densify = await densifyShortlist({
-    candidates: sorted,
-    scoreByName,
-    rubric,
-    k: densifyK,
-    skip: !alwaysDensify,
-  })
+  let densify: Awaited<ReturnType<typeof densifyShortlist>>
+  try {
+    densify = await densifyShortlist({
+      candidates: sorted,
+      scoreByName,
+      rubric,
+      k: densifyK,
+      skip: !alwaysDensify,
+    })
+  } catch {
+    densify = {
+      scoreByName,
+      candidates: sorted,
+      harvest: null,
+      breadthByName: new Map(),
+      densifiedCount: 0,
+      skipped: true,
+      timingMs: 0,
+      warnings: ['Densify pipeline failed (non-fatal); returning cheap shortlist.'],
+    }
+  }
   timing.densify = densify.timingMs
   timing.safetyHarvest = densify.timingMs
   scoreByName = densify.scoreByName

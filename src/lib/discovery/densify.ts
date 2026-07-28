@@ -11,6 +11,7 @@ import {
   type HarvestResult,
 } from './harvest'
 import {
+  BREADTH_CONCURRENCY,
   harvestBreadthBatch,
   mergeLitHitProxy,
   type BreadthHarvestOpts,
@@ -82,22 +83,42 @@ export async function densifyShortlist(input: DensifyInput): Promise<DensifyResu
   }
 
   const top = input.candidates.slice(0, k)
-  const harvest = await harvestCandidateAxes(
-    top.map((c) => ({
-      name: c.name,
-      scores: scoreByName.get(c.name.toLowerCase()),
-      phaseNorm: c.clinicalPhase,
-      clinicalStage: scoreByName.get(c.name.toLowerCase())?.axes.clinicalStage ?? c.clinicalPhase,
-    })),
-    {
-      runSafety: true,
-      runNovelty: true,
-      rubric: input.rubric,
-      concurrency: HARVEST_CONCURRENCY,
-      safetyTimeoutMs: DENSIFY_SAFETY_TIMEOUT_MS,
-      noveltyTimeoutMs: DENSIFY_NOVELTY_TIMEOUT_MS,
-    },
-  )
+  // Harvest is best-effort: never throw out of densify (rank must still return cheap scores)
+  let harvest: Awaited<ReturnType<typeof harvestCandidateAxes>> | null = null
+  try {
+    harvest = await harvestCandidateAxes(
+      top.map((c) => ({
+        name: c.name,
+        scores: scoreByName.get(c.name.toLowerCase()),
+        phaseNorm: c.clinicalPhase,
+        clinicalStage:
+          scoreByName.get(c.name.toLowerCase())?.axes.clinicalStage ?? c.clinicalPhase,
+      })),
+      {
+        runSafety: true,
+        runNovelty: true,
+        rubric: input.rubric,
+        concurrency: HARVEST_CONCURRENCY,
+        safetyTimeoutMs: DENSIFY_SAFETY_TIMEOUT_MS,
+        noveltyTimeoutMs: DENSIFY_NOVELTY_TIMEOUT_MS,
+      },
+    )
+  } catch {
+    warnings.push('Safety/novelty harvest failed (non-fatal); cheap scores retained.')
+    return {
+      scoreByName,
+      candidates: input.candidates.map((c) => {
+        const s = scoreByName.get(c.name.toLowerCase())
+        return s ? { ...c, compositeScore: s.composite } : c
+      }),
+      harvest: null,
+      breadthByName,
+      densifiedCount: 0,
+      skipped: false,
+      timingMs: Date.now() - start,
+      warnings,
+    }
+  }
 
   warnings.push(...harvest.warnings)
   for (const h of harvest.candidates) {
@@ -116,7 +137,7 @@ export async function densifyShortlist(input: DensifyInput): Promise<DensifyResu
     try {
       const breadth = await harvestBreadthBatch(
         top.map((c) => c.name),
-        3,
+        BREADTH_CONCURRENCY,
         optsByName,
       )
       for (const [key, row] of Array.from(breadth.entries())) {
