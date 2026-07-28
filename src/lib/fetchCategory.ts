@@ -1,3 +1,7 @@
+/**
+ * Profile category fetch — L1/L2 cache then network with staged reliability.
+ */
+
 import type { CategoryId } from './categoryConfig'
 import { clientFetch } from './clientFetch'
 import type { ApiIdentifierType, ApiParamValue } from './apiIdentifiers'
@@ -8,6 +12,9 @@ import {
   setProfileClientCache,
 } from './profileClientCache'
 import { logAgentActivity } from './agentActivityLog'
+import { newPipelineRun, runStage } from './pipeline'
+import type { PipelineReport } from './pipeline'
+import { underResourcePressure } from './requestProtocol'
 
 export type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -22,9 +29,10 @@ function categoryCacheExtra(
   apiOverrides?: Record<string, ApiIdentifierType>,
   apiParams?: Record<string, ApiParamValue>,
 ): string {
-  const o = apiOverrides && Object.keys(apiOverrides).length > 0
-    ? JSON.stringify(apiOverrides)
-    : ''
+  const o =
+    apiOverrides && Object.keys(apiOverrides).length > 0
+      ? JSON.stringify(apiOverrides)
+      : ''
   let p = ''
   if (apiParams) {
     const filtered: Record<string, ApiParamValue> = {}
@@ -57,30 +65,81 @@ export function peekCategoryClientCache(
   )
 }
 
+export interface FetchCategoryResult {
+  data: Record<string, unknown>
+  pipeline: PipelineReport
+  fromCache: boolean
+}
+
+/**
+ * Fetch one profile category with staged reliability:
+ * cache_lookup → (optional delay under pressure) → network → stamp_cache
+ */
 export async function fetchCategoryData(
   cid: number,
   categoryId: CategoryId,
   apiOverrides?: Record<string, ApiIdentifierType>,
   apiParams?: Record<string, ApiParamValue>,
-  opts?: { refresh?: boolean; signal?: AbortSignal },
+  opts?: { refresh?: boolean; signal?: AbortSignal; returnPipeline?: boolean },
 ): Promise<Record<string, unknown>> {
-  const cacheKey = categoryProfileCacheKey(cid, categoryId, apiOverrides, apiParams)
+  const out = await fetchCategoryDataDetailed(cid, categoryId, apiOverrides, apiParams, opts)
+  return out.data
+}
 
-  if (opts?.signal?.aborted) {
-    throw opts.signal.reason instanceof Error
-      ? opts.signal.reason
+/** Same as fetchCategoryData but includes pipeline report (tests / telemetry). */
+export async function fetchCategoryDataDetailed(
+  cid: number,
+  categoryId: CategoryId,
+  apiOverrides?: Record<string, ApiIdentifierType>,
+  apiParams?: Record<string, ApiParamValue>,
+  opts?: { refresh?: boolean; signal?: AbortSignal },
+): Promise<FetchCategoryResult> {
+  const cacheKey = categoryProfileCacheKey(cid, categoryId, apiOverrides, apiParams)
+  const run = newPipelineRun(`category:${categoryId}`)
+  const signal = opts?.signal
+
+  if (signal?.aborted) {
+    throw signal.reason instanceof Error
+      ? signal.reason
       : new DOMException('Aborted', 'AbortError')
   }
 
-  // History / SPA / hard-reload: L1 memory then L2 IDB without network.
+  // --- cache ---
   if (!opts?.refresh) {
-    const cached = await getProfileClientCacheAsync<Record<string, unknown>>(cacheKey)
+    const { value: cached, stage } = await runStage(
+      { id: 'cache_lookup', timeoutMs: 3_000, optional: true, signal },
+      async () => {
+        const hit = await getProfileClientCacheAsync<Record<string, unknown>>(cacheKey)
+        return hit ?? null
+      },
+    )
+    run.addStage(stage)
     if (cached) {
-      logAgentActivity('profile.cache.hit', { cid, categoryId, layer: 'l1_or_l2' }, { source: 'profile' })
-      // Mark hit without rewriting stored _clientFetchedAt (honest freshness trail).
-      return { ...cached, _fromClientCache: true }
+      logAgentActivity(
+        'profile.cache.hit',
+        { cid, categoryId, layer: 'l1_or_l2' },
+        { source: 'profile' },
+      )
+      return {
+        data: { ...cached, _fromClientCache: true },
+        pipeline: run.finish(true, false),
+        fromCache: true,
+      }
     }
     logAgentActivity('profile.cache.miss', { cid, categoryId }, { source: 'profile' })
+  } else {
+    run.addStage({
+      id: 'cache_lookup',
+      status: 'skipped',
+      ms: 0,
+      notes: ['refresh — cache bypassed'],
+    })
+  }
+
+  // Yield sockets when browser is under resource pressure
+  if (underResourcePressure()) {
+    run.report.warnings.push('resource pressure — brief delay before category network')
+    await new Promise((r) => setTimeout(r, 400 + Math.random() * 400))
   }
 
   let url = `/api/molecule/${cid}/category/${categoryId}`
@@ -98,38 +157,63 @@ export async function fetchCategoryData(
     }
   }
   if (opts?.refresh) {
-    // Bust client session cache + browser HTTP cache so soft-refresh never serves stale deep links/payloads
     params.set('refresh', '1')
     params.set('_t', String(Date.now()))
   }
   const qs = params.toString()
   if (qs) url += `?${qs}`
 
-  // Category fetches fan out to many free APIs (often 8–15s). Give more wall time
-  // than the default 40s clientFetch budget when a soft stampede is in flight.
-  // Retries cover Fast Refresh 404s, PubChem 502s, and transient category 500s.
-  // Pass signal so force/remount aborts in-flight category work.
-  const res = await clientFetch(
-    url,
-    opts?.signal ? { signal: opts.signal } : undefined,
+  const { value: raw, stage: netStage } = await runStage(
     {
-      retries: 3,
+      id: 'network_category',
+      timeoutMs: 95_000,
+      retries: 2,
       retryDelayMs: 600,
-      // Include 408 in case proxies surface timeouts as such
-      retryStatuses: [404, 408, 429, 500, 502, 503, 504],
-      timeoutMs: 90_000,
+      signal,
+    },
+    async () => {
+      const res = await clientFetch(
+        url,
+        signal ? { signal } : undefined,
+        {
+          retries: 3,
+          retryDelayMs: 600,
+          retryStatuses: [404, 408, 429, 500, 502, 503, 504],
+          timeoutMs: 90_000,
+        },
+      )
+      if (!res.ok) {
+        throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)
+      }
+      return (await res.json()) as Record<string, unknown>
     },
   )
-  if (!res.ok) {
-    throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)
+  run.addStage(netStage)
+
+  if (!raw) {
+    const e = new Error(netStage.error || `Failed to fetch ${categoryId}`)
+    ;(e as Error & { pipeline?: PipelineReport }).pipeline = run.finish(false, false)
+    throw e
   }
-  const raw = (await res.json()) as Record<string, unknown>
-  // Stamp first-network time so cache hits keep an honest freshness trail.
+
   const data: Record<string, unknown> = {
     ...raw,
     _clientFetchedAt: new Date().toISOString(),
     _fromClientCache: false,
   }
-  setProfileClientCache(cacheKey, data)
-  return data
+
+  const { stage: storeStage } = await runStage(
+    { id: 'cache_store', timeoutMs: 2_000, optional: true, signal },
+    async () => {
+      setProfileClientCache(cacheKey, data)
+      return true
+    },
+  )
+  run.addStage(storeStage)
+
+  return {
+    data,
+    pipeline: run.finish(true, storeStage.status !== 'ok'),
+    fromCache: false,
+  }
 }

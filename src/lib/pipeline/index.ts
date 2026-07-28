@@ -16,3 +16,8 @@ export {
   type DiscoverRankPipelineInput,
   type DiscoverRankPipelineResult,
 } from './discoverRankClient'
+export {
+  runDiscoverHarvestPipeline,
+  type DiscoverHarvestCandidateIn,
+  type DiscoverHarvestResult,
+} from './discoverHarvestClient'

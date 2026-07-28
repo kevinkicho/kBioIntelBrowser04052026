@@ -23,13 +23,13 @@ import {
   discoverRankCacheKey,
   recordSearch,
 } from '@/lib/searchHistory'
-import type { ScoreVector } from '@/lib/domain/score'
 import {
   emitDiscoverStagesFromTimingMs,
   emitProductEvent,
 } from '@/lib/productEvents'
 import {
   formatPipelineForUi,
+  runDiscoverHarvestPipeline,
   runDiscoverRankPipeline,
 } from '@/lib/pipeline'
 
@@ -541,10 +541,12 @@ export function useDiscovery() {
 
   /**
    * Deferred harvest for board/promote default: load safety+novelty for current shortlist.
+   * Uses staged harvest pipeline (retry + validate).
    */
   const harvestSafety = useCallback(async () => {
-    if (!state.result?.candidates?.length) return
-    if (state.harvestStatus === 'loading') return
+    const live = stateRef.current
+    if (!live.result?.candidates?.length) return
+    if (live.harvestStatus === 'loading') return
 
     setState((prev) => ({
       ...prev,
@@ -554,37 +556,22 @@ export function useDiscovery() {
     }))
 
     try {
-      const prefs = state.prefs
+      const prefs = live.prefs
       const rubric = scoreRubricFromPreferences(prefs)
-      const body = {
-        candidates: state.result.candidates.slice(0, 15).map((c, i) => ({
+      const pipe = await runDiscoverHarvestPipeline({
+        candidates: live.result.candidates.slice(0, 15).map((c, i) => ({
           name: c.name,
-          candidateId: state.result?.v2?.candidates[i]?.candidateId,
-          scores: state.result?.v2?.candidates[i]?.scores,
+          candidateId: live.result?.v2?.candidates[i]?.candidateId,
+          scores: live.result?.v2?.candidates[i]?.scores,
           phaseNorm: c.clinicalPhase,
           clinicalStage:
-            state.result?.v2?.candidates[i]?.scores?.axes.clinicalStage ?? c.clinicalPhase,
+            live.result?.v2?.candidates[i]?.scores?.axes.clinicalStage ?? c.clinicalPhase,
         })),
-        runSafety: true,
-        runNovelty: true,
         rubric,
-      }
-
-      const res = await clientFetch('/api/discover/harvest', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
       })
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}))
-        throw new Error(data.error ?? data.message ?? `Harvest failed (${res.status})`)
-      }
-      const data = (await res.json()) as {
-        candidates: { name: string; scores: ScoreVector }[]
-      }
 
       const scoreByName = new Map(
-        data.candidates.map((c) => [c.name.toLowerCase(), c.scores]),
+        pipe.candidates.map((c) => [c.name.toLowerCase(), c.scores]),
       )
 
       setState((prev) => {
@@ -619,7 +606,7 @@ export function useDiscovery() {
         return {
           ...prev,
           harvestStatus: 'done',
-          progressLabel: 'Safety & novelty scores loaded',
+          progressLabel: `Safety & novelty scores loaded · ${formatPipelineForUi(pipe.pipeline)}`,
           result: {
             ...prev.result,
             candidates: nextCandidates,
@@ -634,7 +621,7 @@ export function useDiscovery() {
         harvestError: err instanceof Error ? err.message : 'Harvest failed',
       }))
     }
-  }, [state.result, state.prefs, state.harvestStatus])
+  }, [])
 
   const setTargets = useCallback((targets: string[]) => {
     setState((prev) => ({
