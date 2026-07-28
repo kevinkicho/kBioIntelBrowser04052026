@@ -796,26 +796,27 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
           : 'pharmaceutical'
     void loadCategory(first)
 
-    // 2) Rest of first-paint set after a short yield (reduces concurrent free-API storm)
+    // 2–3) Stagger remaining categories (stampede control: ~180ms between starts;
+    // network also capped at 3 concurrent via categoryFetchScheduler)
     const rest: CategoryId[] = isDecisionMode
       ? DECISION_CATEGORY_IDS.filter((id) => id !== first)
-      : TIER1_CATEGORIES.filter((id) => id !== first)
+      : [...TIER1_CATEGORIES.filter((id) => id !== first), ...TIER2_CATEGORIES]
 
+    let cancelStagger: (() => void) | undefined
     const t1 = window.setTimeout(() => {
       if (cancelled) return
-      for (const id of rest) void loadCategory(id)
-    }, 120)
-
-    // 3) Tier-2 after further delay (full mode only)
-    const t2 = window.setTimeout(() => {
-      if (cancelled || isDecisionMode) return
-      for (const id of TIER2_CATEGORIES) void loadCategory(id)
-    }, 900)
+      void import('@/lib/pipeline/categoryFetchScheduler').then(({ scheduleStaggeredLoads }) => {
+        if (cancelled) return
+        cancelStagger = scheduleStaggeredLoads(rest, (id) => {
+          if (!cancelled) void loadCategory(id)
+        }, { delayMs: 180 })
+      })
+    }, 100)
 
     return () => {
       cancelled = true
       window.clearTimeout(t1)
-      window.clearTimeout(t2)
+      cancelStagger?.()
     }
   }, [loadCategory, snapshotId, isDecisionMode, cacheReady, activeCategory]) // eslint-disable-line react-hooks/exhaustive-deps
 

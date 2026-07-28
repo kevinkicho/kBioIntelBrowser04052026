@@ -32,7 +32,10 @@ export interface AgentLoopOptions {
   /** Stream one completion for the current messages. */
   streamOnce: (messages: ChatMessage[]) => AsyncGenerator<string, void, unknown>
   parseToolCall: (text: string) => AgentToolCall | null
-  executeTool: (call: AgentToolCall) => AgentToolResult
+  /** Sync or async tool execution (async preferred for timeouts / network tools). */
+  executeTool: (
+    call: AgentToolCall,
+  ) => AgentToolResult | Promise<AgentToolResult>
   formatObservation: (result: AgentToolResult) => string
   maxToolSteps?: number
   signal?: AbortSignal
@@ -79,7 +82,19 @@ export async function runAgentToolLoop(opts: AgentLoopOptions): Promise<AgentLoo
       if (!toolCall || step >= maxSteps) break
 
       opts.onToolStart?.(toolCall.name)
-      const result = opts.executeTool(toolCall)
+      let result: AgentToolResult
+      try {
+        result = await Promise.resolve(opts.executeTool(toolCall))
+      } catch (toolErr) {
+        result = {
+          name: toolCall.name,
+          ok: false,
+          summary:
+            toolErr instanceof Error
+              ? toolErr.message.slice(0, 200)
+              : `Tool ${toolCall.name} failed`,
+        }
+      }
       const trace: AgentToolTrace = {
         name: result.name,
         ok: result.ok,

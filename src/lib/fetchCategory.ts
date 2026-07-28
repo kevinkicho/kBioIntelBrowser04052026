@@ -14,6 +14,7 @@ import {
 import { logAgentActivity } from './agentActivityLog'
 import { newPipelineRun, runStage } from './pipeline'
 import type { PipelineReport } from './pipeline'
+import { withCategorySlot } from './pipeline/categoryFetchScheduler'
 import { underResourcePressure } from './requestProtocol'
 
 export type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
@@ -163,6 +164,7 @@ export async function fetchCategoryDataDetailed(
   const qs = params.toString()
   if (qs) url += `?${qs}`
 
+  // Category network is stampede-controlled (max 3 concurrent profile categories)
   const { value: raw, stage: netStage } = await runStage(
     {
       id: 'network_category',
@@ -171,22 +173,26 @@ export async function fetchCategoryDataDetailed(
       retryDelayMs: 600,
       signal,
     },
-    async () => {
-      const res = await clientFetch(
-        url,
-        signal ? { signal } : undefined,
-        {
-          retries: 3,
-          retryDelayMs: 600,
-          retryStatuses: [404, 408, 429, 500, 502, 503, 504],
-          timeoutMs: 90_000,
+    async () =>
+      withCategorySlot(
+        async () => {
+          const res = await clientFetch(
+            url,
+            signal ? { signal } : undefined,
+            {
+              retries: 3,
+              retryDelayMs: 600,
+              retryStatuses: [404, 408, 429, 500, 502, 503, 504],
+              timeoutMs: 90_000,
+            },
+          )
+          if (!res.ok) {
+            throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)
+          }
+          return (await res.json()) as Record<string, unknown>
         },
-      )
-      if (!res.ok) {
-        throw new Error(`Failed to fetch ${categoryId}: ${res.status}`)
-      }
-      return (await res.json()) as Record<string, unknown>
-    },
+        { signal, timeoutMs: 120_000 },
+      ),
   )
   run.addStage(netStage)
 

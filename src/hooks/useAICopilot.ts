@@ -748,14 +748,26 @@ export function useAICopilot(
       signal: controller.signal,
       streamOnce: (msgs) => ai.askAI(msgs),
       parseToolCall: (text) => parseToolCall(text),
-      executeTool: (call) =>
-        executeCopilotTool(
+      executeTool: async (call) => {
+        const { runCopilotToolPipeline } = await import(
+          '@/lib/pipeline/copilotToolPipeline'
+        )
+        const { result } = await runCopilotToolPipeline(
           {
             name: call.name as Parameters<typeof executeCopilotTool>[0]['name'],
             args: call.args,
           },
           buildToolContext(),
-        ),
+          { signal: controller.signal, timeoutMs: 8_000 },
+        )
+        return {
+          name: result.name,
+          ok: result.ok,
+          summary: result.summary,
+          data: result.data,
+          categoryId: result.categoryId,
+        }
+      },
       formatObservation: (r) =>
         formatToolObservation({
           name: r.name as Parameters<typeof formatToolObservation>[0]['name'],

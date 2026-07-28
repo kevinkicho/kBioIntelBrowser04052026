@@ -41,3 +41,14 @@ export {
   type PackAiValidatePipelineInput,
   type PackAiValidatePipelineResult,
 } from './packAiValidatePipeline'
+export {
+  runCopilotToolPipeline,
+  type CopilotToolPipelineResult,
+} from './copilotToolPipeline'
+export {
+  MAX_CATEGORY_NETWORK,
+  withCategorySlot,
+  scheduleStaggeredLoads,
+  categorySchedulerSnapshot,
+  resetCategorySchedulerForTests,
+} from './categoryFetchScheduler'
