@@ -4,6 +4,8 @@
 
 import type { EvidenceClaim } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
+import { AI_PROVENANCE_HONESTY } from '@/lib/ai/aiProvenance'
+import { API_PROVENANCE_HONESTY } from '@/lib/provenance/apiContent'
 import {
   buildResearchKitBundle,
   type ResearchKitBundle,
@@ -19,7 +21,7 @@ export interface MondayPackInput extends ResearchKitInput {
 }
 
 export interface MondayPackDocument {
-  schemaVersion: 1
+  schemaVersion: 2
   kind: 'biointel-monday-pack'
   title: string
   subjectId: string
@@ -31,6 +33,20 @@ export interface MondayPackDocument {
   claimCount: number
   /** Short agenda bullets for lab meeting */
   agenda: string[]
+  /** Dual provenance for lab handoff */
+  provenance?: {
+    api: {
+      factCount: number
+      sourceCount: number
+      honesty: string[]
+    }
+    ai: {
+      honesty: string[]
+      note: string
+    }
+  }
+  /** Optional open links for Monday work */
+  openLinks?: Array<{ label: string; href: string }>
 }
 
 export function buildMondayPackTitle(
@@ -68,8 +84,10 @@ export function buildMondayPack(input: MondayPackInput): MondayPackDocument {
   })
   const claims = input.claims ?? []
   const exportedAt = input.asOf || new Date().toISOString()
+  const filled = input.ledger.rows.filter((r) => r.value && r.value !== '—').length
+  const sid = input.ledger.subjectId
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: 'biointel-monday-pack',
     title: buildMondayPackTitle(input.ledger, input.contextLabel, exportedAt),
     subjectId: input.ledger.subjectId,
@@ -85,6 +103,31 @@ export function buildMondayPack(input: MondayPackInput): MondayPackDocument {
     kit,
     claimCount: claims.length,
     agenda: buildMondayPackAgenda(input.ledger, claims),
+    provenance: {
+      api: {
+        factCount: filled,
+        sourceCount: input.ledger.sourceCount,
+        honesty: [...API_PROVENANCE_HONESTY],
+      },
+      ai: {
+        honesty: [...AI_PROVENANCE_HONESTY],
+        note: 'Any AI briefs attached separately must include promptSystem/promptUser; this pack is of-record kit first.',
+      },
+    },
+    openLinks: [
+      {
+        label: 'Molecule research view',
+        href: `/molecule/${encodeURIComponent(sid)}?view=research`,
+      },
+      {
+        label: 'Methodology · honesty',
+        href: '/methodology#honesty',
+      },
+      {
+        label: 'Methodology · provenance',
+        href: '/methodology#provenance',
+      },
+    ],
   }
 }
 

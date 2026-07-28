@@ -16,6 +16,7 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiContentProvenance } from '@/components/ai/AiContentProvenance'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { EmptyStateTip, HelperTip, StatementTip } from '@/components/ui/HelperTip'
@@ -319,6 +320,32 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
           />
         )}
       </div>
+
+      {promptPreview && (
+        <AiContentProvenance
+          className="mb-2"
+          testId="pack-ai-content-provenance"
+          density="compact"
+          meta={{
+            kind: 'pack',
+            mode,
+            promptSystem: promptPreview.system,
+            promptUser: promptPreview.user,
+            model: ai.model,
+            version: 'packAi@v1',
+            contextKey: pack?.id || pack?.title,
+            historyRefreshKey: histRefresh,
+            activeGenId,
+          }}
+          busy={busy}
+          onRegenerate={(opts) => void run(opts)}
+          onLoadEntry={(entry) => {
+            const insight = parseAiGenerationInsight(entry)
+            if (insight) setInsight(insight)
+            setActiveGenId(entry.id)
+          }}
+        />
+      )}
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90">

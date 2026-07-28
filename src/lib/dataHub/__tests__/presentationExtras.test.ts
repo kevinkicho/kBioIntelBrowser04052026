@@ -93,8 +93,10 @@ describe('Monday pack', () => {
       contextLabel: 'Pain',
       asOf: '2026-04-15T12:00:00.000Z',
     })
-    expect(pack.schemaVersion).toBe(1)
+    expect(pack.schemaVersion).toBe(2)
     expect(pack.kind).toBe('biointel-monday-pack')
+    expect(pack.provenance?.api).toBeTruthy()
+    expect(pack.openLinks?.length).toBeGreaterThan(0)
     expect(pack.title).toMatch(/Monday research pack/)
     expect(pack.title).toMatch(/Pain/)
     expect(pack.kit.kind).toBe('biointel-research-kit-bundle')

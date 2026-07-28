@@ -205,8 +205,34 @@ export default function MethodologyPage() {
           </div>
         </section>
 
+        <section id="provenance" className="mb-8 scroll-mt-20 rounded-xl border border-slate-800 bg-slate-900/40 p-4 sm:p-5">
+          <h2 className="text-sm font-semibold text-slate-100">Dual provenance (API + AI)</h2>
+          <p className="mt-2 text-[12px] leading-relaxed text-slate-400">
+            Every of-record fact should name a free public source and offer docs/endpoint when known
+            (API button / Source ↗ on hub rows and Discover cards). Every model-generated block should
+            expose <strong className="font-medium text-slate-300">Prompt</strong> (exact system + user
+            text), <strong className="font-medium text-slate-300">Regenerate</strong> with review, and{' '}
+            <strong className="font-medium text-slate-300">paginated past runs</strong> (local IDB;
+            cloud when signed in). AI never overwrites Discover of-record ranks or hub values.
+          </p>
+          <ul className="mt-3 list-disc space-y-1.5 pl-4 text-[12px] text-slate-400">
+            <li>
+              <span className="text-slate-200">API provenance</span> — Fact · Value · Source · Open;
+              Cite copies lab-notebook citation; methodology honesty for limits.
+            </li>
+            <li>
+              <span className="text-slate-200">AI provenance</span> — kind, mode, model, prompts,
+              regenerate, load prior generation; labeled non-of-record.
+            </li>
+            <li>
+              <span className="text-slate-200">Monday pack v2</span> — embeds API + AI honesty blocks
+              with open links to research view and this page.
+            </li>
+          </ul>
+        </section>
+
         <section id="honesty" className="mb-8 scroll-mt-20">
-          <h2 className="mb-3 text-sm font-semibold text-slate-100">Honesty rules</h2>
+          <h2 className="text-sm font-semibold text-slate-100">Honesty rules</h2>
           <dl className="space-y-3">
             {RULES.map((r) => (
               <div key={r.title} className="border-l-2 border-indigo-800/50 pl-3">

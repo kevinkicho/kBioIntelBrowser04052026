@@ -376,16 +376,32 @@ export function useAICopilot(
       }
     }
 
-    // ── Deep synthesis: fail closed when evidence is thin ────────────────
+    // ── Load-then-reason: kick Core loads before fail-closed ─────────────
     if (
       !isDiseaseContext &&
       !isGeneContext &&
       modeRequiresDeepDensity(mode) &&
       !grounding.canDeepSynthesize
     ) {
-      addMessage('system', buildFailClosedMessage(grounding, mode), mode)
+      const load = actionsRef.current?.loadCategory
+      if (load && grounding.missingCore.length > 0) {
+        for (const cat of grounding.missingCore) {
+          try {
+            load(cat)
+          } catch {
+            /* ignore */
+          }
+        }
+        addMessage(
+          'system',
+          `Loading Core categories for denser evidence: ${grounding.missingCore.join(', ')}. Re-run this mode after panels fill. Prefer Safety memo / Prior-art (deterministic) now.`,
+          mode,
+        )
+      } else {
+        addMessage('system', buildFailClosedMessage(grounding, mode), mode)
+      }
       // Offer deterministic safety memo as useful fallback
-      if (mode === 'safety_deep_dive' || mode === 'auto_insight') {
+      if (mode === 'safety_deep_dive' || mode === 'auto_insight' || mode === 'executive_brief') {
         const memo = buildDeterministicSafetyMemo(context)
         if (memo.rows.length > 0 || memo.mechanisms.length > 0) {
           const text = formatSafetyMemoAsText(memo)

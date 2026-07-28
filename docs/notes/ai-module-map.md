@@ -25,6 +25,17 @@ Do **not** merge Pack/RH prompt systems into Copilot tools. Share only runtime h
 | Deterministic jobs | `deterministicArtifacts`: prior-art, safety memo, next actions |
 | Dense packs | `evidencePack.ts` named NCT/pChEMBL/AE rows (not counts only) |
 | Pack brief threshold | `minClaimsForPackMode` executive ≥10, red-team ≥8 |
+| Load-then-reason | Missing Core categories trigger `loadCategory` before refuse |
+
+## Dual provenance (API + AI) — required on content
+
+| Kind | Contract | UI |
+|------|----------|-----|
+| **API / of-record** | Source label + docs/endpoint when known + record URL + retrievedAt | `ApiProvenanceChip`, `DataPoint`, hub Cite/Source |
+| **AI / non-of-record** | kind · mode · model · promptSystem · promptUser · regenerate · paginated history | `AiContentProvenance` = Prompt + Regenerate + `AiRunNavigator` |
+
+Code: `src/lib/ai/aiProvenance.ts`, `src/lib/provenance/apiContent.ts`, `src/components/ai/AiContentProvenance.tsx`.
+Public methodology: `/methodology#provenance`.
 
 ## Layout
 

@@ -34,6 +34,7 @@ import { ResearchShelvesPanel } from '@/components/dataHub/ResearchShelvesPanel'
 import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
 import { isHubDomainEnabled } from '@/lib/researchViewPrefs'
 import { markShelfKitExported, loadResearchShelves } from '@/lib/researchShelves'
+import { ApiProvenanceChip } from '@/components/ui/ApiProvenanceChip'
 
 export interface DataHubLedgerProps {
   ledger: DataHubLedger
@@ -81,8 +82,15 @@ function RowActions({
   const href = stableHref(row.sourceUrl)
   const canPanel = Boolean(row.panelId && row.categoryId && onOpenPanel)
   const [copied, setCopied] = useState(false)
+  const sourceKey = row.panelId || row.source || 'pubchem'
   return (
     <span className="inline-flex flex-wrap items-center gap-1">
+      <ApiProvenanceChip
+        sourceKey={sourceKey}
+        sourceUrl={href || undefined}
+        fetchedAt={row.retrievedAt}
+        testId={`data-hub-api-${row.id}`}
+      />
       <button
         type="button"
         onClick={() => {
@@ -430,7 +438,17 @@ export function DataHubLedgerView({
                           <td className="py-1 pr-2 text-[11px] text-slate-100">
                             <span className="break-words">{r.value}</span>
                           </td>
-                          <td className="py-1 pr-2 text-[10px] text-slate-400">{r.source}</td>
+                          <td className="py-1 pr-2 text-[10px] text-slate-400">
+                            <span className="inline-flex flex-wrap items-center gap-1">
+                              {r.source}
+                              <ApiProvenanceChip
+                                sourceKey={r.panelId || r.source || 'pubchem'}
+                                sourceUrl={stableHref(r.sourceUrl) || undefined}
+                                fetchedAt={r.retrievedAt}
+                                testId={`${testId}-src-api-${r.id}`}
+                              />
+                            </span>
+                          </td>
                           <td className="py-1">
                             <RowActions
                               row={r}

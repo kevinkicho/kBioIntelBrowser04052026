@@ -141,6 +141,8 @@ Commands:
 
   research kit --cid <n> [--out file.json] [--categories a,b]
                            Build of-record research kit bundle (needs app running)
+  discover densify --q <query> [--targets TTR] [--limit 15] [--json]
+                           Rank + densify shortlist (deterministic; needs app)
 
   orphanet genes --q <disease> GET Orphanet gene pins
 
@@ -253,14 +255,21 @@ async function cmdDiscoverRank(flags) {
         .filter(Boolean)
     : []
   const limit = parseInt(flags.limit || '15', 10) || 15
+  // Server rank path densifies top-K by default; keep harvest flags true
+  const densify =
+    flags.densify !== false &&
+    flags.densify !== 'false' &&
+    flags.safety !== false &&
+    flags.safety !== 'false'
   const body = {
     q: String(q),
     targets,
     limit,
     rubricPreset: flags.preset || flags.rubricPreset || 'balanced',
     aeAggressiveness: flags.ae || 'soft-flag',
-    runSafetyHarvest: flags.safety === true || flags.safety === 'true',
-    runNoveltyHarvest: flags.novelty === true || flags.novelty === 'true',
+    runSafetyHarvest: densify,
+    runNoveltyHarvest:
+      densify || flags.novelty === true || flags.novelty === 'true',
   }
   if (flags.diseaseId) body.diseaseId = String(flags.diseaseId)
 
@@ -503,10 +512,14 @@ async function main() {
         break
       case 'discover': {
         const sub = rest[0]
-        if (sub !== 'rank' && sub !== 'harvest') die('discover subcommands: rank | harvest')
+        if (sub !== 'rank' && sub !== 'harvest' && sub !== 'densify') {
+          die('discover subcommands: rank | densify | harvest')
+        }
         const { flags: f } = parseArgs(rest.slice(1))
-        if (sub === 'rank') await cmdDiscoverRank(f)
-        else await cmdDiscoverHarvest(f)
+        if (sub === 'rank' || sub === 'densify') {
+          // densify is alias for rank with harvest flags (server always densifies top-K)
+          await cmdDiscoverRank({ ...f, densify: true, safety: true })
+        } else await cmdDiscoverHarvest(f)
         break
       }
       case 'molecule': {

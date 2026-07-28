@@ -10,6 +10,7 @@ import { MonitorTab } from './copilot/MonitorTab'
 import { InsightsTab } from './copilot/InsightsTab'
 import { AskTab } from './copilot/AskTab'
 import { SettingsTab } from './copilot/SettingsTab'
+import { AiContentProvenance } from './AiContentProvenance'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 interface Props {
@@ -196,30 +197,90 @@ function AICopilotInner({
             )}
 
             {copilot.activeTab === 'insights' && (
-              <InsightsTab
-                messages={copilot.messages.filter(m => m.mode !== 'free_qa' && m.mode !== 'followup')}
-                isStreaming={copilot.isStreaming}
-                onGenerate={copilot.generateInsight}
-                aiAvailable={copilot.aiAvailable}
-                hasComparisons={compareCount > 1}
-                isDiseaseContext={!!copilot.isDiseaseContext}
-                isGeneContext={!!copilot.isGeneContext}
-                previousMolecules={sessionHistory.getRecentMolecules(8).filter(m => m.name !== identity.name).map(m => m.name)}
-                grounding={copilot.grounding}
-              />
+              <div className="space-y-3">
+                <AiContentProvenance
+                  meta={{
+                    kind: 'copilot',
+                    mode: copilot.lastPrompt?.mode || 'auto_insight',
+                    promptSystem: copilot.lastPrompt?.system,
+                    promptUser: copilot.lastPrompt?.user,
+                    model: ai.model,
+                    version: copilot.lastPrompt?.version,
+                    contextKey: identity.name || String(identity.cid || ''),
+                    historyRefreshKey: copilot.messages.length,
+                    deterministic: copilot.lastPrompt?.system?.includes('deterministic'),
+                  }}
+                  busy={copilot.isStreaming}
+                  allowOverrideSystem={false}
+                  density="full"
+                  testId="copilot-insights-provenance"
+                  onRegenerate={async ({ system, user }) => {
+                    // Re-run last insight mode with override via free_qa path when mode unknown
+                    const mode = (copilot.lastPrompt?.mode || 'executive_brief') as Parameters<
+                      typeof copilot.generateInsight
+                    >[0]
+                    // Store override by asking with embedded instruction
+                    void copilot.askQuestion(
+                      `[Regenerate insight mode=${mode}]\nUse this user prompt override:\n${user}\n\n(System was reviewed separately.)`,
+                    )
+                    void system
+                  }}
+                  onLoadEntry={() => {
+                    /* navigator restores via message list history in settings; insights load is view-only */
+                  }}
+                />
+                <InsightsTab
+                  messages={copilot.messages.filter(m => m.mode !== 'free_qa' && m.mode !== 'followup')}
+                  isStreaming={copilot.isStreaming}
+                  onGenerate={copilot.generateInsight}
+                  aiAvailable={copilot.aiAvailable}
+                  hasComparisons={compareCount > 1}
+                  isDiseaseContext={!!copilot.isDiseaseContext}
+                  isGeneContext={!!copilot.isGeneContext}
+                  previousMolecules={sessionHistory.getRecentMolecules(8).filter(m => m.name !== identity.name).map(m => m.name)}
+                  grounding={copilot.grounding}
+                />
+              </div>
             )}
 
             {copilot.activeTab === 'ask' && (
-              <AskTab
-                messages={copilot.messages.filter(m => m.mode === 'free_qa' || m.mode === 'followup')}
-                isStreaming={copilot.isStreaming}
-                aiAvailable={copilot.aiAvailable}
-                onAsk={(q) => { copilot.askQuestion(q); setInputValue('') }}
-                previousMolecules={sessionHistory.getRecentMolecules(5).filter(m => m.name !== identity.name).map(m => m.name)}
-                isDiseaseContext={!!copilot.isDiseaseContext}
-                isGeneContext={!!copilot.isGeneContext}
-                geneSymbol={identity.geneSymbol}
-              />
+              <div className="space-y-3">
+                <AiContentProvenance
+                  meta={{
+                    kind: 'copilot',
+                    mode: 'free_qa',
+                    promptSystem: copilot.lastPrompt?.mode === 'free_qa' || copilot.lastPrompt?.mode === 'followup'
+                      ? copilot.lastPrompt?.system
+                      : undefined,
+                    promptUser: copilot.lastPrompt?.mode === 'free_qa' || copilot.lastPrompt?.mode === 'followup'
+                      ? copilot.lastPrompt?.user
+                      : undefined,
+                    model: ai.model,
+                    version: copilot.lastPrompt?.version,
+                    contextKey: identity.name || String(identity.cid || ''),
+                    historyRefreshKey: copilot.messages.length,
+                  }}
+                  busy={copilot.isStreaming}
+                  density="full"
+                  testId="copilot-ask-provenance"
+                  onRegenerate={async ({ user }) => {
+                    void copilot.askQuestion(user)
+                  }}
+                  onLoadEntry={(entry) => {
+                    if (entry.promptUser) void copilot.askQuestion(entry.promptUser)
+                  }}
+                />
+                <AskTab
+                  messages={copilot.messages.filter(m => m.mode === 'free_qa' || m.mode === 'followup')}
+                  isStreaming={copilot.isStreaming}
+                  aiAvailable={copilot.aiAvailable}
+                  onAsk={(q) => { copilot.askQuestion(q); setInputValue('') }}
+                  previousMolecules={sessionHistory.getRecentMolecules(5).filter(m => m.name !== identity.name).map(m => m.name)}
+                  isDiseaseContext={!!copilot.isDiseaseContext}
+                  isGeneContext={!!copilot.isGeneContext}
+                  geneSymbol={identity.geneSymbol}
+                />
+              </div>
             )}
 
             {copilot.activeTab === 'settings' && (
