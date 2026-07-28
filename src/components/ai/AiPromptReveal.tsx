@@ -2,13 +2,12 @@
 
 /**
  * Prompt transparency — compact “Prompt” control with a styled hover/focus panel.
- * Shows exact system + user text sent to the model (audit / trust).
- * Slightly dim at rest; clearer first-look copy in the panel.
+ * Body-portaled — always above page-canvas.
  */
 
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import { HelperTip } from '@/components/ui/HelperTip'
-import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { PortaledTooltipPanel } from '@/components/ui/PortaledTooltipPanel'
 import { humanModeLabel } from '@/lib/ai/aiUiCopy'
 
 export interface AiPromptRevealProps {
@@ -35,6 +34,7 @@ export function AiPromptReveal({
 }: AiPromptRevealProps) {
   const uid = useId()
   const panelId = `${uid}-panel`
+  const anchorRef = useRef<HTMLSpanElement>(null)
   const [open, setOpen] = useState(false)
 
   if (!system && !user) return null
@@ -44,6 +44,7 @@ export function AiPromptReveal({
 
   return (
     <span
+      ref={anchorRef}
       className={`relative inline-flex items-center ${className}`}
       data-testid={testId}
       onMouseEnter={() => setOpen(true)}
@@ -70,54 +71,54 @@ export function AiPromptReveal({
       >
         Prompt
       </button>
-      {open && (
-        <span
-          id={panelId}
-          role="tooltip"
-          data-testid={`${testId}-panel`}
-          style={{ zIndex: STYLED_TOOLTIP_Z }}
-          className={`absolute mt-1 w-[min(22rem,calc(100vw-1.5rem))] max-h-72 overflow-y-auto rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-2 text-left shadow-xl shadow-black/50 ${
-            align === 'right' ? 'right-0 top-full' : 'left-0 top-full'
-          }`}
-        >
-          <span className="mb-1.5 flex flex-wrap items-center gap-1.5">
-            <span className="text-[10px] font-semibold text-indigo-200">
-              What was sent to the model{meta ? ` · ${meta}` : ''}
-            </span>
-            <HelperTip
-              content="Exact system rules + user context your Ollama model receives. Use this to audit grounding. Not a regulatory record — of-record ranks stay free-API scores."
-              label="About prompt reveal"
-              testId={`${testId}-about`}
-            />
+      <PortaledTooltipPanel
+        open={open}
+        anchorRef={anchorRef}
+        id={panelId}
+        side="bottom"
+        align={align === 'right' ? 'right' : 'left'}
+        maxWidth="22rem"
+        interactive
+        testId={`${testId}-panel`}
+        className="!max-h-72 !overflow-y-auto !px-2.5 !py-2"
+      >
+        <span className="mb-1.5 flex flex-wrap items-center gap-1.5">
+          <span className="text-[10px] font-semibold text-indigo-200">
+            What was sent to the model{meta ? ` · ${meta}` : ''}
           </span>
-          {system && (
-            <span className="mb-2 block">
-              <span className="block text-[9px] uppercase tracking-wide text-slate-500">
-                System ({system.length.toLocaleString()} chars)
-              </span>
-              <pre
-                className="mt-0.5 max-h-28 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-900/80 p-1.5 font-mono text-[9px] leading-snug text-slate-400"
-                data-testid={`${testId}-system`}
-              >
-                {system}
-              </pre>
-            </span>
-          )}
-          {user && (
-            <span className="block">
-              <span className="block text-[9px] uppercase tracking-wide text-slate-500">
-                User ({user.length.toLocaleString()} chars)
-              </span>
-              <pre
-                className="mt-0.5 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-900/80 p-1.5 font-mono text-[9px] leading-snug text-slate-400"
-                data-testid={`${testId}-user`}
-              >
-                {user}
-              </pre>
-            </span>
-          )}
+          <HelperTip
+            content="Exact system rules + user context your Ollama model receives. Use this to audit grounding. Not a regulatory record — of-record ranks stay free-API scores."
+            label="About prompt reveal"
+            testId={`${testId}-about`}
+          />
         </span>
-      )}
+        {system && (
+          <span className="mb-2 block">
+            <span className="block text-[9px] uppercase tracking-wide text-slate-500">
+              System ({system.length.toLocaleString()} chars)
+            </span>
+            <pre
+              className="mt-0.5 max-h-28 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-900/80 p-1.5 font-mono text-[9px] leading-snug text-slate-400"
+              data-testid={`${testId}-system`}
+            >
+              {system}
+            </pre>
+          </span>
+        )}
+        {user && (
+          <span className="block">
+            <span className="block text-[9px] uppercase tracking-wide text-slate-500">
+              User ({user.length.toLocaleString()} chars)
+            </span>
+            <pre
+              className="mt-0.5 max-h-32 overflow-y-auto whitespace-pre-wrap rounded border border-slate-800 bg-slate-900/80 p-1.5 font-mono text-[9px] leading-snug text-slate-400"
+              data-testid={`${testId}-user`}
+            >
+              {user}
+            </pre>
+          </span>
+        )}
+      </PortaledTooltipPanel>
     </span>
   )
 }

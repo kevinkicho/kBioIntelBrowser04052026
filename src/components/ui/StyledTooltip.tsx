@@ -4,8 +4,7 @@
  * Canonical styled tooltip — never use native HTML `title` for hover help.
  * Hover / focus only; no browser yellow tooltips, no double-tips.
  *
- * Renders in a document.body portal with fixed positioning and the highest
- * product z-index so tips never hide under sticky chrome, modals, or lists.
+ * Always body-portaled with z-index above page-canvas (see uiLayers).
  */
 
 import {
@@ -19,15 +18,24 @@ import {
   type ReactNode,
 } from 'react'
 import { createPortal } from 'react-dom'
+import {
+  ensureTooltipZ,
+  STYLED_TOOLTIP_Z,
+  styledTooltipPanelStyle,
+  Z_PAGE_CANVAS,
+} from '@/lib/uiLayers'
 
 export type StyledTooltipSide = 'top' | 'bottom'
 export type StyledTooltipAlign = 'left' | 'right' | 'center'
 
+/** @deprecated Import STYLED_TOOLTIP_Z from @/lib/uiLayers — re-export for callers */
+export { STYLED_TOOLTIP_Z, Z_PAGE_CANVAS, ensureTooltipZ, styledTooltipPanelStyle }
+
 /**
  * Highest product UI layer for hover/focus tips.
- * Above: header (40), modals (50–80), typeahead menus (9999), provenance popovers (300).
+ * Above: header (40), modals (50–200), typeahead (10k), page-canvas (0).
  */
-export const STYLED_TOOLTIP_Z = 50_000
+export const STYLED_TOOLTIP_Z_MIN = STYLED_TOOLTIP_Z
 
 export interface StyledTooltipProps {
   /** Tooltip body (string or rich node). Empty → children only. */
@@ -43,6 +51,11 @@ export interface StyledTooltipProps {
   maxWidth?: string
   disabled?: boolean
   testId?: string
+  /**
+   * Optional z-index override — still clamped to ≥ STYLED_TOOLTIP_Z
+   * so tips never paint under page-canvas.
+   */
+  zIndex?: number
 }
 
 interface PanelBox {
@@ -76,7 +89,6 @@ function placePanel(
   if (align === 'center') {
     left = anchor.left + anchor.width / 2
     transform = 'translateX(-50%)'
-    // Keep on-screen after transform estimate
     const half = panelW / 2
     if (left - half < pad) {
       left = pad + half
@@ -100,6 +112,7 @@ function placePanel(
 /**
  * Wrap any control with a dark slate flyout on hover/focus.
  * Prefer this over `title="..."` everywhere in product UI.
+ * Panel always portals to body with z-index above page-canvas.
  */
 export function StyledTooltip({
   content,
@@ -111,6 +124,7 @@ export function StyledTooltip({
   maxWidth = '16rem',
   disabled = false,
   testId = 'styled-tooltip',
+  zIndex,
 }: StyledTooltipProps) {
   const uid = useId()
   const panelId = `${uid}-tip`
@@ -128,6 +142,8 @@ export function StyledTooltip({
         : content
   const hasContent =
     typeof text === 'string' ? text.length > 0 : Boolean(text)
+
+  const z = ensureTooltipZ(zIndex ?? STYLED_TOOLTIP_Z)
 
   useEffect(() => {
     setMounted(true)
@@ -168,20 +184,18 @@ export function StyledTooltip({
   }
 
   const panelStyle: CSSProperties = box
-    ? {
-        position: 'fixed',
+    ? styledTooltipPanelStyle({
         top: box.top,
         left: box.left,
         transform: box.transform,
-        zIndex: STYLED_TOOLTIP_Z,
         maxWidth,
-      }
-    : {
-        position: 'fixed',
+        zIndex: z,
+      })
+    : styledTooltipPanelStyle({
         visibility: 'hidden',
-        zIndex: STYLED_TOOLTIP_Z,
         maxWidth,
-      }
+        zIndex: z,
+      })
 
   const panel =
     open &&
@@ -192,8 +206,10 @@ export function StyledTooltip({
         id={panelId}
         role="tooltip"
         data-testid={`${testId}-panel`}
+        data-z-layer="styled-tooltip"
+        data-z-index={z}
         style={panelStyle}
-        className={`pointer-events-none w-max max-w-[min(18rem,92vw)] rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-1.5 text-left text-[10px] leading-snug text-slate-300 shadow-xl shadow-black/50 whitespace-pre-wrap ${panelClassName}`}
+        className={`styled-tooltip-panel pointer-events-none w-max max-w-[min(18rem,92vw)] rounded-lg border border-slate-600 bg-slate-950 px-2.5 py-1.5 text-left text-[10px] leading-snug text-slate-300 shadow-xl shadow-black/50 whitespace-pre-wrap ${panelClassName}`}
       >
         {text}
       </span>,

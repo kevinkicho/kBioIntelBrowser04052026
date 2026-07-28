@@ -2,15 +2,15 @@
 
 /**
  * Compact API provenance control for of-record content.
- * Wraps the same resolver as DataPoint — use on hub rows, Discover chips, exports headers.
+ * Body-portaled panel — always above page-canvas.
  */
 
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import {
   formatProvenanceTimestamp,
   resolveProvenance,
 } from '@/lib/provenance'
-import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { PortaledTooltipPanel } from '@/components/ui/PortaledTooltipPanel'
 
 export interface ApiProvenanceChipProps {
   sourceKey: string
@@ -33,6 +33,7 @@ export function ApiProvenanceChip({
 }: ApiProvenanceChipProps) {
   const [open, setOpen] = useState(false)
   const panelId = useId()
+  const anchorRef = useRef<HTMLSpanElement>(null)
   const p = resolveProvenance(sourceKey, {
     recordUrl: sourceUrl,
     fetchedAt,
@@ -41,6 +42,7 @@ export function ApiProvenanceChip({
 
   return (
     <span
+      ref={anchorRef}
       className={`relative inline-flex ${className}`}
       data-testid={testId}
       onMouseEnter={() => setOpen(true)}
@@ -60,54 +62,56 @@ export function ApiProvenanceChip({
       >
         {label}
       </button>
-      {open && (
-        <span
-          id={panelId}
-          role="tooltip"
-          style={{ zIndex: STYLED_TOOLTIP_Z }}
-          className="absolute left-0 top-full mt-1 w-[min(18rem,calc(100vw-2rem))] rounded-lg border border-slate-600 bg-slate-950 p-2 text-left shadow-xl"
-          data-testid={`${testId}-panel`}
-        >
-          <p className="text-[10px] font-semibold text-slate-200">{p.api}</p>
-          <p className="text-[9px] text-slate-500">{p.organization}</p>
-          {p.description && (
-            <p className="mt-1 text-[10px] leading-snug text-slate-400">{p.description}</p>
-          )}
-          {p.endpoint && (
-            <p className="mt-1 break-all font-mono text-[9px] text-slate-500">
-              {p.endpoint}
-            </p>
-          )}
-          <p className="mt-1 text-[9px] text-slate-600">
-            Retrieved: {formatProvenanceTimestamp(fetchedAt)}
+      <PortaledTooltipPanel
+        open={open}
+        anchorRef={anchorRef}
+        id={panelId}
+        side="bottom"
+        align="left"
+        maxWidth="18rem"
+        interactive
+        testId={`${testId}-panel`}
+        className="!p-2"
+      >
+        <p className="text-[10px] font-semibold text-slate-200">{p.api}</p>
+        <p className="text-[9px] text-slate-500">{p.organization}</p>
+        {p.description && (
+          <p className="mt-1 text-[10px] leading-snug text-slate-400">{p.description}</p>
+        )}
+        {p.endpoint && (
+          <p className="mt-1 break-all font-mono text-[9px] text-slate-500">
+            {p.endpoint}
           </p>
-          <div className="mt-1.5 flex flex-wrap gap-2">
-            {p.docs && (
-              <a
-                href={p.docs}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-indigo-400 hover:underline"
-              >
-                Docs
-              </a>
-            )}
-            {sourceUrl && /^https?:\/\//i.test(sourceUrl) && (
-              <a
-                href={sourceUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[10px] text-indigo-400 hover:underline"
-              >
-                Open record
-              </a>
-            )}
-          </div>
-          <p className="mt-1.5 text-[9px] text-slate-600">
-            Free public API · not clinical decision support
-          </p>
-        </span>
-      )}
+        )}
+        <p className="mt-1 text-[9px] text-slate-600">
+          Retrieved: {formatProvenanceTimestamp(fetchedAt)}
+        </p>
+        <div className="mt-1.5 flex flex-wrap gap-2">
+          {p.docs && (
+            <a
+              href={p.docs}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-indigo-400 hover:underline"
+            >
+              Docs
+            </a>
+          )}
+          {sourceUrl && /^https?:\/\//i.test(sourceUrl) && (
+            <a
+              href={sourceUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[10px] text-indigo-400 hover:underline"
+            >
+              Open record
+            </a>
+          )}
+        </div>
+        <p className="mt-1.5 text-[9px] text-slate-600">
+          Free public API · not clinical decision support
+        </p>
+      </PortaledTooltipPanel>
     </span>
   )
 }

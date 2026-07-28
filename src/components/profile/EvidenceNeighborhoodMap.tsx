@@ -6,10 +6,10 @@
  * rich hover tooltips; Panel bottom-bar provenance via panelSources.
  */
 
-import { memo, useId, useMemo, useState, type ReactNode } from 'react'
+import { memo, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { HelperTip } from '@/components/ui/HelperTip'
-import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { PortaledTooltipPanel } from '@/components/ui/PortaledTooltipPanel'
 import {
   buildEvidenceNeighborhood,
   type NeighborhoodNode,
@@ -356,7 +356,7 @@ function NodeChip({ node, panelId }: { node: NeighborhoodNode; panelId: string }
   )
 }
 
-/** Styled rich tooltip (hover + focus) — more detail than native title. */
+/** Styled rich tooltip (hover + focus) — body-portaled above page-canvas. */
 function ChipTooltip({
   title,
   body,
@@ -371,9 +371,11 @@ function ChipTooltip({
   const uid = useId()
   const [open, setOpen] = useState(false)
   const panelId = `${uid}-tip`
+  const anchorRef = useRef<HTMLSpanElement>(null)
 
   return (
     <span
+      ref={anchorRef}
       className="relative inline-flex max-w-full"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -381,24 +383,25 @@ function ChipTooltip({
       onBlur={() => setOpen(false)}
     >
       {children}
-      {open && (
-        <span
-          id={panelId}
-          role="tooltip"
-          style={{ zIndex: STYLED_TOOLTIP_Z }}
-          className="pointer-events-none absolute bottom-full left-0 mb-1.5 w-56 rounded-lg border border-slate-600 bg-slate-900 p-2 shadow-xl"
-        >
-          <span className="block text-[9px] font-semibold uppercase tracking-wide text-indigo-300/90">
-            {title}
-          </span>
-          {name && (
-            <span className="mt-0.5 block text-[11px] font-medium text-slate-100 leading-snug">
-              {name}
-            </span>
-          )}
-          <span className="mt-1 block text-[10px] text-slate-400 leading-relaxed">{body}</span>
+      <PortaledTooltipPanel
+        open={open}
+        anchorRef={anchorRef}
+        id={panelId}
+        side="top"
+        align="left"
+        maxWidth="14rem"
+        className="!bg-slate-900 !p-2"
+      >
+        <span className="block text-[9px] font-semibold uppercase tracking-wide text-indigo-300/90">
+          {title}
         </span>
-      )}
+        {name && (
+          <span className="mt-0.5 block text-[11px] font-medium text-slate-100 leading-snug">
+            {name}
+          </span>
+        )}
+        <span className="mt-1 block text-[10px] text-slate-400 leading-relaxed">{body}</span>
+      </PortaledTooltipPanel>
     </span>
   )
 }

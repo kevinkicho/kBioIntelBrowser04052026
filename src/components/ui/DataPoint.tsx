@@ -21,9 +21,10 @@ import {
   type ProvenanceInfo,
 } from '@/lib/provenance'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { STYLED_TOOLTIP_Z } from '@/lib/uiLayers'
 
-/** Above AI modal (z-200), panel modals, sticky chrome */
-const PROVENANCE_Z = 300
+/** Same layer as styled tooltips — always above page-canvas */
+const PROVENANCE_Z = STYLED_TOOLTIP_Z
 
 export interface DataPointProps {
   /** Tracker / panel source key (e.g. gtex, bgee, disgenet) */

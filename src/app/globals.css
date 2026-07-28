@@ -12,22 +12,50 @@
   --search-history-sidebar-width: 18rem;
   /* Main content width — prefer information density over large gutters */
   --page-canvas-max: 1800px;
+
+  /*
+   * Stacking scale — styled tooltips must always paint above page-canvas.
+   * Keep in sync with src/lib/uiLayers.ts
+   */
+  --z-page-canvas: 0;
+  --z-sidebar: 30;
+  --z-header: 40;
+  --z-chrome-fab: 55;
+  --z-copilot-fab: 60;
+  --z-modal: 80;
+  --z-modal-high: 200;
+  --z-typeahead: 10000;
+  --z-styled-tooltip: 50000;
 }
 
 @layer components {
   /**
    * Full main-canvas shell for product pages (projects, discover, orgs, AI history, …).
    * Centered within the area to the right of the sidebar (shell already pads left).
+   * z-index 0: all body-portaled styled tooltips use --z-styled-tooltip (50000).
    */
   .page-canvas {
     @apply mx-auto w-full px-2 py-3 sm:px-3 lg:px-4;
     max-width: min(var(--page-canvas-max), 100%);
+    position: relative;
+    z-index: var(--z-page-canvas);
   }
 
   /** Slightly denser vertical padding for secondary pages */
   .page-canvas-tight {
     @apply mx-auto w-full px-2 py-2 sm:px-3 lg:px-4;
     max-width: min(var(--page-canvas-max), 100%);
+    position: relative;
+    z-index: var(--z-page-canvas);
+  }
+
+  /**
+   * Body-portaled tip panels (StyledTooltip / PortaledTooltipPanel).
+   * CSS fallback if inline z-index is stripped — still above canvas.
+   */
+  .styled-tooltip-panel,
+  [data-z-layer='styled-tooltip'] {
+    z-index: var(--z-styled-tooltip) !important;
   }
 
   /** Header inner row: same horizontal rhythm as page-canvas inside the offset shell */

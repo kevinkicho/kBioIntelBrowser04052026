@@ -5,12 +5,12 @@
  * Styled tooltip explains deterministic algorithm (not AI); link opens the matching profile panel.
  */
 
-import { useId, useState } from 'react'
+import { useId, useRef, useState } from 'react'
 import Link from 'next/link'
 import type { SignalItem } from '@/lib/signals'
 import { explainSignal } from '@/lib/signals/explainSignal'
 import { buildMoleculePanelDeepLink } from '@/lib/signals/deepLink'
-import { STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { PortaledTooltipPanel } from '@/components/ui/PortaledTooltipPanel'
 
 interface SignalBadgesProps {
   signals: SignalItem[]
@@ -79,6 +79,7 @@ function SignalChip({
 }) {
   const uid = useId()
   const tipId = `${uid}-tip`
+  const anchorRef = useRef<HTMLSpanElement>(null)
   const [open, setOpen] = useState(false)
   const explain = explainSignal(s, { moleculeName, snapshotAge })
 
@@ -107,6 +108,7 @@ function SignalChip({
 
   return (
     <span
+      ref={anchorRef}
       className="relative inline-flex"
       role="listitem"
       onMouseEnter={() => setOpen(true)}
@@ -136,36 +138,37 @@ function SignalChip({
         </span>
       )}
 
-      {open && (
-        <span
-          id={tipId}
-          role="tooltip"
-          data-testid="signal-chip-tooltip"
-          style={{ zIndex: STYLED_TOOLTIP_Z }}
-          className="pointer-events-none absolute left-0 bottom-full mb-1.5 w-72 max-w-[min(18rem,90vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
-        >
-          <span className="block text-[10px] font-semibold text-amber-200/95">
-            {explain.headline}
-          </span>
-          <span className="mt-0.5 block text-[9px] font-medium uppercase tracking-wide text-slate-500">
-            Free-API count signal · not AI ranking
-          </span>
-
-          <TipSection title="Why it is showing">{explain.whyShowing}</TipSection>
-          <TipSection title="What it points at">{explain.pointsAt}</TipSection>
-          <TipSection title="Algorithm">{explain.algorithm}</TipSection>
-          <TipSection title="Analysis method">{explain.analysis}</TipSection>
-          <TipSection title="Where click goes">{explain.destination}</TipSection>
-          <span className="mt-1.5 block text-[9px] leading-snug text-slate-600">
-            {explain.notAi}
-          </span>
-          {href && (
-            <span className="mt-1 block font-mono text-[8px] text-slate-600 break-all">
-              {href}
-            </span>
-          )}
+      <PortaledTooltipPanel
+        open={open}
+        anchorRef={anchorRef}
+        id={tipId}
+        side="top"
+        align="left"
+        maxWidth="18rem"
+        testId="signal-chip-tooltip"
+        className="!p-2.5"
+      >
+        <span className="block text-[10px] font-semibold text-amber-200/95">
+          {explain.headline}
         </span>
-      )}
+        <span className="mt-0.5 block text-[9px] font-medium uppercase tracking-wide text-slate-500">
+          Free-API count signal · not AI ranking
+        </span>
+
+        <TipSection title="Why it is showing">{explain.whyShowing}</TipSection>
+        <TipSection title="What it points at">{explain.pointsAt}</TipSection>
+        <TipSection title="Algorithm">{explain.algorithm}</TipSection>
+        <TipSection title="Analysis method">{explain.analysis}</TipSection>
+        <TipSection title="Where click goes">{explain.destination}</TipSection>
+        <span className="mt-1.5 block text-[9px] leading-snug text-slate-600">
+          {explain.notAi}
+        </span>
+        {href && (
+          <span className="mt-1 block font-mono text-[8px] text-slate-600 break-all">
+            {href}
+          </span>
+        )}
+      </PortaledTooltipPanel>
     </span>
   )
 }

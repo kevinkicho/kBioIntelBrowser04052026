@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useId, useMemo, useState, type ReactNode } from 'react'
+import { memo, useId, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   buildLandscapeDualStripFromProfileData,
   type JurisdictionPresence,
@@ -9,7 +9,8 @@ import {
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
 import { isBrokenSourceShellUrl } from '@/lib/deepLinkPolicy'
 import { HelperTip } from '@/components/ui/HelperTip'
-import { StyledTooltip, STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { PortaledTooltipPanel } from '@/components/ui/PortaledTooltipPanel'
 
 const TONE: Record<NonNullable<LandscapeStripChip['tone']>, string> = {
   emerald: 'border-emerald-800/40 bg-emerald-950/30 text-emerald-200',
@@ -130,6 +131,7 @@ function JurisdictionChip({
   const uid = useId()
   const tipId = `${uid}-tip`
   const [open, setOpen] = useState(false)
+  const anchorRef = useRef<HTMLSpanElement>(null)
   const href = stableHttpHref(j.href)
   const emptyCount = !j.count || j.count === 0
 
@@ -152,6 +154,7 @@ function JurisdictionChip({
 
   return (
     <span
+      ref={anchorRef}
       className="relative inline-flex max-w-full"
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
@@ -189,76 +192,56 @@ function JurisdictionChip({
         </span>
       )}
 
-      {open && (
-        <JurisdictionTooltip
-          tipId={tipId}
-          j={j}
-          moleculeName={moleculeName}
-          href={href}
-        />
-      )}
-    </span>
-  )
-}
-
-function JurisdictionTooltip({
-  tipId,
-  j,
-  moleculeName,
-  href,
-}: {
-  tipId: string
-  j: JurisdictionPresence
-  moleculeName: string
-  href: string | null
-}) {
-  return (
-    <span
-      id={tipId}
-      role="tooltip"
-      data-testid="jurisdiction-chip-tooltip"
-      style={{ zIndex: STYLED_TOOLTIP_Z }}
-      className="pointer-events-none absolute left-0 bottom-full mb-1.5 w-72 max-w-[min(18rem,92vw)] rounded-lg border border-slate-600 bg-slate-950 p-2.5 shadow-xl shadow-black/50 text-left"
-    >
-      <span className="block text-[10px] font-semibold text-sky-200">
-        {j.region} · {j.label}
-      </span>
-      <span className="mt-0.5 block text-[9px] font-medium uppercase tracking-wide text-slate-500">
-        Jurisdiction presence · free public registers
-      </span>
-      {j.count > 0 && (
-        <span className="mt-1 block font-mono text-[10px] text-indigo-300">
-          {j.count} free-API row{j.count === 1 ? '' : 's'}
-          {j.detail ? ` · ${j.detail}` : ''}
+      <PortaledTooltipPanel
+        open={open}
+        anchorRef={anchorRef}
+        id={tipId}
+        side="top"
+        align="left"
+        maxWidth="18rem"
+        testId="jurisdiction-chip-tooltip"
+        className="!p-2.5"
+      >
+        <span className="block text-[10px] font-semibold text-sky-200">
+          {j.region} · {j.label}
         </span>
-      )}
+        <span className="mt-0.5 block text-[9px] font-medium uppercase tracking-wide text-slate-500">
+          Jurisdiction presence · free public registers
+        </span>
+        {j.count > 0 && (
+          <span className="mt-1 block font-mono text-[10px] text-indigo-300">
+            {j.count} free-API row{j.count === 1 ? '' : 's'}
+            {j.detail ? ` · ${j.detail}` : ''}
+          </span>
+        )}
 
-      <TipBlock title="Why this chip is here">
-        {j.whyShowing ||
-          `Free public data for ${moleculeName} includes a ${j.region} register or portal signal (${j.label}).`}
-      </TipBlock>
-      <TipBlock title="What you can learn if you navigate">
-        {j.learnMore ||
-          'Open the official regulator/register page for product names, status, and public documentation. BioIntel does not give clinical or regulatory decisions.'}
-      </TipBlock>
-      <TipBlock title="How BioIntel decided">
-        {j.method ||
-          'Deterministic join of free-public profile panels and portal deep links. Not LLM ranking or competitive scoring.'}
-      </TipBlock>
-      {j.sourceName && (
-        <TipBlock title="Source">{j.sourceName}</TipBlock>
-      )}
-      <TipBlock title="Link">
-        {href
-          ? 'Official http(s) deep link — opens in a new tab.'
-          : 'No stable deep link for this row — chip is not clickable.'}
-      </TipBlock>
-      {href && (
-        <span className="mt-1 block break-all font-mono text-[8px] text-slate-600">{href}</span>
-      )}
-      <span className="mt-1.5 block text-[9px] leading-snug text-slate-600">
-        Not admissions, clinical referral, or regulatory decision support.
-      </span>
+        <TipBlock title="Why this chip is here">
+          {j.whyShowing ||
+            `Free public data for ${moleculeName} includes a ${j.region} register or portal signal (${j.label}).`}
+        </TipBlock>
+        <TipBlock title="What you can learn if you navigate">
+          {j.learnMore ||
+            'Open the official regulator/register page for product names, status, and public documentation. BioIntel does not give clinical or regulatory decisions.'}
+        </TipBlock>
+        <TipBlock title="How BioIntel decided">
+          {j.method ||
+            'Deterministic join of free-public profile panels and portal deep links. Not LLM ranking or competitive scoring.'}
+        </TipBlock>
+        {j.sourceName && (
+          <TipBlock title="Source">{j.sourceName}</TipBlock>
+        )}
+        <TipBlock title="Link">
+          {href
+            ? 'Official http(s) deep link — opens in a new tab.'
+            : 'No stable deep link for this row — chip is not clickable.'}
+        </TipBlock>
+        {href && (
+          <span className="mt-1 block break-all font-mono text-[8px] text-slate-600">{href}</span>
+        )}
+        <span className="mt-1.5 block text-[9px] leading-snug text-slate-600">
+          Not admissions, clinical referral, or regulatory decision support.
+        </span>
+      </PortaledTooltipPanel>
     </span>
   )
 }

@@ -14,6 +14,7 @@ import {
 import { emitProductEvent } from '@/lib/productEvents'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
+import { PortaledTooltipPanel } from '@/components/ui/PortaledTooltipPanel'
 
 export interface ScoreExplainerProps {
   rubric?: ScoreRubric
@@ -25,7 +26,7 @@ export interface ScoreExplainerProps {
 
 /**
  * Polished multi-axis score breakdown popover.
- * Shows weights, live axis values, contribution shares, and investigation disclaimer.
+ * Body-portaled so it never paints under page-canvas.
  */
 export function ScoreExplainer({
   rubric,
@@ -48,7 +49,11 @@ export function ScoreExplainer({
   useEffect(() => {
     if (!open) return
     const onDoc = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false)
+      const t = e.target as Node | null
+      if (!t) return
+      if (rootRef.current?.contains(t)) return
+      if ((t as Element).closest?.('[data-testid="score-explainer-panel"]')) return
+      setOpen(false)
     }
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
@@ -93,13 +98,20 @@ export function ScoreExplainer({
           <span className="text-[10px] text-slate-400">How scoring works</span>
         )}
       </button>
-      {open && (
+      <PortaledTooltipPanel
+        open={open}
+        anchorRef={rootRef}
+        side="bottom"
+        align="left"
+        maxWidth="20rem"
+        interactive
+        testId="score-explainer-panel"
+        className="!w-80 !max-w-[min(20rem,calc(100vw-2rem))] !bg-slate-800 !border-slate-700 !p-3 !text-xs !leading-relaxed"
+      >
         <div
-          style={{ zIndex: 50000 }}
-          className="absolute left-0 top-5 w-80 max-w-[min(20rem,calc(100vw-2rem))] bg-slate-800 border border-slate-700 rounded-lg p-3 shadow-xl text-xs text-slate-300 leading-relaxed"
-          data-testid="score-explainer-panel"
           role="dialog"
           aria-label="Score breakdown"
+          className="text-slate-300"
         >
           <div className="flex items-center justify-between mb-2">
             <span className="font-semibold text-slate-200">Multi-axis composite</span>
@@ -207,7 +219,7 @@ export function ScoreExplainer({
             />
           </div>
         </div>
-      )}
+      </PortaledTooltipPanel>
     </div>
   )
 }
