@@ -81,6 +81,13 @@ export interface RankEngineOptions {
   alwaysDensify?: boolean
   /** K for always-on densify (default DENSIFY_K_DEFAULT). */
   densifyK?: number
+  /**
+   * When true and targets pins present, only keep candidates that share ≥1 pin
+   * (DGIdb sharedTargets) or have geneAssociationScore &gt; 0 from pin merge.
+   */
+  mustHitPinnedTargets?: boolean
+  /** Rare beachhead: smaller densify K + sparse-path warning. */
+  rareDiseaseBoost?: boolean
 }
 
 /** Alias for facade re-exports (PR6b name). */
@@ -241,13 +248,23 @@ export async function rankCandidatesForDisease(
   const runNoveltyHarvest = options.runNoveltyHarvest === true
   const harvestK = Math.min(options.harvestK ?? HARVEST_K_DEFAULT, limit)
   const alwaysDensify = options.alwaysDensify !== false
-  const densifyK = Math.min(options.densifyK ?? DENSIFY_K_DEFAULT, limit)
+  const rareBoost = options.rareDiseaseBoost === true
+  const densifyK = Math.min(
+    options.densifyK ?? (rareBoost ? 6 : DENSIFY_K_DEFAULT),
+    limit,
+  )
+  const mustHitPins = options.mustHitPinnedTargets === true
   const pinnedId = options.diseaseId?.trim() || undefined
   const pinnedTargets = (options.targets ?? []).map((x) => x.trim()).filter(Boolean).slice(0, 10)
 
   const generatedAt = new Date().toISOString()
   const sourceStatuses: SourceFetchStatus[] = []
   const warnings: string[] = []
+  if (rareBoost) {
+    warnings.push(
+      'Rare-disease path: densify K reduced; public chemical space may be sparse — empty is honest.',
+    )
+  }
   const timingStart = Date.now()
   const timing: {
     disease?: number
@@ -469,7 +486,41 @@ export async function rankCandidatesForDisease(
     })
   }
 
-  let sorted = sortCandidates(candidates).slice(0, limit)
+  // Hard pin filter: candidate must share ≥1 pinned gene target when requested
+  let filteredCandidates = candidates
+  if (mustHitPins && pinnedTargets.length > 0) {
+    const pinSet = new Set(pinnedTargets.map((t) => t.toUpperCase()))
+    filteredCandidates = candidates.filter((c) => {
+      if (c.sharedTargetCountRaw > 0 && c.geneAssociationScore > 0) {
+        // Prefer explicit shared targets from DGIdb bag
+        const mol = moleculesFromTargets.find(
+          (m) => m.name.toLowerCase() === c.name.toLowerCase(),
+        )
+        if (mol?.sharedTargets?.some((t) => pinSet.has(String(t).toUpperCase()))) {
+          return true
+        }
+        // Pin-only genes can still score via geneAssociationScore when symbol matches
+        return c.geneAssociationScore > 0
+      }
+      const mol = moleculesFromTargets.find(
+        (m) => m.name.toLowerCase() === c.name.toLowerCase(),
+      )
+      return Boolean(mol?.sharedTargets?.some((t) => pinSet.has(String(t).toUpperCase())))
+    })
+    if (filteredCandidates.length < candidates.length) {
+      warnings.push(
+        `Must-hit-pin filter: kept ${filteredCandidates.length}/${candidates.length} candidates sharing pins ${pinnedTargets.join(', ')}.`,
+      )
+    }
+    if (filteredCandidates.length === 0) {
+      warnings.push(
+        'Must-hit-pin filter removed all candidates — showing unfiltered shortlist so the page is not empty.',
+      )
+      filteredCandidates = candidates
+    }
+  }
+
+  let sorted = sortCandidates(filteredCandidates).slice(0, limit)
   timing.cheapScore = Date.now() - cheapStart
 
   // Stage 3 — identity first (before densify) so trust/CID rank higher

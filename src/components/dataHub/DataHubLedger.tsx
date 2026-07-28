@@ -35,6 +35,7 @@ import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
 import { isHubDomainEnabled } from '@/lib/researchViewPrefs'
 import { markShelfKitExported, loadResearchShelves } from '@/lib/researchShelves'
 import { ApiProvenanceChip } from '@/components/ui/ApiProvenanceChip'
+import { HubChangeAlertsPanel } from '@/components/dataHub/HubChangeAlertsPanel'
 
 export interface DataHubLedgerProps {
   ledger: DataHubLedger
@@ -465,6 +466,22 @@ export function DataHubLedgerView({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {density === 'full' && (
+        <div className="border-t border-slate-800/80 p-3 sm:p-4">
+          <HubChangeAlertsPanel
+            ledger={ledger}
+            entityType={
+              ledger.subjectId.match(/^\d+$/)
+                ? 'molecule'
+                : ledger.subjectId.startsWith('ENSG')
+                  ? 'gene'
+                  : 'other'
+            }
+            testId={`${testId}-change-alerts`}
+          />
         </div>
       )}
 

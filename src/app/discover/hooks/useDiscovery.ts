@@ -339,6 +339,8 @@ export function useDiscovery() {
           runNoveltyHarvest: flags.runNoveltyHarvest,
           aeAggressiveness: prefs.aeAggressiveness,
           preferencesSnapshot: snapshotDiscoveryPreferences(prefs),
+          rareDiseaseBoost: prefs.rareDiseaseBoost,
+          mustHitPinnedTargets: prefs.mustHitPinnedTargets,
         }
 
         const res = await clientFetch('/api/discover/rank', {

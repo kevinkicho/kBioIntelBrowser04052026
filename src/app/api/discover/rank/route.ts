@@ -40,6 +40,8 @@ function buildOptions(input: {
   runNoveltyHarvest?: unknown
   customWeights?: unknown
   rubric?: unknown
+  rareDiseaseBoost?: unknown
+  mustHitPinnedTargets?: unknown
 }): RankEngineOptions {
   let rubric = createDefaultScoreRubric('balanced')
 
@@ -122,6 +124,8 @@ function buildOptions(input: {
     preferencesSnapshot,
     runSafetyHarvest: runSafetyHarvest === true,
     runNoveltyHarvest: runNoveltyHarvest === true,
+    rareDiseaseBoost: parseBool(input.rareDiseaseBoost) === true,
+    mustHitPinnedTargets: parseBool(input.mustHitPinnedTargets) === true,
   }
 }
 
@@ -224,6 +228,8 @@ export async function POST(request: NextRequest) {
     runNoveltyHarvest: body.runNoveltyHarvest,
     customWeights: body.customWeights,
     rubric: body.rubric,
+    rareDiseaseBoost: body.rareDiseaseBoost,
+    mustHitPinnedTargets: body.mustHitPinnedTargets,
   })
   if (typeof body.diseaseId === 'string' && body.diseaseId.trim()) {
     options.diseaseId = body.diseaseId.trim()

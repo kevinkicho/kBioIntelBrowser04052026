@@ -22,6 +22,7 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiContentProvenance } from '@/components/ai/AiContentProvenance'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
@@ -255,6 +256,32 @@ export function ResearchLabAiPanel({
           />
         )}
       </div>
+
+      {promptPreview && (
+        <AiContentProvenance
+          className="mt-2"
+          testId="research-lab-ai-content-provenance"
+          density="compact"
+          meta={{
+            kind: 'research_lab',
+            mode,
+            promptSystem: promptPreview.system,
+            promptUser: promptPreview.user,
+            model: ai.model,
+            version: 'labAi@v1',
+            contextKey: pack?.id || pack?.title,
+            historyRefreshKey: histRefresh,
+            activeGenId,
+          }}
+          busy={busy}
+          onRegenerate={(opts) => void run(opts)}
+          onLoadEntry={(entry) => {
+            const insight = parseAiGenerationInsight(entry)
+            if (insight) setInsight(insight)
+            setActiveGenId(entry.id)
+          }}
+        />
+      )}
 
       <div className="mt-2 flex flex-wrap items-center gap-2">
         <button

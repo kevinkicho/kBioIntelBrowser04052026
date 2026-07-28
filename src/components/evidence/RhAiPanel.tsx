@@ -16,6 +16,7 @@ import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
 import { AiPromptReveal } from '@/components/ai/AiPromptReveal'
 import { AiRegenerateModal } from '@/components/ai/AiRegenerateModal'
 import { AiRunNavigator } from '@/components/ai/AiRunNavigator'
+import { AiContentProvenance } from '@/components/ai/AiContentProvenance'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { HelperTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
@@ -298,6 +299,29 @@ export function RhAiPanel({
           testId="rh-ai-prompt"
         />
       </div>
+
+      <AiContentProvenance
+        className="mb-2"
+        testId="rh-ai-content-provenance"
+        density="compact"
+        meta={{
+          kind: 'rh',
+          mode,
+          promptSystem: promptPreview.system,
+          promptUser: promptPreview.user,
+          model: ai.model,
+          version: 'rhAi@v1',
+          contextKey: hyp.id,
+          historyRefreshKey: histRefresh,
+          activeGenId,
+        }}
+        busy={busy}
+        allowOverrideSystem
+        onRegenerate={async ({ system, user }) => {
+          await run({ system, user })
+        }}
+        onLoadEntry={restoreRhEntry}
+      />
 
       {gated ? (
         <p className="text-[11px] text-amber-400/90" data-testid="rh-ai-gated">

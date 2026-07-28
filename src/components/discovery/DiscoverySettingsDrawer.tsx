@@ -261,6 +261,19 @@ export function DiscoverySettingsDrawer({
               />
               <span>Enable Orphanet gene pin merge</span>
             </label>
+            <label className="mt-2 flex cursor-pointer items-center gap-2 text-xs text-slate-400">
+              <input
+                type="checkbox"
+                checked={prefs.mustHitPinnedTargets}
+                onChange={(e) => onChange({ mustHitPinnedTargets: e.target.checked })}
+                className="rounded border-slate-600 accent-indigo-500"
+                data-testid="prefs-must-hit-pins"
+              />
+              <span>Must hit ≥1 pinned target (hard filter)</span>
+            </label>
+            <p className="mt-1 text-[10px] text-slate-600">
+              When targets are pinned (URL or Orphanet merge), drop candidates with no shared pin.
+            </p>
           </div>
 
           <div>

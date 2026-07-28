@@ -393,6 +393,30 @@ export default async function ComparePage({
       {n >= 2 && compareHubMatrix && (
         <div className="mb-6 min-w-0">
           <CompareDataHubMatrix matrix={compareHubMatrix} className="mb-2" />
+          <div className="mb-2 flex flex-wrap items-center gap-3 text-[11px]">
+            <Link
+              href="/projects"
+              className="rounded-lg border border-emerald-800/50 bg-emerald-950/30 px-2.5 py-1 font-medium text-emerald-300 hover:border-emerald-600"
+              data-testid="compare-to-projects"
+            >
+              Open Projects → promote &amp; pack
+            </Link>
+            <Link
+              href={`/discover?q=${encodeURIComponent(
+                datasets
+                  .map((d) => d.data.molecule?.name)
+                  .filter(Boolean)
+                  .slice(0, 3)
+                  .join(' ') || 'compare',
+              )}`}
+              className="text-indigo-400 hover:underline"
+            >
+              Discover related
+            </Link>
+            <span className="text-slate-600">
+              Of-record hub matrix above · pack density via board (5 extractors)
+            </span>
+          </div>
           <p className="text-[10px] text-slate-600">
             See also{' '}
             <Link href="/methodology" className="text-indigo-400 hover:underline">
