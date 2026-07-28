@@ -142,6 +142,8 @@ async function fetchCategorySoft(
 ): Promise<Record<string, unknown>> {
   if (signal?.aborted) return {}
   try {
+    // fetchCategoryData already stages cache/network/store + retries;
+    // soft timeout keeps pack density bounded per panel.
     const data = await withTimeout(
       fetchCategoryData(cid, categoryId, undefined, undefined, { signal }),
       PACK_PANEL_TIMEOUT_MS,
@@ -149,6 +151,7 @@ async function fetchCategorySoft(
     )
     return data && typeof data === 'object' ? data : {}
   } catch {
+    // Soft-fail: empty bag → thin claims warning, pack still builds
     return {}
   }
 }

@@ -7,7 +7,6 @@ import type { BoardStatus, Project } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
 import {
   addCandidateAndSave,
-  buildBoardPackClaims,
   candidateNeedsHarvest,
   exportProjectToJson,
   getProject,
@@ -28,6 +27,7 @@ import {
   seedRhFromPaste,
   setBoardStatusAndSave,
 } from '@/lib/project'
+import { runPackExtractPipeline } from '@/lib/pipeline'
 import { useAI } from '@/lib/ai/useAI'
 import { emitProductEvent } from '@/lib/productEvents'
 import type { CorePanelEvidenceInput, EvidenceClaim } from '@/lib/evidence'
@@ -117,7 +117,11 @@ export default function ProjectBoardPage() {
     packFetchKey.current = key
     let cancelled = false
     setPanelsLoading(true)
-    buildBoardPackClaims(project, { maxCandidates: 5, includeLandscape: true })
+    runPackExtractPipeline({
+      project,
+      maxCandidates: 5,
+      includeLandscape: true,
+    })
       .then((res) => {
         if (cancelled) return
         setBoardPanels(res.panels)

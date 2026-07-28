@@ -21,3 +21,11 @@ export {
   type DiscoverHarvestCandidateIn,
   type DiscoverHarvestResult,
 } from './discoverHarvestClient'
+export {
+  runOrphanetPinPipeline,
+  type OrphanetPinPipelineResult,
+} from './orphanetPinPipeline'
+export {
+  runPackExtractPipeline,
+  type PackExtractPipelineResult,
+} from './packExtractPipeline'

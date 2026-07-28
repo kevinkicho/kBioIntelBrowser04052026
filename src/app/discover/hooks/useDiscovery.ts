@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { clientFetch } from '@/lib/clientFetch'
 import type { RankResult } from '@/lib/candidateRanker'
 import type { DiseaseEntity } from '@/lib/domain/entities'
 import type { DiscoveryPreferences } from '@/lib/discovery/preferences'
@@ -15,10 +14,7 @@ import {
   scoreRubricFromPreferences,
   snapshotDiscoveryPreferences,
 } from '@/lib/discovery/preferences'
-import {
-  MAX_DISCOVER_TARGETS,
-  mergeOrphanetGenesIntoTargets,
-} from '@/lib/discovery/discoverUrl'
+import { MAX_DISCOVER_TARGETS } from '@/lib/discovery/discoverUrl'
 import {
   discoverRankCacheKey,
   recordSearch,
@@ -31,6 +27,7 @@ import {
   formatPipelineForUi,
   runDiscoverHarvestPipeline,
   runDiscoverRankPipeline,
+  runOrphanetPinPipeline,
 } from '@/lib/pipeline'
 
 /** Progressive stages aligned with design §5.1.2 (cheap shortlist + optional harvest). */
@@ -388,62 +385,25 @@ export function useDiscovery() {
         // Post-hoc stages from real engine timingMs only (never fake timer labels)
         emitDiscoverStagesFromTimingMs(data.v2?.timingMs)
 
-        // Rare-disease boost: merge Orphanet genes into pins (opt-in; free Orphadata)
+        // Rare-disease boost: Orphanet pin-merge pipeline (opt-in; non-fatal after rank)
         let mergedTargets = targets
         let orphanetProvenance: OrphanetPinProvenance | null = null
         if (prefs.rareDiseaseBoost && data.diseaseName) {
-          try {
-            const geneRes = await clientFetch(
-              `/api/orphanet/genes?q=${encodeURIComponent(data.diseaseName)}`,
-              { signal: controller.signal },
-            )
-            if (geneRes.ok) {
-              const body = (await geneRes.json()) as {
-                genes?: unknown
-                orphaCode?: string | null
-                diseaseName?: string
-                error?: string
-              }
-              const genes = Array.isArray(body.genes)
-                ? body.genes.filter((g): g is string => typeof g === 'string')
-                : []
-              mergedTargets = mergeOrphanetGenesIntoTargets(targets, genes, MAX_DISCOVER_TARGETS)
-              const added = mergedTargets.length - targets.length
-              orphanetProvenance = {
-                orphaCode: body.orphaCode ?? null,
-                diseaseName: body.diseaseName ?? data.diseaseName ?? null,
-                genes,
-                added: Math.max(0, added),
-                error: body.error ?? null,
-              }
-              if (added > 0) {
-                emitProductEvent('discover_orphanet_genes', {
-                  diseaseName: data.diseaseName,
-                  orphaCode: body.orphaCode ?? null,
-                  added,
-                  total: mergedTargets.length,
-                })
-              }
-            } else {
-              orphanetProvenance = {
-                orphaCode: null,
-                diseaseName: data.diseaseName ?? null,
-                genes: [],
-                added: 0,
-                error: `Orphanet genes HTTP ${geneRes.status}`,
-              }
-            }
-          } catch (e) {
-            // Non-fatal: ranking already succeeded
-            if (!(e instanceof DOMException && e.name === 'AbortError')) {
-              orphanetProvenance = {
-                orphaCode: null,
-                diseaseName: data.diseaseName ?? null,
-                genes: [],
-                added: 0,
-                error: e instanceof Error ? e.message : 'Orphanet lookup failed',
-              }
-            }
+          const orpha = await runOrphanetPinPipeline({
+            diseaseName: data.diseaseName,
+            existingTargets: targets,
+            maxTargets: MAX_DISCOVER_TARGETS,
+            signal: controller.signal,
+          })
+          mergedTargets = orpha.mergedTargets
+          orphanetProvenance = orpha.provenance
+          if (orpha.ok && orpha.provenance.added > 0) {
+            emitProductEvent('discover_orphanet_genes', {
+              diseaseName: data.diseaseName,
+              orphaCode: orpha.provenance.orphaCode,
+              added: orpha.provenance.added,
+              total: mergedTargets.length,
+            })
           }
         }
 

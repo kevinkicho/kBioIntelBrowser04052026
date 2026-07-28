@@ -1,13 +1,13 @@
 /**
  * Rehydrate EvidenceClaim statements for a ResearchHypothesis.
  * 1) IDB pack cache by packId
- * 2) Rebuild via buildBoardPackClaims
+ * 2) Rebuild via pack-extract pipeline (staged Core panel fetch)
  * @see docs/design/discovery-workbench-v2.md §6.6.1
  */
 
 import type { EvidenceClaim, Project, ResearchHypothesis } from '@/lib/domain'
 import { getPackFromCache } from './packCache'
-import { buildBoardPackClaims } from './packClaims'
+import { runPackExtractPipeline } from '@/lib/pipeline'
 
 export interface RehydrateResult {
   claims: EvidenceClaim[]
@@ -69,7 +69,8 @@ export async function rehydrateClaimsForHypothesis(
     if (subset.candidates.length === 0) {
       subset.candidates = project.candidates
     }
-    const built = await buildBoardPackClaims(subset, {
+    const built = await runPackExtractPipeline({
+      project: subset,
       maxCandidates: 5,
       signal: opts?.signal,
     })
