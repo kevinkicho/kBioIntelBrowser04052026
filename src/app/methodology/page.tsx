@@ -377,6 +377,12 @@ export default function MethodologyPage() {
               {' — '}Algorithms, prompts, local funnel
             </li>
             <li>
+              <Link href="/how-it-works#tools" className="text-indigo-300 hover:underline">
+                Research tools & playbooks
+              </Link>
+              {' — '}UI / CLI / copilot surfaces for humans and agents
+            </li>
+            <li>
               <Link
                 href="https://github.com/kevinkicho/kBioIntelBrowser04052026/blob/main/docs/api-sources-manifest.md"
                 className="text-indigo-300 hover:underline"

@@ -149,6 +149,13 @@ export function SettingsTab({
             View prompts & algorithms →
           </Link>
           <Link
+            href="/how-it-works#tools"
+            className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
+            data-testid="copilot-settings-tools-link"
+          >
+            Research tools & playbooks →
+          </Link>
+          <Link
             href="/ai-history"
             className="inline-block text-[10px] text-indigo-400 hover:text-indigo-300 hover:underline"
           >

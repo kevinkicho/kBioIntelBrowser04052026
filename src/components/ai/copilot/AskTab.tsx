@@ -1,10 +1,16 @@
 "use client"
 
+import { useState } from 'react'
+import Link from 'next/link'
 import type { CopilotMessage } from '@/hooks/useAICopilot'
 import { MessageBubble } from './MessageBubble'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { buildAskSuggestionWhy } from '@/lib/ai/aiWhyTooltip'
 import { HelperTip } from '@/components/ui/HelperTip'
+import {
+  COPILOT_MAX_TOOL_STEPS,
+  COPILOT_TOOLS,
+} from '@/lib/ai/copilot/tools/catalog'
 
 export function AskTab({
   messages,
@@ -25,6 +31,8 @@ export function AskTab({
   isGeneContext: boolean
   geneSymbol?: string
 }) {
+  const [toolsOpen, setToolsOpen] = useState(false)
+
   const suggestions = isGeneContext
     ? [
         'What is this gene\'s primary therapeutic opportunity?',
@@ -66,14 +74,65 @@ export function AskTab({
           Ask
         </span>
         <HelperTip
-          content={`Agentic Ask can use evidence tools (retrieval snapshot, panel samples, load/retry category) — max 5 steps, claim-bound only. ${emptyPrompt}.`}
+          content={`Agentic Ask can use ${COPILOT_TOOLS.length} evidence tools (max ${COPILOT_MAX_TOOL_STEPS} steps/question) — retrieval snapshot, panel samples, load/retry, pack claims, RH seed. Claim-bound only; never invents Discover ranks. ${emptyPrompt}.`}
           label="About Ask"
           testId="copilot-ask-help"
           maxWidth="18rem"
         />
+        <Link
+          href="/how-it-works#tools"
+          className="ml-auto text-[9px] text-indigo-400/90 hover:text-indigo-300 hover:underline"
+          data-testid="copilot-ask-tools-catalog-link"
+        >
+          All research tools →
+        </Link>
       </div>
+
+      {/* Surfaced allowlisted tools so humans know what the agent can do */}
+      <div
+        className="rounded-lg border border-slate-800/50 bg-slate-900/30"
+        data-testid="copilot-ask-tools-surface"
+      >
+        <button
+          type="button"
+          onClick={() => setToolsOpen((v) => !v)}
+          className="flex w-full items-center gap-1.5 px-2.5 py-1.5 text-left"
+          aria-expanded={toolsOpen}
+        >
+          <span className="text-[9px] font-semibold uppercase tracking-wider text-slate-500">
+            Evidence tools
+          </span>
+          <span className="text-[9px] tabular-nums text-slate-600">
+            {COPILOT_TOOLS.length} · ≤{COPILOT_MAX_TOOL_STEPS}/ask
+          </span>
+          <span
+            className={`ml-auto text-[9px] text-slate-600 transition-transform ${
+              toolsOpen ? 'rotate-90' : ''
+            }`}
+          >
+            ▸
+          </span>
+        </button>
+        {toolsOpen && (
+          <ul className="flex flex-wrap gap-1 border-t border-slate-800/40 px-2 pb-2 pt-1.5">
+            {COPILOT_TOOLS.map((t) => (
+              <li key={t.name}>
+                <HelperTip content={t.description} label={t.name} testId={`copilot-tool-tip-${t.name}`}>
+                  <span
+                    className="cursor-help rounded border border-slate-700/40 bg-slate-950/50 px-1.5 py-0.5 font-mono text-[9px] text-slate-400"
+                    data-testid={`copilot-tool-chip-${t.name}`}
+                  >
+                    {t.name}
+                  </span>
+                </HelperTip>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
       {messages.length === 0 && (
-        <div className="py-4">
+        <div className="py-2">
           <div className="space-y-1.5">
             {suggestions.map((s) => (
               <AiWhyTooltip

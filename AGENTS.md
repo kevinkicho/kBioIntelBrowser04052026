@@ -66,14 +66,20 @@ Zero-dep CLI wrapping free APIs + repo gates. App must be running for HTTP comma
 npm run biointel -- help
 npm run biointel -- law
 npm run biointel -- health
+npm run biointel -- tools list
+npm run biointel -- tools playbook disease_to_shortlist
+npm run biointel -- tools copilot
 npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR
 npm run biointel -- molecule get 3080836
 npm run biointel -- molecule category 3080836 pharmaceutical
+npm run biointel -- research kit --cid 2244 --out kit.json
 npm run biointel -- logs tail --n 30
 npm run biointel -- logs grep product.discover
 npm run biointel -- gate
 npm run biointel -- e2e auto
 ```
+
+**Research tools (humans + agents):** `/how-it-works#tools` — UI/CLI/copilot catalog + scientific playbooks. Code: `src/lib/methods/researchToolCatalog.ts`. Prefer playbooks over ad-hoc thrash when accelerating discovery → evidence → pack → RH loops.
 
 - Implementation: `scripts/biointel-cli.js` (also `bin.biointel`)
 - Base URL: `BIOINTEL_BASE` or `http://localhost:33424`

@@ -157,13 +157,21 @@ Commands:
   e2e [fixture|auto|live]      North-star Playwright e2e
   test [pattern]               Jest (optional path pattern)
 
+  tools list [--json]          Research tools for humans + agents
+  tools playbook [id]          List playbooks or print one (scientific loops)
+  tools copilot                Allowlisted profile copilot tool names
+
 Examples:
   npm run biointel -- health
   npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR
   npm run biointel -- molecule category 3080836 pharmaceutical
   npm run biointel -- research kit --cid 2244 --out kit.json
+  npm run biointel -- tools list
+  npm run biointel -- tools playbook disease_to_shortlist
   npm run biointel -- logs tail --n 20
   npm run biointel -- gate
+
+UI catalog: /how-it-works#tools
 `)
 }
 
@@ -214,6 +222,119 @@ function cmdVersion() {
   } catch {
     /* ignore */
   }
+}
+
+/** Load dual-use research playbooks / tool index (JSON; mirrors TS catalog). */
+function loadResearchToolsData() {
+  const p = path.join(ROOT, 'src', 'lib', 'methods', 'researchPlaybooks.json')
+  try {
+    return JSON.parse(fs.readFileSync(p, 'utf8'))
+  } catch (err) {
+    die(`cannot read researchPlaybooks.json: ${err.message}`)
+  }
+}
+
+/**
+ * tools list | tools playbook [id] | tools copilot
+ * Surfaces research tools so agents pick the right loop without thrash.
+ */
+function cmdTools(sub, positionals, flags) {
+  const data = loadResearchToolsData()
+  const action = sub || 'list'
+
+  if (action === 'copilot') {
+    const names = data.copilotTools || []
+    if (flags.json) {
+      printJson({ copilotTools: names, maxSteps: 5 })
+      return
+    }
+    console.log(`Allowlisted profile copilot tools (${names.length}, max 5 steps/ask):\n`)
+    for (const n of names) console.log(`  • ${n}`)
+    console.log('\nUI: molecule profile → AI Copilot → Ask (evidence-bound only)')
+    console.log('Catalog: /how-it-works#tools')
+    return
+  }
+
+  if (action === 'playbook' || action === 'playbooks') {
+    const id = positionals[0] || flags.id
+    const playbooks = data.playbooks || []
+    if (!id || id === true) {
+      if (flags.json) {
+        printJson(playbooks.map((p) => ({ id: p.id, title: p.title, audience: p.audience })))
+        return
+      }
+      console.log('Research playbooks (scientific / engineering loops):\n')
+      for (const p of playbooks) {
+        console.log(`  ${p.id}`)
+        console.log(`    ${p.title} [${p.audience}]`)
+        console.log(`    ${p.goal}`)
+        console.log('')
+      }
+      console.log('Detail: biointel tools playbook <id>')
+      console.log('UI: /how-it-works#playbooks')
+      return
+    }
+    const pb = playbooks.find((p) => p.id === id)
+    if (!pb) {
+      die(
+        `unknown playbook: ${id}\nKnown: ${(playbooks.map((p) => p.id) || []).join(', ')}`,
+      )
+    }
+    if (flags.json) {
+      printJson(pb)
+      return
+    }
+    console.log(`# ${pb.title}`)
+    console.log(`id: ${pb.id}`)
+    console.log(`audience: ${pb.audience}`)
+    console.log(`goal: ${pb.goal}`)
+    console.log('\nSteps:')
+    ;(pb.steps || []).forEach((s, i) => {
+      console.log(`  ${i + 1}. ${s.title}`)
+      if (s.human) console.log(`     Human: ${s.human}`)
+      if (s.agent) console.log(`     Agent: ${s.agent}`)
+    })
+    if (pb.successSignals && pb.successSignals.length) {
+      console.log('\nSuccess:')
+      for (const s of pb.successSignals) console.log(`  • ${s}`)
+    }
+    if (pb.lawReminders && pb.lawReminders.length) {
+      console.log('\nLaw:')
+      for (const s of pb.lawReminders) console.log(`  • ${s}`)
+    }
+    return
+  }
+
+  if (action === 'list' || action === 'ls') {
+    if (flags.json) {
+      printJson({
+        version: data.version,
+        cliTools: data.cliTools,
+        copilotTools: data.copilotTools,
+        playbooks: (data.playbooks || []).map((p) => p.id),
+      })
+      return
+    }
+    console.log(`BioIntel research tools (v${data.version || 1})`)
+    console.log('Accelerate scientific work: free public APIs, deterministic rank, claim-bound AI.\n')
+    console.log('CLI / agent commands:')
+    for (const t of data.cliTools || []) {
+      console.log(`  biointel ${t.cmd}`)
+      console.log(`    [${t.goal}] ${t.summary}`)
+    }
+    console.log(`\nCopilot tools (${(data.copilotTools || []).length}):`)
+    console.log(`  ${(data.copilotTools || []).join(', ')}`)
+    console.log('\nPlaybooks:')
+    for (const p of data.playbooks || []) {
+      console.log(`  ${p.id} — ${p.title}`)
+    }
+    console.log('\n  biointel tools playbook <id>   # step detail')
+    console.log('  biointel tools copilot          # allowlist only')
+    console.log('  UI: /how-it-works#tools')
+    return
+  }
+
+  die('tools subcommands: list | playbook [id] | copilot')
 }
 
 function cmdLaw() {
@@ -564,6 +685,12 @@ async function main() {
       case 'test':
         cmdTest(positionals)
         break
+      case 'tools': {
+        const sub = rest[0] && !rest[0].startsWith('-') ? rest[0] : 'list'
+        const after = parseArgs(rest[0] === sub ? rest.slice(1) : rest)
+        cmdTools(sub, after.positionals, after.flags)
+        break
+      }
       default:
         die(`unknown command: ${cmd}\nRun: biointel help`)
     }

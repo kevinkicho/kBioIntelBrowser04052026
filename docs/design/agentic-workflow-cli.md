@@ -161,6 +161,7 @@ Implementation: `scripts/biointel-cli.js` · npm: `npm run biointel -- <cmd>` ·
 |---|---|
 | Help / law | `npm run biointel -- help` · `… law` |
 | App up? | `npm run biointel -- health` |
+| **Tools catalog** | `npm run biointel -- tools list` · `tools playbook <id>` · `tools copilot` |
 | Rank shortlist | `npm run biointel -- discover rank --q "ATTR amyloidosis" --targets TTR` |
 | Harvest safety | `npm run biointel -- discover harvest --names "Tafamidis,Diflunisal" --safety` |
 | Molecule shell | `npm run biointel -- molecule get 208901` |
@@ -171,6 +172,8 @@ Implementation: `scripts/biointel-cli.js` · npm: `npm run biointel -- <cmd>` ·
 | Quality gate | `npm run biointel -- gate` |
 | North-star e2e | `npm run biointel -- e2e auto` |
 | Raw API | `npm run biointel -- api get /api/molecule/2244` |
+
+**Research tool surfacing (humans + agents):** UI catalog at `/how-it-works#tools` (playbooks at `#playbooks`). Source: `src/lib/methods/researchToolCatalog.ts` + JSON mirror `researchPlaybooks.json` for CLI. Playbooks: `disease_to_shortlist`, `cid_evidence_deep_dive`, `board_pack_to_rh`, `compare_and_choose`, `agent_ops_loop`. Profile copilot Ask surfaces allowlisted evidence tools; never put LLMs in Discover rank.
 
 **Env:** `BIOINTEL_BASE` (default `http://localhost:33424`). Start app with `npm run dev` before HTTP commands.
 

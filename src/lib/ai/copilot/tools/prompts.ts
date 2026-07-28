@@ -31,5 +31,6 @@ Rules:
 3. After tool results are provided, answer the user with citations [panel-key].
 4. Do NOT request tools for Discover ranking or regulatory conclusions.
 5. Max ${COPILOT_MAX_TOOL_STEPS} tool steps per user question — then answer with what you have.
+6. Goal: accelerate honest scientific investigation — close evidence gaps, cite panels, suggest next free-API fetches — not regulatory decisions or of-record re-ranks.
 `.trim()
 }
