@@ -30,6 +30,7 @@ import {
   sortCandidatesIdentityFirst,
   type IdentitySortMeta,
 } from './identitySort'
+import { expandRankShortlistBySimilarity } from './similarityExpand'
 import type { DiseaseEntity } from '../domain/entities'
 import {
   gatherDiseaseGenes,
@@ -88,6 +89,8 @@ export interface RankEngineOptions {
   mustHitPinnedTargets?: boolean
   /** Rare beachhead: smaller densify K + sparse-path warning. */
   rareDiseaseBoost?: boolean
+  /** Post-CID PubChem similarity expand (default true). Tests may set false. */
+  similarityExpand?: boolean
 }
 
 /** Alias for facade re-exports (PR6b name). */
@@ -581,6 +584,46 @@ export async function rankCandidatesForDisease(
   }
 
   sorted = sortCandidatesIdentityFirst(sorted, metaByName)
+
+  // Post-CID similarity expand (bounded PubChem 2D neighbors + novelty penalty)
+  if (options.similarityExpand !== false && sorted.some((c) => c.cid != null && c.cid > 0)) {
+    try {
+      const sim = await expandRankShortlistBySimilarity(sorted, {
+        existingNames: new Set(
+          Array.from(allMoleculeNames).map((n) => n.toLowerCase()).concat(
+            sorted.map((c) => c.name.toLowerCase()),
+          ),
+        ),
+      })
+      warnings.push(...sim.warnings)
+      if (sim.added > 0) {
+        for (const c of sim.candidates) {
+          const multi = cheapScoreVector(c, rubric, {
+            identityTrust: assessIdentityTrust({ cid: c.cid, name: c.name }).axisValue,
+          })
+          // Apply novelty penalty already in composite; store vector
+          multi.composite = c.compositeScore
+          scoreByName.set(c.name.toLowerCase(), multi)
+          metaByName.set(c.name.toLowerCase(), {
+            cid: c.cid,
+            identityTrust: multi.axes.identityTrust ?? 0.4,
+          })
+        }
+        sorted = sortCandidatesIdentityFirst(
+          [...sorted, ...sim.candidates],
+          metaByName,
+        ).slice(0, limit)
+        sourceStatuses.push({
+          source: 'PubChem (similarity expand)',
+          status: 'loaded',
+          has_data: true,
+          duration_ms: 0,
+        })
+      }
+    } catch {
+      warnings.push('Similarity expand skipped (upstream error).')
+    }
+  }
 
   // Always densify top-K (safety + novelty free APIs) — denser shortlist
   let scorePhase: 'cheap' | 'full' = 'cheap'

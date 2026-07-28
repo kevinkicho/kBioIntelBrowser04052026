@@ -32,6 +32,12 @@ export {
 } from './engine'
 export { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
 export {
+  expandSimilarCandidates,
+  expandRankShortlistBySimilarity,
+  RANK_SIMILARITY_SEED_MAX,
+  RANK_SIMILARITY_SCORE_PENALTY,
+} from './similarityExpand'
+export {
   sortCandidatesIdentityFirst,
   dedupeCandidatesByIdentity,
 } from './identitySort'

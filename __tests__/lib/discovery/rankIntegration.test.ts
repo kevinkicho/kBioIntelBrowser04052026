@@ -37,6 +37,9 @@ jest.mock('@/lib/api/recalls', () => ({
 jest.mock('@/lib/api/europepmc', () => ({
   getLiteratureHitCount: jest.fn().mockResolvedValue(0),
 }))
+jest.mock('@/lib/api/pubchem-similar', () => ({
+  getSimilarMolecules: jest.fn().mockResolvedValue([]),
+}))
 // ChEMBL / OT known-drugs gathers may hit network — keep empty
 
 

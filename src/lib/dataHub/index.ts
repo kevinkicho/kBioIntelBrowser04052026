@@ -90,3 +90,15 @@ export {
   type KitDiffResult,
   type KitDiffRow,
 } from './diffResearchKits'
+export {
+  buildHubClaimGraph,
+  hubClaimGraphToMarkdown,
+  type HubClaimGraph,
+  type HubClaimEdge,
+} from './hubClaimGraph'
+export {
+  saveHubSnapshot,
+  diffAgainstSavedHub,
+  fingerprintLedger,
+  type HubChangeDiff,
+} from './hubChangeAlerts'

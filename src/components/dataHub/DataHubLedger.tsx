@@ -36,6 +36,7 @@ import { isHubDomainEnabled } from '@/lib/researchViewPrefs'
 import { markShelfKitExported, loadResearchShelves } from '@/lib/researchShelves'
 import { ApiProvenanceChip } from '@/components/ui/ApiProvenanceChip'
 import { HubChangeAlertsPanel } from '@/components/dataHub/HubChangeAlertsPanel'
+import { HubClaimGraphPanel } from '@/components/dataHub/HubClaimGraphPanel'
 
 export interface DataHubLedgerProps {
   ledger: DataHubLedger
@@ -470,7 +471,8 @@ export function DataHubLedgerView({
       )}
 
       {density === 'full' && (
-        <div className="border-t border-slate-800/80 p-3 sm:p-4">
+        <div className="space-y-2 border-t border-slate-800/80 p-3 sm:p-4">
+          <HubClaimGraphPanel ledger={ledger} testId={`${testId}-claim-graph`} />
           <HubChangeAlertsPanel
             ledger={ledger}
             entityType={
