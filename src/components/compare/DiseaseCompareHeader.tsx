@@ -4,6 +4,7 @@ import { useState, useRef } from 'react'
 import Link from 'next/link'
 import { useAI } from '@/lib/ai/useAI'
 import { buildCandidateComparePrompt } from '@/lib/ai/copilot/prompts'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 
 export interface CompareCandidateData {
   clinicalTrials: unknown[]
@@ -155,7 +156,15 @@ export function DiseaseCompareHeader({
         <div className="text-right">
           <span className="text-sm font-semibold text-slate-200">{nameA}</span>
           <div className="flex items-center justify-end gap-1.5 mt-0.5">
-            <span className="text-xs text-slate-400">Score: {scorePctA}%</span>
+            <ScoreMathTooltip
+              legacyComposite={scoreA}
+              composite
+              testId="compare-header-score-a"
+            >
+              <span className="text-xs text-slate-400 cursor-help underline decoration-dotted underline-offset-2">
+                Score: {scorePctA}%
+              </span>
+            </ScoreMathTooltip>
             <ConfidenceDot confidence={confidenceA} />
             <span className="text-[10px] text-slate-500">{confidenceA}</span>
           </div>
@@ -164,7 +173,15 @@ export function DiseaseCompareHeader({
         <div>
           <span className="text-sm font-semibold text-slate-200">{nameB}</span>
           <div className="flex items-center gap-1.5 mt-0.5">
-            <span className="text-xs text-slate-400">Score: {scorePctB}%</span>
+            <ScoreMathTooltip
+              legacyComposite={scoreB}
+              composite
+              testId="compare-header-score-b"
+            >
+              <span className="text-xs text-slate-400 cursor-help underline decoration-dotted underline-offset-2">
+                Score: {scorePctB}%
+              </span>
+            </ScoreMathTooltip>
             <ConfidenceDot confidence={confidenceB} />
             <span className="text-[10px] text-slate-500">{confidenceB}</span>
           </div>

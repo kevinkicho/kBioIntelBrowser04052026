@@ -6,6 +6,7 @@ import type { EvidenceClaim, ScoreAxisKey, ScoreVector } from '@/lib/domain'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import { EmptyStateTip, StatementTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import type { CrossSourceBundle, CrossSourceFact } from '@/lib/crossSource'
 
@@ -180,13 +181,19 @@ export function DecisionStrip({
           <div className="flex items-center justify-between mb-2">
             <h4 className="text-[11px] font-semibold text-slate-300">Scores</h4>
             {hasScores && (
-              <span
-                className="text-sm font-bold text-indigo-300 tabular-nums"
-                data-testid="decision-strip-composite"
+              <ScoreMathTooltip
+                composite
+                scores={scores}
+                testId="decision-strip-composite-math"
               >
-                {Math.round(scores!.composite * 100)}
-                <span className="text-[10px] font-normal text-slate-500 ml-0.5">composite</span>
-              </span>
+                <span
+                  className="text-sm font-bold text-indigo-300 tabular-nums cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2"
+                  data-testid="decision-strip-composite"
+                >
+                  {Math.round(scores!.composite * 100)}
+                  <span className="text-[10px] font-normal text-slate-500 ml-0.5">composite</span>
+                </span>
+              </ScoreMathTooltip>
             )}
           </div>
 
@@ -197,19 +204,25 @@ export function DecisionStrip({
                 const status = scores!.axisStatus[key]
                 const missing = v == null
                 return (
-                  <div key={key} className="flex items-center gap-2">
-                    <span className="text-[10px] text-slate-500 w-[88px] shrink-0 truncate">
-                      {AXIS_LABELS[key]}
-                    </span>
-                    <div className="flex-1 bg-slate-800 rounded-full h-1.5 overflow-hidden">
-                      {!missing && (
-                        <div
-                          className={`h-1.5 rounded-full transition-all ${axisBarColor(key)}`}
-                          style={{ width: `${Math.round((v as number) * 100)}%` }}
-                        />
-                      )}
-                    </div>
-                    <StyledTooltip content={missing ? `Status: ${status}` : undefined}>
+                  <ScoreMathTooltip
+                    key={key}
+                    axis={key}
+                    scores={scores}
+                    className="w-full"
+                    testId={`decision-strip-axis-math-${key}`}
+                  >
+                    <div className="flex w-full items-center gap-2 cursor-help">
+                      <span className="text-[10px] text-slate-500 w-[88px] shrink-0 truncate">
+                        {AXIS_LABELS[key]}
+                      </span>
+                      <div className="flex-1 bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                        {!missing && (
+                          <div
+                            className={`h-1.5 rounded-full transition-all ${axisBarColor(key)}`}
+                            style={{ width: `${Math.round((v as number) * 100)}%` }}
+                          />
+                        )}
+                      </div>
                       <span
                         className={`text-[10px] w-8 text-right tabular-nums ${
                           missing ? 'text-slate-600' : 'text-slate-400'
@@ -217,8 +230,11 @@ export function DecisionStrip({
                       >
                         {axisPct(v)}
                       </span>
-                    </StyledTooltip>
-                  </div>
+                      {missing && (
+                        <span className="sr-only">Status: {status}</span>
+                      )}
+                    </div>
+                  </ScoreMathTooltip>
                 )
               })}
               {scores!.scorePhase && (

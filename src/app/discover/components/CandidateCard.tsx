@@ -18,8 +18,10 @@ import { DataPoint } from '@/components/ui/DataPoint'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { originSourceDeepLink } from '@/lib/originDeepLinks'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 import { ConfidenceBadge } from './DiscoveryProgress'
 import { ScoreAxisBars } from './ScoreAxisBars'
+import type { ScoreVector } from '@/lib/domain'
 import { buildCandidateWhy, buildCandidateWhyChips } from '@/lib/discovery/candidateWhy'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { DiscoverMiniHub } from '@/components/dataHub/DiscoverMiniHub'
@@ -135,7 +137,15 @@ function SourcePill({
 
 // ScoreExplainer lives in @/components/score/ScoreExplainer (shared polish)
 
-function CompositeScoreRing({ score }: { score: number }) {
+function CompositeScoreRing({
+  score,
+  scores,
+  rubric,
+}: {
+  score: number
+  scores?: ScoreVector | null
+  rubric?: ScoreRubric
+}) {
   const pct = Math.round(score * 100)
   const radius = 28
   const circumference = 2 * Math.PI * radius
@@ -144,26 +154,39 @@ function CompositeScoreRing({ score }: { score: number }) {
   const strokeColor = pct >= 70 ? '#34d399' : pct >= 40 ? '#fbbf24' : '#94a3b8'
 
   return (
-    <div className="flex-shrink-0 relative w-16 h-16" data-testid="composite-score-ring">
-      <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
-        <circle cx="32" cy="32" r={radius} fill="none" stroke="#1e293b" strokeWidth="4" />
-        <circle
-          cx="32"
-          cy="32"
-          r={radius}
-          fill="none"
-          stroke={strokeColor}
-          strokeWidth="4"
-          strokeDasharray={circumference}
-          strokeDashoffset={offset}
-          strokeLinecap="round"
-          className="transition-all duration-700"
-        />
-      </svg>
-      <div className="absolute inset-0 flex items-center justify-center">
-        <span className={`text-sm font-bold ${color}`}>{pct}</span>
+    <ScoreMathTooltip
+      composite
+      scores={scores}
+      rubric={rubric}
+      legacyComposite={score}
+      testId="composite-score-math"
+      maxWidth="22rem"
+    >
+      <div
+        className="flex-shrink-0 relative w-16 h-16 cursor-help"
+        data-testid="composite-score-ring"
+        aria-label={`Composite score ${pct} percent — hover for math`}
+      >
+        <svg className="w-16 h-16 -rotate-90" viewBox="0 0 64 64">
+          <circle cx="32" cy="32" r={radius} fill="none" stroke="#1e293b" strokeWidth="4" />
+          <circle
+            cx="32"
+            cy="32"
+            r={radius}
+            fill="none"
+            stroke={strokeColor}
+            strokeWidth="4"
+            strokeDasharray={circumference}
+            strokeDashoffset={offset}
+            strokeLinecap="round"
+            className="transition-all duration-700"
+          />
+        </svg>
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className={`text-sm font-bold ${color}`}>{pct}</span>
+        </div>
       </div>
-    </div>
+    </ScoreMathTooltip>
   )
 }
 
@@ -254,7 +277,7 @@ export function CandidateCard({
   const cardContent = (
     <>
       <div className="flex items-start gap-3">
-        <CompositeScoreRing score={compositeScore} />
+        <CompositeScoreRing score={compositeScore} scores={scores} rubric={rubric} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1 flex-wrap">
             <span className="text-xs font-mono text-slate-500">#{rank}</span>

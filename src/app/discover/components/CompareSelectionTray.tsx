@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import type { CandidateMolecule } from '@/lib/candidateRanker'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 
 interface Props {
   candidates: CandidateMolecule[]
@@ -72,9 +73,20 @@ export function CompareSelectionTray({ candidates, diseaseName }: Props) {
                 {isSelected && (selected.indexOf(i) + 1)}
               </span>
               {c.name}
-              <span className={`text-[9px] ${isSelected ? 'text-indigo-200' : 'text-slate-600'}`}>
-                {Math.round(c.compositeScore * 100)}
-              </span>
+              <ScoreMathTooltip
+                legacyComposite={c.compositeScore}
+                composite
+                testId={`compare-tray-score-math-${i}`}
+                className="inline-flex"
+              >
+                <span
+                  className={`text-[9px] cursor-help underline decoration-dotted underline-offset-2 ${
+                    isSelected ? 'text-indigo-200 decoration-indigo-300/50' : 'text-slate-600 decoration-slate-600'
+                  }`}
+                >
+                  {Math.round(c.compositeScore * 100)}
+                </span>
+              </ScoreMathTooltip>
             </button>
           )
         })}

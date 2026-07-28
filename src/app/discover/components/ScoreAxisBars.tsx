@@ -1,15 +1,11 @@
 'use client'
 
-import { useState } from 'react'
 import type { AxisStatus, ScoreAxisKey, ScoreRubric, ScoreVector } from '@/lib/domain'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
-import {
-  AXIS_HELP,
-  axisStatusHelp,
-  formatAxisTooltip,
-} from '@/lib/domain/scoreAxisHelp'
+import { AXIS_HELP } from '@/lib/domain/scoreAxisHelp'
 import { ScoreExplainer } from '@/components/score/ScoreExplainer'
-import { StyledTooltip, STYLED_TOOLTIP_Z } from '@/components/ui/StyledTooltip'
+import { ScoreMathTooltip, ScoreValueWithMath } from '@/components/score/ScoreMathTooltip'
+import { StyledTooltip } from '@/components/ui/StyledTooltip'
 
 export interface ScoreAxisBarsProps {
   scores: ScoreVector
@@ -79,7 +75,7 @@ function EpistemicChip({
 /**
  * Multi-axis ScoreVector bars using shared AXIS_ORDER.
  * Null axes render an epistemic chip — never a zero bar.
- * Always styled tooltips (never native title).
+ * Always styled math tooltips (never native title).
  */
 export function ScoreAxisBars({
   scores,
@@ -91,7 +87,6 @@ export function ScoreAxisBars({
   const weights = rubric?.weights ?? scores.weights
   const labelWidth = compact ? 'w-[72px]' : 'w-24'
   const explainerOn = showExplainer ?? !compact
-  const [hoverKey, setHoverKey] = useState<ScoreAxisKey | null>(null)
 
   return (
     <div
@@ -107,9 +102,11 @@ export function ScoreAxisBars({
           >
             Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
             Composite{' '}
-            <span className="text-slate-400 tabular-nums">
-              {Math.round(scores.composite * 100)}%
-            </span>
+            <ScoreValueWithMath composite scores={scores} rubric={rubric} testId="score-axis-composite-math">
+              <span className="text-slate-400 tabular-nums">
+                {Math.round(scores.composite * 100)}%
+              </span>
+            </ScoreValueWithMath>
             {onOpenBreakdown ? (
               <>
                 {' '}
@@ -141,79 +138,57 @@ export function ScoreAxisBars({
           weights && typeof weights[key] === 'number'
             ? Math.round(weights[key] * 100)
             : null
-        const tip = formatAxisTooltip(key, scores, rubric)
         const help = AXIS_HELP[key]
-        const showFlyout = hoverKey === key && !compact
-        const compactTip = `${tip}\n${axisStatusHelp(status)}`
 
-        const row = (
-          <div
-            className="relative flex w-full items-center gap-2"
-            data-testid={`score-axis-row-${key}`}
-            data-axis={key}
-            data-missing={missing ? 'true' : 'false'}
-            onMouseEnter={() => setHoverKey(key)}
-            onMouseLeave={() => setHoverKey(null)}
-            onFocus={() => setHoverKey(key)}
-            onBlur={() => setHoverKey(null)}
+        return (
+          <ScoreMathTooltip
+            key={key}
+            axis={key}
+            scores={scores}
+            rubric={rubric}
+            side="top"
+            align="left"
+            className="w-full"
+            testId={`score-axis-math-${key}`}
           >
-            <span
-              className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate cursor-help`}
+            <div
+              className="relative flex w-full items-center gap-2"
+              data-testid={`score-axis-row-${key}`}
+              data-axis={key}
+              data-missing={missing ? 'true' : 'false'}
             >
-              {AXIS_LABELS[key]}
-              {weightPct != null && !compact && (
-                <span className="ml-0.5 text-[8px] text-slate-600 tabular-nums">{weightPct}%</span>
-              )}
-            </span>
-            {missing ? (
-              <div className="flex-1 flex items-center min-h-[6px]">
-                <EpistemicChip status={status} />
-              </div>
-            ) : (
-              <div className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden cursor-help">
-                <div
-                  className={`h-1.5 rounded-full transition-all duration-500 ${axisBarColor(key)}`}
-                  style={{ width: `${Math.round((v as number) * 100)}%` }}
-                />
-              </div>
-            )}
-            <span
-              className={`text-[10px] w-8 text-right tabular-nums shrink-0 ${
-                missing ? 'text-slate-600' : 'text-slate-400'
-              }`}
-            >
-              {axisPct(v)}
-            </span>
-            {showFlyout && (
-              <div
-                style={{ zIndex: STYLED_TOOLTIP_Z }}
-                className="absolute left-0 top-full mt-1 w-64 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-xl text-[10px] text-slate-300 leading-snug pointer-events-none"
-                data-testid={`score-axis-flyout-${key}`}
-                role="tooltip"
+              <span
+                className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate cursor-help`}
               >
-                <div className="font-semibold text-slate-100 mb-0.5">
-                  {AXIS_LABELS[key]}
-                  {weightPct != null ? ` · ${weightPct}% weight` : ''}
+                {AXIS_LABELS[key]}
+                {weightPct != null && !compact && (
+                  <span className="ml-0.5 text-[8px] text-slate-600 tabular-nums">{weightPct}%</span>
+                )}
+              </span>
+              {missing ? (
+                <div className="flex-1 flex items-center min-h-[6px]">
+                  <EpistemicChip status={status} />
                 </div>
-                <p className="text-slate-400">{help.summary}</p>
-                <p className="mt-1 text-slate-500">
-                  <span className="text-slate-400">Sources:</span> {help.sources}
-                </p>
-                <p className="mt-0.5 text-emerald-400/80">↑ {help.highMeans}</p>
-                <p className="text-amber-400/80">↓ {help.lowMeans}</p>
-                <p className="mt-1 text-slate-600 whitespace-pre-wrap">{tip}</p>
-                <p className="mt-0.5 text-slate-600">{axisStatusHelp(status)}</p>
-              </div>
-            )}
-          </div>
-        )
-
-        return compact ? (
-          <StyledTooltip key={key} content={compactTip} side="top" align="left" className="w-full">
-            {row}
-          </StyledTooltip>
-        ) : (
-          <div key={key}>{row}</div>
+              ) : (
+                <div
+                  className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden cursor-help"
+                  aria-label={`${help.summary} ${axisPct(v)}`}
+                >
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-500 ${axisBarColor(key)}`}
+                    style={{ width: `${Math.round((v as number) * 100)}%` }}
+                  />
+                </div>
+              )}
+              <span
+                className={`text-[10px] w-8 text-right tabular-nums shrink-0 cursor-help ${
+                  missing ? 'text-slate-600' : 'text-slate-400'
+                }`}
+              >
+                {axisPct(v)}
+              </span>
+            </div>
+          </ScoreMathTooltip>
         )
       })}
 
@@ -222,7 +197,7 @@ export function ScoreAxisBars({
           {scores.safetyFlags.map((flag) => (
             <StyledTooltip
               key={`${flag.kind}:${flag.label}`}
-              content={`${flag.kind} · ${flag.severity}\nSoft flag: may not hard-penalize composite unless AE policy is hard-penalty.`}
+              content={`${flag.kind} · ${flag.severity}\nSoft flag: may not hard-penalize composite unless AE policy is hard-penalty.\nSafety axis: S = 1 − (0.5·aeRisk + 0.3·seriousRisk + 0.2·recallRisk) with log-compressed FAERS counts.`}
             >
               <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-700/50 bg-amber-900/30 text-amber-300 cursor-help">
                 {flag.label}

@@ -129,8 +129,17 @@ export function BgeeExpressionRow({ expr, fetchedAt, compact = false }: BgeeExpr
           </div>
           <div className="flex flex-col items-end gap-1 shrink-0">
             {typeof expr.expressionScore === 'number' && expr.expressionScore > 0 ? (
-              <StyledTooltip content="Bgee expression score">
-                <span className="text-[10px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded tabular-nums">
+              <StyledTooltip
+                content={[
+                  'Bgee expression score (source-native)',
+                  `Value: ${expr.expressionScore.toFixed(3)}`,
+                  'Formula: Bgee publishes a continuous expression score per gene × anatomical entity from integrated RNA-seq / Affymetrix calls (not a BioIntel composite).',
+                  'Interpretation: higher = stronger evidence of expression in that anatomy in Bgee’s presence/absence + level model.',
+                  'Not a Discover multi-axis investigation score. Cite Bgee for methods.',
+                ].join('\n')}
+                maxWidth="20rem"
+              >
+                <span className="text-[10px] px-1.5 py-0.5 bg-green-900/50 text-green-300 rounded tabular-nums cursor-help underline decoration-dotted underline-offset-2">
                   score {expr.expressionScore.toFixed(2)}
                 </span>
               </StyledTooltip>
@@ -141,8 +150,15 @@ export function BgeeExpressionRow({ expr, fetchedAt, compact = false }: BgeeExpr
               </span>
             </StyledTooltip>
             {typeof expr.confidenceScore === 'number' && expr.confidenceScore > 0 ? (
-              <StyledTooltip content="Confidence">
-                <span className="text-[9px] text-slate-500 tabular-nums">
+              <StyledTooltip
+                content={[
+                  'Bgee confidence score (source-native)',
+                  `Value: ${expr.confidenceScore.toFixed(3)}`,
+                  'Reflects quality/consistency of expression calls across data types in Bgee — not statistical p-value and not Discover identityTrust.',
+                ].join('\n')}
+                maxWidth="18rem"
+              >
+                <span className="text-[9px] text-slate-500 tabular-nums cursor-help underline decoration-dotted underline-offset-2">
                   conf {expr.confidenceScore.toFixed(2)}
                 </span>
               </StyledTooltip>

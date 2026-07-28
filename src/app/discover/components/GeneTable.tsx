@@ -8,6 +8,7 @@ import { diseaseAssociationGenesOnly } from '@/lib/discovery/sources/genes'
 import { TdlBadge } from '@/components/discover/TdlBadge'
 import { DataPoint } from '@/components/ui/DataPoint'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 
 function geneSourceKey(source: string): string {
   const s = source.toLowerCase()
@@ -210,11 +211,15 @@ export function GeneTable({
                         {gene.symbol}
                       </span>
                       <TdlBadge tdl={tdl} />
-                      <StyledTooltip content="Association score">
-                        <span className="text-[10px] text-slate-500 shrink-0">
+                      <ScoreMathTooltip
+                        geneAssociation
+                        geneScore={gene.score}
+                        testId={`gene-assoc-math-${gene.symbol}`}
+                      >
+                        <span className="text-[10px] text-slate-500 shrink-0 cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2">
                           {gene.score.toFixed(2)}
                         </span>
-                      </StyledTooltip>
+                      </ScoreMathTooltip>
                     </Link>
                   </StyledTooltip>
                 </DataPoint>

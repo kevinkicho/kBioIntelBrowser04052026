@@ -4,6 +4,7 @@ import Link from 'next/link'
 import type { BoardStatus, MoleculeCandidate, Project } from '@/lib/domain'
 import { AlternateCids, IdentityTrustBadge } from '@/components/identity'
 import { ScoreAxisBars } from '@/app/discover/components/ScoreAxisBars'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 import { SignalBadges } from '@/components/projects/SignalBadges'
 import type { CandidateSignalRow } from '@/lib/signals'
 import { originSourceDeepLink } from '@/lib/originDeepLinks'
@@ -132,9 +133,17 @@ export function BoardTable({
                 </td>
                 <td className="px-3 py-3 min-w-[10rem]">
                   {score != null && (
-                    <div className="mb-1 text-center tabular-nums text-slate-300">
-                      {score.toFixed(2)}
-                    </div>
+                    <ScoreMathTooltip
+                      composite
+                      scores={c.scores}
+                      legacyComposite={score}
+                      testId={`board-composite-math-${c.candidateId}`}
+                      className="mb-1 flex justify-center"
+                    >
+                      <div className="text-center tabular-nums text-slate-300 cursor-help underline decoration-dotted decoration-slate-600 underline-offset-2">
+                        {score.toFixed(2)}
+                      </div>
+                    </ScoreMathTooltip>
                   )}
                   {c.scores ? (
                     <ScoreAxisBars scores={c.scores} compact showExplainer={false} />

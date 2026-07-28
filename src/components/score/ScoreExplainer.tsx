@@ -6,12 +6,14 @@ import { createDefaultScoreRubric } from '@/lib/domain/score'
 import { AXIS_LABELS, AXIS_ORDER } from '@/lib/profileMode'
 import {
   AXIS_HELP,
+  AXIS_MATH,
+  COMPOSITE_MATH,
   explainScoreContributions,
   formatCompositeTooltip,
 } from '@/lib/domain/scoreAxisHelp'
 import { emitProductEvent } from '@/lib/productEvents'
 import { HelperTip } from '@/components/ui/HelperTip'
-import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 
 export interface ScoreExplainerProps {
   rubric?: ScoreRubric
@@ -115,23 +117,26 @@ export function ScoreExplainer({
               Preset: <span className="text-slate-200">{String(preset)}</span>
             </span>
             <HelperTip
-              content="Weighted sum over five axes. Missing axes are renormalized or penalized per rubric — never invented by AI."
-              label="About multi-axis composite"
+              content={`${COMPOSITE_MATH.formula}\n\n${COMPOSITE_MATH.steps.join('\n')}\n\n${COMPOSITE_MATH.science}`}
+              label="About multi-axis composite math"
               testId="score-explainer-method-help"
+              maxWidth="22rem"
             />
           </div>
           {expl && (
-            <p
-              className="mb-2 rounded border border-slate-700/80 bg-slate-900/50 px-2 py-1 text-[11px] text-emerald-300/90 tabular-nums"
-              data-testid="score-explainer-composite"
-            >
-              Composite {Math.round(expl.composite * 100)}%
-              {scores?.scorePhase ? ` · ${scores.scorePhase}` : ''}
-            </p>
+            <ScoreMathTooltip composite scores={scores} rubric={rubric} testId="score-explainer-composite-math">
+              <p
+                className="mb-2 rounded border border-slate-700/80 bg-slate-900/50 px-2 py-1 text-[11px] text-emerald-300/90 tabular-nums cursor-help"
+                data-testid="score-explainer-composite"
+              >
+                Composite {Math.round(expl.composite * 100)}%
+                {scores?.scorePhase ? ` · ${scores.scorePhase}` : ''}
+              </p>
+            </ScoreMathTooltip>
           )}
           <div className="space-y-1.5 mb-2" data-testid="score-explainer-axes">
             {AXIS_ORDER.map((key) => {
-              const help = AXIS_HELP[key]
+              const math = AXIS_MATH[key]
               const row = expl?.axes.find((a) => a.key === key)
               const w = Math.round((row?.weight ?? weights[key] ?? 0) * 100)
               const val =
@@ -147,13 +152,16 @@ export function ScoreExplainer({
                     ? 'excl.'
                     : null
               return (
-                <StyledTooltip
+                <ScoreMathTooltip
                   key={key}
-                  content={`${help.summary}\nSources: ${help.sources}`}
+                  axis={key}
+                  scores={scores}
+                  rubric={rubric}
                   className="w-full"
+                  testId={`score-explainer-axis-math-${key}`}
                 >
                   <div
-                    className="rounded border border-slate-700/60 bg-slate-900/40 px-2 py-1.5 w-full"
+                    className="rounded border border-slate-700/60 bg-slate-900/40 px-2 py-1.5 w-full cursor-help"
                     data-testid={`score-explainer-axis-${key}`}
                   >
                     <div className="flex justify-between gap-2">
@@ -166,8 +174,11 @@ export function ScoreExplainer({
                         )}
                       </span>
                     </div>
+                    <p className="mt-0.5 font-mono text-[8px] text-slate-600 truncate">
+                      {math.formula}
+                    </p>
                   </div>
-                </StyledTooltip>
+                </ScoreMathTooltip>
               )
             })}
           </div>
@@ -181,17 +192,18 @@ export function ScoreExplainer({
             <HelperTip
               content={[
                 expl?.policy,
-                'Not a prediction of clinical success. Empty safety ≠ safe. Soft AE flags may appear as badges without hard-penalizing unless the rubric is set to hard penalty.',
+                COMPOSITE_MATH.disclaimer,
                 ...AXIS_ORDER.map((key) => {
                   const h = AXIS_HELP[key]
-                  return h ? `${AXIS_LABELS[key]}: ${h.summary}` : ''
+                  const m = AXIS_MATH[key]
+                  return h ? `${AXIS_LABELS[key]}: ${m.formula}\n${h.summary}` : ''
                 }),
               ]
                 .filter(Boolean)
                 .join('\n\n')}
-              label="About score axes"
+              label="About score axes math"
               testId="score-explainer-disclaimer-help"
-              maxWidth="20rem"
+              maxWidth="22rem"
             />
           </div>
         </div>

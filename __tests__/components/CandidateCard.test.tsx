@@ -82,7 +82,7 @@ function domainCandidate(): MoleculeCandidate {
 }
 
 describe('CandidateCard', () => {
-  it('does not render free-form Why AI / Why ranked UI', () => {
+  it('does not render free-form Why AI UI (deterministic why chips ok)', () => {
     render(
       <CandidateCard
         candidate={legacy}
@@ -93,9 +93,25 @@ describe('CandidateCard', () => {
         rubric={createDefaultScoreRubric('balanced')}
       />,
     )
-    expect(screen.queryByText(/Why ranked/i)).not.toBeInTheDocument()
+    // Deterministic “Why ranked” evidence line is of-record; block AI-only chrome
     expect(screen.queryByText(/Analyzing/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/Connect Ollama/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/Ask the model/i)).not.toBeInTheDocument()
+  })
+
+  it('composite score ring has math tooltip trigger', () => {
+    render(
+      <CandidateCard
+        candidate={legacy}
+        rank={1}
+        diseaseName="ATTR"
+        topCandidates={[legacy]}
+        domainCandidate={domainCandidate()}
+        rubric={createDefaultScoreRubric('balanced')}
+      />,
+    )
+    expect(screen.getByTestId('composite-score-ring')).toBeInTheDocument()
+    expect(screen.getByTestId('composite-score-math')).toBeInTheDocument()
   })
 
   it('shows multi-axis ScoreAxisBars when domainCandidate has scores', () => {

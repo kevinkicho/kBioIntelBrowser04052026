@@ -3,6 +3,10 @@ import {
   formatAxisTooltip,
   formatCompositeTooltip,
   AXIS_HELP,
+  AXIS_MATH,
+  COMPOSITE_MATH,
+  buildAxisMathPanel,
+  buildCompositeMathPanel,
 } from '@/lib/domain/scoreAxisHelp'
 import {
   createDefaultScoreRubric,
@@ -60,5 +64,27 @@ describe('scoreAxisHelp', () => {
     const tip = formatCompositeTooltip(scores())
     expect(tip).toContain('Composite')
     expect(tip).toContain('Investigation priority')
+  })
+
+  it('AXIS_MATH documents scientific formulas for all axes', () => {
+    expect(Object.keys(AXIS_MATH)).toHaveLength(5)
+    expect(AXIS_MATH.safety.formula).toMatch(/1\s*[−\-]\s*R|S\s*=/)
+    expect(AXIS_MATH.novelty.formula).toMatch(/log/)
+    expect(AXIS_MATH.clinicalStage.formula).toMatch(/0\.7/)
+    expect(COMPOSITE_MATH.formula).toMatch(/Σ|weighted|w/i)
+  })
+
+  it('buildAxisMathPanel includes formula and live value', () => {
+    const panel = buildAxisMathPanel('efficacy', scores())
+    expect(panel.formula).toContain('max')
+    expect(panel.valueLine).toMatch(/Efficacy/)
+    expect(panel.steps.length).toBeGreaterThan(2)
+  })
+
+  it('buildCompositeMathPanel includes renormalize policy when safety missing', () => {
+    const panel = buildCompositeMathPanel(scores())
+    expect(panel.formula).toMatch(/Σ|w/i)
+    expect(panel.valueLine).toMatch(/Composite/)
+    expect(panel.statusLine || panel.steps.join(' ')).toMatch(/renormal|skip|Missing/i)
   })
 })

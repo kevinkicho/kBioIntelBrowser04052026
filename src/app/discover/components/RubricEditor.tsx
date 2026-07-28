@@ -10,6 +10,8 @@ import {
 } from '@/lib/discovery/preferences'
 import { PrefTooltip } from '@/components/discovery/PrefTooltip'
 import { emitProductEvent } from '@/lib/productEvents'
+import { AXIS_MATH, COMPOSITE_MATH } from '@/lib/domain/scoreAxisHelp'
+import { ScoreMathTooltip } from '@/components/score/ScoreMathTooltip'
 
 const AXIS_KEYS: (keyof ScoreAxisWeights)[] = [
   'efficacy',
@@ -117,13 +119,17 @@ export function RubricEditor({
           Axis weights {isCustom ? '(custom)' : `(${preset})`}
           <PrefTooltip
             eventKey="axisWeights"
-            text="Sliders override the preset. Composite = weighted sum with missing-axis policy."
+            text={`${COMPOSITE_MATH.formula}\n\nSliders set wᵢ. ${COMPOSITE_MATH.steps.join(' ')}`}
           />
         </div>
         <div className="space-y-2">
           {AXIS_KEYS.map((key) => (
             <label key={key} className="flex items-center gap-3 text-xs text-slate-400">
-              <span className="w-28 shrink-0 text-slate-300">{AXIS_LABELS[key]}</span>
+              <ScoreMathTooltip axis={key} testId={`rubric-axis-math-${key}`} className="w-28 shrink-0">
+                <span className="cursor-help text-slate-300 underline decoration-dotted decoration-slate-600 underline-offset-2">
+                  {AXIS_LABELS[key]}
+                </span>
+              </ScoreMathTooltip>
               <input
                 type="range"
                 min={0}
@@ -132,6 +138,7 @@ export function RubricEditor({
                 value={Math.round((weights[key] ?? 0) * 100)}
                 onChange={(e) => handleSlider(key, Number(e.target.value) / 100)}
                 className="flex-1 accent-indigo-500"
+                aria-label={`${AXIS_LABELS[key]} weight. Formula: ${AXIS_MATH[key].formula}`}
               />
               <span className="w-10 text-right tabular-nums text-slate-500">
                 {Math.round((weights[key] ?? 0) * 100)}%

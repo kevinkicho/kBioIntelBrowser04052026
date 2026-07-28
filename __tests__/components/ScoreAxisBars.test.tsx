@@ -68,12 +68,11 @@ describe('ScoreAxisBars', () => {
     expect(screen.queryByText(/Phase:/)).not.toBeInTheDocument()
   })
 
-  it('exposes rich axis title tooltips with weight and sources', () => {
+  it('wraps each axis in a score-math tooltip trigger', () => {
     render(<ScoreAxisBars scores={makeScores()} showExplainer={false} />)
-    const row = screen.getByTestId('score-axis-row-efficacy')
-    const labeled = row.querySelector('[title]')
-    expect(labeled?.getAttribute('title') || '').toMatch(/Efficacy/i)
-    expect(labeled?.getAttribute('title') || '').toMatch(/weight|Open Targets|Sources/i)
+    expect(screen.getByTestId('score-axis-math-efficacy')).toBeInTheDocument()
+    expect(screen.getByTestId('score-axis-math-safety')).toBeInTheDocument()
+    expect(screen.getByTestId('score-axis-row-efficacy')).toBeInTheDocument()
   })
 
   it('renders score explainer toggle when enabled', () => {
