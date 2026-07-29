@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
-import { buildRetrievalSnapshot, formatRetrievalSummary } from '@/lib/ai/copilot/retrieval'
+import { formatRetrievalSummary } from '@/lib/ai/copilot/retrieval'
 import {
   buildAgentToolSystemAddendum,
   COPILOT_MAX_TOOL_STEPS,
@@ -15,12 +15,7 @@ import {
 import { runAgentToolLoop } from '@/lib/ai/runtime/agentLoop'
 import { extractStreamError } from '@/lib/ai/runtime/streamChat'
 import {
-  buildMoleculeContext,
-  contextToPromptBlock,
-  buildDiseaseContext,
   diseaseContextToPromptBlock,
-  buildGeneContext,
-  geneContextToPromptBlock,
 } from '@/lib/ai/copilot/context'
 import {
   buildFollowUpPrompt,
@@ -34,6 +29,7 @@ import {
   recentSessionSummaries,
   sessionMoleculeToSummary,
 } from '@/hooks/copilot/buildSessionMoleculeSummary'
+import { useCopilotEntityContext } from '@/hooks/copilot/useCopilotEntityContext'
 import {
   isCopilotTaskMode,
   resolveInsightPrompt,
@@ -44,9 +40,7 @@ import {
 } from '@/lib/ai/copilot/validateTaskMode'
 import {
   buildFailClosedMessage,
-  computeEvidenceGrounding,
   modeRequiresDeepDensity,
-  type EvidenceGroundingStats,
 } from '@/lib/ai/copilot/evidenceDensity'
 import {
   buildDeterministicNextActions,
@@ -104,55 +98,23 @@ export function useAICopilot(
 
   const generateInsightRef = useRef<((mode: PromptMode, opts?: GenerateInsightOptions) => Promise<void>) | null>(null)
 
-  const snapshot = useMemo(
-    () => buildRetrievalSnapshot(categoryData, categoryStatus, fetchedAt),
-    [categoryData, categoryStatus, fetchedAt]
+  const {
+    snapshot,
+    isDiseaseContext,
+    isGeneContext,
+    context,
+    diseaseCtx,
+    geneCtx,
+    diseasePromptSuffix,
+    contextBlock,
+    grounding,
+  } = useCopilotEntityContext(
+    categoryData,
+    categoryStatus,
+    fetchedAt,
+    identity,
+    diseaseName,
   )
-
-  const allData = useMemo(() => {
-    const merged: Record<string, unknown> = {}
-    for (const catId of Object.keys(categoryData) as CategoryId[]) {
-      const catData = categoryData[catId]
-      if (catData) Object.assign(merged, catData)
-    }
-    return merged
-  }, [categoryData])
-
-  const isDiseaseContext = identity.cid === 0 && Array.isArray(allData.diseaseResults)
-  const isGeneContext = !!identity.geneSymbol
-
-  const context = useMemo(
-    () => buildMoleculeContext(categoryData, identity, allData, snapshot),
-    [categoryData, identity, allData, snapshot]
-  )
-
-  const diseaseCtx = useMemo(
-    () => isDiseaseContext
-      ? buildDiseaseContext(identity.name, (allData.diseaseResults as { id: string; name: string; description?: string; therapeuticAreas?: string[]; source: string; molecules?: { name: string; cid: number | null }[] }[]) ?? [])
-      : null,
-    [identity.name, allData, isDiseaseContext]
-  )
-
-  const geneCtx = useMemo(
-    () => isGeneContext
-      ? buildGeneContext(identity.geneSymbol!, allData, snapshot)
-      : null,
-    [identity.geneSymbol, allData, snapshot, isGeneContext]
-  )
-
-  const diseasePromptSuffix = useMemo(() => {
-    if (isGeneContext || isDiseaseContext) return ''
-    if (diseaseName && context.identity.cid !== 0) {
-      return `\n\n// DISEASE CONTEXT (user arrived from discovery for "${diseaseName}"):\nThis molecule is being evaluated as a candidate for treating "${diseaseName}". Prioritize analysis that relates this molecule's targets, mechanisms, safety profile, and clinical evidence to the disease "${diseaseName}". When evaluating therapeutic potential, repurposing opportunities, or safety concerns, frame insights in terms of their relevance to "${diseaseName}" treatment.`
-    }
-    return ''
-  }, [isGeneContext, isDiseaseContext, diseaseName, context.identity.cid])
-
-  const contextBlock = useMemo(() => {
-    if (isGeneContext && geneCtx) return geneContextToPromptBlock(geneCtx)
-    if (isDiseaseContext && diseaseCtx) return diseaseContextToPromptBlock(diseaseCtx)
-    return contextToPromptBlock(context) + diseasePromptSuffix
-  }, [isGeneContext, geneCtx, isDiseaseContext, diseaseCtx, context, diseasePromptSuffix])
 
   const aiAvailable = ai.enabled && ai.status === 'available'
 
@@ -175,16 +137,6 @@ export function useAICopilot(
     at: number
     version: string
   } | null>(null)
-
-  const grounding: EvidenceGroundingStats = useMemo(
-    () =>
-      computeEvidenceGrounding(
-        context,
-        snapshot,
-        categoryStatus as Partial<Record<CategoryId, string>>,
-      ),
-    [context, snapshot, categoryStatus],
-  )
 
   const finishDeterministicTask = useCallback(
     (

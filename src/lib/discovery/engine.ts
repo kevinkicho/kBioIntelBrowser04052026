@@ -15,7 +15,6 @@ import {
 import { assessIdentityTrust } from '../domain/identity'
 import type { DiscoveryPreferencesSnapshot } from './preferences'
 import { scoreLegacyCandidate, sortCandidates } from './legacyScore'
-import { buildScoreVector } from './scoreAxes'
 import { HARVEST_K_DEFAULT } from './harvest'
 import { densifyShortlist, DENSIFY_K_DEFAULT } from './densify'
 import { getDensifyBudgets } from './densifyBudgets'
@@ -32,7 +31,6 @@ import {
   type IdentitySortMeta,
 } from './identitySort'
 import { runRankSimilarityExpandPipeline } from '@/lib/pipeline/similarityExpandPipeline'
-import type { DiseaseEntity } from '../domain/entities'
 import {
   gatherDiseaseGenes,
   gatherTargetMolecules,
@@ -43,25 +41,28 @@ import {
 } from './sources'
 import type { CandidateMolecule, DiseaseGene, RankResult } from './types'
 import { withSourceStatus } from './sourceStatus'
+import {
+  OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
+  UnknownDiseaseIdError,
+  diseaseResultToEntity,
+  findPinnedDisease,
+  mergePinnedGenes,
+  moleculeNamesFromDiseaseResult,
+  emptyRankResult,
+  cheapScoreVector,
+} from './engineHelpers'
 
-/** Documented intentional decontamination (PR3a). */
-export const OT_KNOWN_DRUGS_DECONTAMINATION_WARNING =
-  'Open Targets knownDrugs path excluded: getDrugsForDisease returns linked target/protein names, not drugs. Restored in PR3b via knownDrugs GraphQL.'
+// Re-export helpers for stable public API (tests + callers import from engine)
+export {
+  OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
+  UnknownDiseaseIdError,
+  diseaseResultToEntity,
+  normalizeDiseaseRegistryId,
+  moleculeNamesFromDiseaseResult,
+} from './engineHelpers'
 
 const MAX_MOLECULE_NAMES = 50
 const MAX_CID_RESOLVE = 50
-
-/** Thrown when a hard diseaseId pin is not found among search hits. */
-export class UnknownDiseaseIdError extends Error {
-  readonly diseaseId: string
-  constructor(diseaseId: string) {
-    super(
-      `Unknown diseaseId "${diseaseId}"; no fuzzy substitute applied. Provide a valid registry id from disease search.`,
-    )
-    this.name = 'UnknownDiseaseIdError'
-    this.diseaseId = diseaseId
-  }
-}
 
 export interface RankEngineOptions {
   limit?: number
@@ -96,142 +97,6 @@ export interface RankEngineOptions {
 
 /** Alias for facade re-exports (PR6b name). */
 export type RankCandidatesOptions = RankEngineOptions
-
-export function diseaseResultToEntity(d: DiseaseResult): DiseaseEntity {
-  const id = d.id || d.name
-  return {
-    id,
-    idNamespace: d.id ? 'ot' : 'name',
-    name: d.name,
-    synonyms: [],
-    description: d.description,
-    therapeuticAreas: d.therapeuticAreas ?? [],
-    xrefs: d.id ? [{ system: d.source, id: d.id }] : [],
-    identityTrust: d.id ? 'medium' : 'unresolved',
-  }
-}
-
-/** Normalize registry disease ids for pin matching (MONDO:x ↔ MONDO_x, strip OBO URLs). */
-export function normalizeDiseaseRegistryId(id: string): string {
-  return id
-    .trim()
-    .toLowerCase()
-    .replace(/^https?:\/\/purl\.obolibrary\.org\/obo\//i, '')
-    .replace(/^http:\/\/www\.ebi\.ac\.uk\/efo\//i, '')
-    .replace(/:/g, '_')
-}
-
-function findPinnedDisease(hits: DiseaseResult[], diseaseId: string): DiseaseResult | undefined {
-  const pin = normalizeDiseaseRegistryId(diseaseId)
-  if (!pin) return undefined
-  return hits.find((d) => d.id && normalizeDiseaseRegistryId(d.id) === pin)
-}
-
-/**
- * Inject user-pinned symbols into the gene list used for drug gather / scoring.
- * These are NOT disease–gene associations from public DBs — source is `pinned-target`
- * so the GeneTable can hide them (pins already have TargetPinPanel).
- * Score 1.0 only affects gather preference + geneAssociation axis when a drug hits the pin.
- */
-function mergePinnedGenes(genes: DiseaseGene[], pins: string[]): DiseaseGene[] {
-  if (pins.length === 0) return genes
-  const bySym = new Map(genes.map((g) => [g.symbol.toUpperCase(), g]))
-  const out = [...genes]
-  for (const symbol of pins) {
-    const s = symbol.trim().toUpperCase()
-    if (!s) continue
-    const existing = bySym.get(s)
-    if (existing) {
-      // Real disease association already present — keep DB score/source; pin still biases via panel
-      continue
-    }
-    bySym.set(s, { symbol: s, score: 1, source: 'pinned-target' })
-    out.unshift({ symbol: s, score: 1, source: 'pinned-target' })
-  }
-  return out
-}
-
-/**
- * Safe disease-side molecule names for candidate gather.
- * Open Targets enrichment historically called getDrugsForDisease, which returns
- * **target names** (not molecules). Those must never enter the candidate set.
- */
-export function moleculeNamesFromDiseaseResult(disease: DiseaseResult): {
-  names: string[]
-  skippedOtTargetNames: boolean
-} {
-  if (disease.source === 'Open Targets') {
-    return { names: [], skippedOtTargetNames: true }
-  }
-  const names = (disease.molecules ?? []).map((m) => m.name).filter(Boolean)
-  return { names, skippedOtTargetNames: false }
-}
-
-function emptyRankResult(
-  query: string,
-  opts?: {
-    diseaseName?: string
-    warnings?: string[]
-    sourceStatuses?: SourceFetchStatus[]
-    generatedAt?: string
-    rubric?: ScoreRubric
-    preferencesSnapshot?: DiscoveryPreferencesSnapshot
-  },
-): RankResult {
-  const generatedAt = opts?.generatedAt ?? new Date().toISOString()
-  const base: RankResult = {
-    query,
-    diseaseId: null,
-    diseaseName: opts?.diseaseName ?? query,
-    therapeuticAreas: [],
-    genes: [],
-    candidates: [],
-    sourceStatuses: opts?.sourceStatuses ?? [],
-    generatedAt,
-    warnings: opts?.warnings ?? [],
-  }
-  base.v2 = mapRankResultToDiscoveryResult(base, {
-    generatedAt,
-    rubric: opts?.rubric,
-  })
-  if (opts?.preferencesSnapshot) {
-    base.v2.preferencesSnapshot = opts.preferencesSnapshot
-  }
-  if (base.sourceStatuses) {
-    base.v2.sourceStatuses = base.sourceStatuses
-  }
-  if (base.warnings?.length) {
-    base.v2.warnings = [
-      ...base.v2.warnings,
-      ...base.warnings.filter((w) => !base.v2!.warnings.includes(w)),
-    ]
-  }
-  return base
-}
-
-function cheapScoreVector(
-  c: CandidateMolecule,
-  rubric: ScoreRubric,
-  extras?: { chemblActivityTerm?: number | null; identityTrust?: number | null },
-): ScoreVector {
-  const trust =
-    extras?.identityTrust != null
-      ? { axisValue: extras.identityTrust }
-      : assessIdentityTrust({ cid: c.cid, name: c.name })
-  return buildScoreVector({
-    rubric,
-    scorePhase: 'cheap',
-    cheap: {
-      geneAssociationScore: c.geneAssociationScore,
-      sharedTargetRatio: c.sharedTargetRatio,
-      maxPhase: c.clinicalPhaseRaw,
-      trialNorm: c.trialCountNorm,
-      identityTrust: trust.axisValue,
-      chemblActivityTerm: extras?.chemblActivityTerm ?? null,
-      sources: c.sources,
-    },
-  })
-}
 
 /**
  * Rank candidate molecules for a disease query.
