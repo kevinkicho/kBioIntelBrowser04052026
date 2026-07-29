@@ -155,6 +155,12 @@ if (process.env.PRECOMMIT_SKIP_TSC !== '1') {
   run('Typecheck', 'npx', ['tsc', '--noEmit'])
 }
 
+// Same ESLint errors that fail `next build` (production / App Hosting).
+// Set PRECOMMIT_SKIP_LINT=1 only for emergency local commits.
+if (process.env.PRECOMMIT_SKIP_LINT !== '1') {
+  run('ESLint (next lint — blocks production build)', 'npx', ['next', 'lint'])
+}
+
 run('Brittleness + capability suites', 'npx', [
   'jest',
   `--testPathPatterns=${BRITTLE_PATTERNS}`,
@@ -191,9 +197,10 @@ if (process.env.PRECOMMIT_BUILD === '1') {
 
 console.log('\n==================================')
 console.log('✓ Pre-commit gate passed')
-console.log('  Included: tsc · fullApp · of-record · 01-inventory · apiFetchIsolation')
+console.log('  Included: tsc · next lint · fullApp · of-record · 01-inventory · apiFetchIsolation')
 console.log('  Optional: PRECOMMIT_FULL=1 for broader legacy component smoke')
-console.log('  Optional: PRECOMMIT_BUILD=1 for next build')
+console.log('  Optional: PRECOMMIT_BUILD=1 for next build (slow)')
+console.log('  Optional: PRECOMMIT_SKIP_LINT=1 emergency only')
 console.log('  Optional: npm run test:e2e:full-app (routes + molecule chrome)')
 console.log('  Optional: npm run test:e2e:fixture:auto for Playwright north-star')
 console.log('==================================\n')

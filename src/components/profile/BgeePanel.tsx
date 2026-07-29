@@ -19,7 +19,10 @@ export const BgeePanel = memo(function BgeePanel({
   panelId,
   lastFetched,
 }: BgeePanelProps) {
-  const list = Array.isArray(expressions) ? expressions : []
+  const list = useMemo(
+    () => (Array.isArray(expressions) ? expressions : []),
+    [expressions],
+  )
   const isEmpty = list.length === 0
   const flags = useMemo(() => bgeeColumnFlags(list), [list])
   const tissueCount = new Set(list.map((e) => e.anatomicalEntityName || 'Unknown')).size

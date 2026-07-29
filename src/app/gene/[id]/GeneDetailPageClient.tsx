@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { GeneOverview as GeneOverviewType } from '@/lib/categoryFetchers/gene'
 import { AICopilot } from '@/components/ai/AICopilot'
 import { CATEGORIES, type CategoryId } from '@/lib/categoryConfig'
-import { EmptySection, ErrorSection } from '@/components/ui/DataStatus'
+import { ErrorSection } from '@/components/ui/DataStatus'
 import type { SectionStatus } from '@/lib/dataStatus'
 import { buildDiscoverHref } from '@/lib/discovery/discoverUrl'
 import { DataPoint } from '@/components/ui/DataPoint'
@@ -250,6 +250,9 @@ function GeneDiseasesPanel({
     [],
   )
 
+  // Hooks must run before any early return (next build / react-hooks/rules-of-hooks)
+  const [showEmpty, setShowEmpty] = useState(false)
+
   if (status?.status === 'error') {
     return <ErrorSection label="disease associations" error={status.error} />
   }
@@ -258,7 +261,6 @@ function GeneDiseasesPanel({
   const hasGwas = gwas.length > 0
   const hasClingen = clingen.length > 0
 
-  const [showEmpty, setShowEmpty] = useState(false)
   const emptyCount =
     (!hasDisgenet ? 1 : 0) + (!hasGwas ? 1 : 0) + (!hasClingen ? 1 : 0)
 
@@ -1090,12 +1092,24 @@ function GeneExpressionPanel({
   fetchedAt?: Date | null
 }) {
   void fetchedAt
-  const gtexExps = ((data?.geneExpressionData as Record<string, unknown>)?.gtexExpressions ??
-    []) as GtexTissueRow[]
-  const bgeeExps = ((data?.geneExpressionData as Record<string, unknown>)?.bgeeExpressions ??
-    []) as BgeeExpression[]
-  const atlasData = ((data?.geneExpressionData as Record<string, unknown>)?.expressionAtlasData ??
-    []) as GeneExpression[]
+  const gtexExps = useMemo(
+    () =>
+      ((data?.geneExpressionData as Record<string, unknown> | undefined)?.gtexExpressions ??
+        []) as GtexTissueRow[],
+    [data],
+  )
+  const bgeeExps = useMemo(
+    () =>
+      ((data?.geneExpressionData as Record<string, unknown> | undefined)?.bgeeExpressions ??
+        []) as BgeeExpression[],
+    [data],
+  )
+  const atlasData = useMemo(
+    () =>
+      ((data?.geneExpressionData as Record<string, unknown> | undefined)?.expressionAtlasData ??
+        []) as GeneExpression[],
+    [data],
+  )
 
   const hasGtex = gtexExps.length > 0
   const hasBgee = bgeeExps.length > 0
