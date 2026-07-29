@@ -1,0 +1,15 @@
+/** Barrel for domain DTO types. Prefer import from @/lib/types. */
+export * from './molecule'
+export * from './pharmaceutical'
+export * from './clinicalSafety'
+export * from './bioactivity'
+export * from './proteinStructure'
+export * from './geneGenomics'
+export * from './disease'
+export * from './pathways'
+export * from './literature'
+export * from './metabolomics'
+export * from './toxicology'
+export * from './systems'
+/** Aggregate bag last — depends on domain modules */
+export * from './moleculeData'
