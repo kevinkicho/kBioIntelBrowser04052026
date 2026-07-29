@@ -5,6 +5,7 @@ import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import type { UniProtProtein } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
+import { safeDisplayString } from '@/lib/reactSafe'
 
 export const UniProtExtendedPanel = memo(function UniProtExtendedPanel({ proteins, panelId, lastFetched }: { proteins: UniProtProtein[], panelId?: string, lastFetched?: Date }) {
   const list = Array.isArray(proteins) ? proteins : []
@@ -56,23 +57,14 @@ export const UniProtExtendedPanel = memo(function UniProtExtendedPanel({ protein
           getKey={(protein, i) => `${protein.accession || i}`}
           renderItem={(protein) => {
             // Defensive: never render nested UniProt objects as React children (error #31)
-            const name =
-              typeof protein.proteinName === 'string'
-                ? protein.proteinName
-                : 'Unknown protein'
-            const gene =
-              typeof protein.geneName === 'string' ? protein.geneName : ''
-            const organism =
-              typeof protein.organism === 'string' ? protein.organism : ''
-            const fn =
-              typeof protein.function === 'string' ? protein.function : ''
-            const loc =
-              typeof protein.subcellularLocation === 'string'
-                ? protein.subcellularLocation
-                : ''
-            const pathways = (protein.pathways ?? []).filter(
-              (p): p is string => typeof p === 'string' && p.length > 0,
-            )
+            const name = safeDisplayString(protein.proteinName, { empty: 'Unknown protein' })
+            const gene = safeDisplayString(protein.geneName, { empty: '' })
+            const organism = safeDisplayString(protein.organism, { empty: '' })
+            const fn = safeDisplayString(protein.function, { empty: '' })
+            const loc = safeDisplayString(protein.subcellularLocation, { empty: '' })
+            const pathways = (protein.pathways ?? [])
+              .map((p) => safeDisplayString(p, { empty: '' }))
+              .filter(Boolean)
             return (
             <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">

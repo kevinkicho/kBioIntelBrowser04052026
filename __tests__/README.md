@@ -3,10 +3,27 @@
 ## Running
 
 ```sh
-npx jest                            # full suite
+npm run test:precommit              # **before every commit** — tsc + capability + of-record suites
+npm run test:precommit:full         # + broader component smoke
+npm run test:capabilities           # inventory + brittleness only
+npm run test:brittle                # React-safe / expand / data-hub UI
+npm run test:gate                   # alias-style gate used in CI notes
+npx jest                            # full suite (long)
 npx jest path/to/some.test.ts       # one file
 npx jest --testPathPatterns=lib     # all under __tests__/lib
 ```
+
+## Layers
+
+| Layer | What | Command |
+|-------|------|---------|
+| **Typecheck** | No TS / JSX contract break | `npx tsc --noEmit` |
+| **Capability inventory** | Critical files + of-record builders still wired | `__tests__/capabilities/productCapabilities.test.ts` |
+| **Brittleness** | React #31, expand UI, data hub layout, empty coverage | `test:brittle` |
+| **Of-record product** | Discover rank, packs, events, hub builders | `test:gate` / `test:precommit` |
+| **E2E fixture** | North-star loop + data hub coverage | `test:e2e:fixture:auto` |
+
+New free-API DTO fields rendered in JSX **must** use `safeDisplayString` from `src/lib/reactSafe.ts` (or extract strings in the API mapper). Nested objects as React children throw minified error #31.
 
 ## Mocking `fetch`
 

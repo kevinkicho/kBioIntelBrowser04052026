@@ -47,9 +47,13 @@ Coding agents and human implementers: read this before changing product behavior
 npm run dev                              # required before e2e (no Playwright webServer by default)
 npx tsc --noEmit
 npm test
-npm run test:gate                        # tsc + key jest suites (v2.1 + data hub / research prefs)
+npm run test:precommit                   # **before commit** — tsc + capability + of-record suites
+npm run test:precommit:full              # precommit + broader component smoke
+npm run test:capabilities                # product capability inventory + UI brittleness
+npm run test:brittle                     # React-safe / expand / data-hub UI suites
+npm run test:gate                        # tsc + of-record + brittleness jest suites
 npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
-npm run test:e2e:fixture                 # north-star e2e (needs npm run dev, E2E_FIXTURE=1)
+npm run test:e2e:fixture                 # north-star + data-hub e2e (needs npm run dev, E2E_FIXTURE=1)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
 npm run test:e2e:live                    # north-star e2e against live APIs (optional)
 npm run logs:tail                        # last lines of today's agent activity JSONL
@@ -57,6 +61,16 @@ npm run biointel -- help                 # product CLI v0 for agents (see below)
 npm run lint
 npm run build
 ```
+
+### Pre-commit gate (agents)
+
+Run **`npm run test:precommit`** before committing product behavior changes:
+
+1. `tsc --noEmit`
+2. Brittleness suites (`reactSafe`, ExpandableItems, CrossSourceStrip, DataHubLedger, UniProt nested DTOs, capability inventory)
+3. Of-record product suites (Discover scores, packs, data hub builders, events, research catalog)
+
+Optional: `npm run test:precommit:full` · Playwright UI loop: `npm run test:e2e:fixture:auto`. Free-API fields in JSX: use `safeDisplayString` (`src/lib/reactSafe.ts`) to avoid React error #31.
 
 ## BioIntel CLI v0 (agents / operators)
 

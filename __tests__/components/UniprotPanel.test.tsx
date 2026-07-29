@@ -36,6 +36,10 @@ describe('UniprotPanel', () => {
 
   test('renders empty state when no entries', () => {
     render(<UniprotPanel entries={[]} />)
-    expect(screen.getByText(/no protein\/gene data found/i)).toBeInTheDocument()
+    // Empty chrome uses a "No data" badge with the message in aria-label
+    expect(screen.getByTestId('panel-empty')).toBeInTheDocument()
+    expect(
+      screen.getByLabelText(/no protein\/gene data found/i),
+    ).toBeInTheDocument()
   })
 })
