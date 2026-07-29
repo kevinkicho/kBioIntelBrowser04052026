@@ -45,18 +45,22 @@ export function LoadingOverlay({
     (c) => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error',
   ).length
   const totalAll = categories.length
+  // Dismiss as soon as anything resolves — matches ProfilePageClient overlay gate
+  // (do not pin the full-page blocker until every free API finishes).
+  const firstResolved = totalLoaded > 0
   const allDone =
     totalAll > 0 &&
     categories.every((c) => categoryStatus[c.id] === 'loaded' || categoryStatus[c.id] === 'error')
   const anyLoading = categories.some((c) => categoryStatus[c.id] === 'loading')
+  const shouldDismiss = firstResolved || allDone
 
   useEffect(() => {
-    if (allDone && visible && !fading) {
+    if (shouldDismiss && visible && !fading) {
       setFading(true)
-      const t = setTimeout(() => setVisible(false), 800)
+      const t = setTimeout(() => setVisible(false), 400)
       return () => clearTimeout(t)
     }
-  }, [allDone, visible, fading])
+  }, [shouldDismiss, visible, fading])
 
   if (!visible) return null
 

@@ -25,9 +25,10 @@ test.describe('BioIntel smoke', () => {
     await page.goto('/molecule/2244')
     const fab = page.getByTestId('ai-copilot-fab')
     await expect(fab).toBeVisible({ timeout: 30_000 })
-    // Cold load: may be disabled briefly; always becomes enabled once a category finishes.
-    // Fast cache hits can skip the disabled window — only assert eventual enable.
-    await expect(fab).toBeEnabled({ timeout: 90_000 })
+    // Cold load: disabled until the first category resolves; then enabled.
+    // Fast cache can skip the disabled window — only assert eventual enable.
+    // Live free APIs on CI can be slow; allow long hydrate (overlay no longer blocks forever).
+    await expect(fab).toBeEnabled({ timeout: 120_000 })
   })
 
   test('hypothesis page renders the filter UI', async ({ page }) => {
