@@ -26,6 +26,7 @@ import {
   bgeeGridTemplate,
   bgeeSubtitle,
 } from '@/lib/api/bgeeColumns'
+import { hasAtlasExpressionLevel } from '@/lib/api/expression-atlas'
 import { ElapsedTimer } from '@/components/ui/ElapsedTimer'
 import { clientFetch } from '@/lib/clientFetch'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
@@ -1099,8 +1100,15 @@ function GeneExpressionPanel({
   const gridGtex = 'grid grid-cols-[minmax(0,1fr)_5rem_2.5rem] gap-x-2'
   const bgeeFlags = useMemo(() => bgeeColumnFlags(bgeeExps), [bgeeExps])
   const gridBgee = bgeeGridTemplate(bgeeFlags)
-  const gridAtlas =
-    'grid grid-cols-[minmax(0,1.4fr)_minmax(4.5rem,0.55fr)_minmax(0,0.9fr)_minmax(4rem,0.5fr)_minmax(4rem,0.45fr)_2.5rem] gap-x-2'
+  const atlasHasLevels = useMemo(
+    () => atlasData.some((e) => hasAtlasExpressionLevel(e)),
+    [atlasData],
+  )
+  // With levels: Experiment · Type · Tissue · Level · Species · Open
+  // Without: Experiment · Type · Tissue · Species · Open (no empty Level column)
+  const gridAtlas = atlasHasLevels
+    ? 'grid grid-cols-[minmax(0,1.3fr)_minmax(4.5rem,0.55fr)_minmax(0,0.9fr)_minmax(4rem,0.5fr)_minmax(4rem,0.45fr)_2.5rem] gap-x-2'
+    : 'grid grid-cols-[minmax(0,1.4fr)_minmax(4.5rem,0.55fr)_minmax(0,1fr)_minmax(4.5rem,0.5fr)_2.5rem] gap-x-2'
 
   return (
     <div className="space-y-3" data-testid="gene-expression-cards">
@@ -1293,7 +1301,11 @@ function GeneExpressionPanel({
       {hasAtlas && (
         <ExpressionSourceCard
           title={`Expression Atlas (${atlasData.length})`}
-          subtitle="Experiment, type, tissue/condition, expression level, and species."
+          subtitle={
+            atlasHasLevels
+              ? 'Baseline tissue expression (value + unit when published). Open opens the experiment on Expression Atlas.'
+              : 'Experiment catalog for this gene (metadata). Numeric levels not returned for these rows — open the experiment on Expression Atlas.'
+          }
           testId="gene-expression-atlas"
         >
           <FilterablePaginatedList
@@ -1312,9 +1324,11 @@ function GeneExpressionPanel({
                 .join(' ')
             }
             sortOptions={atlasSort}
-            defaultSortId="name-asc"
+            defaultSortId={atlasHasLevels ? 'level-desc' : 'name-asc'}
             filterPlaceholder="Filter Atlas (experiment, tissue, type…)"
-            getKey={(e, i) => `${e.experimentDescription || e.url}-${i}`}
+            getKey={(e, i) =>
+              `${e.experimentDescription || e.url}-${e.tissueName || ''}-${i}`
+            }
             pageSize={15}
             className="space-y-0"
             renderItem={(e, index) => {
@@ -1322,36 +1336,28 @@ function GeneExpressionPanel({
               const experiment = e.experimentDescription || e.experimentType || '—'
               const type = e.experimentType || '—'
               const tissueOrCond = e.tissueName || e.condition || '—'
-              const level =
-                typeof e.expressionLevel === 'number' && Number.isFinite(e.expressionLevel)
-                  ? `${e.expressionLevel}${e.unit ? ` ${e.unit}` : ''}`
-                  : '—'
+              const hasLevel = hasAtlasExpressionLevel(e)
+              const level = hasLevel
+                ? `${e.expressionLevel}${e.unit ? ` ${e.unit}` : ''}`
+                : '—'
               const species = e.species || '—'
               return (
                 <div>
                   {index === 0 && (
                     <div
                       className={`${gridAtlas} px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80`}
+                      data-testid="gene-atlas-columns"
+                      data-has-level={atlasHasLevels ? 'true' : 'false'}
                     >
                       <span>Experiment</span>
                       <span>Type</span>
                       <span>Tissue / condition</span>
-                      <span className="text-right">Level</span>
+                      {atlasHasLevels && <span className="text-right">Level</span>}
                       <span>Species</span>
                       <span className="text-right">Open</span>
                     </div>
                   )}
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label="Open experiment in Expression Atlas"
-                    onClick={() =>
-                      onDeepLinkClick('expression-atlas', href, {
-                        panelId: 'gene-expression',
-                        label: experiment.slice(0, 80),
-                      })
-                    }
+                  <div
                     className={`${gridAtlas} items-center px-2 py-1.5 border-b border-slate-700/50 last:border-0 hover:bg-slate-800/60 transition-colors group`}
                   >
                     <StyledTooltip content={experiment === '—' ? undefined : experiment}>
@@ -1373,17 +1379,34 @@ function GeneExpressionPanel({
                         {tissueOrCond}
                       </span>
                     </StyledTooltip>
-                    <span
-                      className={`text-[11px] font-mono tabular-nums text-right text-indigo-300/90 ${emptyDataClass(level === '—')}`}
-                    >
-                      {level}
-                    </span>
+                    {atlasHasLevels && (
+                      <span
+                        className={`text-[11px] font-mono tabular-nums text-right text-indigo-300/90 ${emptyDataClass(!hasLevel)}`}
+                      >
+                        {level}
+                      </span>
+                    )}
                     <span
                       className={`text-[10px] text-slate-500 truncate ${emptyDataClass(species === '—')}`}
                     >
                       {species}
                     </span>
-</a>
+                    <a
+                      href={href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      aria-label={`Open ${experiment} in Expression Atlas`}
+                      onClick={() =>
+                        onDeepLinkClick('expression-atlas', href, {
+                          panelId: 'gene-expression',
+                          label: experiment.slice(0, 80),
+                        })
+                      }
+                      className="text-[11px] text-indigo-400 hover:text-indigo-300 text-right tabular-nums"
+                    >
+                      ↗
+                    </a>
+                  </div>
                 </div>
               )
             }}
