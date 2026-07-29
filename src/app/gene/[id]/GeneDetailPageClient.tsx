@@ -195,7 +195,6 @@ function GeneDiseasesPanel({
   geneSymbol?: string
   fetchedAt?: Date | null
 }) {
-  void fetchedAt
   const geneDiseases = data?.geneDiseases as Record<string, unknown> | undefined
   type DisgenetRow = {
     diseaseName: string
