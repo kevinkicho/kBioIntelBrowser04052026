@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useAI } from '@/lib/ai/useAI'
 import { persistAiGeneration } from '@/lib/ai/aiHistoryStore'
 import { formatRetrievalSummary } from '@/lib/ai/copilot/retrieval'
