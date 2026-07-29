@@ -2,6 +2,7 @@
 
 /**
  * Source coverage directory for the current entity's Data Hub.
+ * Compact multi-column grid — hide empty sources by default.
  */
 
 import { useMemo, useState } from 'react'
@@ -29,17 +30,19 @@ export function SourceDirectoryPanel({
     return directory.entries.filter((e) => showEmpty || e.factCount > 0)
   }, [directory.entries, showEmpty])
 
+  const emptySources = directory.total - directory.withData
+
   return (
     <section
       className={`rounded-xl border border-slate-800 bg-slate-950/40 ${className}`}
       data-testid={testId}
       aria-label="Source directory"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 px-3 py-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 px-3 py-1.5">
         <div className="flex flex-wrap items-center gap-1.5">
           <h3 className="text-xs font-semibold text-slate-100">Source directory</h3>
           <HelperTip
-            content="Free public sources that appear on this entity’s Data hub. Filter to what has data for the current page session. Docs open upstream API documentation."
+            content="Free public sources that appear on this entity’s Data hub. Empty sources are hidden by default. Docs open upstream API documentation."
             label="About source directory"
             testId={`${testId}-help`}
           />
@@ -47,22 +50,27 @@ export function SourceDirectoryPanel({
             {directory.withData}/{directory.total} with data
           </span>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowEmpty((v) => !v)}
-          className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:text-slate-200"
-          data-testid={`${testId}-toggle-empty`}
-        >
-          {showEmpty ? 'Hide empty sources' : 'Show empty sources'}
-        </button>
+        {emptySources > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowEmpty((v) => !v)}
+            className="rounded border border-slate-700 px-2 py-0.5 text-[10px] text-slate-400 hover:text-slate-200"
+            data-testid={`${testId}-toggle-empty`}
+          >
+            {showEmpty ? 'Hide empty sources' : `Show ${emptySources} empty`}
+          </button>
+        )}
       </div>
 
       {rows.length === 0 ? (
-        <p className="px-3 py-4 text-center text-[11px] text-slate-500">
+        <p className="px-3 py-3 text-center text-[11px] text-slate-500">
           No source coverage yet — wait for categories to load.
         </p>
       ) : (
-        <ul className="divide-y divide-slate-800/60 max-h-64 overflow-y-auto">
+        <ul
+          className="grid max-h-72 grid-cols-1 gap-1 overflow-y-auto p-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+          data-testid={`${testId}-grid`}
+        >
           {rows.map((e) => {
             const empty = e.factCount === 0
             const panelId = e.panelIds[0]
@@ -72,36 +80,40 @@ export function SourceDirectoryPanel({
                 key={e.id}
                 data-testid={`${testId}-row-${e.id}`}
                 data-empty={empty ? 'true' : 'false'}
-                className={`flex flex-wrap items-start justify-between gap-2 px-3 py-2 ${emptyDataClass(empty)}`}
+                className={`flex min-w-0 flex-col gap-0.5 rounded-lg border border-slate-800/70 bg-slate-900/40 px-2 py-1.5 ${emptyDataClass(empty)}`}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="text-[11px] font-medium text-slate-200">{e.source}</span>
-                    {e.api && (
-                      <span className="text-[9px] text-slate-500">{e.api}</span>
-                    )}
-                    <span
-                      className={`rounded-full border px-1.5 py-0.5 text-[9px] tabular-nums ${
-                        empty
-                          ? 'border-slate-700 text-slate-600'
-                          : 'border-emerald-900/50 bg-emerald-950/30 text-emerald-300'
-                      }`}
-                    >
-                      {e.factCount} fact{e.factCount === 1 ? '' : 's'}
-                    </span>
-                  </div>
-                  {e.sampleFacts.length > 0 && (
-                    <p className="mt-0.5 text-[10px] text-slate-500 truncate">
-                      {e.sampleFacts.join(' · ')}
+                <div className="flex min-w-0 items-start justify-between gap-1">
+                  <div className="min-w-0">
+                    <p className="truncate text-[11px] font-medium leading-tight text-slate-200" title={e.source}>
+                      {e.source}
                     </p>
-                  )}
+                    {e.api && (
+                      <p className="truncate text-[9px] text-slate-600" title={e.api}>
+                        {e.api}
+                      </p>
+                    )}
+                  </div>
+                  <span
+                    className={`shrink-0 rounded-full border px-1.5 py-0.5 text-[9px] tabular-nums ${
+                      empty
+                        ? 'border-slate-700 text-slate-600'
+                        : 'border-emerald-900/50 bg-emerald-950/30 text-emerald-300'
+                    }`}
+                  >
+                    {e.factCount}
+                  </span>
                 </div>
-                <span className="inline-flex flex-wrap gap-1">
+                {e.sampleFacts.length > 0 && (
+                  <p className="line-clamp-1 text-[9px] leading-tight text-slate-500" title={e.sampleFacts.join(' · ')}>
+                    {e.sampleFacts.join(' · ')}
+                  </p>
+                )}
+                <span className="mt-auto inline-flex flex-wrap gap-0.5 pt-0.5">
                   {panelId && catId && onOpenPanel && (
                     <button
                       type="button"
                       onClick={() => onOpenPanel(catId, panelId)}
-                      className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-indigo-300 hover:border-indigo-600/40"
+                      className="rounded border border-slate-700 px-1 py-0.5 text-[9px] text-indigo-300 hover:border-indigo-600/40"
                     >
                       Panel
                     </button>
@@ -112,7 +124,7 @@ export function SourceDirectoryPanel({
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => onDeepLinkClick(e.source, e.docs, { label: 'docs' })}
-                      className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-emerald-300/90 hover:border-emerald-700/40"
+                      className="rounded border border-slate-700 px-1 py-0.5 text-[9px] text-emerald-300/90 hover:border-emerald-700/40"
                     >
                       Docs ↗
                     </a>

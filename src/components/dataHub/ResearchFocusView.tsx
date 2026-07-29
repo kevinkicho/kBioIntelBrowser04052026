@@ -110,15 +110,20 @@ function ResearchTable({
         <p className="px-3 py-4 text-[11px] text-slate-500">{emptyMessage}</p>
       ) : (
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[32rem] border-collapse text-left">
+          <table className="w-full table-fixed border-collapse text-left">
             <thead>
               <tr className="text-[9px] uppercase tracking-wide text-slate-600">
-                {columns.map((c) => (
-                  <th key={c} className="px-3 py-1.5 font-semibold">
+                {columns.map((c, ci) => (
+                  <th
+                    key={c}
+                    className={`px-2 py-1 font-semibold ${
+                      ci === 0 ? 'w-[36%]' : ci === columns.length - 1 ? 'w-[14%]' : ''
+                    }`}
+                  >
                     {c}
                   </th>
                 ))}
-                <th className="px-3 py-1.5 font-semibold">Open</th>
+                <th className="w-12 px-1.5 py-1 font-semibold">Open</th>
               </tr>
             </thead>
             <tbody>
@@ -133,14 +138,14 @@ function ResearchTable({
                     {cells.map((cell, j) => (
                       <td
                         key={j}
-                        className={`px-3 py-1.5 text-[11px] ${
+                        className={`px-2 py-1 text-[11px] leading-snug ${
                           j === 0 ? 'text-slate-100 font-medium' : 'text-slate-400'
                         }`}
                       >
                         <span className="line-clamp-2 break-words">{cell}</span>
                       </td>
                     ))}
-                    <td className="px-3 py-1.5">
+                    <td className="px-1.5 py-1">
                       {link ? (
                         <a
                           href={link}
@@ -148,8 +153,9 @@ function ResearchTable({
                           rel="noopener noreferrer"
                           onClick={() => onDeepLinkClick(source, link, { label: title })}
                           className="text-[10px] text-emerald-300 hover:underline"
+                          title="Open source"
                         >
-                          Source ↗
+                          ↗
                         </a>
                       ) : (
                         <span className="text-[10px] text-slate-600">—</span>
@@ -284,8 +290,8 @@ export function ResearchFocusView({
     (showStruct ? structures.cells.length : 0)
 
   return (
-    <div className={`space-y-4 ${className}`} data-testid={testId}>
-      <header className="rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2.5 sm:px-4">
+    <div className={`space-y-3 ${className}`} data-testid={testId}>
+      <header className="rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2 sm:px-4">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-sm font-semibold text-slate-100">Research view</h2>
           <HelperTip
@@ -362,57 +368,67 @@ export function ResearchFocusView({
 
       {showGrants && <GrantLandscapeStrip data={data} testId={`${testId}-grants-strip`} />}
 
-      {showLit && (
-        <ResearchTable
-          title="Literature"
-          source="Europe PMC / PubMed / OpenAlex"
-          help="Paper titles, years, venues from free literature APIs. Open DOI/PubMed when available."
-          columns={['Title', 'Year', 'Venue', 'DOI/PMID']}
-          rows={lit.cells}
-          links={lit.links}
-          testId={`${testId}-lit`}
-          emptyMessage="No literature rows loaded yet — open Research & Literature category panels or wait for fetch. See methodology for why empty."
-        />
-      )}
+      <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+        {showLit && (
+          <div className="min-w-0 xl:col-span-2">
+            <ResearchTable
+              title="Literature"
+              source="Europe PMC / PubMed / OpenAlex"
+              help="Paper titles, years, venues from free literature APIs. Open DOI/PubMed when available."
+              columns={['Title', 'Year', 'Venue', 'DOI/PMID']}
+              rows={lit.cells}
+              links={lit.links}
+              testId={`${testId}-lit`}
+              emptyMessage="No literature rows loaded yet — open Research & Literature category panels or wait for fetch. See methodology for why empty."
+            />
+          </div>
+        )}
 
-      {showGrants && (
-        <ResearchTable
-          title="NIH grants"
-          source="NIH RePORTER"
-          help="Grant titles, PIs, and institutes from free NIH RePORTER. Affiliation context for research activity."
-          columns={['Title', 'PI', 'Institute', 'Start', 'Project #']}
-          rows={grants.cells}
-          links={grants.links}
-          testId={`${testId}-grants`}
-          emptyMessage="No NIH grant rows loaded yet."
-        />
-      )}
+        {showGrants && (
+          <div className="min-w-0">
+            <ResearchTable
+              title="NIH grants"
+              source="NIH RePORTER"
+              help="Grant titles, PIs, and institutes from free NIH RePORTER. Affiliation context for research activity."
+              columns={['Title', 'PI', 'Institute', 'Start', 'Project #']}
+              rows={grants.cells}
+              links={grants.links}
+              testId={`${testId}-grants`}
+              emptyMessage="No NIH grant rows loaded yet."
+            />
+          </div>
+        )}
 
-      {showTrials && (
-        <ResearchTable
-          title="Clinical trials"
-          source="ClinicalTrials.gov"
-          help="Registered studies from CT.gov. Phase/status are registry fields — not efficacy conclusions."
-          columns={['NCT', 'Title', 'Phase', 'Status', 'Conditions']}
-          rows={trials.cells}
-          links={trials.links}
-          testId={`${testId}-trials`}
-          emptyMessage="No clinical trial rows loaded yet."
-        />
-      )}
+        {showTrials && (
+          <div className="min-w-0">
+            <ResearchTable
+              title="Clinical trials"
+              source="ClinicalTrials.gov"
+              help="Registered studies from CT.gov. Phase/status are registry fields — not efficacy conclusions."
+              columns={['NCT', 'Title', 'Phase', 'Status', 'Conditions']}
+              rows={trials.cells}
+              links={trials.links}
+              testId={`${testId}-trials`}
+              emptyMessage="No clinical trial rows loaded yet."
+            />
+          </div>
+        )}
 
-      {showStruct && (
-        <ResearchTable
-          title="Structures"
-          source="RCSB PDB"
-          help="Experimental structures linked to this entity name/search. Open RCSB for full record."
-          columns={['PDB', 'Title', 'Method', 'Resolution']}
-          rows={structures.cells}
-          links={structures.links}
-          testId={`${testId}-structures`}
-          emptyMessage="No PDB structure rows loaded yet — open Protein & Structure category."
-        />
-      )}
+        {showStruct && (
+          <div className="min-w-0 xl:col-span-2">
+            <ResearchTable
+              title="Structures"
+              source="RCSB PDB"
+              help="Experimental structures linked to this entity name/search. Open RCSB for full record."
+              columns={['PDB', 'Title', 'Method', 'Resolution']}
+              rows={structures.cells}
+              links={structures.links}
+              testId={`${testId}-structures`}
+              emptyMessage="No PDB structure rows loaded yet — open Protein & Structure category."
+            />
+          </div>
+        )}
+      </div>
     </div>
   )
 }

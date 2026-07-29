@@ -70,7 +70,8 @@ function stableHref(url?: string): string | null {
   return u
 }
 
-function RowActions({
+/** Compact provenance + actions cell (source name, API chip, cite/panel/link). */
+function ProvenanceCell({
   row,
   onOpenPanel,
   subjectLabel,
@@ -86,65 +87,72 @@ function RowActions({
   const [copied, setCopied] = useState(false)
   const sourceKey = row.panelId || row.source || 'pubchem'
   return (
-    <span className="inline-flex flex-wrap items-center gap-1">
-      <ApiProvenanceChip
-        sourceKey={sourceKey}
-        sourceUrl={href || undefined}
-        fetchedAt={row.retrievedAt}
-        testId={`data-hub-api-${row.id}`}
-      />
-      <button
-        type="button"
-        onClick={() => {
-          void copyDataHubFactCitation(row, { subjectLabel, subjectId }).then((ok) => {
-            if (ok) {
-              setCopied(true)
-              window.setTimeout(() => setCopied(false), 1500)
-            }
-          })
-        }}
-        className="rounded border border-slate-700 bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-medium text-slate-300 hover:border-slate-500"
-        data-testid={`data-hub-cite-${row.id}`}
-        title="Copy citation for lab notebook"
-      >
-        {copied ? 'Copied' : 'Cite'}
-      </button>
-      {canPanel && (
+    <div className="flex flex-col gap-0.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-x-1.5 sm:gap-y-0.5">
+      <span className="inline-flex min-w-0 max-w-full items-center gap-1">
+        <span className="truncate text-[10px] text-slate-400" title={row.source}>
+          {row.source}
+        </span>
+        <ApiProvenanceChip
+          sourceKey={sourceKey}
+          sourceUrl={href || undefined}
+          fetchedAt={row.retrievedAt}
+          testId={`data-hub-api-${row.id}`}
+        />
+      </span>
+      <span className="inline-flex flex-wrap items-center gap-0.5">
         <button
           type="button"
-          onClick={() => onOpenPanel!(row.categoryId!, row.panelId!)}
-          className="rounded border border-slate-700 bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-medium text-indigo-300 hover:border-indigo-600/50 hover:text-indigo-200"
-          data-testid={`data-hub-open-${row.id}`}
-        >
-          Panel
-        </button>
-      )}
-      {href && (
-        <a
-          href={href}
-          target="_blank"
-          rel="noopener noreferrer"
-          onClick={() =>
-            onDeepLinkClick(row.source, href, {
-              panelId: row.panelId,
-              label: row.fact,
+          onClick={() => {
+            void copyDataHubFactCitation(row, { subjectLabel, subjectId }).then((ok) => {
+              if (ok) {
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1500)
+              }
             })
-          }
-          className="rounded border border-slate-700 bg-slate-900/80 px-1.5 py-0.5 text-[10px] font-medium text-emerald-300/90 hover:border-emerald-700/40 hover:text-emerald-200"
-          data-testid={`data-hub-source-${row.id}`}
+          }}
+          className="rounded border border-slate-700/80 bg-slate-950/60 px-1 py-0.5 text-[9px] font-medium text-slate-300 hover:border-slate-500"
+          data-testid={`data-hub-cite-${row.id}`}
+          title="Copy citation for lab notebook"
         >
-          Source ↗
-        </a>
-      )}
-      {!href && !canPanel && (
-        <Link
-          href="/methodology#honesty"
-          className="text-[9px] text-slate-600 hover:text-slate-400"
-        >
-          ?
-        </Link>
-      )}
-    </span>
+          {copied ? 'Copied' : 'Cite'}
+        </button>
+        {canPanel && (
+          <button
+            type="button"
+            onClick={() => onOpenPanel!(row.categoryId!, row.panelId!)}
+            className="rounded border border-slate-700/80 bg-slate-950/60 px-1 py-0.5 text-[9px] font-medium text-indigo-300 hover:border-indigo-600/50 hover:text-indigo-200"
+            data-testid={`data-hub-open-${row.id}`}
+          >
+            Panel
+          </button>
+        )}
+        {href && (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={() =>
+              onDeepLinkClick(row.source, href, {
+                panelId: row.panelId,
+                label: row.fact,
+              })
+            }
+            className="rounded border border-slate-700/80 bg-slate-950/60 px-1 py-0.5 text-[9px] font-medium text-emerald-300/90 hover:border-emerald-700/40 hover:text-emerald-200"
+            data-testid={`data-hub-source-${row.id}`}
+          >
+            ↗
+          </a>
+        )}
+        {!href && !canPanel && (
+          <Link
+            href="/methodology#honesty"
+            className="text-[9px] text-slate-600 hover:text-slate-400"
+          >
+            ?
+          </Link>
+        )}
+      </span>
+    </div>
   )
 }
 
@@ -403,20 +411,33 @@ export function DataHubLedgerView({
           </Link>
         </div>
       ) : (
-        <div className="divide-y divide-slate-800/80">
+        <div className="grid grid-cols-1 divide-y divide-slate-800/80 xl:grid-cols-2 xl:divide-y-0 xl:gap-px xl:bg-slate-800/40">
           {visibleSections.map(({ sec, rows }) => (
-            <div key={sec.id} data-testid={`${testId}-section-${sec.id}`} className="px-3 py-2 sm:px-4">
-              <h3 className="mb-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
-                {sec.title}
+            <div
+              key={sec.id}
+              data-testid={`${testId}-section-${sec.id}`}
+              className={`bg-slate-900/50 px-3 py-2 sm:px-4 xl:min-h-0 ${
+                rows.length >= 8 ? 'xl:col-span-2' : ''
+              }`}
+            >
+              <h3 className="mb-1 flex items-baseline justify-between gap-2 text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                <span>{sec.title}</span>
+                <span className="font-normal normal-case tabular-nums text-slate-600">
+                  {rows.length}
+                </span>
               </h3>
               <div className="overflow-x-auto">
-                <table className="w-full min-w-[28rem] border-collapse text-left">
+                <table className="w-full table-fixed border-collapse text-left">
+                  <colgroup>
+                    <col className="w-[28%]" />
+                    <col className="w-[42%]" />
+                    <col className="w-[30%]" />
+                  </colgroup>
                   <thead>
                     <tr className="text-[9px] uppercase tracking-wide text-slate-600">
-                      <th className="pb-1 pr-2 font-semibold">Fact</th>
-                      <th className="pb-1 pr-2 font-semibold">Value</th>
-                      <th className="pb-1 pr-2 font-semibold">Source</th>
-                      <th className="pb-1 font-semibold">Open</th>
+                      <th className="pb-0.5 pr-1.5 font-semibold">Fact</th>
+                      <th className="pb-0.5 pr-1.5 font-semibold">Value</th>
+                      <th className="pb-0.5 font-semibold">Source</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -429,30 +450,23 @@ export function DataHubLedgerView({
                           data-empty={empty ? 'true' : 'false'}
                           className={`border-t border-slate-800/40 align-top ${emptyDataClass(empty)}`}
                         >
-                          <td className="py-1 pr-2 text-[11px] font-medium text-slate-300">
-                            {r.fact}
-                            {r.detail && (
-                              <StyledTooltip content={r.detail}>
-                                <span className="ml-1 cursor-help text-[9px] text-slate-600">ⓘ</span>
-                              </StyledTooltip>
-                            )}
-                          </td>
-                          <td className="py-1 pr-2 text-[11px] text-slate-100">
-                            <span className="break-words">{r.value}</span>
-                          </td>
-                          <td className="py-1 pr-2 text-[10px] text-slate-400">
-                            <span className="inline-flex flex-wrap items-center gap-1">
-                              {r.source}
-                              <ApiProvenanceChip
-                                sourceKey={r.panelId || r.source || 'pubchem'}
-                                sourceUrl={stableHref(r.sourceUrl) || undefined}
-                                fetchedAt={r.retrievedAt}
-                                testId={`${testId}-src-api-${r.id}`}
-                              />
+                          <td className="py-0.5 pr-1.5 text-[11px] font-medium leading-snug text-slate-300">
+                            <span className="line-clamp-2 break-words">
+                              {r.fact}
+                              {r.detail && (
+                                <StyledTooltip content={r.detail}>
+                                  <span className="ml-0.5 cursor-help text-[9px] text-slate-600">
+                                    ⓘ
+                                  </span>
+                                </StyledTooltip>
+                              )}
                             </span>
                           </td>
-                          <td className="py-1">
-                            <RowActions
+                          <td className="py-0.5 pr-1.5 text-[11px] leading-snug text-slate-100">
+                            <span className="line-clamp-3 break-words">{r.value}</span>
+                          </td>
+                          <td className="py-0.5">
+                            <ProvenanceCell
                               row={r}
                               onOpenPanel={onOpenPanel}
                               subjectLabel={ledger.subjectLabel}

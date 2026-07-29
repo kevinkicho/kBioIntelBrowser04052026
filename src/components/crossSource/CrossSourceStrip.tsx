@@ -3,9 +3,10 @@
 /**
  * Entity-centric multi-source evidence strip.
  * Chips keep free-API provenance; click opens siloed panel or external deep link.
+ * Empty counts are hidden by default so coverage uses available space.
  */
 
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import type { CrossSourceBundle, CrossSourceFact, CrossSourceTone } from '@/lib/crossSource'
 import { isFactEmpty } from '@/lib/crossSource'
 import { emptyDataClass } from '@/lib/summaryEmpty'
@@ -41,6 +42,8 @@ export interface CrossSourceStripProps {
   /** compact = fewer notes / denser chips */
   density?: 'full' | 'compact'
   title?: string
+  /** Start with empty counts visible (default false — hide sparse zeros) */
+  showEmptyDefault?: boolean
 }
 
 export function CrossSourceStrip({
@@ -50,12 +53,33 @@ export function CrossSourceStrip({
   testId = 'cross-source-strip',
   density = 'full',
   title,
+  showEmptyDefault = false,
 }: CrossSourceStripProps) {
+  const [showEmpty, setShowEmpty] = useState(showEmptyDefault)
+
   const byId = useMemo(() => {
     const m = new Map<string, CrossSourceFact>()
     for (const f of bundle.facts) m.set(f.id, f)
     return m
   }, [bundle.facts])
+
+  const emptyCount = useMemo(
+    () => bundle.facts.filter((f) => isFactEmpty(f)).length,
+    [bundle.facts],
+  )
+  const filledCount = bundle.facts.length - emptyCount
+
+  const groups = useMemo(() => {
+    return bundle.groups
+      .map((g) => {
+        const facts = g.factIds
+          .map((id) => byId.get(id))
+          .filter((f): f is CrossSourceFact => Boolean(f))
+          .filter((f) => showEmpty || !isFactEmpty(f))
+        return { g, facts }
+      })
+      .filter(({ facts }) => facts.length > 0)
+  }, [bundle.groups, byId, showEmpty])
 
   const heading =
     title ||
@@ -71,19 +95,21 @@ export function CrossSourceStrip({
 
   return (
     <section
-      className={`rounded-xl border border-slate-800 bg-slate-900/40 p-3 sm:p-4 ${className}`}
+      className={`rounded-xl border border-slate-800 bg-slate-900/40 px-3 py-2.5 sm:px-4 ${className}`}
       data-testid={testId}
       data-empty={bundle.empty ? 'true' : 'false'}
       data-source-count={bundle.sourceCount}
+      data-hide-empty={showEmpty ? 'false' : 'true'}
       aria-label={heading}
     >
-      <div className="mb-2 flex flex-wrap items-start justify-between gap-2">
+      <div className="mb-2 flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5">
         <div className="min-w-0 flex flex-wrap items-center gap-1.5">
           <h3 className="text-xs font-semibold text-slate-100">{heading}</h3>
           {density === 'full' && (
             <HelperTip
               content={[
                 'Free public sources joined for analysis — each chip keeps its source. Open a chip for the full siloed table (list cards stay one-API for provenance).',
+                'Empty zero counts are hidden by default so coverage fills the row with real signal.',
                 bundle.notes[0] || '',
               ]
                 .filter(Boolean)
@@ -92,47 +118,79 @@ export function CrossSourceStrip({
               testId={`${testId}-help`}
             />
           )}
+          <span
+            className={`rounded-full border px-2 py-0.5 text-[9px] font-semibold tabular-nums ${
+              bundle.empty
+                ? 'border-slate-700 text-slate-500'
+                : 'border-indigo-800/50 bg-indigo-950/40 text-indigo-200'
+            }`}
+            data-testid={`${testId}-source-count`}
+          >
+            {bundle.empty
+              ? 'No sources yet'
+              : `${filledCount} with data · ${bundle.sourceCount} sources`}
+          </span>
         </div>
-        <span
-          className={`shrink-0 rounded-full border px-2 py-0.5 text-[9px] font-semibold tabular-nums ${
-            bundle.empty
-              ? 'border-slate-700 text-slate-500'
-              : 'border-indigo-800/50 bg-indigo-950/40 text-indigo-200'
-          }`}
-          data-testid={`${testId}-source-count`}
-        >
-          {bundle.empty ? 'No sources yet' : `${bundle.sourceCount} sources`}
-        </span>
+        {emptyCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setShowEmpty((v) => !v)}
+            className={`rounded border px-2 py-0.5 text-[10px] font-medium transition-colors ${
+              showEmpty
+                ? 'border-slate-600 text-slate-300'
+                : 'border-slate-700 text-slate-500 hover:text-slate-300'
+            }`}
+            data-testid={`${testId}-toggle-empty`}
+          >
+            {showEmpty ? 'Hide empty' : `Show ${emptyCount} empty`}
+          </button>
+        )}
       </div>
 
-      {bundle.groups.map((g) => {
-        const facts = g.factIds
-          .map((id) => byId.get(id))
-          .filter((f): f is CrossSourceFact => Boolean(f))
-        if (facts.length === 0) return null
-        const allEmpty = facts.every(isFactEmpty)
-        return (
-          <div
-            key={g.id}
-            className={`mb-2 last:mb-0 ${emptyDataClass(allEmpty)}`}
-            data-testid={`${testId}-group-${g.id}`}
-          >
-            <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
-              {g.title}
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {facts.map((f) => (
-                <FactChip
-                  key={f.id}
-                  fact={f}
-                  onOpenPanel={onOpenPanel}
-                  testId={`${testId}-fact-${f.id}`}
-                />
-              ))}
-            </div>
-          </div>
-        )
-      })}
+      {groups.length === 0 ? (
+        <p className="text-[11px] text-slate-500">
+          {bundle.empty
+            ? 'No multi-source counts loaded yet — categories still hydrating.'
+            : 'All coverage counts are empty for this session. Load more panels or show empty chips.'}
+        </p>
+      ) : (
+        <div
+          className={
+            density === 'compact'
+              ? 'space-y-1.5'
+              : 'grid gap-x-4 gap-y-2 sm:grid-cols-2 xl:grid-cols-3'
+          }
+        >
+          {groups.map(({ g, facts }) => {
+            const allEmpty = facts.every(isFactEmpty)
+            return (
+              <div
+                key={g.id}
+                className={`min-w-0 ${emptyDataClass(allEmpty)}`}
+                data-testid={`${testId}-group-${g.id}`}
+              >
+                <p className="mb-1 text-[9px] font-semibold uppercase tracking-wide text-slate-500">
+                  {g.title}
+                  <span className="ml-1 font-normal normal-case tabular-nums text-slate-600">
+                    ({facts.length})
+                  </span>
+                </p>
+                <div className="flex flex-wrap gap-1">
+                  {facts.map((f) => (
+                    <FactChip
+                      key={f.id}
+                      fact={f}
+                      onOpenPanel={onOpenPanel}
+                      compact={density === 'compact'}
+                      testId={`${testId}-fact-${f.id}`}
+                    />
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
     </section>
   )
 }
@@ -140,10 +198,12 @@ export function CrossSourceStrip({
 function FactChip({
   fact,
   onOpenPanel,
+  compact,
   testId,
 }: {
   fact: CrossSourceFact
   onOpenPanel?: (categoryId: string, panelId: string) => void
+  compact?: boolean
   testId: string
 }) {
   const empty = isFactEmpty(fact)
@@ -152,14 +212,20 @@ function FactChip({
   const canPanel = Boolean(fact.panelId && fact.categoryId && onOpenPanel)
   const interactive = canPanel || Boolean(href)
 
+  const value =
+    typeof fact.value === 'number' ? fact.value.toLocaleString() : fact.value
+
+  // Single-line dense chip: value · label · source — fills horizontal space
   const body = (
-    <>
-      <span className="font-semibold text-slate-100 tabular-nums">
-        {typeof fact.value === 'number' ? fact.value.toLocaleString() : fact.value}
-      </span>
-      <span className="text-slate-400">{fact.label}</span>
-      <span className="text-[8px] uppercase tracking-wide text-slate-500">{fact.source}</span>
-    </>
+    <span className="inline-flex max-w-full items-baseline gap-1 whitespace-nowrap">
+      <span className="font-semibold tabular-nums text-slate-100">{value}</span>
+      <span className="truncate text-slate-400">{fact.label}</span>
+      {!compact && (
+        <span className="hidden text-[8px] uppercase tracking-wide text-slate-500 sm:inline">
+          · {fact.source}
+        </span>
+      )}
+    </span>
   )
 
   const tip = [
@@ -170,7 +236,7 @@ function FactChip({
     .filter(Boolean)
     .join('\n')
 
-  const className = `inline-flex max-w-full flex-col items-start gap-0.5 rounded-lg border px-2 py-1 text-[10px] leading-tight transition-colors ${tone} ${emptyDataClass(empty)} ${
+  const className = `inline-flex max-w-full items-center rounded-md border px-1.5 py-0.5 text-[10px] leading-tight transition-colors ${tone} ${emptyDataClass(empty)} ${
     interactive ? 'cursor-pointer hover:brightness-125' : ''
   }`
 

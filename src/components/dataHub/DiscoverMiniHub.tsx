@@ -57,7 +57,13 @@ export function DiscoverMiniHub({
           {rows.length} facts · {ledger.sourceCount} sources
         </span>
       </div>
-      <table className="w-full text-left">
+      <table className="w-full table-fixed text-left">
+        <colgroup>
+          <col className="w-[26%]" />
+          <col className="w-[44%]" />
+          <col className="w-[22%]" />
+          <col className="w-8" />
+        </colgroup>
         <tbody>
           {rows.map((r) => {
             const link =
@@ -72,16 +78,16 @@ export function DiscoverMiniHub({
                 data-testid={`${testId}-row-${r.id}`}
                 className={`border-t border-slate-800/40 ${emptyDataClass(false)}`}
               >
-                <td className="px-2 py-0.5 text-[9px] text-slate-500 w-[28%] align-top">
-                  {r.fact}
+                <td className="px-1.5 py-0.5 text-[9px] leading-snug text-slate-500 align-top">
+                  <span className="line-clamp-2">{r.fact}</span>
                 </td>
-                <td className="px-2 py-0.5 text-[10px] text-slate-200 align-top">
-                  <span className="break-words">{r.value}</span>
+                <td className="px-1.5 py-0.5 text-[10px] leading-snug text-slate-200 align-top">
+                  <span className="line-clamp-2 break-words">{r.value}</span>
                 </td>
-                <td className="px-2 py-0.5 text-[9px] text-slate-500 w-[22%] align-top">
+                <td className="px-1.5 py-0.5 text-[9px] leading-snug text-slate-500 align-top truncate" title={r.source}>
                   {r.source}
                 </td>
-                <td className="px-2 py-0.5 text-[9px] w-12 align-top">
+                <td className="px-1 py-0.5 text-[9px] align-top text-center">
                   {link ? (
                     <a
                       href={link}

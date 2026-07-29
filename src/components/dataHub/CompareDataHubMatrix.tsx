@@ -165,22 +165,22 @@ export function CompareDataHubMatrix({
 
       {/* Column headers */}
       <div className="overflow-x-auto">
-        <table className="w-full min-w-[36rem] border-collapse text-left">
+        <table className="w-full min-w-[32rem] border-collapse text-left">
           <thead>
             <tr className="border-b border-slate-800 text-[9px] uppercase tracking-wide text-slate-600">
-              <th className="sticky left-0 z-10 bg-slate-900/95 px-3 py-2 font-semibold">
+              <th className="sticky left-0 z-10 w-[18%] max-w-[10rem] bg-slate-900/95 px-2 py-1.5 font-semibold">
                 Fact
               </th>
               {matrix.columns.map((c) => (
-                <th key={c.subjectId} className="px-3 py-2 font-semibold min-w-[8rem]">
+                <th key={c.subjectId} className="px-2 py-1.5 font-semibold min-w-[6.5rem]">
                   <Link
                     href={`/molecule/${encodeURIComponent(c.subjectId)}`}
-                    className="text-indigo-300 hover:text-indigo-200 normal-case text-[11px] font-semibold"
+                    className="text-indigo-300 hover:text-indigo-200 normal-case text-[11px] font-semibold line-clamp-1"
                   >
                     {c.subjectLabel}
                   </Link>
-                  <div className="mt-0.5 normal-case font-normal text-slate-600">
-                    CID {c.subjectId} · {c.sourceCount} src
+                  <div className="mt-0.5 normal-case font-normal text-slate-600 tabular-nums">
+                    {c.subjectId} · {c.sourceCount} src
                   </div>
                 </th>
               ))}
@@ -192,7 +192,7 @@ export function CompareDataHubMatrix({
                 <tr className="bg-slate-950/60">
                   <td
                     colSpan={n + 1}
-                    className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
+                    className="px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-slate-500"
                   >
                     {sec.title}
                   </td>
@@ -203,9 +203,9 @@ export function CompareDataHubMatrix({
                     data-testid={`${testId}-row-${r.factId}`}
                     className="border-t border-slate-800/40"
                   >
-                    <td className="sticky left-0 z-10 bg-slate-900/90 px-3 py-1.5 text-[11px] font-medium text-slate-300">
-                      {r.fact}
-                      <div className="text-[9px] font-normal text-slate-600">
+                    <td className="sticky left-0 z-10 bg-slate-900/90 px-2 py-1 text-[11px] font-medium leading-snug text-slate-300">
+                      <span className="line-clamp-2">{r.fact}</span>
+                      <div className="text-[9px] font-normal text-slate-600 line-clamp-1">
                         {r.sourceHint}
                       </div>
                     </td>
@@ -214,7 +214,7 @@ export function CompareDataHubMatrix({
                       return (
                         <td
                           key={i}
-                          className={`px-3 py-1.5 text-[11px] text-slate-100 align-top ${emptyDataClass(cell.empty)}`}
+                          className={`px-2 py-1 text-[11px] leading-snug text-slate-100 align-top ${emptyDataClass(cell.empty)}`}
                           data-empty={cell.empty ? 'true' : 'false'}
                         >
                           <span className="break-words">{cell.value}</span>
