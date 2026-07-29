@@ -3,19 +3,15 @@ import type { OrangeBookEntry } from '../types'
 const BASE_URL = 'https://api.fda.gov/drug/drugsfda.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-function twoYearsAgoCompact(): string {
-  const d = new Date()
-  d.setFullYear(d.getFullYear() - 2)
-  return d.toISOString().slice(0, 10).replace(/-/g, '')
-}
-
 export async function getOrangeBookByName(name: string): Promise<OrangeBookEntry[]> {
   try {
     const apiKey = process.env.OPENFDA_API_KEY
     const keyParam = apiKey ? `&api_key=${apiKey}` : ''
     const encoded = encodeURIComponent(name)
-    const dateFilter = `+AND+submissions.submission_date:[${twoYearsAgoCompact()}+TO+${new Date().toISOString().slice(0, 10).replace(/-/g, '')}]`
-    const url = `${BASE_URL}?search=openfda.generic_name:"${encoded}"+AND+openfda.brand_name:"${encoded}"${dateFilter}&limit=10${keyParam}`
+    // Match generic OR brand (AND never matches both labels). Do not require a
+    // recent submission_date — origin approvals are decades old for many drugs.
+    const search = `openfda.generic_name:"${encoded}"+openfda.brand_name:"${encoded}"`
+    const url = `${BASE_URL}?search=${search}&limit=10${keyParam}`
 
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []

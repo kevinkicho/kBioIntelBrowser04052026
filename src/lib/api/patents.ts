@@ -1,40 +1,67 @@
 import type { Patent } from '../types'
 
-const BASE_URL = 'https://api.patentsview.org/patents/query'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
+/**
+ * Free patent IDs via PubChem compound xrefs (PatentsView legacy API is migrating
+ * to USPTO ODP and is not reliably free/keyless).
+ * https://pubchem.ncbi.nlm.nih.gov/docs/pug-rest
+ */
 export async function getPatentsByMoleculeName(name: string): Promise<Patent[]> {
   try {
-    const query = JSON.stringify({ _text_any: { patent_abstract: name } })
-    const fields = JSON.stringify([
-      'patent_number', 'patent_title', 'patent_date', 'patent_abstract',
-    ])
-    const opts = JSON.stringify({ per_page: 10 })
+    const q = name?.trim()
+    if (!q) return []
 
-    const url = `${BASE_URL}?q=${encodeURIComponent(query)}&f=${encodeURIComponent(fields)}&o=${encodeURIComponent(opts)}`
+    // Prefer name → PatentID xrefs
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(q)}/xrefs/PatentID/JSON`
+    const res = await fetch(url, fetchOptions)
+    if (!res.ok) {
+      // Fallback: CID if numeric
+      if (/^\d+$/.test(q)) {
+        return getPatentsByCid(parseInt(q, 10))
+      }
+      return []
+    }
+    const data = await res.json()
+    const ids: string[] =
+      data?.InformationList?.Information?.[0]?.PatentID ??
+      data?.InformationList?.Information?.flatMap(
+        (i: { PatentID?: string[] }) => i.PatentID ?? [],
+      ) ??
+      []
+    if (!Array.isArray(ids) || ids.length === 0) return []
 
+    return ids.slice(0, 15).map((pid) => mapPatent(String(pid)))
+  } catch {
+    return []
+  }
+}
+
+function mapPatent(patentNumber: string): Patent {
+  return {
+    id: patentNumber,
+    patentNumber,
+    title: `Patent ${patentNumber}`,
+    assignee: '',
+    filingDate: '',
+    publicationDate: '',
+    expirationDate: '',
+    status: '',
+    abstract: patentNumber
+      ? `PubChem patent xref ${patentNumber} (open https://patents.google.com/patent/${encodeURIComponent(patentNumber)})`
+      : '',
+  }
+}
+
+async function getPatentsByCid(cid: number): Promise<Patent[]> {
+  try {
+    const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/PatentID/JSON`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []
     const data = await res.json()
-
-    const patents = data?.patents
-    if (!Array.isArray(patents)) return []
-
-    return patents.slice(0, 10).map((p: Record<string, unknown>) => ({
-      id: String(p.patent_number || ''),
-      patentNumber: String(p.patent_number || ''),
-      title: String(p.patent_title || ''),
-      assignee: String(
-        (Array.isArray(p.assignees) && p.assignees[0]?.assignee_organization)
-          ? p.assignees[0].assignee_organization
-          : 'Unknown'
-      ),
-      filingDate: String(p.patent_date || ''),
-      publicationDate: String(p.patent_date || ''),
-      expirationDate: '',
-      status: '',
-      abstract: String(p.patent_abstract || '').slice(0, 300),
-    }))
+    const ids: string[] = data?.InformationList?.Information?.[0]?.PatentID ?? []
+    if (!Array.isArray(ids)) return []
+    return ids.slice(0, 15).map((pid) => mapPatent(String(pid)))
   } catch {
     return []
   }

@@ -48,9 +48,22 @@ export async function getUniprotEntriesByName(name: string): Promise<UniprotEntr
   // Empty query = missing gene/accession (do not search free-text chemical names for gene APIs)
   if (!name?.trim()) return []
   try {
+    const raw = name.trim()
     // Accession-style queries (P12345) use id: filter when possible
-    const isAccession = /^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(name.trim())
-    const q = isAccession ? `accession:${name.trim()}` : name
+    const isAccession = /^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(raw)
+    // Already a UniProt Lucene-style query
+    const isFielded = /^(gene|gene_exact|accession|organism_id|id):/i.test(raw) || raw.includes(' AND ')
+    let q: string
+    if (isAccession) {
+      q = `accession:${raw}`
+    } else if (isFielded) {
+      q = raw
+    } else if (/^[A-Z][A-Z0-9-]{1,14}$/i.test(raw) && raw.length <= 12) {
+      // Gene symbol → human reviewed first
+      q = `(gene_exact:${raw} OR gene:${raw}) AND organism_id:9606`
+    } else {
+      q = raw
+    }
     const url = `${BASE_URL}?query=${encodeURIComponent(q)}&format=json&size=5`
     const res = await fetch(url, fetchOptions)
     if (!res.ok) return []

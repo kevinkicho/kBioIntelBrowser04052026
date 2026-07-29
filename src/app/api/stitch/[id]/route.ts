@@ -14,6 +14,10 @@ export async function GET(
   if (!molecule) {
     return NextResponse.json({ chemicalProteinInteractions: [] })
   }
-  const chemicalProteinInteractions = await getChemicalInteractionsByName(molecule.name)
+  const chemicalProteinInteractions = await getChemicalInteractionsByName(
+    molecule.name,
+    undefined,
+    { cid },
+  )
   return NextResponse.json({ chemicalProteinInteractions })
 }

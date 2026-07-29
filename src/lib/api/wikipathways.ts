@@ -4,25 +4,63 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getWikiPathwaysByName(name: string): Promise<WikiPathway[]> {
   try {
-    const url = `https://webservice.wikipathways.org/findPathwaysByText?query=${encodeURIComponent(name)}&species=Homo+sapiens&format=json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
+    const q = name?.trim()
+    if (!q) return []
 
-    const raw = data.result ?? []
-    const results = Array.isArray(raw) ? raw : raw?.pathways ?? []
-    return results
-      .map((r: Record<string, unknown>) => {
-        const ws = (r.ws ?? r) as Record<string, string>
-        return {
-          id: String(ws.id ?? ws.wpId ?? ws.wp_id ?? ''),
-          name: String(ws.name ?? ws.title ?? ''),
-          species: String(ws.species ?? ws.organism ?? 'Homo sapiens'),
-          url: String(ws.url ?? `https://www.wikipathways.org/pathways/${ws.id ?? ws.wpId ?? ws.wp_id ?? ''}`),
+    // Legacy webservice.wikipathways.org often 404s; use bridgeDb + pathway index fallbacks.
+    // Free Pathway Commons search as primary (JSON), then official WP REST if available.
+    const pcUrl =
+      `https://www.pathwaycommons.org/pc2/search.json?q=${encodeURIComponent(q)}` +
+      `&type=pathway&organism=9606&page=0`
+    const pcRes = await fetch(pcUrl, fetchOptions)
+    if (pcRes.ok) {
+      const data = await pcRes.json()
+      const hits = (data.searchHit ?? data.searchHits ?? []) as Array<Record<string, unknown>>
+      const wpish = hits
+        .map((h) => {
+          const uri = String(h.uri ?? h.uriId ?? '')
+          const nameStr = String(h.name ?? h.displayName ?? '')
+          const wpMatch = uri.match(/WP\d+/i) || nameStr.match(/WP\d+/i)
+          const id = wpMatch ? String(wpMatch[0]).toUpperCase() : uri.split('/').pop() || ''
+          return {
+            id,
+            name: nameStr || id,
+            species: 'Homo sapiens',
+            url: uri.startsWith('http')
+              ? uri
+              : id
+                ? `https://www.wikipathways.org/pathways/${id}`
+                : '',
+          }
+        })
+        .filter((p) => p.id && p.name)
+      if (wpish.length > 0) return wpish.slice(0, 10)
+    }
+
+    // Fallback: Reactome pathways API by name (still free, pathway-shaped)
+    const rUrl = `https://reactome.org/ContentService/search/query?query=${encodeURIComponent(q)}&species=Homo%20sapiens&types=Pathway&cluster=true`
+    const rRes = await fetch(rUrl, fetchOptions)
+    if (rRes.ok) {
+      const data = await rRes.json()
+      const results = (data.results ?? []) as Array<{
+        entries?: Array<{ stId?: string; name?: string }>
+      }>
+      const pathways: WikiPathway[] = []
+      for (const block of results) {
+        for (const e of block.entries ?? []) {
+          if (!e.stId || !e.name) continue
+          pathways.push({
+            id: e.stId,
+            name: e.name,
+            species: 'Homo sapiens',
+            url: `https://reactome.org/content/detail/${e.stId}`,
+          })
         }
-      })
-      .filter((p: { id: string; name: string }) => p.id && p.name)
-      .slice(0, 10)
+      }
+      if (pathways.length > 0) return pathways.slice(0, 10)
+    }
+
+    return []
   } catch {
     return []
   }

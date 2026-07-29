@@ -4,8 +4,9 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getMonarchDiseasesByName(name: string): Promise<MonarchDisease[]> {
   try {
+    // v3 API path is /v3/api/search (not /v3/search)
     const res = await fetch(
-      `https://api.monarchinitiative.org/v3/search?q=${encodeURIComponent(name)}&limit=10&category=biolink:Disease`,
+      `https://api.monarchinitiative.org/v3/api/search?q=${encodeURIComponent(name)}&limit=10&category=biolink:Disease`,
       fetchOptions,
     )
     if (!res.ok) return []

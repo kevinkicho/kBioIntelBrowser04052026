@@ -13,9 +13,10 @@ export async function GET(
 
   const molecule = await getMoleculeById(cid)
   if (!molecule) {
+    // Still try ChEMBL-free path is not possible without name; empty
     return NextResponse.json({ bioAssays: [] })
   }
 
-  const bioAssays = await getBioAssaysByName(molecule.name)
+  const bioAssays = await getBioAssaysByName(molecule.name, { cid })
   return NextResponse.json({ bioAssays })
 }

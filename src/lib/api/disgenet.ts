@@ -55,16 +55,43 @@ export async function getGenesByDisease(diseaseName: string): Promise<DisGeNetAs
 }
 
 /**
- * Main export: Get gene-disease associations for a molecule name
+ * Main export: gene–disease associations for a query that may be a gene symbol
+ * *or* a drug/disease name. DisGeNET gene_symbol search returns empty for drug
+ * names; fall back to free Open Targets disease associations for drugs.
  */
 export async function getDisGeNetData(name: string): Promise<{
   associations: DisGeNetAssociation[]
 }> {
-  const [geneAssociations] = await Promise.all([
-    getDiseasesByGene(name)
-  ])
+  const q = name?.trim()
+  if (!q) return { associations: [] }
 
-  return {
-    associations: geneAssociations.slice(0, 30)
+  // Gene-shaped queries (TP53, TTR, …)
+  if (/^[A-Z][A-Z0-9]{1,14}$/i.test(q) && !/\s/.test(q)) {
+    const geneAssociations = await getDiseasesByGene(q)
+    if (geneAssociations.length > 0) {
+      return { associations: geneAssociations.slice(0, 30) }
+    }
   }
+
+  // Drug / free-text: free Open Targets associations (no DisGeNET key required)
+  try {
+    const { getDiseaseAssociationsByName } = await import('./opentargets')
+    const hits = await getDiseaseAssociationsByName(q)
+    const associations: DisGeNetAssociation[] = hits.slice(0, 30).map((h) => ({
+      geneSymbol: q,
+      geneId: '',
+      diseaseId: h.diseaseId ?? '',
+      diseaseName: h.diseaseName ?? '',
+      diseaseType: (h.therapeuticAreas ?? []).join('; '),
+      score: Number(h.score) || 0,
+      source: 'Open Targets',
+      pmids: [],
+    }))
+    if (associations.length > 0) return { associations }
+  } catch {
+    /* fall through */
+  }
+
+  const byDisease = await getGenesByDisease(q)
+  return { associations: byDisease.slice(0, 30) }
 }

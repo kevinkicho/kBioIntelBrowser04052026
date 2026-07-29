@@ -59,6 +59,8 @@ npm run ship:verify                      # local precommit + git hygiene (agents
 npm run ship:verify:ci                   # + watch GitHub Pre-commit gate for HEAD
 npm run ship:verify:e2e                  # + full-app Playwright with webServer
 npm run ship:verify:all                  # --ci --e2e
+npm run api:health                       # probe all /api routes (app must be running)
+npm run api:health:json                  # same as JSON report
 npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
 npm run test:e2e:fixture                 # north-star + data-hub e2e (needs npm run dev, E2E_FIXTURE=1)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
