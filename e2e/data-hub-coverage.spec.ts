@@ -25,18 +25,21 @@ test.describe('Data hub coverage UI', () => {
   })
 
   test('source coverage can show empty toggle when zeros exist', async ({ page }) => {
+    test.setTimeout(90_000)
     await page.goto('/molecule/2244')
-    await expect(page.getByText(/CID:2244/)).toBeVisible({ timeout: 90_000 })
+    await expect(page.getByText(/CID:2244/)).toBeVisible({ timeout: 60_000 })
+
     const strip = page.getByTestId('molecule-cross-source').or(page.getByTestId('cross-source-strip'))
     const stripEl = strip.first()
-    await expect(stripEl).toBeVisible({ timeout: 90_000 })
+    await expect(stripEl).toBeVisible({ timeout: 60_000 })
 
-    // Overlay dismisses after first category resolves (not all free APIs)
+    // Overlay is pointer-blocking; product dismisses on first category OR 12s max.
+    // Never wait the full test budget for free-API hydrate.
     const overlay = page.getByTestId('loading-overlay')
     try {
-      await expect(overlay).toBeHidden({ timeout: 90_000 })
+      await expect(overlay).toBeHidden({ timeout: 20_000 })
     } catch {
-      // Upstream hang: still allow forced toggle click below
+      /* still click with force below */
     }
 
     const stripToggle = page.getByTestId('molecule-cross-source-toggle-empty')
@@ -45,11 +48,11 @@ test.describe('Data hub coverage UI', () => {
       .or(page.getByTestId('molecule-data-hub-toggle-empty'))
 
     if (await anyToggle.first().isVisible().catch(() => false)) {
-      // force:true if a fading overlay still intercepts for a frame
-      await anyToggle.first().click({ force: true, timeout: 15_000 })
+      await anyToggle.first().click({ force: true, timeout: 10_000 })
       if (await stripToggle.isVisible().catch(() => false)) {
         await expect(stripEl).toHaveAttribute('data-hide-empty', 'false')
       }
     }
+    // If no empty sources (all chips filled), toggle is absent — still a pass.
   })
 })

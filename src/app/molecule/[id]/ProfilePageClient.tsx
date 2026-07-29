@@ -338,17 +338,27 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
     [categoryStatus]
   )
 
-  // Gate the viewport only until the first category resolves. Waiting for *all*
-  // free-API categories left the overlay up for minutes (max-3 concurrent + slow
-  // upstreams) and blocked pointer events / e2e. Rest of categories still load
-  // in the background with per-card loading states.
-  const showLoadingOverlay = useMemo(() => {
+  // Gate the viewport only until the first category resolves *or* a short
+  // wall-clock max — free APIs can hang under rate limits and must not pin a
+  // full-page blocker for minutes (blocks pointer events + e2e).
+  const coldOverlayBase = useMemo(() => {
     const anyResolved = ALL_CATEGORY_IDS.some(
       (id) => categoryStatus[id] === 'loaded' || categoryStatus[id] === 'error',
     )
     const anyLoading = ALL_CATEGORY_IDS.some((id) => categoryStatus[id] === 'loading')
     return anyLoading && !anyResolved
   }, [categoryStatus])
+  const [overlayGraceExpired, setOverlayGraceExpired] = useState(false)
+  useEffect(() => {
+    if (!coldOverlayBase) {
+      setOverlayGraceExpired(false)
+      return
+    }
+    setOverlayGraceExpired(false)
+    const t = setTimeout(() => setOverlayGraceExpired(true), 12_000)
+    return () => clearTimeout(t)
+  }, [coldOverlayBase])
+  const showLoadingOverlay = coldOverlayBase && !overlayGraceExpired
 
   // Build freshness map from current state
   const freshnessMap = useMemo(() => {

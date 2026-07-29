@@ -91,13 +91,25 @@ function AICopilotInner({
   }
 
   const showFab = true
-  // Disable the fab while category data is still loading. Opening the copilot
-  // mid-fetch sends partial data to the model and tends to produce confusing
-  // output (and made the user anxious about crashes). Re-enable once at least
-  // one category has finished loading.
-  const anyLoading = Object.values(categoryStatus).some(s => s === 'loading')
-  const anyLoaded = Object.values(categoryStatus).some(s => s === 'loaded')
-  const fabDisabled = anyLoading && !anyLoaded
+  // Disable the fab only during pure cold load (nothing resolved yet). Opening
+  // mid-fetch with zero categories produces confusing output. Re-enable when:
+  //  - any category loads or errors, or
+  //  - cold-load grace expires (free APIs can hang under rate limits / CI).
+  const anyLoading = Object.values(categoryStatus).some((s) => s === 'loading')
+  const anyResolved = Object.values(categoryStatus).some(
+    (s) => s === 'loaded' || s === 'error',
+  )
+  const [coldLoadGate, setColdLoadGate] = useState(true)
+  useEffect(() => {
+    if (anyResolved) {
+      setColdLoadGate(false)
+      return
+    }
+    // Keep briefly disabled on cold open; never pin forever if fetches hang.
+    const t = setTimeout(() => setColdLoadGate(false), 12_000)
+    return () => clearTimeout(t)
+  }, [anyResolved])
+  const fabDisabled = anyLoading && !anyResolved && coldLoadGate
 
   return (
     <>

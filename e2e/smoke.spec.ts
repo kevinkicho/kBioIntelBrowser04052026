@@ -22,13 +22,13 @@ test.describe('BioIntel smoke', () => {
   })
 
   test('AI copilot fab is disabled while data loads, then enables', async ({ page }) => {
+    test.setTimeout(60_000)
     await page.goto('/molecule/2244')
     const fab = page.getByTestId('ai-copilot-fab')
     await expect(fab).toBeVisible({ timeout: 30_000 })
-    // Cold load: disabled until the first category resolves; then enabled.
-    // Fast cache can skip the disabled window — only assert eventual enable.
-    // Live free APIs on CI can be slow; allow long hydrate (overlay no longer blocks forever).
-    await expect(fab).toBeEnabled({ timeout: 120_000 })
+    // Cold gate: disabled until first category resolves *or* 12s grace (product).
+    // Do not wait on free-API hydrate — that is what failed nightly at 90s+.
+    await expect(fab).toBeEnabled({ timeout: 25_000 })
   })
 
   test('hypothesis page renders the filter UI', async ({ page }) => {

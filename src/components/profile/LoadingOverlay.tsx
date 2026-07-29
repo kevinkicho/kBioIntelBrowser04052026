@@ -62,6 +62,16 @@ export function LoadingOverlay({
     }
   }, [shouldDismiss, visible, fading])
 
+  // Hard ceiling — free-API hangs must not pin pointer-blocking overlay forever
+  useEffect(() => {
+    const t = setTimeout(() => {
+      if (!visible) return
+      setFading(true)
+      setTimeout(() => setVisible(false), 400)
+    }, 12_000)
+    return () => clearTimeout(t)
+  }, [visible])
+
   if (!visible) return null
 
   return (
