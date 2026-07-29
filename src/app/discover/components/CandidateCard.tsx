@@ -315,17 +315,21 @@ export function CandidateCard({
             alternateCids={identity.alternateCids}
             className="mb-2"
           />
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-[10px] font-medium text-slate-400">Score breakdown</span>
-            <ScoreExplainer rubric={rubric} scores={scores} />
-          </div>
           {scores ? (
-            <div className="mb-2">
-              {/* Explainer is above; bars keep per-axis hover flyouts without a second ? icon */}
-              <ScoreAxisBars scores={scores} rubric={rubric} showExplainer={false} />
+            <div className="mb-2" data-testid="candidate-score-breakdown">
+              {/* Card chrome lives in ScoreAxisBars header; explainer is in composite cluster */}
+              <ScoreAxisBars scores={scores} rubric={rubric} showExplainer />
             </div>
           ) : (
-            <p className="text-[10px] text-slate-600 mb-2">No multi-axis scores available.</p>
+            <div className="mb-2 rounded-xl border border-slate-800/80 bg-slate-900/40 px-3 py-2">
+              <div className="mb-1 flex items-center gap-1.5">
+                <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-500">
+                  Score breakdown
+                </span>
+                <ScoreExplainer rubric={rubric} scores={scores} />
+              </div>
+              <p className="text-[10px] text-slate-600">No multi-axis scores available.</p>
+            </div>
           )}
           <div className="flex items-center gap-1.5 flex-wrap">
             {candidate.sources.map((s) => {

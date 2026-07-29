@@ -21,7 +21,7 @@ function axisBarColor(key: ScoreAxisKey): string {
     case 'efficacy':
       return 'bg-indigo-500'
     case 'clinicalStage':
-      return 'bg-blue-500'
+      return 'bg-sky-500'
     case 'safety':
       return 'bg-emerald-500'
     case 'novelty':
@@ -30,6 +30,23 @@ function axisBarColor(key: ScoreAxisKey): string {
       return 'bg-cyan-500'
     default:
       return 'bg-slate-500'
+  }
+}
+
+function axisGlow(key: ScoreAxisKey): string {
+  switch (key) {
+    case 'efficacy':
+      return 'shadow-indigo-500/20'
+    case 'clinicalStage':
+      return 'shadow-sky-500/20'
+    case 'safety':
+      return 'shadow-emerald-500/20'
+    case 'novelty':
+      return 'shadow-amber-500/20'
+    case 'identityTrust':
+      return 'shadow-cyan-500/20'
+    default:
+      return ''
   }
 }
 
@@ -55,18 +72,21 @@ function epistemicLabel(status: AxisStatus | undefined): string {
   }
 }
 
-function EpistemicChip({
-  status,
-}: {
-  status: AxisStatus | undefined
-}) {
+function EpistemicChip({ status }: { status: AxisStatus | undefined }) {
   const label = epistemicLabel(status)
+  const tone =
+    label === 'empty' || label === 'not-retrieved'
+      ? 'border-slate-600/70 bg-slate-800/70 text-slate-400'
+      : label === 'error' || label === 'timeout'
+        ? 'border-amber-700/50 bg-amber-950/40 text-amber-300/90'
+        : 'border-slate-600/60 bg-slate-800/60 text-slate-500'
   return (
     <span
-      className="text-[9px] px-1.5 py-0.5 rounded border border-slate-600/60 bg-slate-800/60 text-slate-500 font-medium whitespace-nowrap"
+      className={`inline-flex items-center gap-1 rounded-md border px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide ${tone}`}
       data-testid="score-axis-epistemic"
       data-status={label}
     >
+      <span className="h-1 w-1 rounded-full bg-current opacity-70" aria-hidden />
       {label}
     </span>
   )
@@ -85,121 +105,193 @@ export function ScoreAxisBars({
   showExplainer,
 }: ScoreAxisBarsProps) {
   const weights = rubric?.weights ?? scores.weights
-  const labelWidth = compact ? 'w-[72px]' : 'w-24'
   const explainerOn = showExplainer ?? !compact
+  const compositePct = Math.round(scores.composite * 100)
 
   return (
     <div
-      className={compact ? 'space-y-1' : 'space-y-1.5'}
+      className={
+        compact
+          ? 'space-y-1.5'
+          : 'overflow-hidden rounded-xl border border-slate-800/90 bg-gradient-to-b from-slate-900/80 to-slate-950/60'
+      }
       data-testid="score-axis-bars"
       data-score-phase={scores.scorePhase}
     >
       {!compact && (
-        <div className="flex items-start gap-1.5 mb-0.5">
-          <p
-            className="text-[9px] leading-snug text-slate-600 flex-1"
-            data-testid="score-trust-footnote"
-          >
-            Investigation priority only — not a prediction of clinical success. Empty safety ≠ safe.
-            Composite{' '}
-            <ScoreValueWithMath composite scores={scores} rubric={rubric} testId="score-axis-composite-math">
-              <span className="text-slate-400 tabular-nums">
-                {Math.round(scores.composite * 100)}%
-              </span>
-            </ScoreValueWithMath>
-            {onOpenBreakdown ? (
-              <>
-                {' '}
-                <button
-                  type="button"
-                  onClick={onOpenBreakdown}
-                  className="text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
-                >
-                  How scoring works
-                </button>
-              </>
-            ) : null}
-          </p>
-          {explainerOn && (
-            <ScoreExplainer rubric={rubric} scores={scores} compact />
+        <div className="border-b border-slate-800/80 px-3 py-2.5">
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                  Score breakdown
+                </span>
+                {scores.scorePhase && (
+                  <span className="rounded-full border border-slate-700/80 bg-slate-900/80 px-1.5 py-px text-[9px] font-medium text-slate-400">
+                    {scores.scorePhase}
+                    {scores.rubricId ? ` · ${scores.rubricId}` : ''}
+                  </span>
+                )}
+              </div>
+              <p
+                className="mt-1 text-[10px] leading-snug text-slate-500"
+                data-testid="score-trust-footnote"
+              >
+                Investigation priority only — not a prediction of clinical success.
+                <span className="text-slate-600"> · </span>
+                <span className="text-amber-500/90">Empty safety ≠ safe</span>
+              </p>
+            </div>
+            <div className="flex shrink-0 items-center gap-1.5">
+              <ScoreValueWithMath
+                composite
+                scores={scores}
+                rubric={rubric}
+                testId="score-axis-composite-math"
+              >
+                <div className="flex flex-col items-end rounded-lg border border-indigo-800/40 bg-indigo-950/40 px-2.5 py-1.5 cursor-help">
+                  <span className="text-[9px] font-medium uppercase tracking-wide text-indigo-300/80">
+                    Composite
+                  </span>
+                  <span className="text-lg font-semibold tabular-nums leading-none text-indigo-100">
+                    {compositePct}
+                    <span className="text-sm font-medium text-indigo-300/70">%</span>
+                  </span>
+                </div>
+              </ScoreValueWithMath>
+              {explainerOn && <ScoreExplainer rubric={rubric} scores={scores} compact />}
+            </div>
+          </div>
+          {onOpenBreakdown && (
+            <button
+              type="button"
+              onClick={onOpenBreakdown}
+              className="mt-2 text-[10px] text-indigo-400/90 hover:text-indigo-300 underline-offset-2 hover:underline"
+            >
+              How scoring works
+            </button>
           )}
         </div>
       )}
+
       {compact && explainerOn && (
-        <div className="flex justify-end -mt-0.5 mb-0.5">
+        <div className="flex items-center justify-between gap-2 px-0.5">
+          <ScoreValueWithMath
+            composite
+            scores={scores}
+            rubric={rubric}
+            testId="score-axis-composite-math"
+          >
+            <span className="text-[10px] text-slate-400 cursor-help">
+              Composite{' '}
+              <span className="font-semibold tabular-nums text-slate-200">{compositePct}%</span>
+            </span>
+          </ScoreValueWithMath>
           <ScoreExplainer rubric={rubric} scores={scores} compact />
         </div>
       )}
-      {AXIS_ORDER.map((key) => {
-        const v = scores.axes[key]
-        const status = scores.axisStatus[key]
-        const missing = v == null
-        const weightPct =
-          weights && typeof weights[key] === 'number'
-            ? Math.round(weights[key] * 100)
-            : null
-        const help = AXIS_HELP[key]
 
-        return (
-          <ScoreMathTooltip
-            key={key}
-            axis={key}
-            scores={scores}
-            rubric={rubric}
-            side="top"
-            align="left"
-            className="w-full"
-            testId={`score-axis-math-${key}`}
-          >
-            <div
-              className="relative flex w-full items-center gap-2"
-              data-testid={`score-axis-row-${key}`}
-              data-axis={key}
-              data-missing={missing ? 'true' : 'false'}
-            >
-              <span
-                className={`text-[10px] text-slate-500 ${labelWidth} shrink-0 truncate cursor-help`}
+      <ul className={compact ? 'space-y-1' : 'divide-y divide-slate-800/60 px-2 py-1'}>
+        {AXIS_ORDER.map((key) => {
+          const v = scores.axes[key]
+          const status = scores.axisStatus[key]
+          const missing = v == null
+          const weightPct =
+            weights && typeof weights[key] === 'number'
+              ? Math.round(weights[key] * 100)
+              : null
+          const help = AXIS_HELP[key]
+          const pct = missing ? null : Math.round((v as number) * 100)
+
+          return (
+            <li key={key}>
+              <ScoreMathTooltip
+                axis={key}
+                scores={scores}
+                rubric={rubric}
+                side="top"
+                align="left"
+                className="w-full"
+                testId={`score-axis-math-${key}`}
               >
-                {AXIS_LABELS[key]}
-                {weightPct != null && !compact && (
-                  <span className="ml-0.5 text-[8px] text-slate-600 tabular-nums">{weightPct}%</span>
-                )}
-              </span>
-              {missing ? (
-                <div className="flex-1 flex items-center min-h-[6px]">
-                  <EpistemicChip status={status} />
-                </div>
-              ) : (
                 <div
-                  className="flex-1 bg-slate-700/50 rounded-full h-1.5 overflow-hidden cursor-help"
-                  aria-label={`${help.summary} ${axisPct(v)}`}
+                  className={`group flex w-full cursor-help items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-slate-800/40 ${
+                    compact ? 'py-1' : ''
+                  }`}
+                  data-testid={`score-axis-row-${key}`}
+                  data-axis={key}
+                  data-missing={missing ? 'true' : 'false'}
                 >
-                  <div
-                    className={`h-1.5 rounded-full transition-all duration-500 ${axisBarColor(key)}`}
-                    style={{ width: `${Math.round((v as number) * 100)}%` }}
-                  />
+                  <div className="w-[5.5rem] shrink-0 sm:w-28">
+                    <div className="flex items-center gap-1.5">
+                      <span
+                        className={`h-1.5 w-1.5 shrink-0 rounded-full ${axisBarColor(key)} ${
+                          missing ? 'opacity-30' : ''
+                        }`}
+                        aria-hidden
+                      />
+                      <span className="truncate text-[11px] font-medium text-slate-300">
+                        {AXIS_LABELS[key]}
+                      </span>
+                    </div>
+                    {weightPct != null && !compact && (
+                      <span className="ml-3 mt-0.5 inline-block rounded border border-slate-700/70 bg-slate-900/80 px-1 py-px text-[8px] font-medium tabular-nums text-slate-500">
+                        weight {weightPct}%
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="min-w-0 flex-1">
+                    {missing ? (
+                      <div
+                        className="flex h-2 items-center rounded-full border border-dashed border-slate-700/80 bg-slate-900/40 px-1"
+                        aria-label={`${help.summary} not retrieved`}
+                      >
+                        <div className="h-px w-full bg-gradient-to-r from-transparent via-slate-600/50 to-transparent" />
+                      </div>
+                    ) : (
+                      <div
+                        className="relative h-2 overflow-hidden rounded-full bg-slate-800/90 ring-1 ring-inset ring-slate-700/50"
+                        aria-label={`${help.summary} ${axisPct(v)}`}
+                      >
+                        <div
+                          className={`absolute inset-y-0 left-0 rounded-full shadow-sm transition-all duration-500 ${axisBarColor(key)} ${axisGlow(key)}`}
+                          style={{ width: `${pct}%` }}
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex w-[4.25rem] shrink-0 flex-col items-end gap-0.5">
+                    {missing ? (
+                      <EpistemicChip status={status} />
+                    ) : (
+                      <span className="text-[12px] font-semibold tabular-nums text-slate-100">
+                        {axisPct(v)}
+                      </span>
+                    )}
+                    {!missing && weightPct != null && compact && (
+                      <span className="text-[8px] tabular-nums text-slate-600">w {weightPct}%</span>
+                    )}
+                  </div>
                 </div>
-              )}
-              <span
-                className={`text-[10px] w-8 text-right tabular-nums shrink-0 cursor-help ${
-                  missing ? 'text-slate-600' : 'text-slate-400'
-                }`}
-              >
-                {axisPct(v)}
-              </span>
-            </div>
-          </ScoreMathTooltip>
-        )
-      })}
+              </ScoreMathTooltip>
+            </li>
+          )
+        })}
+      </ul>
 
       {scores.safetyFlags && scores.safetyFlags.length > 0 && (
-        <div className="flex flex-wrap gap-1 pt-1" data-testid="score-axis-safety-flags">
+        <div
+          className={`flex flex-wrap gap-1 ${compact ? 'pt-1' : 'border-t border-slate-800/80 px-3 py-2'}`}
+          data-testid="score-axis-safety-flags"
+        >
           {scores.safetyFlags.map((flag) => (
             <StyledTooltip
               key={`${flag.kind}:${flag.label}`}
               content={`${flag.kind} · ${flag.severity}\nSoft flag: may not hard-penalize composite unless AE policy is hard-penalty.\nSafety axis: S = 1 − (0.5·aeRisk + 0.3·seriousRisk + 0.2·recallRisk) with log-compressed FAERS counts.`}
             >
-              <span className="text-[9px] px-1.5 py-0.5 rounded border border-amber-700/50 bg-amber-900/30 text-amber-300 cursor-help">
+              <span className="cursor-help rounded-md border border-amber-700/50 bg-amber-900/30 px-1.5 py-0.5 text-[9px] font-medium text-amber-300">
                 {flag.label}
               </span>
             </StyledTooltip>
@@ -207,23 +299,15 @@ export function ScoreAxisBars({
         </div>
       )}
 
-      {!compact && (scores.scorePhase || onOpenBreakdown) && (
-        <div className="flex items-center gap-2 pt-0.5">
-          {scores.scorePhase && (
-            <p className="text-[9px] text-slate-600">
-              Phase: {scores.scorePhase}
-              {scores.rubricId ? ` · ${scores.rubricId}` : ''}
-            </p>
-          )}
-          {onOpenBreakdown && (
-            <button
-              type="button"
-              onClick={onOpenBreakdown}
-              className="text-[9px] text-indigo-400 hover:text-indigo-300 ml-auto"
-            >
-              Weights
-            </button>
-          )}
+      {!compact && onOpenBreakdown && (
+        <div className="flex justify-end border-t border-slate-800/80 px-3 py-1.5">
+          <button
+            type="button"
+            onClick={onOpenBreakdown}
+            className="text-[9px] text-indigo-400 hover:text-indigo-300"
+          >
+            Edit weights
+          </button>
         </div>
       )}
     </div>
