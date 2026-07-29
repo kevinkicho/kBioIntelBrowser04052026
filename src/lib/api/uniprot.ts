@@ -121,6 +121,65 @@ export async function searchUniProt(
 /**
  * Get full protein details by accession
  */
+/**
+ * UniProt REST returns nested name objects — never pass proteinDescription to React.
+ * Shape: { recommendedName: { fullName: { value } }, alternativeNames?: [...] }
+ */
+export function extractUniProtProteinName(proteinDescription: unknown): string {
+  if (!proteinDescription || typeof proteinDescription !== 'object') {
+    return typeof proteinDescription === 'string' && proteinDescription.trim()
+      ? proteinDescription.trim()
+      : 'Unknown protein'
+  }
+  const pd = proteinDescription as {
+    recommendedName?: { fullName?: { value?: string }; shortNames?: { value?: string }[] }
+    alternativeNames?: { fullName?: { value?: string } }[]
+    submissionNames?: { fullName?: { value?: string } }[]
+  }
+  const rec =
+    pd.recommendedName?.fullName?.value?.trim() ||
+    pd.recommendedName?.shortNames?.[0]?.value?.trim()
+  if (rec) return rec
+  const alt = pd.alternativeNames?.[0]?.fullName?.value?.trim()
+  if (alt) return alt
+  const sub = pd.submissionNames?.[0]?.fullName?.value?.trim()
+  if (sub) return sub
+  return 'Unknown protein'
+}
+
+function extractAlternativeSequence(alt: unknown): string {
+  if (alt == null) return ''
+  if (typeof alt === 'string') return alt
+  if (typeof alt !== 'object') return String(alt)
+  const a = alt as {
+    originalSequence?: string
+    alternativeSequences?: string[]
+  }
+  const orig = a.originalSequence?.trim() ?? ''
+  const next = a.alternativeSequences?.[0]?.trim() ?? ''
+  if (orig && next) return `${orig}→${next}`
+  return next || orig || ''
+}
+
+function extractSubcellularLocation(comments: unknown): string | undefined {
+  if (!Array.isArray(comments)) return undefined
+  const c = comments.find(
+    (x: { commentType?: string }) => x?.commentType === 'SUBCELLULAR LOCATION',
+  ) as
+    | {
+        subcellularLocations?: { location?: { value?: string } }[]
+        subcellularLocation?: { value?: string }
+        texts?: { value?: string }[]
+      }
+    | undefined
+  if (!c) return undefined
+  const fromList = c.subcellularLocations?.[0]?.location?.value?.trim()
+  if (fromList) return fromList
+  if (typeof c.subcellularLocation?.value === 'string') return c.subcellularLocation.value
+  const text = c.texts?.[0]?.value?.trim()
+  return text || undefined
+}
+
 export async function getUniProtProtein(accession: string): Promise<UniProtProtein | null> {
   try {
     const url = `${DETAIL_URL}/${accession}.json`
@@ -134,30 +193,30 @@ export async function getUniProtProtein(accession: string): Promise<UniProtProte
     return {
       accession: d.primaryAccession ?? '',
       id: d.uniProtkbId ?? '',
-      proteinName: d.proteinDescription ?? '',
+      proteinName: extractUniProtProteinName(d.proteinDescription),
       geneName: d.genes?.[0]?.geneName?.value ?? '',
       organism: d.organism?.scientificName ?? '',
       length: d.sequence?.length ?? 0,
-      sequence: d.sequence?.sequence ?? '',
+      sequence: typeof d.sequence?.sequence === 'string' ? d.sequence.sequence : '',
       function: (d.comments as any[])?.find((c: any) => c.commentType === 'FUNCTION')?.texts?.[0]?.value,
-      subcellularLocation: (d.comments as any[])?.find((c: any) => c.commentType === 'SUBCELLULAR LOCATION')?.subcellularLocation?.value,
+      subcellularLocation: extractSubcellularLocation(d.comments),
       pathways: (d.comments as any[])?.find((c: any) => c.commentType === 'PATHWAY')?.texts?.map((t: any) => t.value) ?? [],
       domains: (d.features as any[] ?? [])
         .filter((f: any) => ['DOMAIN', 'REGION', 'DNA_BIND', 'ZN_FING'].includes(f.type))
         .map((f: any) => ({
           type: f.type,
-          start: f.location.start?.value ?? 0,
-          end: f.location.end?.value ?? 0,
-          description: f.description ?? f.type,
+          start: f.location?.start?.value ?? 0,
+          end: f.location?.end?.value ?? 0,
+          description: typeof f.description === 'string' ? f.description : f.type,
         })),
       variants: (d.features as any[] ?? [])
         .filter((f: any) => f.type === 'VARIANT')
         .map((f: any) => ({
           type: 'VARIANT',
-          start: f.location.start?.value ?? 0,
-          end: f.location.end?.value ?? 0,
-          sequence: f.alternativeSequence ?? '',
-          description: f.description ?? '',
+          start: f.location?.start?.value ?? 0,
+          end: f.location?.end?.value ?? 0,
+          sequence: extractAlternativeSequence(f.alternativeSequence),
+          description: typeof f.description === 'string' ? f.description : '',
         })),
     }
     /* eslint-enable @typescript-eslint/no-explicit-any */

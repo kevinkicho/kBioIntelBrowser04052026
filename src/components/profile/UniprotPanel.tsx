@@ -56,7 +56,9 @@ export const UniprotPanel = memo(function UniprotPanel({ entries, panelId, lastF
           renderItem={(entry) => (
             <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-slate-100 text-sm">{entry.proteinName}</p>
+                <p className="font-semibold text-slate-100 text-sm">
+                  {typeof entry.proteinName === 'string' ? entry.proteinName : 'Unknown protein'}
+                </p>
                 {entry.geneName && (
                   <span className="text-xs bg-purple-900/40 text-purple-300 border border-purple-700/30 px-2 py-0.5 rounded shrink-0">
                     {entry.geneName}

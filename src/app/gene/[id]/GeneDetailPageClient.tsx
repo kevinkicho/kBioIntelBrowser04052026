@@ -2014,12 +2014,19 @@ function GenePathwaysPanel({
             className="space-y-0"
             renderItem={(p, index) => {
               const acc = p.accession || '—'
-              const name = p.proteinName || '—'
+              // Coerce — UniProt REST can leave nested objects if a mapper skipped extract
+              const name =
+                typeof p.proteinName === 'string' && p.proteinName.trim()
+                  ? p.proteinName
+                  : '—'
               const genes =
                 Array.isArray(p.geneNames) && p.geneNames.length > 0
-                  ? p.geneNames.slice(0, 3).join(', ')
+                  ? p.geneNames
+                      .filter((g): g is string => typeof g === 'string')
+                      .slice(0, 3)
+                      .join(', ') || '—'
                   : '—'
-              const org = p.organism || '—'
+              const org = typeof p.organism === 'string' && p.organism ? p.organism : '—'
               const href =
                 p.url ||
                 (p.accession

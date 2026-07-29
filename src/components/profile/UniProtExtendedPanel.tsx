@@ -54,26 +54,45 @@ export const UniProtExtendedPanel = memo(function UniProtExtendedPanel({ protein
           defaultSortId="name-asc"
           filterPlaceholder="Filter proteins (name, gene, accession…)"
           getKey={(protein, i) => `${protein.accession || i}`}
-          renderItem={(protein) => (
+          renderItem={(protein) => {
+            // Defensive: never render nested UniProt objects as React children (error #31)
+            const name =
+              typeof protein.proteinName === 'string'
+                ? protein.proteinName
+                : 'Unknown protein'
+            const gene =
+              typeof protein.geneName === 'string' ? protein.geneName : ''
+            const organism =
+              typeof protein.organism === 'string' ? protein.organism : ''
+            const fn =
+              typeof protein.function === 'string' ? protein.function : ''
+            const loc =
+              typeof protein.subcellularLocation === 'string'
+                ? protein.subcellularLocation
+                : ''
+            const pathways = (protein.pathways ?? []).filter(
+              (p): p is string => typeof p === 'string' && p.length > 0,
+            )
+            return (
             <div className="py-3 border-b border-slate-700 last:border-0">
               <div className="flex items-start justify-between gap-2">
-                <p className="font-semibold text-slate-100 text-sm">{protein.proteinName}</p>
-                {protein.geneName && (
+                <p className="font-semibold text-slate-100 text-sm">{name}</p>
+                {gene && (
                   <span className="text-xs bg-purple-900/40 text-purple-300 border border-purple-700/30 px-2 py-0.5 rounded shrink-0">
-                    {protein.geneName}
+                    {gene}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 mt-1">{protein.organism} • {protein.length} aa</p>
-              {protein.function && (
-                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{protein.function}</p>
+              <p className="text-xs text-slate-400 mt-1">{organism} • {protein.length} aa</p>
+              {fn && (
+                <p className="text-xs text-slate-500 mt-1 line-clamp-2">{fn}</p>
               )}
-              {protein.subcellularLocation && (
-                <p className="text-xs text-slate-500 mt-0.5">Location: {protein.subcellularLocation}</p>
+              {loc && (
+                <p className="text-xs text-slate-500 mt-0.5">Location: {loc}</p>
               )}
-              {protein.pathways && protein.pathways.length > 0 && (
+              {pathways.length > 0 && (
                 <div className="flex flex-wrap gap-1 mt-1">
-                  {protein.pathways.slice(0, 3).map((pw, j) => (
+                  {pathways.slice(0, 3).map((pw, j) => (
                     <span key={j} className="text-xs bg-blue-900/30 text-blue-300 border border-blue-700/30 px-1.5 py-0.5 rounded">
                       {pw}
                     </span>
@@ -89,7 +108,8 @@ export const UniProtExtendedPanel = memo(function UniProtExtendedPanel({ protein
                 {protein.accession} →
               </a>
             </div>
-          )}
+            )
+          }}
         />
       )}
     </Panel>
