@@ -13,6 +13,7 @@ import {
 } from '@/lib/dataHub'
 import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 import {
   fetchMolecularChemical,
   fetchClinicalSafety,
@@ -104,44 +105,52 @@ export async function GET(
       categories.map(async (categoryId) => {
         const categoryTimeout = Math.min(getCategoryTimeout(categoryId) || 12_000, 14_000)
         try {
-          const fetchPromise = (async (): Promise<Record<string, unknown> | null> => {
-            switch (categoryId) {
-              case 'pharmaceutical':
-                return (await fetchPharmaceutical(name, synonyms, queryFor, apiParams)) as Record<
-                  string,
-                  unknown
-                >
-              case 'clinical-safety':
-                return (await fetchClinicalSafety(name, queryFor, apiParams)) as Record<
-                  string,
-                  unknown
-                >
-              case 'molecular-chemical':
-                return (await fetchMolecularChemical(
-                  name,
-                  cid,
-                  molecularWeight,
-                  queryFor,
-                  apiParams,
-                )) as Record<string, unknown>
-              case 'bioactivity-targets':
-                return (await fetchBioactivityTargets(name, queryFor, apiParams)) as Record<
-                  string,
-                  unknown
-                >
-              case 'research-literature':
-                return (await fetchResearchLiterature(name, queryFor, apiParams)) as Record<
-                  string,
-                  unknown
-                >
-              default:
-                return null
-            }
-          })()
+          const ac = new AbortController()
+          const data = await runWithApiAbort(
+            ac,
+            async () => {
+              const fetchPromise = (async (): Promise<Record<string, unknown> | null> => {
+                switch (categoryId) {
+                  case 'pharmaceutical':
+                    return (await fetchPharmaceutical(name, synonyms, queryFor, apiParams)) as Record<
+                      string,
+                      unknown
+                    >
+                  case 'clinical-safety':
+                    return (await fetchClinicalSafety(name, queryFor, apiParams)) as Record<
+                      string,
+                      unknown
+                    >
+                  case 'molecular-chemical':
+                    return (await fetchMolecularChemical(
+                      name,
+                      cid,
+                      molecularWeight,
+                      queryFor,
+                      apiParams,
+                    )) as Record<string, unknown>
+                  case 'bioactivity-targets':
+                    return (await fetchBioactivityTargets(name, queryFor, apiParams)) as Record<
+                      string,
+                      unknown
+                    >
+                  case 'research-literature':
+                    return (await fetchResearchLiterature(name, queryFor, apiParams)) as Record<
+                      string,
+                      unknown
+                    >
+                  default:
+                    return null
+                }
+              })()
 
-          const data = await withTimeout(fetchPromise, categoryTimeout + 2000, {
-            signal: request.signal,
-          })
+              return await withTimeout(fetchPromise, categoryTimeout + 2000, {
+                abortController: ac,
+                signal: request.signal,
+              })
+            },
+            [request.signal],
+          )
           if (data && typeof data === 'object') {
             for (const [k, v] of Object.entries(data)) {
               if (k.startsWith('_')) continue

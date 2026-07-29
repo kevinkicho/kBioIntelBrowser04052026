@@ -1,4 +1,5 @@
 # Blocks merges when of-record / full-app / typecheck gates fail.
+# Keep in lockstep with scripts/precommit-gate.js (single source of gate steps).
 name: Pre-commit gate
 
 on:
@@ -26,8 +27,16 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Pre-commit capability gate (tsc + fullApp + of-record)
-        run: npm run test:precommit
+      - name: Sanity — Jest config must not require ts-node
+        run: |
+          if [ -f jest.config.ts ] && [ ! -f jest.config.js ] && [ ! -f jest.config.mjs ] && [ ! -f jest.config.cjs ]; then
+            echo "::error::jest.config.ts alone needs ts-node; use jest.config.js for CI"
+            exit 1
+          fi
+          if [ -f jest.config.ts ]; then
+            echo "::warning::Remove jest.config.ts — prefer jest.config.js only"
+          fi
+          test -f jest.config.js || test -f jest.config.mjs || test -f jest.config.cjs
 
-      - name: Catalog completeness (fail if new panel lacks panelSources)
-        run: npx jest --testPathPatterns=fullApp/01-inventory --no-coverage
+      - name: Pre-commit capability gate (tsc + fullApp + of-record + inventory)
+        run: npm run test:precommit

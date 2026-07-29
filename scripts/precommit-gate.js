@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 /**
- * Pre-commit / pre-push capability gate for BioIntel.
+ * Pre-commit / CI capability gate for BioIntel.
+ *
+ * Must match `.github/workflows/precommit.yml` so local pre-commit catches
+ * every failure GitHub CI would hit (tsc + fullApp + of-record + inventory).
  *
  * Blocks brittle regressions before they hit main:
  *  1. Typecheck (tsc --noEmit)
- *  2. Capability inventory + UI brittleness suites
- *  3. Product of-record / data hub / discovery unit tests (test:gate patterns)
+ *  2. Capability inventory + UI brittleness suites (includes fullApp)
+ *  3. Product of-record / data hub / discovery unit tests
+ *  4. Catalog completeness: fullApp/01-inventory (explicit; also in CI step)
  *
  * Usage:
  *   node scripts/precommit-gate.js
@@ -14,10 +18,12 @@
  * Optional env:
  *   PRECOMMIT_SKIP_TSC=1   — skip typecheck (not recommended)
  *   PRECOMMIT_FULL=1       — also run broader component panel smoke patterns
+ *   PRECOMMIT_BUILD=1      — also run `next build` (slow; optional local/CI extra)
  */
 
 const { spawnSync } = require('child_process')
 const path = require('path')
+const fs = require('fs')
 
 const root = path.join(__dirname, '..')
 
@@ -42,6 +48,27 @@ function run(label, command, args) {
   console.log(`\n✓ ${label}\n`)
 }
 
+/** Fail fast if Jest config would break on clean npm ci (no ts-node). */
+function assertJestConfigCiSafe() {
+  const tsConfig = path.join(root, 'jest.config.ts')
+  const jsConfig = path.join(root, 'jest.config.js')
+  const mjsConfig = path.join(root, 'jest.config.mjs')
+  const cjsConfig = path.join(root, 'jest.config.cjs')
+  if (fs.existsSync(tsConfig) && !fs.existsSync(jsConfig) && !fs.existsSync(mjsConfig) && !fs.existsSync(cjsConfig)) {
+    console.error(
+      '\n✗ Gate failed: jest.config.ts alone requires ts-node on clean CI installs.\n' +
+        '  Use jest.config.js (committed) or add ts-node as a direct devDependency.\n',
+    )
+    process.exit(1)
+  }
+  // Prefer JS config; warn if both exist (Jest may prefer .ts and reintroduce CI footgun)
+  if (fs.existsSync(tsConfig) && (fs.existsSync(jsConfig) || fs.existsSync(mjsConfig) || fs.existsSync(cjsConfig))) {
+    console.warn(
+      '⚠ Both jest.config.ts and a JS config exist — remove jest.config.ts so CI never needs ts-node.',
+    )
+  }
+}
+
 // Capability + brittleness suites (new + high-risk surfaces)
 const BRITTLE_PATTERNS = [
   'reactSafe',
@@ -57,6 +84,7 @@ const BRITTLE_PATTERNS = [
 ].join('|')
 
 // Historical of-record / pack / discovery gate (from package.json test:gate)
+// Keep apiFetchIsolation / api-tracker isolation in the gate so fetch hardening stays green.
 const PRODUCT_PATTERNS = [
   'productEvents',
   'packClaims',
@@ -76,6 +104,7 @@ const PRODUCT_PATTERNS = [
   'PackBuilder.share',
   'agentActivity',
   'api-tracker.isolation',
+  'apiFetchIsolation',
   'panelApiTrace',
   'relatedMolecules',
   'candidateWhy',
@@ -117,6 +146,10 @@ const FULL_COMPONENT_PATTERNS = [
 
 console.log('BioIntel pre-commit capability gate')
 console.log('==================================')
+console.log(`  platform: ${process.platform}  node: ${process.version}`)
+console.log('  (mirrors .github/workflows/precommit.yml)\n')
+
+assertJestConfigCiSafe()
 
 if (process.env.PRECOMMIT_SKIP_TSC !== '1') {
   run('Typecheck', 'npx', ['tsc', '--noEmit'])
@@ -136,6 +169,13 @@ run('Of-record product unit suites', 'npx', [
   '--no-coverage',
 ])
 
+// Explicit inventory step — same as CI workflow second jest step
+run('Catalog completeness (fullApp/01-inventory)', 'npx', [
+  'jest',
+  '--testPathPatterns=fullApp/01-inventory',
+  '--no-coverage',
+])
+
 if (process.env.PRECOMMIT_FULL === '1') {
   run('Broader component smoke', 'npx', [
     'jest',
@@ -145,10 +185,15 @@ if (process.env.PRECOMMIT_FULL === '1') {
   ])
 }
 
+if (process.env.PRECOMMIT_BUILD === '1') {
+  run('Production build (next build)', 'npx', ['next', 'build'])
+}
+
 console.log('\n==================================')
 console.log('✓ Pre-commit gate passed')
-console.log('  Included: fullApp inventory · provenance · diagnostics · panel empty smokes')
+console.log('  Included: tsc · fullApp · of-record · 01-inventory · apiFetchIsolation')
 console.log('  Optional: PRECOMMIT_FULL=1 for broader legacy component smoke')
+console.log('  Optional: PRECOMMIT_BUILD=1 for next build')
 console.log('  Optional: npm run test:e2e:full-app (routes + molecule chrome)')
 console.log('  Optional: npm run test:e2e:fixture:auto for Playwright north-star')
 console.log('==================================\n')

@@ -3,6 +3,7 @@ import { getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
 import { metricsToSourceStatus, runWithApiMetrics, type ApiMetric } from '@/lib/api-tracker'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { recordMetric } from '@/lib/analytics/db'
 import { buildCategoryApiTrace } from '@/lib/panelApiTrace'
 import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
@@ -170,38 +171,49 @@ export async function GET(
   try {
     // Isolate perApiMetrics for this request — concurrent category loads on the
     // same Node process must not steal/merge each other's timeout/error rows.
+    // runWithApiAbort patches fetch (ALS) so wall-clock / client disconnect stop
+    // in-flight free-API sockets, not just the Node wait.
     const { value, metrics } = await runWithApiMetrics(async () => {
-      const fetchPromise = (async () => {
-        switch (categoryId) {
-          case 'pharmaceutical':
-            return await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
-          case 'clinical-safety':
-            return await fetchClinicalSafety(name, queryFor, apiParams)
-          case 'molecular-chemical':
-            return await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
-          case 'bioactivity-targets':
-            return await fetchBioactivityTargets(name, queryFor, apiParams)
-          case 'protein-structure':
-            return await fetchProteinStructure(name, queryFor, apiParams)
-          case 'genomics-disease':
-            return await fetchGenomicsDisease(name, queryFor, apiParams)
-          case 'interactions-pathways':
-            return await fetchInteractionsPathways(name, queryFor, apiParams)
-          case 'research-literature':
-            return await fetchResearchLiterature(name, queryFor, apiParams)
-          case 'nih-high-impact':
-            return await fetchNihHighImpact(name, queryFor)
-          default:
-            return null
-        }
-      })()
-
-      // AbortController linked so slow upstream work can stop when wall-clock expires
       const ac = new AbortController()
-      return await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000, {
-        abortController: ac,
-        signal: request.signal,
-      })
+      return await runWithApiAbort(
+        ac,
+        async () => {
+          const fetchPromise = (async () => {
+            switch (categoryId) {
+              case 'pharmaceutical':
+                return await fetchPharmaceutical(name, synonyms, queryFor, apiParams)
+              case 'clinical-safety':
+                return await fetchClinicalSafety(name, queryFor, apiParams)
+              case 'molecular-chemical':
+                return await fetchMolecularChemical(name, cid, molecularWeight, queryFor, apiParams)
+              case 'bioactivity-targets':
+                return await fetchBioactivityTargets(name, queryFor, apiParams)
+              case 'protein-structure':
+                return await fetchProteinStructure(name, queryFor, apiParams)
+              case 'genomics-disease':
+                return await fetchGenomicsDisease(name, queryFor, apiParams)
+              case 'interactions-pathways':
+                return await fetchInteractionsPathways(name, queryFor, apiParams)
+              case 'research-literature':
+                return await fetchResearchLiterature(name, queryFor, apiParams)
+              case 'nih-high-impact':
+                return await fetchNihHighImpact(name, queryFor)
+              default:
+                return null
+            }
+          })()
+
+          return await withTimeout(
+            fetchPromise as Promise<Record<string, unknown>>,
+            categoryTimeout + 3000,
+            {
+              abortController: ac,
+              signal: request.signal,
+            },
+          )
+        },
+        [request.signal],
+      )
     })
 
     data = value

@@ -53,6 +53,37 @@ export async function runWithApiMetrics<T>(fn: () => Promise<T>): Promise<{
   })
 }
 
+/**
+ * Map items to async work; each item failure becomes `fallback` so siblings continue.
+ * Prefer this over bare `Promise.all(items.map(fn))` inside multi-id fanouts.
+ */
+export async function mapSettled<T, R>(
+  items: readonly T[],
+  fn: (item: T, index: number) => Promise<R>,
+  fallback: R,
+): Promise<R[]> {
+  if (items.length === 0) return []
+  return Promise.all(
+    items.map((item, index) =>
+      Promise.resolve()
+        .then(() => fn(item, index))
+        .catch(() => fallback),
+    ),
+  )
+}
+
+/**
+ * Like Promise.all but each rejection becomes `fallback` (siblings keep running).
+ * Use when fanning out heterogeneous promises that share one trackedSafe source.
+ */
+export async function allSettledValues<T>(
+  promises: readonly Promise<T>[],
+  fallback: T,
+): Promise<T[]> {
+  if (promises.length === 0) return []
+  return Promise.all(promises.map((p) => Promise.resolve(p).catch(() => fallback)))
+}
+
 export function trackedSafe<T>(
   source: string,
   promise: Promise<T>,
@@ -88,13 +119,16 @@ export function trackedSafe<T>(
     })
     .catch((err: unknown) => {
       const timedOut = err instanceof Error && err.message?.includes('timed out')
+      const aborted =
+        (err instanceof DOMException && err.name === 'AbortError') ||
+        (err instanceof Error && err.name === 'AbortError')
       bucket.push({
         source,
-        status: timedOut ? 408 : 500,
+        status: timedOut || aborted ? 408 : 500,
         duration_ms: Date.now() - start,
         error: err instanceof Error ? err.message : String(err),
         has_data: false,
-        loadStatus: timedOut ? 'timeout' : 'error',
+        loadStatus: timedOut || aborted ? 'timeout' : 'error',
       })
       return fallback
     })

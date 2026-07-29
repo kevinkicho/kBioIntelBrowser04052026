@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { CategoryId } from '@/lib/categoryConfig'
 import {
   isCategoryLoading,
   useProfilePanelContext,
 } from '@/components/profile/ProfilePanelContext'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { summarizeSourceHealth } from '@/lib/panelApiTrace'
 
 interface CategorySectionProps {
   icon: string
@@ -54,6 +55,20 @@ export function CategorySection({
   const canRefresh = Boolean(categoryId && profileCtx?.refreshCategory)
   const isCollapsed = forceExpanded ? false : collapsed
 
+  const sourceHealth = useMemo(() => {
+    if (!categoryId || !profileCtx?.categoryTraces[categoryId]) return null
+    const sources = profileCtx.categoryTraces[categoryId]!.sources
+    if (!sources?.length) return null
+    return summarizeSourceHealth(sources)
+  }, [categoryId, profileCtx])
+
+  const sourceBadgeClass =
+    sourceHealth && sourceHealth.ok < sourceHealth.total
+      ? sourceHealth.errors + sourceHealth.timeouts > 0
+        ? 'bg-amber-900/40 text-amber-300 border border-amber-700/30'
+        : 'bg-slate-800 text-slate-400'
+      : 'bg-emerald-900/30 text-emerald-300/90 border border-emerald-800/30'
+
   return (
     <div>
       <div
@@ -71,9 +86,42 @@ export function CategorySection({
         >
           <span>{icon}</span>
           <span className="font-semibold text-sm uppercase tracking-wider">{label}</span>
-          <span className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}>
-            {withData}/{total}
-          </span>
+          <StyledTooltip content={`Panels with data: ${withData} of ${total} cards in this category`}>
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${badgeClass}`}
+              data-testid={categoryId ? `category-panels-${categoryId}` : 'category-panels'}
+            >
+              {withData}/{total}
+            </span>
+          </StyledTooltip>
+          {sourceHealth && sourceHealth.total > 0 && (
+            <StyledTooltip
+              content={
+                sourceHealth.ok === sourceHealth.total
+                  ? `All ${sourceHealth.total} free-API sources responded (errors do not cancel siblings)`
+                  : [
+                      `${sourceHealth.ok}/${sourceHealth.total} free-API sources OK`,
+                      sourceHealth.withData ? `${sourceHealth.withData} with data` : null,
+                      sourceHealth.empty ? `${sourceHealth.empty} empty` : null,
+                      sourceHealth.errors ? `${sourceHealth.errors} error` : null,
+                      sourceHealth.timeouts ? `${sourceHealth.timeouts} timeout` : null,
+                      sourceHealth.disabled ? `${sourceHealth.disabled} disabled` : null,
+                      'One source failing does not cancel the rest',
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')
+              }
+            >
+              <span
+                className={`text-[10px] px-1.5 py-0.5 rounded-full cursor-help ${sourceBadgeClass}`}
+                data-testid={categoryId ? `category-sources-${categoryId}` : 'category-sources'}
+                data-sources-ok={sourceHealth.ok}
+                data-sources-total={sourceHealth.total}
+              >
+                {sourceHealth.ok}/{sourceHealth.total} sources OK
+              </span>
+            </StyledTooltip>
+          )}
           <span
             className={`ml-auto text-xs transition-transform ${isCollapsed ? '-rotate-90' : ''}`}
           >

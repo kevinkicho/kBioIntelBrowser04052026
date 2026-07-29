@@ -142,7 +142,7 @@ Agents should read these before changing related behavior.
 | Jest unit/integration | `__tests__/**` |
 | Discovery project tests | `__tests__/lib/project/*`, `__tests__/lib/discovery/*` |
 | E2E Playwright | `e2e/*.spec.ts` |
-| Jest config | `jest.config.ts` (ignores `e2e/`) |
+| Jest config | `jest.config.js` (ignores `e2e/`; plain JS so CI needs no ts-node) |
 | Playwright config | `playwright.config.ts` |
 
 ---

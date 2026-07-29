@@ -1,4 +1,4 @@
-import { trackedSafe } from '@/lib/api-tracker'
+import { mapSettled, trackedSafe } from '@/lib/api-tracker'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 
 import { getUniprotEntriesByName } from '@/lib/api/uniprot'
@@ -70,8 +70,20 @@ export async function fetchGenomicsDisease(name: string, queryFor: (s: string) =
     trackedSafe('ensembl', getEnsemblGenesBySymbols(geneSymbols), []),
     trackedSafe('expression-atlas', getGeneExpressionBySymbols(geneSymbols), []),
     trackedSafe('bgee', getBgeeData(geneSymbols[0] || name), { expressions: [] }),
-    trackedSafe('gtex', Promise.all(geneSymbols.slice(0, 5).map(g => getGTExTopTissues(g, 10).catch(() => []))).then(r => r.flat()), []),
-    trackedSafe('gene-ontology', Promise.all(geneSymbols.slice(0, 5).map(g => searchGOTerms(g).then(r => r.terms).catch(() => []))).then(r => r.flat()), []),
+    trackedSafe(
+      'gtex',
+      mapSettled(geneSymbols.slice(0, 5), (g) => getGTExTopTissues(g, 10), []).then((r) => r.flat()),
+      [],
+    ),
+    trackedSafe(
+      'gene-ontology',
+      mapSettled(
+        geneSymbols.slice(0, 5),
+        (g) => searchGOTerms(g).then((r) => r.terms),
+        [],
+      ).then((r) => r.flat()),
+      [],
+    ),
     trackedSafe('hpo', searchHPOTerms(name), { terms: [], total: 0 }),
     trackedSafe('ols', searchOLS(name), { terms: [], total: 0 }),
     trackedSafe('biomodels', searchBioModels(name), { models: [], total: 0 }),

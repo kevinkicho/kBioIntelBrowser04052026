@@ -153,7 +153,7 @@ export function PanelApiDetailModal({
               />
               <Row
                 label="Sources"
-                value={`${trace.responseSummary.withData} with data · ${trace.responseSummary.empty} empty · ${trace.responseSummary.errors} err · ${trace.responseSummary.timeouts} timeout / ${trace.responseSummary.sourceCount}`}
+                value={`${trace.responseSummary.withData} with data · ${trace.responseSummary.empty} empty · ${trace.responseSummary.errors} err · ${trace.responseSummary.timeouts} timeout / ${trace.responseSummary.sourceCount} (failures do not cancel sibling sources)`}
               />
             </section>
 

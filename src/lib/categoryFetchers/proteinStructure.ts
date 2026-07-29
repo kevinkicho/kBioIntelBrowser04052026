@@ -1,5 +1,5 @@
 import { safe } from '@/lib/utils'
-import { trackedSafe } from '@/lib/api-tracker'
+import { mapSettled, trackedSafe } from '@/lib/api-tracker'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 
 import { getUniprotEntriesByName } from '@/lib/api/uniprot'
@@ -37,11 +37,34 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
     safe(getProteinAtlasBySymbols(geneSymbols), []),
     safe(getGoAnnotationsByAccessions(accessions), []),
     safe(getPeptideAtlasData(name), { peptides: [] }),
-    safe(Promise.all(geneSymbols.slice(0, 5).map(s => searchGene3D(s).catch(() => []))).then(r => r.flat()), []),
-    safe(Promise.all(geneSymbols.slice(0, 5).map(g => getUniProtProtein(g).catch(() => null))).then(results => results.filter((p): p is NonNullable<typeof p> => p !== null)), []),
-    safe(Promise.all(accessions.slice(0, 3).map(a => getProteinVariations(a).catch(() => null))).then(r => r.find(x => x) || null), null),
-    safe(Promise.all(accessions.slice(0, 3).map(a => getProteomicsMappings(a).catch(() => null))).then(r => r.find(x => x) || null), null),
-    safe(Promise.all(accessions.slice(0, 3).map(a => getProteinCrossReferences(a).catch(() => null))).then(r => r.find(x => x) || null), null),
+    safe(
+      mapSettled(geneSymbols.slice(0, 5), (s) => searchGene3D(s), []).then((r) => r.flat()),
+      [],
+    ),
+    safe(
+      mapSettled(geneSymbols.slice(0, 5), (g) => getUniProtProtein(g), null).then((results) =>
+        results.filter((p): p is NonNullable<typeof p> => p !== null),
+      ),
+      [],
+    ),
+    safe(
+      mapSettled(accessions.slice(0, 3), (a) => getProteinVariations(a), null).then(
+        (r) => r.find((x) => x) || null,
+      ),
+      null,
+    ),
+    safe(
+      mapSettled(accessions.slice(0, 3), (a) => getProteomicsMappings(a), null).then(
+        (r) => r.find((x) => x) || null,
+      ),
+      null,
+    ),
+    safe(
+      mapSettled(accessions.slice(0, 3), (a) => getProteinCrossReferences(a), null).then(
+        (r) => r.find((x) => x) || null,
+      ),
+      null,
+    ),
     safe(geneSymbols.length > 0 ? getProteinAtlasData(geneSymbols[0]) : Promise.resolve(null), null),
   ])
   return {

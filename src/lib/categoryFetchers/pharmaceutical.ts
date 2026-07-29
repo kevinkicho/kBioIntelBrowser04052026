@@ -1,4 +1,4 @@
-import { trackedSafe } from '@/lib/api-tracker'
+import { mapSettled, trackedSafe } from '@/lib/api-tracker'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 
 import { getDrugsByIngredient } from '@/lib/api/openfda'
@@ -28,7 +28,13 @@ import { getOpenFdaLabelSectionsByName } from '@/lib/api/openFdaLabelSections'
 export async function fetchPharmaceutical(name: string, synonyms: string[], queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const searchTerms = [name, ...synonyms.slice(0, 1)]
   const [companiesNested, ndcProducts, orangeBookEntries, drugsFdaApplications, openFdaLabelSections, healthCanadaProducts, emaMedicines, biologicsLicensed, purpleBookResult, purpleBookPatentsResult, emaBulkResult, drugPrices, drugInteractions, drugLabels, atcClassifications, drugCentralData, gsrsSubstances, pharmgkbData, cpicGuidelines] = await Promise.all([
-    trackedSafe('openfda', Promise.all(searchTerms.map(t => getDrugsByIngredient(t))).then(r => r.filter(Boolean)), []),
+    trackedSafe(
+      'openfda',
+      mapSettled(searchTerms, (t) => getDrugsByIngredient(t), []).then((r) =>
+        r.flat().filter(Boolean),
+      ),
+      [],
+    ),
     trackedSafe('fda-ndc', getNdcProductsByName(queryFor('companies')), []),
     trackedSafe('orangebook', getOrangeBookByName(queryFor('orange-book')), []),
     trackedSafe('drugs-fda', getDrugsFdaByName(queryFor('drugs-fda') || name), []),

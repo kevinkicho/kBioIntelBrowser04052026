@@ -418,7 +418,7 @@ export const ALGORITHM_CATALOG: AlgorithmCatalogEntry[] = [
     area: 'profile',
     title: 'Molecule profile category fan-out',
     summary:
-      'Tiered category loads call free public APIs in parallel; client L1/L2 cache + soft refresh; AbortController cancel on remount.',
+      'Tiered category loads call free public APIs in parallel via trackedSafe (sibling isolation); mapSettled for multi-id fanouts; runWithApiAbort patches fetch so category wall-clock / client disconnect stop sockets; client L1/L2 cache + soft refresh; per-category AbortController on remount; UI shows N/M sources OK from _apiTrace.',
     steps: [
       'Hydrate IDB → memory cache',
       'Load active / decision tier first',

@@ -188,6 +188,60 @@ export function loadStatusFromPanelTrace(
   return worst
 }
 
+/**
+ * Count free-API sources that completed without error/timeout.
+ * "OK" = loaded or empty (honest empty still means the request succeeded).
+ * Disabled counts as not-OK for the badge (source intentionally skipped).
+ */
+export function summarizeSourceHealth(
+  sources:
+    | Array<{ loadStatus?: string; has_data?: boolean }>
+    | null
+    | undefined,
+): {
+  total: number
+  ok: number
+  withData: number
+  empty: number
+  errors: number
+  timeouts: number
+  disabled: number
+} {
+  const list = sources ?? []
+  let ok = 0
+  let withData = 0
+  let empty = 0
+  let errors = 0
+  let timeouts = 0
+  let disabled = 0
+  for (const s of list) {
+    const st = s.loadStatus
+    if (st === 'loaded' || st === 'empty') {
+      ok++
+      if (st === 'loaded' || s.has_data) withData++
+      else empty++
+    } else if (st === 'error') {
+      errors++
+    } else if (st === 'timeout') {
+      timeouts++
+    } else if (st === 'disabled') {
+      disabled++
+    } else if (s.has_data) {
+      ok++
+      withData++
+    }
+  }
+  return {
+    total: list.length,
+    ok,
+    withData,
+    empty,
+    errors,
+    timeouts,
+    disabled,
+  }
+}
+
 /** Prefer durable client stamp, then server API trace finish time. */
 export function resolveCategoryFetchedAt(data: Record<string, unknown> | null | undefined): Date {
   if (!data) return new Date()

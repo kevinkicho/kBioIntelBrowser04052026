@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCached, setCache } from '@/lib/cache'
 import { getCategoryTimeout, withTimeout } from '@/lib/utils'
-import { flushApiMetrics } from '@/lib/api-tracker'
+import { flushApiMetrics, runWithApiMetrics } from '@/lib/api-tracker'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { recordMetric } from '@/lib/analytics/db'
 import { fetchGene } from '@/lib/categoryFetchers'
 
@@ -46,17 +47,27 @@ export async function GET(
 
   let data: Record<string, unknown>
   try {
-    const fetchPromise = (async () => {
-      return await fetchGene(geneId, symbol)
-    })()
-
     const ac = new AbortController()
-    data = await withTimeout(fetchPromise as Promise<Record<string, unknown>>, categoryTimeout + 3000, {
-      abortController: ac,
-      signal: request.signal,
-    })
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      runWithApiAbort(
+        ac,
+        async () => {
+          const fetchPromise = fetchGene(geneId, symbol)
+          return await withTimeout(
+            fetchPromise as Promise<Record<string, unknown>>,
+            categoryTimeout + 3000,
+            {
+              abortController: ac,
+              signal: request.signal,
+            },
+          )
+        },
+        [request.signal],
+      ),
+    )
+    data = value
 
-    for (const m of flushApiMetrics()) {
+    for (const m of metrics) {
       recordMetric({
         source: m.source,
         endpoint: '',
@@ -67,7 +78,10 @@ export async function GET(
       })
     }
   } catch (err) {
-    for (const m of flushApiMetrics()) {
+    const metrics =
+      (err as { __apiMetrics?: ReturnType<typeof flushApiMetrics> })?.__apiMetrics ??
+      flushApiMetrics()
+    for (const m of metrics) {
       recordMetric({
         source: m.source,
         endpoint: '',

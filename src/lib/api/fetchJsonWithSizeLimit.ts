@@ -10,6 +10,7 @@
  */
 
 import { acquireRateLimit } from '../rateLimit'
+import { getApiAbortSignal } from './apiAbort'
 
 export const DEFAULT_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 export const DEFAULT_FETCH_TIMEOUT_MS = 12000
@@ -26,6 +27,7 @@ export interface FetchJsonWithSizeLimitOptions {
 /**
  * Fetch a URL and parse JSON only if the body is within maxBytes and looks like JSON.
  * Returns null on non-OK status, oversize body, HTML, timeout, or parse failure.
+ * Merges caller signal + category ALS abort (runWithApiAbort).
  */
 export async function fetchJsonWithSizeLimit<T = unknown>(
   url: string,
@@ -36,13 +38,24 @@ export async function fetchJsonWithSizeLimit<T = unknown>(
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
 
-  const onOuterAbort = () => controller.abort()
-  if (options.signal) {
-    if (options.signal.aborted) {
+  const outerSignals = [options.signal, getApiAbortSignal()].filter(
+    (s): s is AbortSignal => Boolean(s),
+  )
+
+  const onOuterAbort = () => {
+    try {
+      controller.abort()
+    } catch {
+      /* ignore */
+    }
+  }
+
+  for (const sig of outerSignals) {
+    if (sig.aborted) {
       clearTimeout(timeout)
       return null
     }
-    options.signal.addEventListener('abort', onOuterAbort, { once: true })
+    sig.addEventListener('abort', onOuterAbort, { once: true })
   }
 
   try {
@@ -75,8 +88,8 @@ export async function fetchJsonWithSizeLimit<T = unknown>(
     return null
   } finally {
     clearTimeout(timeout)
-    if (options.signal) {
-      options.signal.removeEventListener('abort', onOuterAbort)
+    for (const sig of outerSignals) {
+      sig.removeEventListener('abort', onOuterAbort)
     }
   }
 }

@@ -1,5 +1,5 @@
 import { safe } from '@/lib/utils'
-import { trackedSafe } from '@/lib/api-tracker'
+import { allSettledValues, trackedSafe } from '@/lib/api-tracker'
 import { API_SOURCE_TIMEOUTS } from '@/lib/analytics/timeouts'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 import type { SynthesisRoute } from '@/lib/types'
@@ -60,7 +60,17 @@ export async function fetchMolecularChemical(name: string, cid: number, molecula
     trackedSafe('massbank', searchMassBank(queryFor('massbank')), [], API_SOURCE_TIMEOUTS['massbank']),
     trackedSafe('chemspider', searchChemSpider(queryFor('chemspider')), []),
     trackedSafe('metabolights', searchMetaboLights(name), []),
-    trackedSafe('gnps-library', Promise.all([searchGNPSLibrary(name), searchGNPSNetworks(name)]).then(([spectra, clusters]) => ({ spectra, clusters })), { spectra: [], clusters: [] }),
+    trackedSafe(
+      'gnps-library',
+      allSettledValues(
+        [searchGNPSLibrary(name), searchGNPSNetworks(name)] as Promise<unknown>[],
+        [],
+      ).then(([spectra, clusters]) => ({
+        spectra: Array.isArray(spectra) ? spectra : [],
+        clusters: Array.isArray(clusters) ? clusters : [],
+      })),
+      { spectra: [], clusters: [] },
+    ),
     trackedSafe('lipidmaps', searchLipidMaps(queryFor('lipidmaps')), { lipids: [], total: 0 }),
     trackedSafe('unichem', getAllCompoundIds('pubchem', String(cid)), {
       inchiKey: null,
