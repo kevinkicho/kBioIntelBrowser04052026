@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { ProductFunnelPanel } from '@/components/analytics/ProductFunnelPanel'
 import { RequestMetricsPanel } from '@/components/analytics/RequestMetricsPanel'
-import { productEventLabel } from '@/lib/productEvents'
 import { API_METADATA } from '@/lib/analytics/api-meta'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import {
@@ -22,9 +21,6 @@ import {
   CategoryGroup,
   DailySnapshot,
   ApiMetricRow,
-  StatusCodeEntry,
-  ErrorBucket,
-  HourlyBucket,
   ApiDetail,
 } from '@/components/analytics/analyticsPageUi'
 

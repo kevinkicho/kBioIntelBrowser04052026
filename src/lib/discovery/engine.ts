@@ -42,7 +42,6 @@ import {
 import type { CandidateMolecule, DiseaseGene, RankResult } from './types'
 import { withSourceStatus } from './sourceStatus'
 import {
-  OT_KNOWN_DRUGS_DECONTAMINATION_WARNING,
   UnknownDiseaseIdError,
   diseaseResultToEntity,
   findPinnedDisease,

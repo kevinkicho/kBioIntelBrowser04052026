@@ -1,7 +1,6 @@
 'use client'
 
 import type { ApiMeta } from '@/lib/analytics/api-meta'
-import { API_METADATA } from '@/lib/analytics/api-meta'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { productEventLabel } from '@/lib/productEvents'
 

@@ -4,7 +4,6 @@
  */
 import {
   asArr,
-  fmtMw,
   phaseLabel,
   row,
   section,
@@ -12,6 +11,7 @@ import {
   type MoleculeIdentityInput,
 } from '../../moleculeHubShared'
 import type { DataHubRow, DataHubSection } from '../../types'
+
 
 export function buildClinicalPart(
   identity: MoleculeIdentityInput,

@@ -4,14 +4,13 @@
  */
 import {
   asArr,
-  fmtMw,
-  phaseLabel,
   row,
   section,
   str,
   type MoleculeIdentityInput,
 } from '../../moleculeHubShared'
 import type { DataHubRow, DataHubSection } from '../../types'
+
 
 export function buildStructuresPart(
   identity: MoleculeIdentityInput,

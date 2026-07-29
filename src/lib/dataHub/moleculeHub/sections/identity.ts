@@ -3,19 +3,18 @@
  * Pure; no network.
  */
 import {
-  asArr,
   fmtMw,
-  phaseLabel,
   row,
   section,
-  str,
   type MoleculeIdentityInput,
 } from '../../moleculeHubShared'
 import type { DataHubRow, DataHubSection } from '../../types'
 
+
 export function buildIdentityPart(
   identity: MoleculeIdentityInput,
-  data: Record<string, unknown>,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- same signature as other section builders
+  _data: Record<string, unknown>,
 ): { rows: DataHubRow[]; sections: DataHubSection[] } {
   const all: DataHubRow[] = []
   const sections: DataHubSection[] = []
