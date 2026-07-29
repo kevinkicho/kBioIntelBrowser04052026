@@ -41,6 +41,10 @@ import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
 import { isGeneResearchTableEnabled } from '@/lib/researchViewPrefs'
 import { buildGeneCrossSource } from '@/lib/crossSource'
 import { buildGeneDataHub } from '@/lib/dataHub'
+import {
+  EmptySourcesToggle,
+  SourceEvidenceCard,
+} from '@/components/gene/SourceEvidenceCard'
 
 type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -255,16 +259,9 @@ function GeneDiseasesPanel({
   const hasGwas = gwas.length > 0
   const hasClingen = clingen.length > 0
 
-  if (!hasDisgenet && !hasGwas && !hasClingen) {
-    return (
-      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 opacity-30" data-empty="true">
-        <EmptySection
-          label="disease associations"
-          hint="DisGeNET / GWAS / ClinGen may not have associations for this gene"
-        />
-      </div>
-    )
-  }
+  const [showEmpty, setShowEmpty] = useState(false)
+  const emptyCount =
+    (!hasDisgenet ? 1 : 0) + (!hasGwas ? 1 : 0) + (!hasClingen ? 1 : 0)
 
   const gridDg =
     'grid grid-cols-[minmax(0,1.4fr)_minmax(5rem,0.55fr)_minmax(4rem,0.45fr)_minmax(4.5rem,0.5fr)_2.5rem] gap-x-2'
@@ -276,15 +273,38 @@ function GeneDiseasesPanel({
   return (
     <div className="space-y-3" data-testid="gene-diseases-cards">
       <p className="text-[10px] text-slate-600 px-0.5">
-        Disease association tables (DisGeNET, GWAS Catalog, ClinGen). Open rows for source records.
+        Disease association tables (DisGeNET, GWAS Catalog, ClinGen). Empty sources stay dimmed with
+        API provenance for troubleshooting.
       </p>
+      <EmptySourcesToggle
+        emptyCount={emptyCount}
+        showEmpty={showEmpty}
+        onToggle={() => setShowEmpty((v) => !v)}
+        testId="gene-diseases-empty-toggle"
+      />
 
-      {hasDisgenet && (
+      {(hasDisgenet || true) && (
         <ExpressionSourceCard
           title={`DisGeNET Associations (${diseases.length})`}
-          subtitle="Disease · ID · source · association score · Discover deep link."
+          subtitle={
+            hasDisgenet
+              ? 'Disease · ID · source · association score · Discover deep link.'
+              : 'No DisGeNET rows returned for this gene (gather attempted).'
+          }
           testId="gene-disgenet-diseases"
+          sourceKey="disgenet"
+          sourceLabel="DisGeNET"
+          rowCount={diseases.length}
+          empty={!hasDisgenet}
+          fetchedAt={fetchedAt}
+          forceExpanded={showEmpty}
+          registryUrl={
+            geneSymbol
+              ? `https://www.disgenet.org/search?q=${encodeURIComponent(geneSymbol)}`
+              : 'https://www.disgenet.org/'
+          }
         >
+          {hasDisgenet ? (
           <FilterablePaginatedList
             items={diseases}
             getSearchText={(d) =>
@@ -366,22 +386,37 @@ function GeneDiseasesPanel({
                         })
                       }
                     >
-                     
+                      ↗
                     </a>
                   </div>
                 </div>
               )
             }}
           />
+          ) : (
+            <p className="text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+          )}
         </ExpressionSourceCard>
       )}
 
-      {hasGwas && (
+      {(hasGwas || true) && (
         <ExpressionSourceCard
           title={`GWAS Catalog (${gwas.length})`}
-          subtitle="Trait · p-value · PubMed · open."
+          subtitle={
+            hasGwas
+              ? 'Trait · p-value · PubMed · open.'
+              : 'No GWAS Catalog rows returned for this gene (gather attempted).'
+          }
           testId="gene-gwas-diseases"
+          sourceKey="gwas"
+          sourceLabel="GWAS Catalog"
+          rowCount={gwas.length}
+          empty={!hasGwas}
+          fetchedAt={fetchedAt}
+          forceExpanded={showEmpty}
+          registryUrl="https://www.ebi.ac.uk/gwas/"
         >
+          {hasGwas ? (
           <FilterablePaginatedList
             items={gwas}
             getSearchText={(g) =>
@@ -449,20 +484,36 @@ function GeneDiseasesPanel({
                     >
                       {g.pubmedId || '—'}
                     </span>
-</a>
+                    <span className="text-[11px] text-indigo-400 text-right">↗</span>
+                  </a>
                 </div>
               )
             }}
           />
+          ) : (
+            <p className="text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+          )}
         </ExpressionSourceCard>
       )}
 
-      {hasClingen && (
+      {(hasClingen || true) && (
         <ExpressionSourceCard
           title={`ClinGen Gene–Disease (${clingen.length})`}
-          subtitle="Disease · validity/score · open."
+          subtitle={
+            hasClingen
+              ? 'Disease · validity/score · open.'
+              : 'No ClinGen rows returned for this gene (gather attempted).'
+          }
           testId="gene-clingen-diseases"
+          sourceKey="clingen"
+          sourceLabel="ClinGen"
+          rowCount={clingen.length}
+          empty={!hasClingen}
+          fetchedAt={fetchedAt}
+          forceExpanded={showEmpty}
+          registryUrl="https://clinicalgenome.org/"
         >
+          {hasClingen ? (
           <FilterablePaginatedList
             items={clingen}
             getSearchText={(c) =>
@@ -515,11 +566,15 @@ function GeneDiseasesPanel({
                     <span className="text-[11px] font-mono tabular-nums text-right text-slate-500">
                       {c.score != null ? c.score : '—'}
                     </span>
-</a>
+                    <span className="text-[11px] text-indigo-400 text-right">↗</span>
+                  </a>
                 </div>
               )
             }}
           />
+          ) : (
+            <p className="text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+          )}
         </ExpressionSourceCard>
       )}
     </div>
@@ -950,29 +1005,50 @@ function GeneVariantsPanel({
   )
 }
 
-/** Shared shell for each expression source so they render as separate main cards. */
+/** Shared shell for gene source cards — provenance + empty hide/reveal. */
 function ExpressionSourceCard({
   title,
   subtitle,
   testId,
   children,
   empty,
+  sourceKey = 'expression-atlas',
+  sourceLabel,
+  rowCount,
+  fetchedAt,
+  registryUrl,
+  forceExpanded,
 }: {
   title: string
   subtitle?: string
   testId?: string
   children: ReactNode
   empty?: boolean
+  sourceKey?: string
+  sourceLabel?: string
+  rowCount?: number
+  fetchedAt?: Date | string | null
+  registryUrl?: string
+  forceExpanded?: boolean
 }) {
+  const isEmpty = empty ?? (typeof rowCount === 'number' && rowCount === 0)
   return (
-    <div
-      data-testid={testId}
-      className={`bg-slate-800/50 border border-slate-700 rounded-xl p-5 ${empty ? 'opacity-20' : ''}`}
+    <SourceEvidenceCard
+      title={title}
+      sourceKey={sourceKey}
+      sourceLabel={sourceLabel}
+      rowCount={rowCount}
+      fetchedAt={fetchedAt}
+      empty={isEmpty}
+      resultStatus={isEmpty ? 'empty' : 'loaded'}
+      resultMessage={subtitle}
+      registryUrl={registryUrl}
+      forceExpanded={forceExpanded}
+      testId={testId || 'gene-source-card'}
+      className="mb-0"
     >
-      <h3 className="text-sm font-semibold text-slate-100 mb-0.5">{title}</h3>
-      {subtitle && <p className="text-[10px] text-slate-600 mb-3 leading-relaxed">{subtitle}</p>}
-      {children}
-    </div>
+      <div className="px-3 py-3">{children}</div>
+    </SourceEvidenceCard>
   )
 }
 
@@ -1086,16 +1162,8 @@ function GeneExpressionPanel({
     [],
   )
 
-  if (!hasGtex && !hasBgee && !hasAtlas) {
-    return (
-      <div
-        className="bg-slate-800/50 border border-slate-700 rounded-xl p-5 opacity-20"
-        data-empty="true"
-      >
-        <div className="text-slate-500 text-sm py-2">No expression data found.</div>
-      </div>
-    )
-  }
+  const [showEmpty, setShowEmpty] = useState(false)
+  const emptyCount = (!hasGtex ? 1 : 0) + (!hasBgee ? 1 : 0) + (!hasAtlas ? 1 : 0)
 
   const gridGtex = 'grid grid-cols-[minmax(0,1fr)_5rem_2.5rem] gap-x-2'
   const bgeeFlags = useMemo(() => bgeeColumnFlags(bgeeExps), [bgeeExps])
@@ -1113,15 +1181,34 @@ function GeneExpressionPanel({
   return (
     <div className="space-y-3" data-testid="gene-expression-cards">
       <p className="text-[10px] text-slate-600 px-0.5">
-        Expression tables from GTEx, Bgee, and Expression Atlas. Open a row for the source record.
+        Expression tables from GTEx, Bgee, and Expression Atlas. Empty sources are dimmed and hidden
+        by default — each card keeps API provenance for troubleshooting.
       </p>
+      <EmptySourcesToggle
+        emptyCount={emptyCount}
+        showEmpty={showEmpty}
+        onToggle={() => setShowEmpty((v) => !v)}
+        testId="gene-expression-empty-toggle"
+      />
 
-      {hasGtex && (
+      {(hasGtex || true) && (
         <ExpressionSourceCard
           title={`GTEx Top Tissues (${gtexExps.length})`}
-          subtitle="Tissue-level TPM from GTEx Portal."
+          subtitle={
+            hasGtex
+              ? 'Tissue-level TPM from GTEx Portal.'
+              : 'No GTEx rows returned for this gene (gather attempted).'
+          }
           testId="gene-gtex-expression"
+          sourceKey="gtex"
+          sourceLabel="GTEx Portal"
+          rowCount={gtexExps.length}
+          empty={!hasGtex}
+          fetchedAt={fetchedAt}
+          forceExpanded={showEmpty}
+          registryUrl="https://gtexportal.org/home/"
         >
+          {hasGtex ? (
           <FilterablePaginatedList
             items={gtexExps}
             getSearchText={(e) => [e.tissueName, e.geneSymbol, String(e.tpm ?? '')].filter(Boolean).join(' ')}
@@ -1173,20 +1260,32 @@ function GeneExpressionPanel({
                     >
                       {tpm}
                     </span>
-</a>
+                    <span className="text-[11px] text-indigo-400 text-right">↗</span>
+                  </a>
                 </div>
               )
             }}
           />
+          ) : (
+            <p className="text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+          )}
         </ExpressionSourceCard>
       )}
 
-      {hasBgee && (
+      {(hasBgee || true) && (
         <ExpressionSourceCard
           title={`Bgee Expression (${bgeeExps.length})`}
           subtitle={bgeeSubtitle(bgeeFlags, bgeeExps.length)}
           testId="gene-bgee-expression"
+          sourceKey="bgee"
+          sourceLabel="Bgee"
+          rowCount={bgeeExps.length}
+          empty={!hasBgee}
+          fetchedAt={fetchedAt}
+          forceExpanded={showEmpty}
+          registryUrl="https://www.bgee.org/"
         >
+          {hasBgee ? (
           <FilterablePaginatedList
             items={bgeeExps}
             getSearchText={(e) =>
@@ -1295,19 +1394,32 @@ function GeneExpressionPanel({
               )
             }}
           />
+          ) : (
+            <p className="text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+          )}
         </ExpressionSourceCard>
       )}
 
-      {hasAtlas && (
+      {(hasAtlas || true) && (
         <ExpressionSourceCard
           title={`Expression Atlas (${atlasData.length})`}
           subtitle={
-            atlasHasLevels
-              ? 'Baseline tissue expression (value + unit when published). Open opens the experiment on Expression Atlas.'
-              : 'Experiment catalog for this gene (metadata). Numeric levels not returned for these rows — open the experiment on Expression Atlas.'
+            hasAtlas
+              ? atlasHasLevels
+                ? 'Baseline tissue expression (value + unit when published). Open opens the experiment on Expression Atlas.'
+                : 'Experiment catalog for this gene (metadata). Numeric levels not returned for these rows — open the experiment on Expression Atlas.'
+              : 'No Expression Atlas rows returned for this gene (gather attempted).'
           }
           testId="gene-expression-atlas"
+          sourceKey="expression-atlas"
+          sourceLabel="Expression Atlas"
+          rowCount={atlasData.length}
+          empty={!hasAtlas}
+          fetchedAt={fetchedAt}
+          forceExpanded={showEmpty}
+          registryUrl="https://www.ebi.ac.uk/gxa/"
         >
+          {hasAtlas ? (
           <FilterablePaginatedList
             items={atlasData}
             getSearchText={(e) =>
@@ -1411,6 +1523,9 @@ function GeneExpressionPanel({
               )
             }}
           />
+          ) : (
+            <p className="text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+          )}
         </ExpressionSourceCard>
       )}
     </div>
@@ -1432,23 +1547,35 @@ function TargetedDrugsPanel({
       score?: number
     }>) ?? []
 
-  if (drugs.length === 0) {
-    return (
-      <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5">
-        <div className="text-slate-500 text-sm py-2">No targeted drug data found.</div>
-      </div>
-    )
-  }
+  const geneSym =
+    typeof (data as { overview?: { symbol?: string } } | null)?.overview?.symbol === 'string'
+      ? (data as { overview: { symbol: string } }).overview.symbol
+      : ''
 
   return (
-    <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-5" data-testid="gene-targeted-drugs">
-      <h3 className="text-sm font-semibold text-slate-100 mb-0.5">
-        Drugs targeting this gene ({drugs.length})
-      </h3>
-      <p className="text-[10px] text-slate-600 mb-3">
-        DGIdb interactions. Use the API button for source, timestamp, and endpoint. Open goes to
-        DGIdb drug search.
-      </p>
+    <SourceEvidenceCard
+      title={`Targeted drugs (${drugs.length})`}
+      sourceKey="dgidb"
+      sourceLabel="DGIdb"
+      rowCount={drugs.length}
+      fetchedAt={fetchedAt}
+      resultStatus={drugs.length === 0 ? 'empty' : 'loaded'}
+      resultMessage={
+        drugs.length === 0
+          ? 'No DGIdb interactions returned for this gene (gather attempted).'
+          : 'DGIdb interactions. Open goes to DGIdb drug search.'
+      }
+      registryUrl={
+        geneSym
+          ? `https://www.dgidb.org/results?searchType=gene&searchTerms=${encodeURIComponent(geneSym)}`
+          : 'https://www.dgidb.org/'
+      }
+      testId="gene-targeted-drugs"
+    >
+      {drugs.length === 0 ? (
+        <p className="px-3 py-3 text-[11px] text-slate-500">No rows loaded yet for this source.</p>
+      ) : (
+      <>
       <div
         className="grid grid-cols-[minmax(0,1.2fr)_minmax(0,0.9fr)_minmax(0,1fr)_3rem_2.5rem] gap-x-2 px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80"
         role="row"
@@ -1508,7 +1635,7 @@ function TargetedDrugsPanel({
                     className="text-xs text-blue-400 hover:text-blue-300 text-right"
                     aria-label="View in DGIdb"
                   >
-                   
+                    ↗
                   </a>
                 </StyledTooltip>
               </div>
@@ -1516,7 +1643,9 @@ function TargetedDrugsPanel({
           )
         })}
       </div>
-    </div>
+      </>
+      )}
+    </SourceEvidenceCard>
   )
 }
 
@@ -2237,6 +2366,8 @@ function GeneResearchFocus({
       ?.reactomePathways ?? []
   ).slice(0, limit)
 
+  const [showEmpty, setShowEmpty] = useState(false)
+
   const cell = (v: unknown) => {
     if (v == null || v === '') return '—'
     return String(v).slice(0, 100)
@@ -2245,62 +2376,88 @@ function GeneResearchFocus({
   const Table = ({
     title,
     source,
+    sourceKey,
+    registryUrl,
     cols,
     rows,
     testId,
   }: {
     title: string
     source: string
+    sourceKey: string
+    registryUrl?: string
     cols: string[]
     rows: string[][]
     testId: string
-  }) => (
-    <section
-      className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden"
-      data-testid={testId}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 px-3 py-2">
-        <div>
-          <h3 className="text-xs font-semibold text-slate-100">{title}</h3>
-          <p className="text-[9px] text-slate-500">{source}</p>
-        </div>
-        <span className="text-[9px] tabular-nums text-slate-500">{rows.length} rows</span>
-      </div>
-      {rows.length === 0 ? (
-        <p className="px-3 py-3 text-[11px] text-slate-500">No rows loaded yet for this source.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[28rem] text-left">
-            <thead>
-              <tr className="text-[9px] uppercase tracking-wide text-slate-600">
-                {cols.map((c) => (
-                  <th key={c} className="px-3 py-1.5 font-semibold">
-                    {c}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((r, i) => (
-                <tr key={i} className="border-t border-slate-800/50">
-                  {r.map((c, j) => (
-                    <td
-                      key={j}
-                      className={`px-3 py-1.5 text-[11px] ${
-                        j === 0 ? 'text-slate-100 font-medium' : 'text-slate-400'
-                      }`}
-                    >
-                      <span className="line-clamp-2">{c}</span>
-                    </td>
+  }) => {
+    const empty = rows.length === 0
+    // Parent show-empty forces expand; when hidden, empty cards stay mounted but collapsed
+    if (empty && !showEmpty) {
+      // Still mount for provenance visibility when parent reveals — parent lists empty count
+      // When showEmpty false we still render card collapsed (user can reveal per-card)
+    }
+    return (
+      <SourceEvidenceCard
+        title={title}
+        sourceKey={sourceKey}
+        sourceLabel={source}
+        rowCount={rows.length}
+        fetchedAt={null}
+        resultStatus={empty ? 'empty' : 'loaded'}
+        resultMessage={
+          empty
+            ? 'No rows loaded yet for this free-API source (empty ≠ no biology).'
+            : undefined
+        }
+        registryUrl={registryUrl}
+        forceExpanded={showEmpty}
+        testId={testId}
+        className="mb-4"
+      >
+        {rows.length === 0 ? (
+          <p className="px-3 py-3 text-[11px] text-slate-500">
+            No rows loaded yet for this source.
+          </p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[28rem] text-left">
+              <thead>
+                <tr className="text-[9px] uppercase tracking-wide text-slate-600">
+                  {cols.map((c) => (
+                    <th key={c} className="px-3 py-1.5 font-semibold">
+                      {c}
+                    </th>
                   ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </section>
-  )
+              </thead>
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i} className="border-t border-slate-800/50">
+                    {r.map((c, j) => (
+                      <td
+                        key={j}
+                        className={`px-3 py-1.5 text-[11px] ${
+                          j === 0 ? 'text-slate-100 font-medium' : 'text-slate-400'
+                        }`}
+                      >
+                        <span className="line-clamp-2">{c}</span>
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </SourceEvidenceCard>
+    )
+  }
+
+  const emptyCount =
+    (showDrugs && drugs.length === 0 ? 1 : 0) +
+    (showDiseases && diseases.length === 0 ? 1 : 0) +
+    (showVariants && variants.length === 0 ? 1 : 0) +
+    (showPathways && pathways.length === 0 ? 1 : 0)
 
   return (
     <div data-testid="gene-research-focus" className="space-y-2">
@@ -2311,14 +2468,26 @@ function GeneResearchFocus({
         <p className="text-[10px] text-slate-500">
           Dense of-record samples from free gene sources ·{' '}
           {drugCount + diseaseCount + clinvarCount + pathwayCount} rows across domains · pins saved
-          locally
+          locally · empty sources dimmed and collapsible
         </p>
       </header>
       <ResearchViewPrefsBar mode="gene" testId="gene-research-prefs" className="mb-3" />
+      <EmptySourcesToggle
+        emptyCount={emptyCount}
+        showEmpty={showEmpty}
+        onToggle={() => setShowEmpty((v) => !v)}
+        testId="gene-research-empty-toggle"
+      />
       {showDrugs && (
         <Table
           title="Targeted drugs"
           source="DGIdb"
+          sourceKey="dgidb"
+          registryUrl={
+            geneSymbol
+              ? `https://www.dgidb.org/results?searchType=gene&searchTerms=${encodeURIComponent(geneSymbol)}`
+              : 'https://www.dgidb.org/'
+          }
           cols={['Drug', 'Interaction', 'Score', 'Source']}
           rows={drugs.map((d) => [
             cell(d.drugName || d.name),
@@ -2333,6 +2502,12 @@ function GeneResearchFocus({
         <Table
           title="Disease associations"
           source="DisGeNET"
+          sourceKey="disgenet"
+          registryUrl={
+            geneSymbol
+              ? `https://www.disgenet.org/search?q=${encodeURIComponent(geneSymbol)}`
+              : 'https://www.disgenet.org/'
+          }
           cols={['Disease', 'Score', 'PMIDs', 'Source']}
           rows={diseases.map((d) => [
             cell(d.diseaseName),
@@ -2347,6 +2522,12 @@ function GeneResearchFocus({
         <Table
           title="ClinVar variants"
           source="ClinVar"
+          sourceKey="clinvar"
+          registryUrl={
+            geneSymbol
+              ? `https://www.ncbi.nlm.nih.gov/clinvar/?term=${encodeURIComponent(geneSymbol + '[gene]')}`
+              : 'https://www.ncbi.nlm.nih.gov/clinvar/'
+          }
           cols={['Title', 'Significance', 'Condition']}
           rows={variants.map((v) => [
             cell(v.title || v.variantId),
@@ -2360,6 +2541,12 @@ function GeneResearchFocus({
         <Table
           title="Reactome pathways"
           source="Reactome"
+          sourceKey="reactome"
+          registryUrl={
+            geneSymbol
+              ? `https://reactome.org/content/query?q=${encodeURIComponent(geneSymbol)}`
+              : 'https://reactome.org/'
+          }
           cols={['Pathway', 'ID', 'Species']}
           rows={pathways.map((p) => [
             cell(p.name || p.displayName),
