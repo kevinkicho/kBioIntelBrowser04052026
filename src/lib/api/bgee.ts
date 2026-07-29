@@ -22,10 +22,31 @@ const GENERIC_ANAT = new Set([
  */
 async function querySparql(query: string): Promise<Record<string, unknown>[]> {
   try {
+    // Prefer POST + Accept so Cloudflare / intermediaries return JSON when possible
+    const res = await fetch(`${SPARQL_URL}/`, {
+      ...fetchOptions,
+      method: 'POST',
+      headers: {
+        Accept: 'application/sparql-results+json, application/json',
+        'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
+      },
+      body: `query=${encodeURIComponent(query)}&format=json`,
+    })
+    if (res.ok) {
+      const ct = res.headers.get('content-type') || ''
+      if (ct.includes('json')) {
+        const data = await res.json()
+        return data.results?.bindings ?? []
+      }
+    }
+    // GET fallback (some Bgee deployments only allow GET)
     const url = `${SPARQL_URL}?query=${encodeURIComponent(query)}&format=json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
+    const getRes = await fetch(url, {
+      ...fetchOptions,
+      headers: { Accept: 'application/sparql-results+json, application/json' },
+    })
+    if (!getRes.ok) return []
+    const data = await getRes.json()
     return data.results?.bindings ?? []
   } catch {
     return []
@@ -99,7 +120,8 @@ export async function getGeneExpression(geneSymbol: string): Promise<BgeeExpress
   const seen = new Set<string>()
   const out: BgeeExpression[] = []
 
-  // Richer call-based query (Bgee genex Expression calls)
+  // Richer call-based query (Bgee genex Expression calls).
+  // Stage often hangs off genex:hasCondition; scores use several property aliases.
   const callQuery = `
     PREFIX orth: <http://purl.org/net/orth#>
     PREFIX genex: <http://purl.org/genex#>
@@ -121,9 +143,18 @@ export async function getGeneExpression(geneSymbol: string): Promise<BgeeExpress
         ?call genex:hasDevelopmentalStage ?stage .
         ?stage rdfs:label ?stageName .
       }
+      OPTIONAL {
+        ?call genex:hasCondition ?cond .
+        ?cond genex:hasDevelopmentalStage ?stage .
+        ?stage rdfs:label ?stageName .
+      }
       OPTIONAL { ?call genex:hasExpressionLevel ?level . }
+      OPTIONAL { ?call genex:expressionLevel ?level . }
       OPTIONAL { ?call genex:hasExpressionScore ?score . }
+      OPTIONAL { ?call genex:expressionScore ?score . }
+      OPTIONAL { ?call genex:hasExpressionValue ?score . }
       OPTIONAL { ?call genex:hasConfidenceLevel ?confidence . }
+      OPTIONAL { ?call genex:hasQuality ?confidence . }
     }
     LIMIT 100
   `
@@ -134,14 +165,14 @@ export async function getGeneExpression(geneSymbol: string): Promise<BgeeExpress
     if (out.length >= 40) break
   }
 
-  // Presence query (isExpressedIn) if calls empty or thin
+  // Presence query (isExpressedIn) if calls empty or thin — anatomy only (no score)
   if (out.length < 8) {
     const presenceQuery = `
       PREFIX orth: <http://purl.org/net/orth#>
       PREFIX genex: <http://purl.org/genex#>
       PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
       PREFIX obo: <http://purl.obolibrary.org/obo/>
-      SELECT DISTINCT ?gene ?geneName ?anatEntity ?anatName ?stage ?stageName
+      SELECT DISTINCT ?gene ?geneName ?anatEntity ?anatName
       WHERE {
         ?gene a orth:Gene ;
               orth:organism ?organism ;
@@ -151,16 +182,17 @@ export async function getGeneExpression(geneSymbol: string): Promise<BgeeExpress
         ?anatEntity rdfs:label ?anatName .
         FILTER(LCASE(STR(?geneName)) = LCASE("${safe}"))
         FILTER(CONTAINS(STR(?anatEntity), "UBERON"))
-        OPTIONAL {
-          ?gene genex:hasDevelopmentalStage ?stage .
-          ?stage rdfs:label ?stageName .
-        }
       }
       LIMIT 80
     `
     const results = await querySparql(presenceQuery)
     for (const binding of results) {
-      pushUnique(out, seen, mapBinding(binding, safe))
+      const row = mapBinding(binding, safe)
+      // Presence-only path: explicit level when SPARQL did not return score/stage
+      if (!row.expressionLevel || row.expressionLevel === 'present') {
+        row.expressionLevel = 'present'
+      }
+      pushUnique(out, seen, row)
       if (out.length >= 40) break
     }
   }

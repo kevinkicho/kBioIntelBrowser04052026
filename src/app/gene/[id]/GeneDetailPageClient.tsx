@@ -21,6 +21,11 @@ import type {
   dbSNPVariant,
 } from '@/lib/types'
 import { bgeeRecordUrl } from '@/lib/api/bgee'
+import {
+  bgeeColumnFlags,
+  bgeeGridTemplate,
+  bgeeSubtitle,
+} from '@/lib/api/bgeeColumns'
 import { ElapsedTimer } from '@/components/ui/ElapsedTimer'
 import { clientFetch } from '@/lib/clientFetch'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
@@ -1032,22 +1037,31 @@ function GeneExpressionPanel({
     [],
   )
 
-  const bgeeSort = useMemo(
-    () => [
+  const bgeeSort = useMemo(() => {
+    const flags = bgeeColumnFlags(bgeeExps)
+    const opts = [
       ...alphaSortOptions<BgeeExpression>((e) => e.anatomicalEntityName || ''),
-      ...alphaSortOptions<BgeeExpression>((e) => e.developmentalStageName || '').map((o) => ({
-        ...o,
-        id: `stage-${o.id}`,
-        label: o.id.includes('asc') ? 'Stage A–Z' : 'Stage Z–A',
-      })),
-      ...numberSortOptions<BgeeExpression>((e) => e.expressionScore ?? 0, {
-        high: 'Score high→low',
-        low: 'Score low→high',
-        idPrefix: 'score',
-      }),
-    ],
-    [],
-  )
+    ]
+    if (flags.hasStage) {
+      opts.push(
+        ...alphaSortOptions<BgeeExpression>((e) => e.developmentalStageName || '').map((o) => ({
+          ...o,
+          id: `stage-${o.id}`,
+          label: o.id.includes('asc') ? 'Stage A–Z' : 'Stage Z–A',
+        })),
+      )
+    }
+    if (flags.hasScore) {
+      opts.push(
+        ...numberSortOptions<BgeeExpression>((e) => e.expressionScore ?? 0, {
+          high: 'Score high→low',
+          low: 'Score low→high',
+          idPrefix: 'score',
+        }),
+      )
+    }
+    return opts
+  }, [bgeeExps])
 
   const atlasSort = useMemo(
     () => [
@@ -1083,8 +1097,8 @@ function GeneExpressionPanel({
   }
 
   const gridGtex = 'grid grid-cols-[minmax(0,1fr)_5rem_2.5rem] gap-x-2'
-  const gridBgee =
-    'grid grid-cols-[minmax(0,1.1fr)_minmax(5.5rem,0.7fr)_minmax(0,0.9fr)_minmax(4.5rem,0.55fr)_minmax(3.5rem,0.4fr)_2.5rem] gap-x-2'
+  const bgeeFlags = useMemo(() => bgeeColumnFlags(bgeeExps), [bgeeExps])
+  const gridBgee = bgeeGridTemplate(bgeeFlags)
   const gridAtlas =
     'grid grid-cols-[minmax(0,1.4fr)_minmax(4.5rem,0.55fr)_minmax(0,0.9fr)_minmax(4rem,0.5fr)_minmax(4rem,0.45fr)_2.5rem] gap-x-2'
 
@@ -1162,7 +1176,7 @@ function GeneExpressionPanel({
       {hasBgee && (
         <ExpressionSourceCard
           title={`Bgee Expression (${bgeeExps.length})`}
-          subtitle="Anatomy, ontology id, developmental stage, presence, and score."
+          subtitle={bgeeSubtitle(bgeeFlags, bgeeExps.length)}
           testId="gene-bgee-expression"
         >
           <FilterablePaginatedList
@@ -1176,13 +1190,18 @@ function GeneExpressionPanel({
                 e.expressionLevel,
                 e.geneSymbol,
                 e.species,
+                String(e.expressionScore ?? ''),
               ]
                 .filter(Boolean)
                 .join(' ')
             }
             sortOptions={bgeeSort}
-            defaultSortId="name-asc"
-            filterPlaceholder="Filter Bgee (tissue, stage, UBERON…)"
+            defaultSortId={bgeeFlags.hasScore ? 'score-desc' : 'name-asc'}
+            filterPlaceholder={
+              bgeeFlags.hasStage
+                ? 'Filter Bgee (tissue, stage, UBERON…)'
+                : 'Filter Bgee (tissue, UBERON…)'
+            }
             getKey={(e, i) =>
               `${e.anatomicalEntityId}-${e.developmentalStageId}-${i}`
             }
@@ -1203,12 +1222,15 @@ function GeneExpressionPanel({
                   {index === 0 && (
                     <div
                       className={`${gridBgee} px-2 py-1.5 text-[10px] font-semibold uppercase tracking-wider text-slate-500 border-b border-slate-700/80`}
+                      data-testid="gene-bgee-columns"
+                      data-has-stage={bgeeFlags.hasStage ? 'true' : 'false'}
+                      data-has-score={bgeeFlags.hasScore ? 'true' : 'false'}
                     >
                       <span>Anatomy</span>
-                      <span>Ontology</span>
-                      <span>Stage</span>
+                      {bgeeFlags.hasOntology && <span>Ontology</span>}
+                      {bgeeFlags.hasStage && <span>Stage</span>}
                       <span>Presence</span>
-                      <span className="text-right">Score</span>
+                      {bgeeFlags.hasScore && <span className="text-right">Score</span>}
                       <span className="text-right">Open</span>
                     </div>
                   )}
@@ -1230,31 +1252,37 @@ function GeneExpressionPanel({
                         {anat}
                       </span>
                     </StyledTooltip>
-                    <StyledTooltip content={anatId === '—' ? undefined : anatId}>
-                      <span
-                        className={`text-[10px] font-mono text-slate-500 truncate ${emptyDataClass(anatId === '—')}`}
-                      >
-                        {anatId}
-                      </span>
-                    </StyledTooltip>
-                    <StyledTooltip content={stage === '—' ? undefined : stage}>
-                      <span
-                        className={`text-[11px] text-slate-400 truncate ${emptyDataClass(stage === '—')}`}
-                      >
-                        {stage}
-                      </span>
-                    </StyledTooltip>
+                    {bgeeFlags.hasOntology && (
+                      <StyledTooltip content={anatId === '—' ? undefined : anatId}>
+                        <span
+                          className={`text-[10px] font-mono text-slate-500 truncate ${emptyDataClass(anatId === '—')}`}
+                        >
+                          {anatId}
+                        </span>
+                      </StyledTooltip>
+                    )}
+                    {bgeeFlags.hasStage && (
+                      <StyledTooltip content={stage === '—' ? undefined : stage}>
+                        <span
+                          className={`text-[11px] text-slate-400 truncate ${emptyDataClass(stage === '—')}`}
+                        >
+                          {stage}
+                        </span>
+                      </StyledTooltip>
+                    )}
                     <span
                       className={`justify-self-start text-[9px] px-1.5 py-0.5 rounded border truncate max-w-full ${presence.className}`}
                     >
                       {presence.text}
                     </span>
-                    <span
-                      className={`text-[11px] font-mono tabular-nums text-right text-emerald-400/90 ${emptyDataClass(score === '—')}`}
-                    >
-                      {score}
-                    </span>
-</a>
+                    {bgeeFlags.hasScore && (
+                      <span
+                        className={`text-[11px] font-mono tabular-nums text-right text-emerald-400/90 ${emptyDataClass(score === '—')}`}
+                      >
+                        {score}
+                      </span>
+                    )}
+                  </a>
                 </div>
               )
             }}
