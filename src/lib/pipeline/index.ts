@@ -61,8 +61,4 @@ export {
   type RequestMetricEvent,
   type RequestMetricsSnapshot,
 } from './requestMetrics'
-export {
-  getDensifyBudgets,
-  resolveDensifyBudgets,
-  type DensifyBudgets,
-} from '../discovery/densifyBudgets'
+// densify budgets: import from `@/lib/discovery/densifyBudgets` (domain, not pipeline)

@@ -463,13 +463,8 @@ export const ALGORITHM_CATALOG: AlgorithmCatalogEntry[] = [
   },
 ]
 
-export const PRODUCT_LAW_BULLETS = [
-  'Free public APIs only (no paid DBs as product requirements).',
-  'Evidence-first; no regulatory decision support language.',
-  'Discover ranking is deterministic — never LLM in the rank path.',
-  'AI is claim-bound on packs / research hypotheses and evidence-gated on profile copilot.',
-  'Solo + local export default; share optional.',
-] as const
+/** @see `@/lib/methods/productLaw` — re-exported for stable imports */
+export { PRODUCT_LAW_BULLETS } from './productLaw'
 
 export function promptsBySurface(surface: PromptSurface): PromptCatalogEntry[] {
   return PROMPT_CATALOG.filter((p) => p.surface === surface)
