@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { CTDInteraction, CTDDiseaseAssociation } from '@/lib/types'
 import {
   alphaSortOptions,
@@ -109,9 +110,13 @@ export const CTDPanel = memo(function CTDPanel({ interactions, diseaseAssociatio
                 </span>
               </div>
               {interaction.interactionActions && interaction.interactionActions.length > 0 && (
-                <p className="text-xs text-slate-400 mt-0.5">
-                  Actions: {interaction.interactionActions.slice(0, 3).join(', ')}
-                </p>
+                <ExpandableTextList
+                  items={interaction.interactionActions}
+                  maxVisible={3}
+                  prefix="Actions:"
+                  className="text-xs text-slate-400 mt-0.5"
+                  testId="ctd-actions"
+                />
               )}
             </div>
           )}

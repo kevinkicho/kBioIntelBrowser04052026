@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DescriptionTip } from '@/components/ui/HelperTip'
+import { ExpandableItems, ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { MedGenConcept } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -35,20 +36,32 @@ function ConceptItem({ concept }: { concept: MedGenConcept }) {
             </span>
           </div>
           <DescriptionTip text={definition} label="Definition" />
-          <div className="flex flex-wrap gap-1 mt-1">
-            {semanticTypes.slice(0, 6).map((type, i) => (
-              <span
-                key={`${type}-${i}`}
-                className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded"
-              >
-                {type}
-              </span>
-            ))}
+          <div className="mt-1 space-y-1">
+            {semanticTypes.length > 0 && (
+              <ExpandableItems
+                items={semanticTypes}
+                maxVisible={6}
+                className="flex flex-wrap gap-1"
+                moreClassName="text-[10px] font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer bg-transparent border-0 p-0"
+                testId="medgen-semantic-types"
+                renderItem={(type, i) => (
+                  <span
+                    key={`${type}-${i}`}
+                    className="text-[10px] bg-slate-800 text-slate-400 border border-slate-700 px-1.5 py-0.5 rounded"
+                  >
+                    {type}
+                  </span>
+                )}
+              />
+            )}
             {omimIds.length > 0 && (
-              <span className="text-[10px] text-slate-600">
-                OMIM: {omimIds.slice(0, 3).join(', ')}
-                {omimIds.length > 3 ? ` +${omimIds.length - 3}` : ''}
-              </span>
+              <ExpandableTextList
+                items={omimIds}
+                maxVisible={3}
+                prefix="OMIM:"
+                className="text-[10px] text-slate-600"
+                testId="medgen-omim"
+              />
             )}
           </div>
         </div>

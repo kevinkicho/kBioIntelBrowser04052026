@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { OMIMEntry } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -113,17 +114,23 @@ export const OMIMPanel = memo(function OMIMPanel({ entries, panelId, lastFetched
                   )}
 
                   {entry.geneSymbols && entry.geneSymbols.length > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Associated genes: {entry.geneSymbols.slice(0, 5).join(', ')}
-                      {entry.geneSymbols.length > 5 && ` +${entry.geneSymbols.length - 5} more`}
-                    </p>
+                    <ExpandableTextList
+                      items={entry.geneSymbols}
+                      maxVisible={5}
+                      prefix="Associated genes:"
+                      className="text-xs text-slate-500 mt-1"
+                      testId="omim-genes"
+                    />
                   )}
 
                   {entry.phenotypes && entry.phenotypes.length > 0 && (
-                    <p className="text-xs text-slate-500">
-                      Phenotypes: {entry.phenotypes.slice(0, 3).map((p) => p.name).join(', ')}
-                      {entry.phenotypes.length > 3 && ` +${entry.phenotypes.length - 3} more`}
-                    </p>
+                    <ExpandableTextList
+                      items={entry.phenotypes.map((p) => p.name)}
+                      maxVisible={3}
+                      prefix="Phenotypes:"
+                      className="text-xs text-slate-500"
+                      testId="omim-phenotypes"
+                    />
                   )}
 
                   {entry.references && entry.references.length > 0 && (

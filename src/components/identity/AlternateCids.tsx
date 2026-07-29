@@ -1,8 +1,10 @@
 'use client'
 
+import { useState } from 'react'
 import Link from 'next/link'
 import { mergeAlternateCids } from '@/lib/domain'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { ExpandableMoreToggle } from '@/components/ui/ExpandableItems'
 
 export interface AlternateCidsProps {
   /** Primary PubChem CID (excluded from the list). */
@@ -30,11 +32,12 @@ export function AlternateCids({
   compact = false,
   maxVisible = 4,
 }: AlternateCidsProps) {
+  const [expanded, setExpanded] = useState(false)
   const alts = mergeAlternateCids(primaryCid, alternateCids)
   if (alts.length === 0) return null
 
-  const visible = alts.slice(0, maxVisible)
-  const rest = alts.length - visible.length
+  const visible = expanded ? alts : alts.slice(0, maxVisible)
+  const rest = alts.length - maxVisible
   const qs = linkQuery
     ? linkQuery.startsWith('?')
       ? linkQuery
@@ -58,7 +61,15 @@ export function AlternateCids({
             </Link>
           </StyledTooltip>
         ))}
-        {rest > 0 && <span className="text-slate-600">+{rest}</span>}
+        {(rest > 0 || expanded) && (
+          <ExpandableMoreToggle
+            remaining={rest}
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            className="text-indigo-400 hover:text-indigo-300 cursor-pointer text-[10px] font-medium"
+            testId="alternate-cids-more"
+          />
+        )}
       </div>
     )
   }
@@ -82,10 +93,13 @@ export function AlternateCids({
           </Link>
         </StyledTooltip>
       ))}
-      {rest > 0 && (
-        <StyledTooltip content={alts.slice(maxVisible).join(', ')}>
-          <span className="text-slate-600">+{rest} more</span>
-        </StyledTooltip>
+      {(rest > 0 || expanded) && (
+        <ExpandableMoreToggle
+          remaining={rest}
+          expanded={expanded}
+          onToggle={() => setExpanded((v) => !v)}
+          testId="alternate-cids-more"
+        />
       )}
     </div>
   )

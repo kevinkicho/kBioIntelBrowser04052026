@@ -6,6 +6,7 @@ import { Panel } from '@/components/ui/Panel'
 import type { BioSample } from '@/lib/api/biosamples'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 
 interface BioSamplesPanelProps {
   samples?: BioSample[]
@@ -93,20 +94,19 @@ export function BioSamplesPanel({
 
               {(sample.attributes?.length ?? 0) > 0 && (
                 <div className="mt-2 pt-2 border-t">
-                  <div className="flex flex-wrap gap-1">
-                    {sample.attributes.slice(0, 6).map((attr, idx) => (
+                  <ExpandableItems
+                    items={sample.attributes}
+                    maxVisible={6}
+                    testId="biosample-attrs"
+                    moreClassName="px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer font-medium"
+                    renderItem={(attr, idx) => (
                       <StyledTooltip key={idx} content={`${attr.name}: ${attr.value}`}>
                         <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded">
                           {attr.name}
                         </span>
                       </StyledTooltip>
-                    ))}
-                    {sample.attributes.length > 6 && (
-                      <span className="px-2 py-0.5 text-xs text-gray-500">
-                        +{sample.attributes.length - 6} more
-                      </span>
                     )}
-                  </div>
+                  />
                 </div>
               )}
 

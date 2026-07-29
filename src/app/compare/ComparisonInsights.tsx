@@ -1,5 +1,8 @@
+'use client'
+
 import { computeOverlaps, type OverlapResult } from './comparisonUtils'
 import type { MoleculeData } from './page'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 
 interface ComparisonInsightsProps {
   dataA: MoleculeData
@@ -24,19 +27,20 @@ function OverlapBadge({ count, label, color }: { count: number; label: string; c
 
 function SharedList({ items, maxPreview = 5 }: { items: string[]; maxPreview?: number }) {
   if (items.length === 0) return <span className="text-xs text-slate-600 italic">none shared</span>
-  const preview = items.slice(0, maxPreview)
-  const remaining = items.length - maxPreview
   return (
-    <div className="flex flex-wrap gap-1.5">
-      {preview.map(item => (
-        <span key={item} className="text-xs px-2 py-0.5 rounded bg-indigo-900/30 text-indigo-300 border border-indigo-800/40">
+    <ExpandableItems
+      items={items}
+      maxVisible={maxPreview}
+      testId="compare-shared-list"
+      renderItem={(item) => (
+        <span
+          key={item}
+          className="text-xs px-2 py-0.5 rounded bg-indigo-900/30 text-indigo-300 border border-indigo-800/40"
+        >
           {item}
         </span>
-      ))}
-      {remaining > 0 && (
-        <span className="text-xs text-slate-500">+{remaining} more</span>
       )}
-    </div>
+    />
   )
 }
 

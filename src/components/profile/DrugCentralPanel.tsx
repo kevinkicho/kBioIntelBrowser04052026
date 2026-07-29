@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type {
   DrugCentralDrug,
   DrugCentralTarget,
@@ -85,10 +86,22 @@ export const DrugCentralPanel = memo(function DrugCentralPanel({ data, enhancedD
         <div className="text-sm text-slate-300">
           <p><span className="font-medium text-slate-100">Name:</span> {drug.name}</p>
           {drug.synonym.length > 0 && (
-            <p><span className="font-medium text-slate-100">Synonyms:</span> {drug.synonym.slice(0, 5).join(', ')}</p>
+            <ExpandableTextList
+              items={drug.synonym}
+              maxVisible={5}
+              prefix={<span className="font-medium text-slate-100">Synonyms:</span>}
+              className="text-sm text-slate-300"
+              testId="drugcentral-synonyms"
+            />
           )}
           {(indications.length > 0 || drug.indication.length > 0) && (
-            <p className="mt-1"><span className="font-medium text-slate-100">Indications:</span> {(indications.length > 0 ? indications : drug.indication).slice(0, 3).join(', ')}</p>
+            <ExpandableTextList
+              items={indications.length > 0 ? indications : drug.indication}
+              maxVisible={3}
+              prefix={<span className="font-medium text-slate-100">Indications:</span>}
+              className="text-sm text-slate-300 mt-1"
+              testId="drugcentral-indications"
+            />
           )}
           {(pharmacologicActions.length > 0 || drug.actionType.length > 0) && (
             <p><span className="font-medium text-slate-100">Pharmacologic Actions:</span> {(pharmacologicActions.length > 0 ? pharmacologicActions : drug.actionType).join(', ')}</p>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo } from 'react'
 import { clientFetch } from '@/lib/clientFetch'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import {
   deleteProfileClientCache,
   getProfileClientCacheAsync,
@@ -390,16 +391,18 @@ export function PipelinePanel({ cid }: { cid: number }) {
             <p className="text-[10px] text-emerald-400 uppercase tracking-wider mb-1.5 font-medium">
               Approved Indications ({p.approvedIndications.length})
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {p.approvedIndications.slice(0, 8).map(ind => (
+            <ExpandableItems
+              items={p.approvedIndications}
+              maxVisible={8}
+              className="flex flex-wrap gap-1.5"
+              moreClassName="text-[10px] font-medium text-emerald-400 hover:text-emerald-300 cursor-pointer bg-transparent border-0 p-0"
+              testId="pipeline-approved-indications"
+              renderItem={(ind) => (
                 <span key={ind} className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-900/30 text-emerald-300 border border-emerald-800/40">
                   {ind}
                 </span>
-              ))}
-              {p.approvedIndications.length > 8 && (
-                <span className="text-[10px] text-emerald-500">+{p.approvedIndications.length - 8} more</span>
               )}
-            </div>
+            />
           </div>
         )}
 
@@ -408,16 +411,18 @@ export function PipelinePanel({ cid }: { cid: number }) {
             <p className="text-[10px] text-indigo-400 uppercase tracking-wider mb-1.5 font-medium">
               Investigational ({p.investigationalIndications.length})
             </p>
-            <div className="flex flex-wrap gap-1.5">
-              {p.investigationalIndications.slice(0, 6).map(ind => (
+            <ExpandableItems
+              items={p.investigationalIndications}
+              maxVisible={6}
+              className="flex flex-wrap gap-1.5"
+              moreClassName="text-[10px] font-medium text-indigo-400 hover:text-indigo-300 cursor-pointer bg-transparent border-0 p-0"
+              testId="pipeline-investigational-indications"
+              renderItem={(ind) => (
                 <span key={ind} className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-900/30 text-indigo-300 border border-indigo-800/40">
                   {ind}
                 </span>
-              ))}
-              {p.investigationalIndications.length > 6 && (
-                <span className="text-[10px] text-indigo-500">+{p.investigationalIndications.length - 6} more</span>
               )}
-            </div>
+            />
           </div>
         )}
 

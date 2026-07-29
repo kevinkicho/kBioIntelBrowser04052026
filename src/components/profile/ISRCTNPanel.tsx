@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { ISRCTNTrial } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -39,16 +40,22 @@ function TrialItem({ trial }: { trial: ISRCTNTrial }) {
         )}
       </div>
       {trial.conditions.length > 0 && (
-        <p className="text-xs text-slate-400 mt-1">
-          <span className="text-slate-500">Conditions:</span> {trial.conditions.slice(0, 3).join(', ')}
-          {trial.conditions.length > 3 && ` +${trial.conditions.length - 3} more`}
-        </p>
+        <ExpandableTextList
+          items={trial.conditions}
+          maxVisible={3}
+          prefix="Conditions:"
+          className="text-xs text-slate-400 mt-1"
+          testId="isrctn-conditions"
+        />
       )}
       {trial.interventions.length > 0 && (
-        <p className="text-xs text-slate-400 mt-0.5">
-          <span className="text-slate-500">Interventions:</span> {trial.interventions.slice(0, 2).join(', ')}
-          {trial.interventions.length > 2 && ` +${trial.interventions.length - 2} more`}
-        </p>
+        <ExpandableTextList
+          items={trial.interventions}
+          maxVisible={2}
+          prefix="Interventions:"
+          className="text-xs text-slate-400 mt-0.5"
+          testId="isrctn-interventions"
+        />
       )}
       <div className="flex items-center justify-between mt-2">
         <div className="text-xs text-slate-500">

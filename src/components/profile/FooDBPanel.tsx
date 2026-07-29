@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems, ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { FoodBCompound } from '@/lib/types'
 import {
   alphaSortOptions,
@@ -102,29 +103,30 @@ export const FooDBPanel = memo(function FooDBPanel({ compounds, panelId, lastFet
                   {compound.foodSources.length > 0 && (
                     <div className="mb-2">
                       <p className="text-xs text-slate-400 mb-1">Food Sources:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {compound.foodSources.slice(0, 5).map((source, idx) => (
+                      <ExpandableItems
+                        items={compound.foodSources}
+                        maxVisible={5}
+                        testId="foodb-sources"
+                        renderItem={(source, idx) => (
                           <span
                             key={idx}
                             className="px-2 py-0.5 text-xs bg-green-900/40 text-green-300 border border-green-700/30 rounded"
                           >
                             {source}
                           </span>
-                        ))}
-                        {compound.foodSources.length > 5 && (
-                          <span className="px-2 py-0.5 text-xs text-slate-500">
-                            +{compound.foodSources.length - 5} more
-                          </span>
                         )}
-                      </div>
+                      />
                     </div>
                   )}
 
                   {compound.synonyms.length > 0 && (
-                    <div>
-                      <p className="text-xs text-slate-400 mb-1">Synonyms:</p>
-                      <p className="text-xs text-slate-500">{compound.synonyms.slice(0, 3).join(', ')}</p>
-                    </div>
+                    <ExpandableTextList
+                      items={compound.synonyms}
+                      maxVisible={3}
+                      prefix="Synonyms:"
+                      className="text-xs text-slate-500"
+                      testId="foodb-synonyms"
+                    />
                   )}
                 </div>
               )}

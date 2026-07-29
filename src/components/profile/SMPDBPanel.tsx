@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { SMPDBPathway } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -40,16 +41,22 @@ function PathwayItem({ pathway }: { pathway: SMPDBPathway }) {
         Organism: {pathway.organism}
       </p>
       {pathway.metabolites.length > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          Metabolites: {pathway.metabolites.slice(0, 3).join(', ')}
-          {pathway.metabolites.length > 3 && ` +${pathway.metabolites.length - 3} more`}
-        </p>
+        <ExpandableTextList
+          items={pathway.metabolites}
+          maxVisible={3}
+          prefix="Metabolites:"
+          className="text-xs text-slate-500 mt-1"
+          testId="smpdb-metabolites"
+        />
       )}
       {pathway.enzymes.length > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          Enzymes: {pathway.enzymes.slice(0, 2).join(', ')}
-          {pathway.enzymes.length > 2 && ` +${pathway.enzymes.length - 2} more`}
-        </p>
+        <ExpandableTextList
+          items={pathway.enzymes}
+          maxVisible={2}
+          prefix="Enzymes:"
+          className="text-xs text-slate-500 mt-1"
+          testId="smpdb-enzymes"
+        />
       )}
     </div>
   )

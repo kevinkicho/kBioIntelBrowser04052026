@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { SAbDabEntry } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -50,10 +51,13 @@ function EntryItem({ entry }: { entry: SAbDabEntry }) {
       </div>
 
       {entry.species.length > 0 && (
-        <p className="text-xs text-slate-400 mt-1">
-          <span className="text-slate-500">Species:</span> {entry.species.slice(0, 2).join(', ')}
-          {entry.species.length > 2 && ` +${entry.species.length - 2} more`}
-        </p>
+        <ExpandableTextList
+          items={entry.species}
+          maxVisible={2}
+          prefix="Species:"
+          className="text-xs text-slate-400 mt-1"
+          testId="sabdab-species"
+        />
       )}
 
       {(entry.heavyChain || entry.lightChain) && (

@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import { DescriptionTip } from '@/components/ui/HelperTip'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { MetaboLightsStudy, MetaboLightsMetabolite } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -46,10 +47,13 @@ function StudyItem({ study }: { study: MetaboLightsStudy }) {
         )}
       </div>
       {study.techniques.length > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          <span className="text-slate-400">Techniques:</span> {study.techniques.slice(0, 3).join(', ')}
-          {study.techniques.length > 3 && ` +${study.techniques.length - 3} more`}
-        </p>
+        <ExpandableTextList
+          items={study.techniques}
+          maxVisible={3}
+          prefix="Techniques:"
+          className="text-xs text-slate-500 mt-1"
+          testId="metabolights-techniques"
+        />
       )}
       <div className="flex items-center justify-between mt-2">
         <span className="text-xs text-slate-500">{study.publicationDate}</span>

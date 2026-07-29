@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { SynthesisRoute } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -61,16 +62,14 @@ export const RheaPanel = memo(function RheaPanel({ routes, panelId, lastFetched 
               {route.precursors && route.precursors.length > 0 && (
                 <div className="mt-2">
                   <p className="text-xs text-slate-500 mb-1">Precursors:</p>
-                  <div className="flex flex-wrap gap-1">
-                    {route.precursors.slice(0, 5).map((p, j) => (
-                      <span key={j} className="text-xs bg-slate-700/40 text-slate-300 px-1.5 py-0.5 rounded">
-                        {p}
-                      </span>
-                    ))}
-                    {route.precursors.length > 5 && (
-                      <span className="text-xs text-slate-500">+{route.precursors.length - 5} more</span>
-                    )}
-                  </div>
+                  <ExpandableItems
+                    items={route.precursors}
+                    maxVisible={5}
+                    asChips
+                    className="flex flex-wrap gap-1"
+                    moreClassName="text-xs font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer bg-transparent border-0 p-0"
+                    testId="rhea-precursors"
+                  />
                 </div>
               )}
               {route.enzymesInvolved && route.enzymesInvolved.length > 0 && (

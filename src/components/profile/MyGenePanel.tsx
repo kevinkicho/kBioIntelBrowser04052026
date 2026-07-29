@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DescriptionTip } from '@/components/ui/HelperTip'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { MyGeneAnnotation } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -125,25 +126,34 @@ export const MyGenePanel = memo(function MyGenePanel({ genes, panelId, lastFetch
               </div>
 
               {gene.pathways && gene.pathways.length > 0 && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Pathways: {gene.pathways.slice(0, 3).join(', ')}
-                  {gene.pathways.length > 3 && ` +${gene.pathways.length - 3} more`}
-                </p>
+                <ExpandableTextList
+                  items={gene.pathways}
+                  maxVisible={3}
+                  prefix="Pathways:"
+                  className="text-xs text-slate-500 mt-1"
+                  testId="mygene-pathways"
+                />
               )}
 
               {gene.goAnnotations && (
                 <div className="mt-1 space-y-0.5">
                   {gene.goAnnotations.biologicalProcess.length > 0 && (
-                    <p className="text-xs text-slate-500">
-                      <span className="font-medium text-slate-400">BP:</span>{' '}
-                      {gene.goAnnotations.biologicalProcess.slice(0, 2).join(', ')}
-                    </p>
+                    <ExpandableTextList
+                      items={gene.goAnnotations.biologicalProcess}
+                      maxVisible={2}
+                      prefix={<span className="font-medium text-slate-400">BP:</span>}
+                      className="text-xs text-slate-500"
+                      testId="mygene-go-bp"
+                    />
                   )}
                   {gene.goAnnotations.molecularFunction.length > 0 && (
-                    <p className="text-xs text-slate-500">
-                      <span className="font-medium text-slate-400">MF:</span>{' '}
-                      {gene.goAnnotations.molecularFunction.slice(0, 2).join(', ')}
-                    </p>
+                    <ExpandableTextList
+                      items={gene.goAnnotations.molecularFunction}
+                      maxVisible={2}
+                      prefix={<span className="font-medium text-slate-400">MF:</span>}
+                      className="text-xs text-slate-500"
+                      testId="mygene-go-mf"
+                    />
                   )}
                 </div>
               )}

@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { ChemSpiderCompound } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -41,16 +42,23 @@ function CompoundItem({ compound }: { compound: ChemSpiderCompound }) {
       )}
 
       {(compound.synonyms?.length ?? 0) > 0 && (
-        <p className="text-xs text-slate-500 mt-1 line-clamp-1">
-          <span className="text-slate-400">Synonyms:</span> {(compound.synonyms ?? []).slice(0, 3).join(', ')}
-          {(compound.synonyms?.length ?? 0) > 3 && ` +${compound.synonyms.length - 3} more`}
-        </p>
+        <ExpandableTextList
+          items={compound.synonyms ?? []}
+          maxVisible={3}
+          prefix="Synonyms:"
+          className="text-xs text-slate-500 mt-1"
+          testId="chemspider-synonyms"
+        />
       )}
 
       {(compound.sources?.length ?? 0) > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          <span className="text-slate-400">Sources:</span> {(compound.sources ?? []).slice(0, 3).join(', ')}
-        </p>
+        <ExpandableTextList
+          items={compound.sources ?? []}
+          maxVisible={3}
+          prefix="Sources:"
+          className="text-xs text-slate-500 mt-1"
+          testId="chemspider-sources"
+        />
       )}
 
       <div className="flex gap-2 mt-2">

@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { PharmGKBDrug } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -39,28 +40,44 @@ function DrugItem({ drug }: { drug: PharmGKBDrug }) {
         )}
       </div>
       {drug.genericNames.length > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          <span className="text-slate-400">Generic:</span> {drug.genericNames.slice(0, 3).join(', ')}
-          {drug.genericNames.length > 3 && ` +${drug.genericNames.length - 3} more`}
-        </p>
+        <div className="mt-1">
+          <span className="text-xs text-slate-400">Generic:</span>
+          <ExpandableItems
+            items={drug.genericNames}
+            maxVisible={3}
+            className="mt-0.5 flex flex-wrap gap-1"
+            testId="pharmgkb-generic"
+            asChips
+          />
+        </div>
       )}
       {drug.brandNames.length > 0 && (
-        <p className="text-xs text-slate-500 mt-0.5">
-          <span className="text-slate-400">Brand:</span> {drug.brandNames.slice(0, 3).join(', ')}
-          {drug.brandNames.length > 3 && ` +${drug.brandNames.length - 3} more`}
-        </p>
+        <div className="mt-0.5">
+          <span className="text-xs text-slate-400">Brand:</span>
+          <ExpandableItems
+            items={drug.brandNames}
+            maxVisible={3}
+            className="mt-0.5 flex flex-wrap gap-1"
+            testId="pharmgkb-brand"
+            asChips
+          />
+        </div>
       )}
       {drug.genes.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {drug.genes.slice(0, 5).map((g, i) => (
-            <span key={i} className={`text-xs px-1.5 py-0.5 rounded ${levelColors[g.level] || 'bg-slate-700/50 text-slate-300'}`}>
+        <ExpandableItems
+          items={drug.genes}
+          maxVisible={5}
+          className="flex flex-wrap gap-1 mt-2"
+          testId="pharmgkb-genes"
+          renderItem={(g, i) => (
+            <span
+              key={i}
+              className={`text-xs px-1.5 py-0.5 rounded ${levelColors[g.level] || 'bg-slate-700/50 text-slate-300'}`}
+            >
               {g.geneSymbol}
             </span>
-          ))}
-          {drug.genes.length > 5 && (
-            <span className="text-xs text-slate-400 px-1.5 py-0.5">+{drug.genes.length - 5} more</span>
           )}
-        </div>
+        />
       )}
       {drug.guidelines.length > 0 && (
         <p className="text-xs text-slate-400 mt-2">

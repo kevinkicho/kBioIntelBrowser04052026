@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { CPICGuideline } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
@@ -21,8 +22,14 @@ function GuidelineItem({ guideline }: { guideline: CPICGuideline }) {
         </span>
       </div>
       {(guideline.recommendations?.length ?? 0) > 0 && (
-        <div className="mt-2 space-y-1.5">
-          {(guideline.recommendations ?? []).slice(0, 3).map((rec, i) => (
+        <ExpandableItems
+          items={guideline.recommendations ?? []}
+          maxVisible={3}
+          unit="recommendations"
+          className="mt-2 space-y-1.5"
+          moreClassName="text-xs font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer bg-transparent border-0 p-0"
+          testId="cpic-recommendations"
+          renderItem={(rec, i) => (
             <div key={i} className="text-xs bg-slate-800/50 rounded p-2">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-purple-300 font-medium">{rec.phenotype}</span>
@@ -33,11 +40,8 @@ function GuidelineItem({ guideline }: { guideline: CPICGuideline }) {
                 <p className="text-slate-500 mt-1">Implication: {rec.implication}</p>
               )}
             </div>
-          ))}
-          {(guideline.recommendations?.length ?? 0) > 3 && (
-            <p className="text-xs text-slate-400">+{(guideline.recommendations?.length ?? 0) - 3} more recommendations</p>
           )}
-        </div>
+        />
       )}
       <div className="flex items-center justify-between mt-2">
         <span className="text-xs text-slate-500">Updated: {guideline.lastUpdated || 'N/A'}</span>

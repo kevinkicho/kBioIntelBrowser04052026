@@ -6,6 +6,7 @@ import { Panel } from '@/components/ui/Panel'
 import { DescriptionTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { OrphanetDisease } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -96,10 +97,13 @@ export const OrphanetPanel = memo(function OrphanetPanel({ diseases, panelId, la
               </div>
               <DescriptionTip text={disease.definition} label="Definition" className="mt-1" />
               {disease.genes && disease.genes.length > 0 && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Genes: {disease.genes.slice(0, 5).join(', ')}
-                  {disease.genes.length > 5 && ` +${disease.genes.length - 5} more`}
-                </p>
+                <ExpandableTextList
+                  items={disease.genes}
+                  maxVisible={5}
+                  prefix="Genes:"
+                  className="text-xs text-slate-500 mt-1"
+                  testId="orphanet-genes"
+                />
               )}
             </div>
           )}

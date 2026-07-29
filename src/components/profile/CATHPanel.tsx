@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { CATHDomain, Gene3DEntry } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -106,17 +107,21 @@ function GeneItem({ entry }: { entry: Gene3DEntry }) {
       )}
 
       {entry.domains.length > 0 && (
-        <div className="mt-2 space-y-1">
-          {entry.domains.slice(0, 3).map((domain, i) => (
+        <ExpandableItems
+          items={entry.domains}
+          maxVisible={3}
+          className="mt-2 space-y-1"
+          unit="domains"
+          testId="cath-domains"
+          renderItem={(domain, i) => (
             <div key={i} className="text-xs bg-slate-800/50 rounded p-1.5">
               <span className="text-slate-300">{domain.domainId}</span>
-              {domain.superfamily && <span className="text-slate-400 ml-1">— {domain.superfamily}</span>}
+              {domain.superfamily && (
+                <span className="text-slate-400 ml-1">— {domain.superfamily}</span>
+              )}
             </div>
-          ))}
-          {entry.domains.length > 3 && (
-            <p className="text-xs text-slate-400 pl-1">+{entry.domains.length - 3} more domains</p>
           )}
-        </div>
+        />
       )}
     </div>
   )

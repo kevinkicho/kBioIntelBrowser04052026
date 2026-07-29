@@ -2,6 +2,7 @@
 
 import React, { useMemo } from 'react'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import { Panel } from '@/components/ui/Panel'
 import type { LINCSSignature } from '@/lib/api/lincs'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
@@ -133,21 +134,17 @@ export function LINCSPanel({
                   <p className="text-xs text-gray-500 mb-1">
                     Upregulated ({signature.upregulatedGenes.length}):
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                    {signature.upregulatedGenes.slice(0, 10).map((gene, idx) => (
-                      <span
-                        key={idx}
-                        className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded"
-                      >
+                  <ExpandableItems
+                    items={signature.upregulatedGenes}
+                    maxVisible={10}
+                    testId="lincs-up"
+                    moreClassName="px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer font-medium"
+                    renderItem={(gene, idx) => (
+                      <span key={idx} className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">
                         {gene}
                       </span>
-                    ))}
-                    {signature.upregulatedGenes.length > 10 && (
-                      <span className="px-2 py-0.5 text-xs text-gray-500">
-                        +{signature.upregulatedGenes.length - 10} more
-                      </span>
                     )}
-                  </div>
+                  />
                 </div>
               )}
 
@@ -156,21 +153,20 @@ export function LINCSPanel({
                   <p className="text-xs text-gray-500 mb-1">
                     Downregulated ({signature.downregulatedGenes.length}):
                   </p>
-                  <div className="flex flex-wrap gap-1">
-                    {signature.downregulatedGenes.slice(0, 10).map((gene, idx) => (
+                  <ExpandableItems
+                    items={signature.downregulatedGenes}
+                    maxVisible={10}
+                    testId="lincs-down"
+                    moreClassName="px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer font-medium"
+                    renderItem={(gene, idx) => (
                       <span
                         key={idx}
                         className="px-2 py-0.5 text-xs bg-green-100 text-green-800 rounded"
                       >
                         {gene}
                       </span>
-                    ))}
-                    {signature.downregulatedGenes.length > 10 && (
-                      <span className="px-2 py-0.5 text-xs text-gray-500">
-                        +{signature.downregulatedGenes.length - 10} more
-                      </span>
                     )}
-                  </div>
+                  />
                 </div>
               )}
             </div>

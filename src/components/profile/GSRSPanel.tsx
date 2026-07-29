@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { GSRSSubstance } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -107,21 +108,19 @@ export const GSRSPanel = memo(function GSRSPanel({ substances, panelId, lastFetc
                   {substance.synonyms.length > 0 && (
                     <div className="mt-2">
                       <p className="text-xs text-slate-400 mb-1">Synonyms:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {substance.synonyms.slice(0, 5).map((synonym, idx) => (
+                      <ExpandableItems
+                        items={substance.synonyms}
+                        maxVisible={5}
+                        testId="gsrs-synonyms"
+                        renderItem={(synonym, idx) => (
                           <span
                             key={idx}
                             className="px-2 py-0.5 text-xs bg-slate-700/50 text-slate-300 rounded"
                           >
                             {synonym}
                           </span>
-                        ))}
-                        {substance.synonyms.length > 5 && (
-                          <span className="px-2 py-0.5 text-xs text-slate-500">
-                            +{substance.synonyms.length - 5} more
-                          </span>
                         )}
-                      </div>
+                      />
                     </div>
                   )}
                 </div>

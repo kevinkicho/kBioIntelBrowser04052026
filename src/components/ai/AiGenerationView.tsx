@@ -9,6 +9,7 @@ import {
   type FormattedAiGeneration,
 } from '@/lib/ai/formatAiGeneration'
 import type { AiGeneratedRecord } from '@/lib/firebase/aiDataSync'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 
 export interface AiGenerationViewProps {
   entry?: Pick<AiGeneratedRecord, 'content' | 'error' | 'task' | 'kind' | 'mode'> | null
@@ -214,10 +215,13 @@ export function AiGenerationView({
       )}
 
       {f.claimIds && f.claimIds.length > 0 && (
-        <p className="text-[9px] text-slate-600 font-mono">
-          Grounded claims: {f.claimIds.slice(0, 8).join(', ')}
-          {f.claimIds.length > 8 ? ` +${f.claimIds.length - 8}` : ''}
-        </p>
+        <ExpandableTextList
+          items={f.claimIds}
+          maxVisible={8}
+          prefix="Grounded claims:"
+          className="text-[9px] text-slate-600 font-mono"
+          testId="ai-gen-claim-ids"
+        />
       )}
     </div>
   )

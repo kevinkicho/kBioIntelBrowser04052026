@@ -3,6 +3,7 @@
 import { useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { TTDTarget, TTDDrug } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -46,21 +47,17 @@ function TargetItem({ target }: { target: TTDTarget }) {
       {target.associatedDiseases?.length > 0 && (
         <div className="mb-2">
           <p className="text-xs text-gray-500 mb-1">Associated Diseases:</p>
-          <div className="flex flex-wrap gap-1">
-            {target.associatedDiseases.slice(0, 5).map((disease, idx) => (
-              <span
-                key={idx}
-                className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded"
-              >
+          <ExpandableItems
+            items={target.associatedDiseases}
+            maxVisible={5}
+            testId="ttd-diseases"
+            moreClassName="px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer font-medium"
+            renderItem={(disease, idx) => (
+              <span key={idx} className="px-2 py-0.5 text-xs bg-red-100 text-red-800 rounded">
                 {disease}
               </span>
-            ))}
-            {target.associatedDiseases.length > 5 && (
-              <span className="px-2 py-0.5 text-xs text-gray-500">
-                +{target.associatedDiseases.length - 5} more
-              </span>
             )}
-          </div>
+          />
         </div>
       )}
 
@@ -111,21 +108,17 @@ function DrugItem({ drug }: { drug: TTDDrug }) {
       {drug.indications?.length > 0 && (
         <div className="mb-2">
           <p className="text-xs text-gray-500 mb-1">Indications:</p>
-          <div className="flex flex-wrap gap-1">
-            {drug.indications.slice(0, 5).map((indication, idx) => (
-              <span
-                key={idx}
-                className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded"
-              >
+          <ExpandableItems
+            items={drug.indications}
+            maxVisible={5}
+            testId="ttd-indications"
+            moreClassName="px-2 py-0.5 text-xs text-indigo-600 hover:text-indigo-800 cursor-pointer font-medium"
+            renderItem={(indication, idx) => (
+              <span key={idx} className="px-2 py-0.5 text-xs bg-blue-100 text-blue-800 rounded">
                 {indication}
               </span>
-            ))}
-            {drug.indications.length > 5 && (
-              <span className="px-2 py-0.5 text-xs text-gray-500">
-                +{drug.indications.length - 5} more
-              </span>
             )}
-          </div>
+          />
         </div>
       )}
 

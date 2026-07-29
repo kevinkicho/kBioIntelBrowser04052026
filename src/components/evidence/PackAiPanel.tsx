@@ -20,6 +20,7 @@ import { AiContentProvenance } from '@/components/ai/AiContentProvenance'
 import { AiPanelIntro } from '@/components/ai/AiPanelIntro'
 import { AiWhyTooltip } from '@/components/ai/AiWhyTooltip'
 import { EmptyStateTip, HelperTip, StatementTip } from '@/components/ui/HelperTip'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import { buildPackAiModeWhy, buildInsightNextStepWhy } from '@/lib/ai/aiWhyTooltip'
 import { parseAiGenerationInsight } from '@/lib/ai/parseAiGeneration'
 import {
@@ -469,11 +470,17 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
               <p className="text-[10px] font-medium uppercase tracking-wide text-slate-500 mb-1">
                 Evidence used ({evidenceLines.length})
               </p>
-              <ul className="space-y-1.5 max-h-40 overflow-y-auto">
-                {evidenceLines.slice(0, 12).map((e) => (
+              <ExpandableItems
+                items={evidenceLines}
+                maxVisible={12}
+                unit="claims"
+                className="space-y-1.5 max-h-56 overflow-y-auto"
+                moreClassName="text-[10px] font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer bg-transparent border-0 p-0 mt-1"
+                testId="pack-ai-evidence"
+                renderItem={(e) => (
                   <li
                     key={e.id}
-                    className="flex flex-wrap items-center gap-1.5 rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1 text-[11px]"
+                    className="flex flex-wrap items-center gap-1.5 rounded border border-slate-800/80 bg-slate-950/40 px-2 py-1 text-[11px] list-none"
                   >
                     {(e.type || e.source) && (
                       <span className="text-[9px] text-slate-500">
@@ -486,15 +493,8 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
                       testId={`pack-ai-evidence-${e.id}`}
                     />
                   </li>
-                ))}
-              </ul>
-              {evidenceLines.length > 12 && (
-                <EmptyStateTip
-                  badge={`+${evidenceLines.length - 12} more`}
-                  message={`${evidenceLines.length - 12} additional claims cited (not shown).`}
-                  testId="pack-ai-evidence-more"
-                />
-              )}
+                )}
+              />
             </div>
           )}
           {insight.claimIds.length > 0 && evidenceLines.length === 0 && isStructuredPackMode(mode) && (

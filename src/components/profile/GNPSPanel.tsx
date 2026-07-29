@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { GNPSLibrarySpectrum, GNPSNetworkCluster } from '@/lib/types'
 import {
   alphaSortOptions,
@@ -56,10 +57,13 @@ function SpectrumItem({ spectrum }: { spectrum: GNPSLibrarySpectrum }) {
       )}
 
       {spectrum.sources.length > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          <span className="text-slate-400">Sources:</span> {spectrum.sources.slice(0, 2).join(', ')}
-          {spectrum.sources.length > 2 && ` +${spectrum.sources.length - 2} more`}
-        </p>
+        <ExpandableTextList
+          items={spectrum.sources}
+          maxVisible={2}
+          prefix="Sources:"
+          className="text-xs text-slate-500 mt-1"
+          testId="gnps-sources"
+        />
       )}
 
       <a
@@ -104,10 +108,13 @@ function ClusterItem({ cluster }: { cluster: GNPSNetworkCluster }) {
       </div>
 
       {cluster.libraryIdentifications.length > 0 && (
-        <p className="text-xs text-slate-500 mt-1">
-          <span className="text-slate-400">Library matches:</span> {cluster.libraryIdentifications.slice(0, 2).join(', ')}
-          {cluster.libraryIdentifications.length > 2 && ` +${cluster.libraryIdentifications.length - 2} more`}
-        </p>
+        <ExpandableTextList
+          items={cluster.libraryIdentifications}
+          maxVisible={2}
+          prefix="Library matches:"
+          className="text-xs text-slate-500 mt-1"
+          testId="gnps-library-matches"
+        />
       )}
 
       <a

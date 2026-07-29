@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { HealthCanadaDpdProduct } from '@/lib/api/healthCanadaDpd'
 import { alphaSortOptions } from '@/lib/listControls'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
@@ -99,21 +100,22 @@ export const HealthCanadaDpdPanel = memo(function HealthCanadaDpdPanel({
                   </p>
                 )}
                 {p.ingredients.length > 0 && (
-                  <ul className="mt-1.5 space-y-0.5">
-                    {p.ingredients.slice(0, 6).map((ing) => (
-                      <li key={ing.name} className="text-[11px] text-slate-500">
+                  <ExpandableItems
+                    items={p.ingredients}
+                    maxVisible={6}
+                    unit="ingredients"
+                    className="mt-1.5 space-y-0.5"
+                    moreClassName="text-[10px] font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer bg-transparent border-0 p-0"
+                    testId="health-canada-ingredients"
+                    renderItem={(ing) => (
+                      <div key={ing.name} className="text-[11px] text-slate-500">
                         {ing.name}
                         {ing.strength
                           ? ` — ${ing.strength}${ing.strengthUnit ? ` ${ing.strengthUnit}` : ''}`
                           : ''}
-                      </li>
-                    ))}
-                    {p.ingredients.length > 6 && (
-                      <li className="text-[10px] text-slate-600">
-                        +{p.ingredients.length - 6} more ingredients
-                      </li>
+                      </div>
                     )}
-                  </ul>
+                  />
                 )}
                 {p.url && (
                   <a

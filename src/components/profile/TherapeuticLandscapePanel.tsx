@@ -1,6 +1,9 @@
-import { memo, useMemo } from 'react'
+'use client'
+
+import { memo, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { Panel } from '@/components/ui/Panel'
+import { ExpandableMoreToggle } from '@/components/ui/ExpandableItems'
 import { buildTherapeuticLandscape, type TherapeuticLandscape, type LandscapeDisease } from '@/lib/therapeuticLandscape'
 import type { ChemblIndication, DiseaseAssociation, DisGeNetAssociation, OrphanetDisease, CTDDiseaseAssociation } from '@/lib/types'
 
@@ -118,8 +121,10 @@ function DiseaseGroup({
   icon: 'check' | 'flask' | 'spark'
 }) {
   const style = ACCENT_STYLES[accent]
-  const displayDiseases = diseases.slice(0, 15)
-  const remaining = diseases.length - displayDiseases.length
+  const [expanded, setExpanded] = useState(false)
+  const limit = 15
+  const displayDiseases = expanded ? diseases : diseases.slice(0, limit)
+  const remaining = diseases.length - limit
 
   return (
     <div className={`rounded-xl border ${style.border} ${style.bg} p-4`}>
@@ -141,8 +146,14 @@ function DiseaseGroup({
         {displayDiseases.map((d) => (
           <DiseaseRow key={d.normalizedName} disease={d} accent={accent} />
         ))}
-        {remaining > 0 && (
-          <p className="text-xs text-slate-500 pl-1">+{remaining} more</p>
+        {(remaining > 0 || expanded) && diseases.length > limit && (
+          <ExpandableMoreToggle
+            remaining={remaining}
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            className="text-xs text-indigo-400 hover:text-indigo-300 pl-1 cursor-pointer font-medium"
+            testId={`landscape-more-${accent}`}
+          />
         )}
       </div>
     </div>

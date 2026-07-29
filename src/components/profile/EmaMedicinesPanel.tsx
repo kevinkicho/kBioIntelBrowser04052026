@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { EmaMedicineRecord } from '@/lib/api/emaMedicines'
 import { getEmaBulkDownloadLinks } from '@/lib/api/emaBulk'
 import { onDeepLinkClick } from '@/lib/trackDeepLink'
@@ -66,10 +67,13 @@ export const EmaMedicinesPanel = memo(function EmaMedicinesPanel({
                 <div>
                   <p className="font-semibold text-slate-100 text-sm">{m.name}</p>
                   {m.tradeNames.length > 0 && (
-                    <p className="text-[11px] text-slate-500 mt-0.5">
-                      Trade names: {m.tradeNames.slice(0, 6).join(', ')}
-                      {m.tradeNames.length > 6 ? '…' : ''}
-                    </p>
+                    <ExpandableTextList
+                      items={m.tradeNames}
+                      maxVisible={6}
+                      prefix="Trade names:"
+                      className="text-[11px] text-slate-500 mt-0.5"
+                      testId="ema-trade-names"
+                    />
                   )}
                 </div>
                 <div className="flex flex-wrap gap-1.5">

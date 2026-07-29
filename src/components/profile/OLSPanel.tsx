@@ -4,6 +4,7 @@ import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
 import { DescriptionTip } from '@/components/ui/HelperTip'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { OLSTerm } from '@/lib/types'
 import { alphaSortOptions } from '@/lib/listControls'
 
@@ -98,10 +99,13 @@ export const OLSPanel = memo(function OLSPanel({
                   </div>
                   <DescriptionTip text={term.description} />
                   {term.synonyms?.length > 0 && (
-                    <p className="mt-0.5 text-[10px] text-slate-600">
-                      Also: {term.synonyms.slice(0, 4).join(', ')}
-                      {term.synonyms.length > 4 ? '…' : ''}
-                    </p>
+                    <ExpandableTextList
+                      items={term.synonyms}
+                      maxVisible={4}
+                      prefix="Also:"
+                      className="mt-0.5 text-[10px] text-slate-600"
+                      testId="ols-synonyms"
+                    />
                   )}
                   {(term.parents?.length > 0 || term.mappings?.length > 0) && (
                     <div className="mt-1 flex flex-wrap gap-1 items-center">

@@ -192,7 +192,12 @@ export default function DiseasePage() {
 }
 
 function DiseaseCard({ result }: { result: DiseaseResult }) {
+  const [molExpanded, setMolExpanded] = useState(false)
   const detailHref = `/disease/${encodeURIComponent(result.id)}?source=${encodeURIComponent(result.source)}&q=${encodeURIComponent(result.name)}`
+  const molLimit = 6
+  const molecules = result.molecules ?? []
+  const visibleMols = molExpanded ? molecules : molecules.slice(0, molLimit)
+  const molRemaining = molecules.length - molLimit
 
   return (
     <article className="bg-slate-800/80 border border-slate-700 rounded-xl p-5 hover:border-indigo-600 transition-colors">
@@ -224,11 +229,11 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
         </div>
       )}
 
-      {result.molecules && result.molecules.length > 0 && (
+      {molecules.length > 0 && (
         <div>
           <p className="text-xs text-slate-500 uppercase tracking-wider mb-2">Associated Molecules</p>
           <ul className="space-y-1.5">
-            {result.molecules.slice(0, 6).map((m) => {
+            {visibleMols.map((m) => {
               const kind =
                 m.relationKind === 'known_drug'
                   ? 'drug'
@@ -259,9 +264,17 @@ function DiseaseCard({ result }: { result: DiseaseResult }) {
                 </li>
               )
             })}
-            {result.molecules.length > 6 && (
-              <li className="text-[10px] text-slate-600 px-1">
-                +{result.molecules.length - 6} more on detail page
+            {molRemaining > 0 && (
+              <li className="px-1">
+                <button
+                  type="button"
+                  className="text-[10px] font-medium text-indigo-300 hover:text-indigo-200 cursor-pointer bg-transparent border-0 p-0"
+                  aria-expanded={molExpanded}
+                  data-testid="disease-card-mols-more"
+                  onClick={() => setMolExpanded((v) => !v)}
+                >
+                  {molExpanded ? 'Show less' : `+${molRemaining} more`}
+                </button>
               </li>
             )}
           </ul>

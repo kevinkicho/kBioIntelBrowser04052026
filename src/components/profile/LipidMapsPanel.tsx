@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { LipidMapsLipid } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -90,9 +91,13 @@ export const LipidMapsPanel = memo(function LipidMapsPanel({
                 <p className="text-xs text-slate-500 mt-1">Subclass: {lipid.subClass}</p>
               )}
               {lipid.synonyms.length > 0 && lipid.synonyms[0] && (
-                <p className="text-xs text-slate-500 mt-1">
-                  Synonyms: {lipid.synonyms.slice(0, 3).join(', ')}
-                </p>
+                <ExpandableTextList
+                  items={lipid.synonyms}
+                  maxVisible={3}
+                  prefix="Synonyms:"
+                  className="text-xs text-slate-500 mt-1"
+                  testId="lipidmaps-synonyms"
+                />
               )}
               <a
                 href={lipid.url}

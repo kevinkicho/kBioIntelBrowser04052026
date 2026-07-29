@@ -133,8 +133,50 @@ export function GeneTable({
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 max-h-40 overflow-y-auto">
-          {associationGenes.slice(0, 20).map((gene) => {
+        <GeneAssociationGrid
+          associationGenes={associationGenes}
+          pinnedTargets={pinnedTargets}
+          onTogglePin={onTogglePin}
+          maxPins={maxPins}
+          atCap={atCap}
+          tdlMap={tdlMap}
+          isPinned={isPinned}
+        />
+      )}
+    </div>
+  )
+}
+
+function GeneAssociationGrid({
+  associationGenes,
+  pinnedTargets,
+  onTogglePin,
+  maxPins,
+  atCap,
+  tdlMap,
+  isPinned,
+}: {
+  associationGenes: DiseaseGene[]
+  pinnedTargets: string[]
+  onTogglePin?: (symbol: string) => void
+  maxPins: number
+  atCap: boolean
+  tdlMap: Record<string, string | undefined>
+  isPinned: (symbol: string, pinned: string[]) => boolean
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const limit = 20
+  const visible = expanded ? associationGenes : associationGenes.slice(0, limit)
+  const remaining = associationGenes.length - limit
+
+  return (
+    <div className="space-y-2">
+      <div
+        className={`grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2 ${
+          expanded ? 'max-h-80 overflow-y-auto' : 'max-h-40 overflow-y-auto'
+        }`}
+      >
+        {visible.map((gene) => {
             const pinned = isPinned(gene.symbol, pinnedTargets)
             const pinDisabled = !pinned && atCap
             const tdl = tdlMap[gene.symbol.toUpperCase()]
@@ -226,12 +268,16 @@ export function GeneTable({
               </div>
             )
           })}
-          {associationGenes.length > 20 && (
-            <div className="flex items-center justify-center text-xs text-slate-500">
-              +{associationGenes.length - 20} more
-            </div>
-          )}
-        </div>
+      </div>
+      {(remaining > 0 || expanded) && associationGenes.length > limit && (
+        <button
+          type="button"
+          className="w-full rounded-lg border border-slate-700/60 bg-slate-900/50 py-1.5 text-xs font-medium text-indigo-300 hover:border-indigo-600/40 hover:bg-indigo-950/30 transition-colors"
+          data-testid="gene-table-show-more"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? 'Show less' : `+${remaining} more`}
+        </button>
       )}
     </div>
   )

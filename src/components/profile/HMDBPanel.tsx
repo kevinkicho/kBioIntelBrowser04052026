@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { HMDBMetabolite } from '@/lib/types'
 import { alphaSortOptions, numberSortOptions } from '@/lib/listControls'
 
@@ -93,24 +94,33 @@ export const HMDBPanel = memo(function HMDBPanel({ metabolites, panelId, lastFet
                   )}
 
                   {metabolite.biospecimens.length > 0 && (
-                    <p className="text-xs text-slate-500 mt-1">
-                      Biospecimens: {metabolite.biospecimens.slice(0, 3).join(', ')}
-                      {metabolite.biospecimens.length > 3 && ` +${metabolite.biospecimens.length - 3} more`}
-                    </p>
+                    <ExpandableTextList
+                      items={metabolite.biospecimens}
+                      maxVisible={3}
+                      prefix="Biospecimens:"
+                      className="text-xs text-slate-500 mt-1"
+                      testId="hmdb-biospecimens"
+                    />
                   )}
 
                   {metabolite.tissues.length > 0 && (
-                    <p className="text-xs text-slate-500">
-                      Tissues: {metabolite.tissues.slice(0, 3).join(', ')}
-                      {metabolite.tissues.length > 3 && ` +${metabolite.tissues.length - 3} more`}
-                    </p>
+                    <ExpandableTextList
+                      items={metabolite.tissues}
+                      maxVisible={3}
+                      prefix="Tissues:"
+                      className="text-xs text-slate-500"
+                      testId="hmdb-tissues"
+                    />
                   )}
 
                   {metabolite.pathways.length > 0 && (
-                    <p className="text-xs text-slate-500">
-                      Pathways: {metabolite.pathways.slice(0, 3).join(', ')}
-                      {metabolite.pathways.length > 3 && ` +${metabolite.pathways.length - 3} more`}
-                    </p>
+                    <ExpandableTextList
+                      items={metabolite.pathways}
+                      maxVisible={3}
+                      prefix="Pathways:"
+                      className="text-xs text-slate-500"
+                      testId="hmdb-pathways"
+                    />
                   )}
                 </div>
               </div>

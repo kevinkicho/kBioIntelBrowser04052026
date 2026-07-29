@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableItems } from '@/components/ui/ExpandableItems'
 import type { IRISAssessment } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
@@ -114,16 +115,17 @@ function AssessmentItem({ assessment }: { assessment: IRISAssessment }) {
         )}
 
       {effects.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-2">
-          {effects.slice(0, 3).map((effect, i) => (
+        <ExpandableItems
+          items={effects}
+          maxVisible={3}
+          className="flex flex-wrap gap-1 mt-2"
+          testId="iris-effects"
+          renderItem={(effect, i) => (
             <span key={i} className="text-xs bg-red-900/30 text-red-300 px-1.5 py-0.5 rounded">
               {effect}
             </span>
-          ))}
-          {effects.length > 3 && (
-            <span className="text-xs text-slate-400">+{effects.length - 3} more</span>
           )}
-        </div>
+        />
       )}
 
       {organs.length > 0 && (

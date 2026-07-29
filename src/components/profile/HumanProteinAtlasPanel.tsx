@@ -1,7 +1,8 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Panel } from '@/components/ui/Panel'
+import { ExpandableMoreToggle } from '@/components/ui/ExpandableItems'
 import type { ProteinAtlasData } from '@/lib/types'
 
 interface HumanProteinAtlasPanelProps {
@@ -47,55 +48,18 @@ export function HumanProteinAtlasPanel({
 
         {/* Tissue Expression */}
         {data?.tissueExpression && data.tissueExpression.length > 0 && (
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Tissue Expression</h4>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-              {data.tissueExpression.slice(0, 12).map((tissue, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
-                >
-                  <p className="font-medium text-sm text-gray-800 mb-1">{tissue.tissue}</p>
-                  <p className="text-xs text-gray-500 mb-1">{tissue.tissueType}</p>
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded ${getExpressionColor(tissue.expressionLevel)}`}>
-                    {tissue.expressionLevel}
-                  </span>
-                  <p className="text-xs text-gray-500 mt-1">Score: {tissue.score}</p>
-                </div>
-              ))}
-            </div>
-            {data.tissueExpression.length > 12 && (
-              <p className="text-xs text-gray-500 mt-2">
-                +{data.tissueExpression.length - 12} more tissues
-              </p>
-            )}
-          </div>
+          <TissueExpressionSection
+            items={data.tissueExpression}
+            getExpressionColor={getExpressionColor}
+          />
         )}
 
         {/* Cell Line Expression */}
         {data?.cellLineExpression && data.cellLineExpression.length > 0 && (
-          <div>
-            <h4 className="font-semibold text-gray-800 mb-3">Cell Line Expression</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-              {data.cellLineExpression.slice(0, 9).map((cellLine, idx) => (
-                <div
-                  key={idx}
-                  className="p-3 border rounded-lg bg-gray-50"
-                >
-                  <p className="font-medium text-sm text-gray-800 mb-1">{cellLine.cellLine}</p>
-                  <span className={`inline-block px-2 py-0.5 text-xs rounded ${getExpressionColor(cellLine.expressionLevel)}`}>
-                    {cellLine.expressionLevel}
-                  </span>
-                  <p className="text-xs text-gray-500 mt-1">Score: {cellLine.score}</p>
-                </div>
-              ))}
-            </div>
-            {data.cellLineExpression.length > 9 && (
-              <p className="text-xs text-gray-500 mt-2">
-                +{data.cellLineExpression.length - 9} more cell lines
-              </p>
-            )}
-          </div>
+          <CellLineExpressionSection
+            items={data.cellLineExpression}
+            getExpressionColor={getExpressionColor}
+          />
         )}
 
         {/* Subcellular Localization */}
@@ -133,5 +97,93 @@ export function HumanProteinAtlasPanel({
         )}
       </div>
     </Panel>
+  )
+}
+
+function TissueExpressionSection({
+  items,
+  getExpressionColor,
+}: {
+  items: NonNullable<ProteinAtlasData['tissueExpression']>
+  getExpressionColor: (level: string) => string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const limit = 12
+  const visible = expanded ? items : items.slice(0, limit)
+  const remaining = items.length - limit
+
+  return (
+    <div>
+      <h4 className="font-semibold text-gray-800 mb-3">Tissue Expression</h4>
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+        {visible.map((tissue, idx) => (
+          <div
+            key={idx}
+            className="p-3 border rounded-lg bg-gray-50 hover:bg-gray-100 transition-colors"
+          >
+            <p className="font-medium text-sm text-gray-800 mb-1">{tissue.tissue}</p>
+            <p className="text-xs text-gray-500 mb-1">{tissue.tissueType}</p>
+            <span className={`inline-block px-2 py-0.5 text-xs rounded ${getExpressionColor(tissue.expressionLevel)}`}>
+              {tissue.expressionLevel}
+            </span>
+            <p className="text-xs text-gray-500 mt-1">Score: {tissue.score}</p>
+          </div>
+        ))}
+      </div>
+      {remaining > 0 && (
+        <div className="mt-2">
+          <ExpandableMoreToggle
+            remaining={remaining}
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            unit="tissues"
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-500 cursor-pointer bg-transparent border-0 p-0"
+            testId="hpa-tissues-more"
+          />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function CellLineExpressionSection({
+  items,
+  getExpressionColor,
+}: {
+  items: NonNullable<ProteinAtlasData['cellLineExpression']>
+  getExpressionColor: (level: string) => string
+}) {
+  const [expanded, setExpanded] = useState(false)
+  const limit = 9
+  const visible = expanded ? items : items.slice(0, limit)
+  const remaining = items.length - limit
+
+  return (
+    <div>
+      <h4 className="font-semibold text-gray-800 mb-3">Cell Line Expression</h4>
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+        {visible.map((cellLine, idx) => (
+          <div key={idx} className="p-3 border rounded-lg bg-gray-50">
+            <p className="font-medium text-sm text-gray-800 mb-1">{cellLine.cellLine}</p>
+            <span className={`inline-block px-2 py-0.5 text-xs rounded ${getExpressionColor(cellLine.expressionLevel)}`}>
+              {cellLine.expressionLevel}
+            </span>
+            <p className="text-xs text-gray-500 mt-1">Score: {cellLine.score}</p>
+          </div>
+        ))}
+      </div>
+      {remaining > 0 && (
+        <div className="mt-2">
+          <ExpandableMoreToggle
+            remaining={remaining}
+            expanded={expanded}
+            onToggle={() => setExpanded((v) => !v)}
+            unit="cell lines"
+            className="text-xs font-medium text-indigo-600 hover:text-indigo-500 cursor-pointer bg-transparent border-0 p-0"
+            testId="hpa-cell-lines-more"
+          />
+        </div>
+      )}
+    </div>
   )
 }

@@ -3,6 +3,7 @@
 import { memo, useMemo } from 'react'
 import { Panel } from '@/components/ui/Panel'
 import { FilterablePaginatedList } from '@/components/ui/FilterablePaginatedList'
+import { ExpandableTextList } from '@/components/ui/ExpandableItems'
 import type { BioModelsModel } from '@/lib/types'
 import { alphaSortOptions, dateSortOptions } from '@/lib/listControls'
 
@@ -59,7 +60,13 @@ export const BioModelsPanel = memo(function BioModelsPanel({ models, panelId, la
                   <span>Updated: {new Date(model.lastUpdate).toLocaleDateString()}</span>
                 </div>
                 {(model.organisms?.length ?? 0) > 0 && model.organisms[0] && (
-                  <p className="text-xs text-slate-500 mt-1">Organisms: {model.organisms.slice(0, 3).join(', ')}</p>
+                  <ExpandableTextList
+                    items={model.organisms}
+                    maxVisible={3}
+                    prefix="Organisms:"
+                    className="text-xs text-slate-500 mt-1"
+                    testId="biomodels-organisms"
+                  />
                 )}
                 <div className="flex items-center gap-3 mt-2">
                   <a
