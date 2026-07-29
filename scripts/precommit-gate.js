@@ -53,6 +53,7 @@ const BRITTLE_PATTERNS = [
   'UniProtExtendedPanel',
   'lib/uniprot',
   'extractUniProtProteinName',
+  'fullApp',
 ].join('|')
 
 // Historical of-record / pack / discovery gate (from package.json test:gate)
@@ -146,6 +147,8 @@ if (process.env.PRECOMMIT_FULL === '1') {
 
 console.log('\n==================================')
 console.log('✓ Pre-commit gate passed')
-console.log('  Optional: PRECOMMIT_FULL=1 for broader component smoke')
+console.log('  Included: fullApp inventory · provenance · diagnostics · panel empty smokes')
+console.log('  Optional: PRECOMMIT_FULL=1 for broader legacy component smoke')
+console.log('  Optional: npm run test:e2e:full-app (routes + molecule chrome)')
 console.log('  Optional: npm run test:e2e:fixture:auto for Playwright north-star')
 console.log('==================================\n')

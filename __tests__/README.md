@@ -18,10 +18,25 @@ npx jest --testPathPatterns=lib     # all under __tests__/lib
 | Layer | What | Command |
 |-------|------|---------|
 | **Typecheck** | No TS / JSX contract break | `npx tsc --noEmit` |
+| **Full-app inventory** | Every category card, provenance, diagnostics, chrome, routes | `npm run test:full-app` (`__tests__/fullApp/*`) |
 | **Capability inventory** | Critical files + of-record builders still wired | `__tests__/capabilities/productCapabilities.test.ts` |
 | **Brittleness** | React #31, expand UI, data hub layout, empty coverage | `test:brittle` |
 | **Of-record product** | Discover rank, packs, events, hub builders | `test:gate` / `test:precommit` |
+| **E2E full surface** | All major routes + molecule chrome + runtime-config | `test:e2e:full-app` |
 | **E2E fixture** | North-star loop + data hub coverage | `test:e2e:fixture:auto` |
+
+### Full-app suite (`__tests__/fullApp/`)
+
+| File | Covers |
+|------|--------|
+| `01-inventory-integrity` | 139 panels resolve to components; routes exist; lazyPanels count |
+| `02-panel-chrome-and-sources` | Panel empty badge, tier badges, source footer |
+| `03-api-and-ai-provenance` | `ApiProvenanceChip`, `AiContentProvenance`, PROMPT_CATALOG no rank |
+| `04-diagnostics-and-availability` | Request metrics, SourceStatusStrip, sourceAvailability, runtime-config |
+| `05-chrome-buttons-and-routes` | Cite/Share/Export files, testids, AGENTS product law |
+| `06-panel-empty-render.smoke` | Mount every profile panel with empty props (React crash net) |
+
+Inventory SSOT: `src/lib/fullAppCoverage/inventory.ts`.
 
 New free-API DTO fields rendered in JSX **must** use `safeDisplayString` from `src/lib/reactSafe.ts` (or extract strings in the API mapper). Nested objects as React children throw minified error #31.
 
