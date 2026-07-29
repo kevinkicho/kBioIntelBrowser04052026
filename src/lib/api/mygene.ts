@@ -86,10 +86,16 @@ export async function searchGenes(query: string): Promise<MyGeneAnnotation[]> {
     const responses = await Promise.all(
       queries.map(async (url) => {
         try {
-          const res = await fetch(url, fetchOptions)
-          if (!res.ok) return [] as unknown[]
-          const data = (await res.json()) as { hits?: unknown[] }
-          return data.hits ?? []
+          const controller = new AbortController()
+          const timer = setTimeout(() => controller.abort(), 4_000)
+          try {
+            const res = await fetch(url, { ...fetchOptions, signal: controller.signal, cache: 'no-store' })
+            if (!res.ok) return [] as unknown[]
+            const data = (await res.json()) as { hits?: unknown[] }
+            return data.hits ?? []
+          } finally {
+            clearTimeout(timer)
+          }
         } catch {
           return [] as unknown[]
         }

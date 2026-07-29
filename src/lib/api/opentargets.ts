@@ -108,15 +108,28 @@ export async function searchDiseases(queryString: string): Promise<DiseaseAssoci
     }
   `
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    ...fetchOptions,
-    headers: { ...((fetchOptions.headers as Record<string, string>) || {}), 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      query,
-      variables: { q: queryString },
-    }),
-  })
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 4_500)
+  let res: Response
+  try {
+    res = await fetch(API_URL, {
+      method: 'POST',
+      ...fetchOptions,
+      headers: {
+        ...((fetchOptions.headers as Record<string, string>) || {}),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query,
+        variables: { q: queryString },
+      }),
+      signal: controller.signal,
+    })
+  } catch {
+    return []
+  } finally {
+    clearTimeout(timer)
+  }
 
   if (!res.ok) {
     console.error('[opentargets] searchDiseases HTTP', res.status)

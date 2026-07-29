@@ -111,8 +111,11 @@ export function SearchBar({
       setIsLoading(true)
       try {
         const type = searchType === 'all' ? 'all' : searchType
+        // Typeahead budget: server arms are ~4.5s; do not leave the spinner spinning 40s
         const res = await clientFetch(
           `/api/search?q=${encodeURIComponent(query)}&type=${encodeURIComponent(type)}`,
+          undefined,
+          { timeoutMs: 12_000, retries: 0 },
         )
         if (res.ok) {
           const data = await res.json()
@@ -136,11 +139,17 @@ export function SearchBar({
             )
           }
           setIsOpen(true)
+        } else {
+          setHits([])
+          setIsOpen(false)
         }
+      } catch {
+        setHits([])
+        setIsOpen(false)
       } finally {
         setIsLoading(false)
       }
-    }, 300)
+    }, 250)
 
     return () => clearTimeout(debounceRef.current)
   }, [query, searchType])

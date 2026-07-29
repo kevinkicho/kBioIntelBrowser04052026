@@ -18,6 +18,14 @@ const fetchOpts: RequestInit = {
   },
 }
 
+function timedFetch(url: string, init?: RequestInit, timeoutMs = 4_000): Promise<Response> {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), timeoutMs)
+  return fetch(url, { ...fetchOpts, ...init, signal: controller.signal }).finally(() =>
+    clearTimeout(timer),
+  )
+}
+
 /** Extract PubChem CIDs from a MyChem hit (pubchem may be object or array). */
 function extractCidsFromHit(hit: Record<string, unknown>): number[] {
   const out: number[] = []
@@ -52,7 +60,7 @@ export async function searchChemblMoleculeNames(
 ): Promise<string[]> {
   try {
     const url = `${CHEMBL_SEARCH}?q=${encodeURIComponent(query)}&limit=${limit}`
-    const res = await fetch(url, fetchOpts)
+    const res = await timedFetch(url)
     if (!res.ok) return []
     const data = (await res.json()) as {
       molecules?: Array<{
@@ -102,7 +110,7 @@ export async function searchMyChemMoleculeNames(
     const url =
       `${MYCHEM_QUERY}?q=${encodeURIComponent(q)}` +
       `&fields=name,chebi.name,chembl.pref_name,pubchem.cid&size=${limit}`
-    const res = await fetch(url, fetchOpts)
+    const res = await timedFetch(url)
     if (!res.ok) return []
     const data = (await res.json()) as { hits?: Array<Record<string, unknown>> }
     const names: string[] = []
@@ -122,7 +130,7 @@ export async function searchMyChemMoleculeNames(
       const url2 =
         `${MYCHEM_QUERY}?q=${encodeURIComponent(q2)}` +
         `&fields=chembl.pref_name,pubchem.cid&size=${limit}`
-      const res2 = await fetch(url2, fetchOpts)
+      const res2 = await timedFetch(url2)
       if (res2.ok) {
         const data2 = (await res2.json()) as {
           hits?: Array<Record<string, unknown>>
@@ -165,7 +173,7 @@ export async function resolveCidViaMyChem(name: string): Promise<number | null> 
       const url =
         `${MYCHEM_QUERY}?q=${encodeURIComponent(q)}` +
         `&fields=pubchem.cid,chembl.pref_name,name&size=8`
-      const res = await fetch(url, fetchOpts)
+      const res = await timedFetch(url)
       if (!res.ok) continue
       const data = (await res.json()) as {
         hits?: Array<Record<string, unknown>>
@@ -272,7 +280,7 @@ export async function getMoleculeByCidViaMyChem(
     const url =
       `${MYCHEM_QUERY}?q=pubchem.cid:${cid}` +
       `&fields=name,_id,pubchem,chembl.pref_name,chebi.name,formula,mass,inchi_key,synonyms&size=3`
-    const res = await fetch(url, fetchOpts)
+    const res = await timedFetch(url)
     if (!res.ok) {
       // Still shell so category routes do not 502 the whole profile on App Hosting
       return identityShell(
@@ -348,7 +356,7 @@ export async function searchChemblMoleculesDetailed(
 ): Promise<Array<{ name: string; chemblId: string }>> {
   try {
     const url = `${CHEMBL_SEARCH}?q=${encodeURIComponent(query)}&limit=${limit}`
-    const res = await fetch(url, fetchOpts)
+    const res = await timedFetch(url)
     if (!res.ok) return []
     const data = (await res.json()) as {
       molecules?: Array<{

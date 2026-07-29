@@ -46,6 +46,19 @@ const strictEmpty = !args.includes('--allow-empty')
 const aiWireOnly = args.includes('--ai-wire-only')
 /** Force-skip AI routes (legacy) */
 const skipAi = args.includes('--skip-ai')
+/**
+ * Only try the first fixture per probe (fast live / production smoke).
+ * Auto-enabled when BIOINTEL_BASE is not localhost unless --multi-fixture.
+ */
+const isRemoteBase = !/localhost|127\.0\.0\.1/i.test(BASE)
+const singleFixture =
+  args.includes('--single-fixture') ||
+  (isRemoteBase && !args.includes('--multi-fixture'))
+/** After a timeout or 5xx, at most this many more fixtures (avoids 5×90s thrash) */
+const maxHardRetries = Number(
+  (args.find((a) => a.startsWith('--max-hard-retries=')) || '').split('=')[1] ||
+    (singleFixture ? 0 : 1),
+)
 
 // Optional live Ollama for AI route probes (never required for free-API DATA)
 const OLLAMA_URL = (
@@ -1217,16 +1230,29 @@ async function probeSeries(series) {
     }
   }
 
+  // Live smoke: first fixture only (AI series may keep wire fallback as 2nd)
+  let attemptList = series.attempts
+  if (singleFixture && attemptList.length > 1) {
+    if (series.dataCheck === 'ai' && attemptList.length >= 2) {
+      attemptList = attemptList.slice(0, 2)
+    } else {
+      attemptList = attemptList.slice(0, 1)
+    }
+  }
+
   let last = null
   let attemptN = 0
-  for (const att of series.attempts) {
+  let hardFailures = 0
+  for (const att of attemptList) {
     attemptN++
     const body = att.body !== undefined ? att.body : series.body
     const res = await fetchOnce(series.method, att.path, series.body, body)
     last = { ...res, path: att.path, note: att.note }
 
     if (res.error) {
-      // try next fixture on network blip? only retry empty; hard fail immediately if all fail
+      hardFailures++
+      // Timeouts/network: limited retries so production doesn't burn 5×timeout
+      if (hardFailures > maxHardRetries) break
       continue
     }
 
@@ -1246,7 +1272,8 @@ async function probeSeries(series) {
     }
 
     if (res.status >= 500) {
-      // hard — try alternate fixture once more
+      hardFailures++
+      if (hardFailures > maxHardRetries) break
       continue
     }
 
@@ -1392,7 +1419,10 @@ async function main() {
     console.log(
       `probes: ${seriesList.length}  concurrency: ${concurrency}  timeout: ${timeoutMs}ms`,
     )
-    console.log(`fixtures: cids=${FIX.cids.join(',')} genes=${FIX.genes.join(',')}`)
+    console.log(
+      `fixtures: cids=${FIX.cids.join(',')} genes=${FIX.genes.join(',')}  ` +
+        `singleFixture=${singleFixture}  maxHardRetries=${maxHardRetries}`,
+    )
     if (skipAi) {
       console.log('AI routes: skipped (--skip-ai)')
     } else if (AI.available) {

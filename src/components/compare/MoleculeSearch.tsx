@@ -152,6 +152,7 @@ export function MoleculeSearch({
         const res = await clientFetch(
           `/api/search?q=${encodeURIComponent(query.trim())}&type=name`,
           { signal: ac.signal },
+          { timeoutMs: 12_000, retries: 0 },
         )
         if (ac.signal.aborted) return
         if (!res.ok) {

@@ -2,7 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { searchByType } from '@/lib/api/pubchem'
 import { searchDiseases as searchOpenTargetsDiseases } from '@/lib/api/opentargets'
 import { searchOrphanetDiseases } from '@/lib/api/orphanet'
-import { getGenesByDisease } from '@/lib/api/disgenet'
 import { searchGenes } from '@/lib/api/mygene'
 import type { SearchType } from '@/lib/apiIdentifiers'
 import {
@@ -23,6 +22,13 @@ const VALID_SEARCH_TYPES = new Set<string>([
   'gene',
 ])
 
+/**
+ * Typeahead must stay snappy on App Hosting. Upstream free APIs (PubChem especially)
+ * can hang without AbortSignal — never wait unbounded for suggestions.
+ */
+const TYPEAHEAD_ARM_MS = 4_500
+const TYPEAHEAD_TOTAL_MS = 7_500
+
 export type UnifiedSearchHit = {
   kind: 'disease' | 'molecule' | 'gene'
   label: string
@@ -30,11 +36,26 @@ export type UnifiedSearchHit = {
   geneKey?: string
 }
 
+/** Resolve with fallback on timeout/error — never throw for typeahead arms. */
+async function withArmBudget<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  try {
+    return await Promise.race([
+      promise.catch(() => fallback),
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => resolve(fallback), ms)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 async function searchDiseasesList(query: string, limit = 5): Promise<string[]> {
-  const [otResults, orphanetResults, disgenetResults] = await Promise.allSettled([
-    searchOpenTargetsDiseases(query),
-    searchOrphanetDiseases(query),
-    getGenesByDisease(query),
+  // Typeahead: Open Targets + Orphanet only (skip DisGeNET — often slow/empty without key)
+  const [otResults, orphanetResults] = await Promise.allSettled([
+    withArmBudget(searchOpenTargetsDiseases(query), TYPEAHEAD_ARM_MS, []),
+    withArmBudget(searchOrphanetDiseases(query), TYPEAHEAD_ARM_MS, []),
   ])
 
   const suggestions: string[] = []
@@ -58,47 +79,52 @@ async function searchDiseasesList(query: string, limit = 5): Promise<string[]> {
     }
   }
 
-  if (disgenetResults.status === 'fulfilled' && disgenetResults.value.length > 0) {
-    for (const a of disgenetResults.value.slice(0, limit)) {
-      const key = a.diseaseName?.toLowerCase()
-      if (key && !seen.has(key)) {
-        seen.add(key)
-        suggestions.push(a.diseaseName)
-      }
-    }
-  }
-
   return suggestions.slice(0, limit)
 }
 
 async function searchMoleculesList(query: string, typeParam: SearchType): Promise<string[]> {
-  let suggestions = await searchByType(query, typeParam)
+  // Race PubChem vs cloud fallbacks — App Hosting often sees PubChem hang/503
+  const pubchemP = withArmBudget(searchByType(query, typeParam), TYPEAHEAD_ARM_MS, [] as string[])
 
-  if (suggestions.length === 0 && (typeParam === 'name' || typeParam === 'cas')) {
-    try {
-      const { searchChemblMoleculeNames, searchMyChemMoleculeNames } = await import(
-        '@/lib/api/cloudSearchFallback'
-      )
-      const [a, b] = await Promise.all([
-        searchChemblMoleculeNames(query, 8),
-        searchMyChemMoleculeNames(query, 8),
-      ])
-      const seen = new Set<string>()
-      const merged: string[] = []
-      for (const n of [...a, ...b]) {
-        const k = n.toLowerCase()
-        if (seen.has(k)) continue
-        seen.add(k)
-        merged.push(n)
-        if (merged.length >= 8) break
-      }
-      suggestions = merged
-    } catch {
-      /* keep empty */
-    }
+  let cloudP: Promise<string[]> = Promise.resolve([])
+  if (typeParam === 'name' || typeParam === 'cas') {
+    cloudP = withArmBudget(
+      (async () => {
+        const { searchChemblMoleculeNames, searchMyChemMoleculeNames } = await import(
+          '@/lib/api/cloudSearchFallback'
+        )
+        const [a, b] = await Promise.all([
+          searchChemblMoleculeNames(query, 8),
+          searchMyChemMoleculeNames(query, 8),
+        ])
+        const seen = new Set<string>()
+        const merged: string[] = []
+        for (const n of [...a, ...b]) {
+          const k = n.toLowerCase()
+          if (seen.has(k)) continue
+          seen.add(k)
+          merged.push(n)
+          if (merged.length >= 8) break
+        }
+        return merged
+      })(),
+      TYPEAHEAD_ARM_MS,
+      [] as string[],
+    )
   }
 
-  return filterMoleculeSuggestionLabels(suggestions)
+  const [fromPubchem, fromCloud] = await Promise.all([pubchemP, cloudP])
+  const seen = new Set<string>()
+  const merged: string[] = []
+  for (const n of [...fromPubchem, ...fromCloud]) {
+    const k = n.toLowerCase()
+    if (seen.has(k)) continue
+    seen.add(k)
+    merged.push(n)
+    if (merged.length >= 8) break
+  }
+
+  return filterMoleculeSuggestionLabels(merged)
 }
 
 async function searchGenesList(
@@ -107,7 +133,7 @@ async function searchGenesList(
 ): Promise<Array<{ label: string; geneKey: string }>> {
   // Pathway IDs are not genes — do not fan out mygene for WP1220 etc.
   if (isDatabaseIdNoise(query)) return []
-  const genes = await searchGenes(query)
+  const genes = await withArmBudget(searchGenes(query), TYPEAHEAD_ARM_MS, [])
   return genes
     .slice(0, limit)
     .filter((g) => {
@@ -120,13 +146,17 @@ async function searchGenesList(
     }))
 }
 
-/** Unified fan-out: disease + molecule + gene in parallel. */
+/** Unified fan-out: disease + molecule + gene in parallel (budgeted). */
 async function searchAll(query: string): Promise<UnifiedSearchHit[]> {
-  const [diseases, molecules, genes] = await Promise.all([
-    searchDiseasesList(query, 5).catch(() => [] as string[]),
-    searchMoleculesList(query, 'name').catch(() => [] as string[]),
-    searchGenesList(query, 5).catch(() => [] as Array<{ label: string; geneKey: string }>),
-  ])
+  const [diseases, molecules, genes] = await withArmBudget(
+    Promise.all([
+      searchDiseasesList(query, 5),
+      searchMoleculesList(query, 'name'),
+      searchGenesList(query, 5),
+    ]),
+    TYPEAHEAD_TOTAL_MS,
+    [[], [], []] as [string[], string[], Array<{ label: string; geneKey: string }>],
+  )
 
   const results: UnifiedSearchHit[] = []
   const seen = new Set<string>()

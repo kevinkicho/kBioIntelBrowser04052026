@@ -26,12 +26,19 @@ const fetchOptions: RequestInit = {
 
 const RETRY_STATUSES = new Set([408, 425, 429, 500, 502, 503, 504])
 
-async function pubchemFetch(url: string, attempts = 2): Promise<Response> {
+async function pubchemFetch(
+  url: string,
+  attempts = 2,
+  opts?: { timeoutMs?: number },
+): Promise<Response> {
   let lastErr: unknown
+  const timeoutMs = opts?.timeoutMs ?? 8_000
   // Keep retries short: App Hosting often gets PubChem 503; fall back to MyChem/ChEMBL faster.
   for (let i = 0; i < attempts; i++) {
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), timeoutMs)
     try {
-      const res = await fetch(url, fetchOptions)
+      const res = await fetch(url, { ...fetchOptions, signal: controller.signal })
       if (res.ok || !RETRY_STATUSES.has(res.status) || i === attempts - 1) {
         return res
       }
@@ -40,6 +47,8 @@ async function pubchemFetch(url: string, attempts = 2): Promise<Response> {
       lastErr = err
       if (i === attempts - 1) throw err
       await new Promise((r) => setTimeout(r, 200 * (i + 1)))
+    } finally {
+      clearTimeout(timer)
     }
   }
   throw lastErr instanceof Error ? lastErr : new Error('PubChem fetch failed')
@@ -76,10 +85,10 @@ function getLargeMoleculeDescription(name: string, formula: string): string {
 }
 
 export async function searchMolecules(query: string): Promise<string[]> {
-  // 1) PubChem autocomplete (best when reachable)
+  // 1) PubChem autocomplete (best when reachable) — short timeout for typeahead
   try {
     const url = `${AUTOCOMPLETE_URL}/${encodeURIComponent(query)}/JSON?limit=8`
-    const res = await pubchemFetch(url)
+    const res = await pubchemFetch(url, 1, { timeoutMs: 3_500 })
     if (res.ok) {
       const data = await res.json()
       const terms: string[] = data.dictionary_terms?.compound ?? []
