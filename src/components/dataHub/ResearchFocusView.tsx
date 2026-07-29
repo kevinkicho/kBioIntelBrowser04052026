@@ -305,8 +305,30 @@ export function ResearchFocusView({
           <Link href="/methodology#honesty" className="text-indigo-400 hover:underline">
             honesty rules
           </Link>
+          {' · '}
+          <Link
+            href="/methodology#kit-diff"
+            className="text-indigo-400 hover:underline"
+            data-testid={`${testId}-kit-diff-link`}
+          >
+            Diff two research kits
+          </Link>
         </p>
       </header>
+
+      <div
+        className="rounded-lg border border-slate-800/80 bg-slate-900/30 px-3 py-2"
+        data-testid={`${testId}-kit-diff-teaser`}
+      >
+        <p className="text-[11px] text-slate-400">
+          Freeze evidence with a <strong className="font-medium text-slate-300">Research kit</strong>{' '}
+          export, then compare sessions with the{' '}
+          <Link href="/methodology#kit-diff" className="text-indigo-400 hover:underline">
+            kit-diff tool
+          </Link>
+          — of-record fact changes only (content hashes), not clinical conclusions.
+        </p>
+      </div>
 
       {showPrefsBar && (
         <ResearchViewPrefsBar mode="research" testId={`${testId}-prefs`} />

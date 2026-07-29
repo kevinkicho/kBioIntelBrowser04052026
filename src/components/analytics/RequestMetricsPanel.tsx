@@ -12,6 +12,7 @@ import {
   subscribeRequestMetrics,
   type RequestMetricsSnapshot,
 } from '@/lib/pipeline/requestMetrics'
+import { loadLocalFunnel } from '@/lib/analytics/localFunnel'
 import { HelperTip } from '@/components/ui/HelperTip'
 
 function kindTone(kind: string): string {
@@ -30,9 +31,21 @@ function kindTone(kind: string): string {
 
 export function RequestMetricsPanel({ className = '' }: { className?: string }) {
   const [snap, setSnap] = useState<RequestMetricsSnapshot>(() => snapshotRequestMetrics())
+  const [rankCompletes, setRankCompletes] = useState(0)
 
   useEffect(() => {
-    const refresh = () => setSnap(snapshotRequestMetrics())
+    const refresh = () => {
+      setSnap(snapshotRequestMetrics())
+      try {
+        const funnel = loadLocalFunnel()
+        // M7 uses discover_rank_completed.ms only (not harvest) — count shows loop volume
+        setRankCompletes(
+          typeof funnel.discover_rank_completed === 'number' ? funnel.discover_rank_completed : 0,
+        )
+      } catch {
+        /* ignore */
+      }
+    }
     refresh()
     const unsub = subscribeRequestMetrics(refresh)
     const t = window.setInterval(refresh, 2000)
@@ -75,6 +88,12 @@ export function RequestMetricsPanel({ className = '' }: { className?: string }) 
       )}
 
       <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        <Stat
+          label="Rank completes"
+          value={String(rankCompletes)}
+          sub="M7: rank ms only (not harvest)"
+          testId="request-metrics-rank-m7"
+        />
         <Stat
           label="Browser gate"
           value={`${snap.browserGate.inFlight}/${snap.browserGate.max}`}

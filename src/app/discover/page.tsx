@@ -7,6 +7,10 @@ import { DiscoveryHero } from './components/DiscoveryHero'
 import { DiseasePicker } from './components/DiseasePicker'
 import { DiscoveryProgress, EmptyState, ErrorState } from './components/DiscoveryProgress'
 import { ResearchPlaybookTips } from '@/components/research/ResearchPlaybookTips'
+import {
+  ResearchLoopStrip,
+  discoverLoopSteps,
+} from '@/components/research/ResearchLoopStrip'
 import { CandidateCard } from './components/CandidateCard'
 import { CompareSelectionTray } from './components/CompareSelectionTray'
 import { ExportResults } from './components/ExportResults'
@@ -422,7 +426,12 @@ export default function DiscoverPage() {
               <EmptyState tips={<ResearchPlaybookTips surface="discover-empty" />} />
             ) : (
               <>
-                <div className="mb-3">
+                <div className="mb-3 space-y-2">
+                  <ResearchLoopStrip
+                    steps={discoverLoopSteps({
+                      hasCandidates: state.result.candidates.length > 0,
+                    })}
+                  />
                   <ResearchPlaybookTips surface="discover-results" compact />
                 </div>
                 <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -459,13 +468,22 @@ export default function DiscoverPage() {
                           content={
                             state.result.v2.scorePhase === 'full'
                               ? 'Full phase: identity-first shortlist densified with free-API safety + novelty for top-K (empty safety ≠ safe).'
-                              : 'Cheap phase only (densify skipped). Prefer default densify path for honest safety status chips.'
+                              : 'Cheap phase only (densify skipped or deferred). Empty safety chips mean not retrieved yet — not “safe”. Prefer densify / promote harvest for honest safety axes.'
                           }
                         >
                           <span className="inline-flex cursor-help rounded-full border border-slate-700 px-1.5 py-0.5 text-[9px] text-slate-500">
                             ?
                           </span>
                         </StyledTooltip>
+                      </p>
+                    )}
+                    {state.result.v2?.scorePhase === 'cheap' && (
+                      <p
+                        className="mt-1 rounded border border-amber-900/40 bg-amber-950/20 px-2 py-1 text-[10px] text-amber-200/90"
+                        data-testid="discover-cheap-phase-honesty"
+                      >
+                        Cheap phase: safety/novelty may be empty until densify or board promote. Empty ≠
+                        absence of biology; empty safety ≠ safe.
                       </p>
                     )}
                     <p className="mt-1 text-[10px] text-slate-600">

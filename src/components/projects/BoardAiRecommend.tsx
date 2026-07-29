@@ -175,6 +175,13 @@ export function BoardAiRecommend({
       data-testid="board-ai-recommend"
     >
       <AiPanelIntro intro={intro} status={status} density="compact" testId="board-ai-intro" />
+      <p
+        className="mb-2 rounded border border-violet-800/40 bg-violet-950/30 px-2 py-1 text-[10px] text-violet-100"
+        data-testid="board-ai-non-of-record"
+      >
+        <strong className="font-semibold">Non-of-record.</strong> Suggested triage order only —
+        board statuses and Discover scores are never auto-changed. You confirm each apply.
+      </p>
 
       <div className="mb-2 flex flex-wrap items-end justify-between gap-2">
         <div className="min-w-0 flex-1">

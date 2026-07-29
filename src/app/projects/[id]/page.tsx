@@ -36,6 +36,10 @@ import { BoardEmptyState } from '@/components/projects/BoardEmptyState'
 import { BoardPackSection } from '@/components/projects/BoardPackSection'
 import { ResearchHypothesisSection } from '@/components/projects/ResearchHypothesisSection'
 import { ResearchPlaybookTips } from '@/components/research/ResearchPlaybookTips'
+import {
+  ResearchLoopStrip,
+  projectLoopSteps,
+} from '@/components/research/ResearchLoopStrip'
 import type { MoleculeCandidate, ResearchHypothesis } from '@/lib/domain'
 
 const BOARD_STATUSES: BoardStatus[] = ['untriaged', 'promote', 'hold', 'kill', 'watching']
@@ -567,6 +571,18 @@ export default function ProjectBoardPage() {
             {banner.text}
           </div>
         )}
+
+        <div className="mb-4">
+          <ResearchLoopStrip
+            steps={projectLoopSteps({
+              candidateCount: project.candidates.length,
+              promoteCount: project.candidates.filter((c) => c.boardStatus === 'promote').length,
+              packCount: project.packIndex?.length ?? 0,
+              rhCount: hypotheses.length,
+              projectId: project.id,
+            })}
+          />
+        </div>
 
         {project.candidates.length > 0 && (
           <>

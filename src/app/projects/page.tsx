@@ -24,60 +24,19 @@ import {
   type CloudExportItem,
 } from '@/lib/firebase/storageSync'
 import { MissionControlStrip } from '@/components/projects/MissionControlStrip'
-
-const LAST_OPENED_KEY = 'biointel-projects-last-opened-v1'
-
-type ProjectSort = 'opened' | 'updated' | 'name' | 'candidates' | 'promote'
-type ProjectFilter = 'all' | 'has_promote' | 'empty' | 'has_disease' | 'has_targets'
-
-const SORT_OPTIONS: { id: ProjectSort; label: string }[] = [
-  { id: 'opened', label: 'Opened' },
-  { id: 'updated', label: 'Updated' },
-  { id: 'name', label: 'Name' },
-  { id: 'candidates', label: 'Candidates' },
-  { id: 'promote', label: 'Promote' },
-]
-
-const FILTER_OPTIONS: { id: ProjectFilter; label: string }[] = [
-  { id: 'all', label: 'All' },
-  { id: 'has_promote', label: 'Has promote' },
-  { id: 'empty', label: 'Empty board' },
-  { id: 'has_disease', label: 'Has disease' },
-  { id: 'has_targets', label: 'Has targets' },
-]
-
-function loadLastOpened(): Record<string, string> {
-  try {
-    const raw = localStorage.getItem(LAST_OPENED_KEY)
-    return raw ? (JSON.parse(raw) as Record<string, string>) : {}
-  } catch {
-    return {}
-  }
-}
-
-function promoteCount(p: Project): number {
-  return p.candidates.filter((c) => c.boardStatus === 'promote').length
-}
-
-function watchingCount(p: Project): number {
-  return p.candidates.filter((c) => c.boardStatus === 'watching').length
-}
-
-function holdCount(p: Project): number {
-  return p.candidates.filter((c) => c.boardStatus === 'hold').length
-}
-
-function killCount(p: Project): number {
-  return p.candidates.filter((c) => c.boardStatus === 'kill').length
-}
-
-function diseaseLabel(p: Project): string {
-  return (
-    p.disease?.name ||
-    (p.preferencesSnapshot as { diseaseName?: string } | undefined)?.diseaseName ||
-    ''
-  )
-}
+import {
+  LAST_OPENED_KEY,
+  PROJECT_FILTER_OPTIONS as FILTER_OPTIONS,
+  PROJECT_SORT_OPTIONS as SORT_OPTIONS,
+  diseaseLabel,
+  holdCount,
+  killCount,
+  loadLastOpened,
+  promoteCount,
+  watchingCount,
+  type ProjectFilter,
+  type ProjectSort,
+} from '@/components/projects/projectsListHelpers'
 
 export default function ProjectsPage() {
   const auth = useFirebaseAuth()

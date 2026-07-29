@@ -240,21 +240,77 @@ function loadResearchToolsData() {
 }
 
 /**
+ * Session context for tools suggest: flags > env > agent logs > defaults.
+ * Env: BIOINTEL_Q, BIOINTEL_TARGETS, BIOINTEL_CID, BIOINTEL_PROJECT
+ */
+function resolveSuggestSession(flags) {
+  let q = flags.q && flags.q !== true ? String(flags.q) : process.env.BIOINTEL_Q || null
+  let targets =
+    flags.targets && flags.targets !== true
+      ? String(flags.targets)
+      : process.env.BIOINTEL_TARGETS || null
+  let cid =
+    flags.cid && flags.cid !== true ? String(flags.cid) : process.env.BIOINTEL_CID || null
+  let projectId =
+    (flags.projectId || flags.project) &&
+    (flags.projectId || flags.project) !== true
+      ? String(flags.projectId || flags.project)
+      : process.env.BIOINTEL_PROJECT || null
+
+  // Optional: scrape today's agent log for last discover rank query
+  if ((!q || flags.fromLogs) && flags.fromLogs !== false) {
+    try {
+      const day = new Date().toISOString().slice(0, 10)
+      const logPath = path.join(ROOT, 'logs', `agent-activity-${day}.jsonl`)
+      if (fs.existsSync(logPath)) {
+        const lines = fs.readFileSync(logPath, 'utf8').trim().split(/\n/).slice(-80)
+        for (let i = lines.length - 1; i >= 0; i--) {
+          const line = lines[i]
+          if (!line.includes('discover_rank') && !line.includes('discover.rank')) continue
+          try {
+            const row = JSON.parse(line)
+            const props = row.props || row.payload || row
+            if (!q && (props.q || props.query || props.disease)) {
+              q = String(props.q || props.query || props.disease)
+            }
+            if (!targets && props.targets) {
+              targets = Array.isArray(props.targets)
+                ? props.targets.join(',')
+                : String(props.targets)
+            }
+            if (q) break
+          } catch {
+            /* next line */
+          }
+        }
+      }
+    } catch {
+      /* ignore log parse */
+    }
+  }
+
+  return {
+    q: q || 'ATTR amyloidosis',
+    targets: targets || 'TTR',
+    cid: cid || '2244',
+    projectId: projectId || '<projectId>',
+    source: {
+      q: flags.q ? 'flag' : process.env.BIOINTEL_Q ? 'env' : q !== 'ATTR amyloidosis' ? 'logs' : 'default',
+      projectId: projectId && projectId !== '<projectId>' ? 'flag|env' : 'none',
+    },
+  }
+}
+
+/**
  * Interpolate {{q}} {{targets}} {{cid}} from export:research-catalog templates.
  * Catalog is generated from TS suggestResearchForGoal — do not reimplement suggest here.
  */
-function suggestInterpolate(template, flags) {
-  const q = flags.q && flags.q !== true ? String(flags.q) : 'ATTR amyloidosis'
-  const targets =
-    flags.targets && flags.targets !== true ? String(flags.targets) : 'TTR'
-  const cid = flags.cid && flags.cid !== true ? String(flags.cid) : '2244'
-  const projectId =
-    flags.projectId && flags.projectId !== true ? String(flags.projectId) : '<projectId>'
+function suggestInterpolate(template, session) {
   return String(template)
-    .replace(/\{\{q\}\}/g, q)
-    .replace(/\{\{targets\}\}/g, targets)
-    .replace(/\{\{cid\}\}/g, cid)
-    .replace(/\{\{projectId\}\}/g, projectId)
+    .replace(/\{\{q\}\}/g, session.q)
+    .replace(/\{\{targets\}\}/g, session.targets)
+    .replace(/\{\{cid\}\}/g, session.cid)
+    .replace(/\{\{projectId\}\}/g, session.projectId)
 }
 
 /**
@@ -294,8 +350,9 @@ function cmdTools(sub, positionals, flags) {
         `no suggestCommands for goal=${goal}. Run: npm run export:research-catalog`,
       )
     }
+    const session = resolveSuggestSession(flags)
     const actions = templates.slice(0, limit).map((t, i) => {
-      const bare = suggestInterpolate(t, flags)
+      const bare = suggestInterpolate(t, session)
       const title =
         bare
           .replace(/^npm run biointel --\s*/i, '')
@@ -309,12 +366,22 @@ function cmdTools(sub, positionals, flags) {
       }
     })
 
+    // Session-aware extras for pack/board goals
+    if ((goal === 'pack' || goal === 'hypothesis') && session.projectId !== '<projectId>') {
+      actions.push({
+        rank: actions.length + 1,
+        title: 'project context',
+        cli: `# projectId=${session.projectId} — open /projects/${session.projectId} or use copilot compare_board`,
+      })
+    }
+
     const payload = {
       goal,
       blurb: mapping.blurb || pb.goal,
       playbookId: pb.id,
       playbookTitle: pb.title,
       href: `/how-it-works#${pb.id}`,
+      session,
       actions,
       lawReminders: pb.lawReminders || [],
     }
@@ -327,6 +394,10 @@ function cmdTools(sub, positionals, flags) {
     console.log(`# tools suggest — goal=${goal}`)
     console.log(`Playbook: ${pb.title} (${pb.id})`)
     console.log(`${payload.blurb}`)
+    console.log(
+      `Session: q=${session.q} targets=${session.targets} cid=${session.cid}` +
+        (session.projectId !== '<projectId>' ? ` project=${session.projectId}` : ''),
+    )
     console.log(`UI: ${payload.href}`)
     console.log('\nNext actions:')
     for (const a of payload.actions) {
@@ -338,6 +409,9 @@ function cmdTools(sub, positionals, flags) {
       for (const s of payload.lawReminders) console.log(`  • ${s}`)
     }
     console.log('\nDetail: biointel tools playbook ' + pb.id)
+    console.log(
+      'Session flags: --q --targets --cid --project | env BIOINTEL_Q BIOINTEL_TARGETS BIOINTEL_CID BIOINTEL_PROJECT | --fromLogs',
+    )
     console.log('Catalog: npm run export:research-catalog  # after TS catalog edits')
     return
   }

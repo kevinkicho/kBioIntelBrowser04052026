@@ -9,6 +9,15 @@ export type PlaybookTipSurface =
   | 'board-empty'
   | 'board-ready'
 
+/** Optional in-app next step (not just a catalog link). */
+export type PlaybookRunActionId =
+  | 'focus_discover_search'
+  | 'open_projects'
+  | 'open_compare'
+  | 'scroll_pack_section'
+  | 'open_discover'
+  | 'open_methodology_kit_diff'
+
 export interface PlaybookTipCard {
   surface: PlaybookTipSurface
   playbookId: string
@@ -20,6 +29,9 @@ export interface PlaybookTipCard {
   /** Optional secondary link (e.g. Discover) */
   actionHref?: string
   actionLabel?: string
+  /** Primary run action for one-click next step in the app */
+  runActionId?: PlaybookRunActionId
+  runActionLabel?: string
 }
 
 /** Curated one-click tip cards for empty / next-step UI surfaces. */
@@ -35,6 +47,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           summary: 'Rank with free public APIs (no LLM), densify top-K, save to a project.',
           humanCta: 'Enter a disease above or pick a journey, then Rank.',
           href: '/how-it-works#disease_to_shortlist',
+          runActionId: 'focus_discover_search',
+          runActionLabel: 'Focus search',
         },
         {
           surface,
@@ -56,6 +70,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           summary: 'Empty gather ≠ no biology. Try another disease spelling, pin targets, or rare/Orphanet path.',
           humanCta: 'Change query, pin 1–3 targets, Rank again.',
           href: '/how-it-works#disease_to_shortlist',
+          runActionId: 'focus_discover_search',
+          runActionLabel: 'Edit query',
         },
         {
           surface,
@@ -65,6 +81,10 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           summary: 'If you already have a PubChem CID, skip rank and deep-dive evidence + research kit.',
           humanCta: 'Open molecule profile or export a research kit via CLI.',
           href: '/how-it-works#cid_evidence_deep_dive',
+          actionHref: '/methodology#kit-diff',
+          actionLabel: 'Kit diff',
+          runActionId: 'open_methodology_kit_diff',
+          runActionLabel: 'Kit-diff tool',
         },
       ]
     case 'discover-results':
@@ -79,6 +99,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           href: '/how-it-works#board_pack_to_rh',
           actionHref: '/projects',
           actionLabel: 'Projects',
+          runActionId: 'open_projects',
+          runActionLabel: 'Open projects',
         },
         {
           surface,
@@ -90,6 +112,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           href: '/how-it-works#compare_and_choose',
           actionHref: '/compare',
           actionLabel: 'Compare',
+          runActionId: 'open_compare',
+          runActionLabel: 'Open compare',
         },
       ]
     case 'board-empty':
@@ -104,6 +128,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           href: '/how-it-works#disease_to_shortlist',
           actionHref: '/discover',
           actionLabel: 'Open Discover',
+          runActionId: 'open_discover',
+          runActionLabel: 'Open Discover',
         },
         {
           surface,
@@ -125,6 +151,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           summary: 'Promote candidates, build pack (5 extractors max), seed claim-bound RH.',
           humanCta: 'Set Promote, wait harvest, Build pack, Seed RH.',
           href: '/how-it-works#board_pack_to_rh',
+          runActionId: 'scroll_pack_section',
+          runActionLabel: 'Jump to packs',
         },
         {
           surface,
@@ -136,6 +164,8 @@ export function playbookTipsForSurface(surface: PlaybookTipSurface): PlaybookTip
           href: '/how-it-works#compare_and_choose',
           actionHref: '/compare',
           actionLabel: 'Compare hub',
+          runActionId: 'open_compare',
+          runActionLabel: 'Open compare',
         },
       ]
     default:

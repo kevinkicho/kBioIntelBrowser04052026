@@ -296,8 +296,9 @@ export function AiAnalysisView({
               className="rounded-lg border border-violet-800/40 bg-violet-950/30 px-3 py-2 text-[11px] text-violet-100"
               data-testid="ai-analysis-banner"
             >
-              <strong className="font-semibold">AI suggested order · not of-record.</strong> Model:{' '}
-              {ai.model || '—'} · Free-API scores and ranks stay unchanged.
+              <strong className="font-semibold">AI suggested order · non-of-record.</strong> Model:{' '}
+              {ai.model || '—'} · Deterministic free-API scores and of-record ranks stay unchanged.
+              Investigation priority only — not clinical decision support.
             </div>
             <p className="text-[10px] text-slate-500">
               Optional: tell the model what to prioritize, then generate a reorder with reasons.
