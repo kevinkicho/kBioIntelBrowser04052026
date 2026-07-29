@@ -1,0 +1,33 @@
+# Blocks merges when of-record / full-app / typecheck gates fail.
+name: Pre-commit gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: precommit-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Pre-commit capability gate (tsc + fullApp + of-record)
+        run: npm run test:precommit
+
+      - name: Catalog completeness (fail if new panel lacks panelSources)
+        run: npx jest --testPathPatterns=fullApp/01-inventory --no-coverage

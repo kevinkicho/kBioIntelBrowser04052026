@@ -1,6 +1,6 @@
 /**
  * Full-app inventory integrity — every category panel must resolve to a component
- * file and (for molecule free-API cards) a panelSources provenance entry.
+ * (molecule cards) and every panel must have panelSources provenance (no allowlist).
  */
 
 import fs from 'fs'
@@ -11,13 +11,28 @@ import {
   listInventoryPanels,
 } from '@/lib/fullAppCoverage/inventory'
 import { CATEGORIES, MOLECULE_CATEGORY_IDS as MOL_IDS } from '@/lib/categoryConfig'
-import { getPanelSource } from '@/lib/panelSources'
+import {
+  getPanelSource,
+  panelsMissingSources,
+  listPanelSourceIds,
+} from '@/lib/panelSources'
 
 const root = process.cwd()
+
+/** Gene detail tabs may render inside GeneDetailPageClient without *Panel.tsx */
+const GENE_VIRTUAL_PANEL_IDS = new Set([
+  'gene-overview',
+  'gene_drugs',
+  'gene-diseases',
+  'gene-variants',
+  'gene-expression',
+  'gene-pathways',
+])
 
 describe('full-app inventory integrity', () => {
   const summary = inventorySummary(root)
   const panels = listInventoryPanels(root)
+  const allPanelIds = panels.map((p) => p.panel.id)
 
   it('catalogs a non-trivial panel surface (100+ free-API cards)', () => {
     expect(summary.totalPanels).toBeGreaterThanOrEqual(100)
@@ -31,64 +46,40 @@ describe('full-app inventory integrity', () => {
   })
 
   it('every panel has unique id within catalog', () => {
-    const ids = panels.map((p) => p.panel.id)
-    expect(new Set(ids).size).toBe(ids.length)
+    expect(new Set(allPanelIds).size).toBe(allPanelIds.length)
   })
 
-  it('every panel resolves to a profile component file', () => {
-    const missing = summary.missingComponent.map(
-      (p) => `${p.categoryId}/${p.panel.id} (${p.panel.title})`,
+  it('every non-virtual panel resolves to a profile component file', () => {
+    const realMissing = summary.missingComponent.filter(
+      (p) => !GENE_VIRTUAL_PANEL_IDS.has(p.panel.id),
     )
-    if (missing.length) {
-      // Allow gene-only synthetic panels without *Panel.tsx when intentionally virtual
-      const virtualOk = new Set([
-        'gene-overview',
-        'gene_drugs',
-        'gene-diseases',
-        'gene-variants',
-        'gene-expression',
-        'gene-pathways',
-      ])
-      const realMissing = summary.missingComponent.filter(
-        (p) => !virtualOk.has(p.panel.id),
-      )
-      expect(realMissing.map((p) => `${p.panel.id}`)).toEqual([])
-    }
+    expect(realMissing.map((p) => p.panel.id)).toEqual([])
   })
 
-  it('molecule free-API panels have panelSources provenance (api + docs)', () => {
-    const molecule = panels.filter((p) =>
-      (MOL_IDS as string[]).includes(p.categoryId),
-    )
-    const missing = molecule.filter((p) => {
-      // Virtual gene tabs live under gene category only
-      if (p.categoryId === 'gene') return false
-      const src = getPanelSource(p.panel.id)
-      return !src || !src.api || !src.docs
-    })
-    // Some experimental panels may share a parent source — report clearly
-    const allowedMissing = new Set([
-      // multi-source / portal / bulk / navigator surfaces without sole panelSources key yet
-      'biosimilar-family',
-      'establishment-links',
-      'international-regulators',
-      'evidence-neighborhood',
-      'therapeutic-landscape',
-      'eu-research-orgs',
+  it('every CATEGORIES panel has panelSources api + docs (zero allowlist)', () => {
+    const missing = panelsMissingSources(allPanelIds)
+    expect(missing).toEqual([])
+  })
+
+  it('panelSources registry is non-empty and includes health-canada / openaire', () => {
+    const ids = listPanelSourceIds()
+    expect(ids.length).toBeGreaterThanOrEqual(100)
+    expect(ids).toEqual(expect.arrayContaining([
       'health-canada',
       'ema-medicines',
-      'biologics-licensed',
       'purple-book',
-      'purple-book-patents',
-      'ema-bulk',
-      'research-orgs-lit',
       'openaire-projects',
       'openaire-publications',
-    ])
-    const unexpected = missing.filter((p) => !allowedMissing.has(p.panel.id))
-    expect(
-      unexpected.map((p) => `${p.panel.id}: source=${Boolean(getPanelSource(p.panel.id))}`),
-    ).toEqual([])
+      'biologics-licensed',
+    ]))
+  })
+
+  it('getPanelSource returns docs https URL for sample free APIs', () => {
+    for (const id of ['chembl', 'clinical-trials', 'health-canada', 'openaire-projects']) {
+      const s = getPanelSource(id)
+      expect(s?.docs).toMatch(/^https?:\/\//)
+      expect(s?.api).toBeTruthy()
+    }
   })
 
   it('resolved component files exist on disk', () => {

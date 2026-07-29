@@ -7,6 +7,7 @@
 
 import React from 'react'
 import { render } from '@testing-library/react'
+import fs from 'fs'
 import path from 'path'
 import { listInventoryPanels, type InventoryPanel } from '@/lib/fullAppCoverage/inventory'
 
@@ -21,49 +22,95 @@ jest.mock('@/components/ui/FilterablePaginatedList', () => ({
   FilterablePaginatedList: () => <div data-testid="mock-list" />,
 }))
 
+/** Pull destructured prop names from `function Foo({ a, b }: { ... })` signatures. */
+function extractPropNamesFromSource(src: string): string[] {
+  const names = new Set<string>()
+  const re = /function\s+\w+\s*\(\s*\{\s*([^}]+)\}/g
+  let m: RegExpExecArray | null
+  while ((m = re.exec(src))) {
+    const chunk = m[1]
+    for (const part of chunk.split(',')) {
+      const name = part.trim().split(/[=:]/)[0]?.trim()
+      if (name && /^[A-Za-z_][\w]*$/.test(name) && name !== 'panelId' && name !== 'lastFetched') {
+        names.add(name)
+      }
+    }
+  }
+  return Array.from(names)
+}
+
+/**
+ * Empty props: category propKey + names parsed from the panel source file.
+ */
 function emptyPropsFor(p: InventoryPanel): Record<string, unknown> {
-  const key = p.panel.propKey
+  const emptyList: unknown[] = []
+  const emptyData = {
+    geneDiseases: emptyList,
+    variants: emptyList,
+    domains: emptyList,
+    gene3dEntries: emptyList,
+    items: emptyList,
+    entries: emptyList,
+    results: emptyList,
+    spectra: emptyList,
+    clusters: emptyList,
+    activities: emptyList,
+    mechanisms: emptyList,
+    indications: emptyList,
+  }
   const base: Record<string, unknown> = {
     panelId: p.panel.id,
     lastFetched: undefined,
+    cid: 2244,
+    molecularWeight: 0,
+    moleculeName: 'Aspirin',
+    data: emptyData,
+    family: emptyData,
+    toxcast: emptyData,
+    metabolomicsData: emptyData,
+    properties: null,
+    computedProperties: null,
   }
-  // Common shapes across profile panels
-  if (p.panel.isNullable) {
-    base[key] = null
-    base.data = null
-  } else {
-    base[key] = []
-    base.data = { items: [], entries: [], results: [] }
+  if (p.panel.propKey) base[p.panel.propKey] = emptyList
+  if (p.componentPath) {
+    try {
+      const src = fs.readFileSync(path.join(process.cwd(), p.componentPath), 'utf8')
+      for (const name of extractPropNamesFromSource(src)) {
+        if (name === 'data' || name === 'family' || name === 'toxcast' || name === 'metabolomicsData') {
+          base[name] = emptyData
+        } else if (
+          name === 'properties' ||
+          name === 'computedProperties' ||
+          name === 'hazards' ||
+          name === 'annotation' ||
+          name === 'chebiAnnotation'
+        ) {
+          // Nullable object bags — [] is truthy and breaks `.roles` / `.hazardStatements`
+          base[name] = null
+        } else if (name === 'cid' || name === 'molecularWeight') {
+          base[name] = name === 'cid' ? 2244 : 0
+        } else if (
+          name === 'moleculeName' ||
+          name === 'firmHint' ||
+          name === 'diseaseName' ||
+          /Hint$|Name$|Title$|Query$|Label$/.test(name)
+        ) {
+          base[name] = name === 'moleculeName' ? 'Aspirin' : ''
+        } else {
+          base[name] = emptyList
+        }
+      }
+    } catch {
+      /* ignore */
+    }
   }
-  // Frequent alternate prop names
-  base.entries = []
-  base.proteins = []
-  base.compounds = []
-  base.guidelines = []
-  base.pathways = []
-  base.trials = []
-  base.products = []
-  base.metabolites = []
-  base.genes = []
-  base.interactions = []
-  base.diseases = []
-  base.variants = []
-  base.structures = []
-  base.predictions = []
-  base.models = []
-  base.spectra = []
-  base.clusters = []
-  base.awards = []
-  base.publications = []
-  base.projects = []
-  base.hospitals = []
-  base.colleges = []
-  base.applications = []
-  base.sections = []
-  base.family = null
-  base.cid = 2244
-  base.moleculeName = 'Aspirin'
   return base
+}
+
+function isReactComponent(v: unknown): v is React.ComponentType<Record<string, unknown>> {
+  if (typeof v === 'function') return true
+  if (v && typeof v === 'object' && (v as { $$typeof?: unknown }).$$typeof) return true
+  return false
 }
 
 function loadPanelComponent(p: InventoryPanel): React.ComponentType<Record<string, unknown>> | null {
@@ -71,18 +118,15 @@ function loadPanelComponent(p: InventoryPanel): React.ComponentType<Record<strin
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const mod = require(path.join(process.cwd(), p.componentPath)) as Record<string, unknown>
   const hint = p.componentExportHint
-  if (hint && typeof mod[hint] === 'function') {
+  if (hint && isReactComponent(mod[hint])) {
     return mod[hint] as React.ComponentType<Record<string, unknown>>
   }
-  // Prefer named *Panel export
   for (const [k, v] of Object.entries(mod)) {
-    if (typeof v === 'function' && /Panel|Navigator|Strip|Map$/.test(k)) {
-      return v as React.ComponentType<Record<string, unknown>>
+    if (/Panel|Navigator|Strip|Map$/.test(k) && isReactComponent(v)) {
+      return v
     }
   }
-  if (typeof mod.default === 'function') {
-    return mod.default as React.ComponentType<Record<string, unknown>>
-  }
+  if (isReactComponent(mod.default)) return mod.default
   return null
 }
 

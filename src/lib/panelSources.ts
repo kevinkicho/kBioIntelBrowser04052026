@@ -208,6 +208,156 @@ const ENTRIES: Record<string, PanelSourceEntry> = {
     docs: 'https://www.ema.europa.eu/en/medicines/download-medicine-data',
     endpoint: 'https://www.ema.europa.eu/en/search',
   },
+  /** International + biologics + OpenAIRE (were inventory gaps) */
+  'health-canada': {
+    source: 'Health Canada',
+    api: 'Drug Product Database (DPD)',
+    description:
+      'Health Canada free DPD API — DIN, brand, company, status, ingredients. Not FDA Orange Book equivalence.',
+    docs: 'https://health-products.canada.ca/api/documentation/dpd-documentation-en.html',
+    endpoint: 'https://health-products.canada.ca/api/drug/drugproduct.json',
+  },
+  'ema-medicines': {
+    source: 'Open Targets + EMA',
+    api: 'Open Targets GraphQL · EMA portals',
+    description:
+      'EU-facing medicine card from Open Targets GraphQL plus EMA portal/bulk deep links. Not MHRA/TGA of-record alone.',
+    docs: 'https://platform-docs.opentargets.org/data-access/graphql-api',
+    endpoint: 'https://api.platform.opentargets.org/api/v4/graphql',
+    _metaKey: 'ema-medicines',
+  },
+  'ema-bulk': {
+    source: 'European Medicines Agency',
+    api: 'EMA medicines download (Excel)',
+    description:
+      'Official EMA medicines Excel dump (biosimilar / orphan / ATMP flags, MAH, dates). Free public download.',
+    docs: 'https://www.ema.europa.eu/en/medicines/download-medicine-data',
+    endpoint:
+      'https://www.ema.europa.eu/en/documents/report/medicines-output-medicines-report_en.xlsx',
+    _metaKey: 'ema-bulk',
+  },
+  'biologics-licensed': {
+    source: 'U.S. FDA (openFDA)',
+    api: 'openFDA Drugs@FDA (BLA)',
+    description:
+      'FDA-licensed biologics and biosimilar BLA applications via free openFDA Drugs@FDA.',
+    docs: 'https://open.fda.gov/apis/drug/drugsfda/',
+    endpoint: 'https://api.fda.gov/drug/drugsfda.json',
+    _metaKey: 'biologics-licensed',
+  },
+  'purple-book': {
+    source: 'U.S. FDA',
+    api: 'Purple Book downloads',
+    description:
+      'Purple Book monthly CSV — licensed biologics, biosimilar and interchangeable labels.',
+    docs: 'https://purplebooksearch.fda.gov/downloads',
+    endpoint: 'https://www.accessdata.fda.gov/drugsatfda_docs/PurpleBook/',
+    _metaKey: 'purple-book',
+  },
+  'purple-book-patents': {
+    source: 'U.S. FDA',
+    api: 'Purple Book BPPT patent list',
+    description:
+      'Sponsor-submitted patents for certain reference biologics (Purple Book patent list).',
+    docs: 'https://purplebooksearch.fda.gov/patent-list',
+    endpoint: 'https://purplebooksearch.fda.gov/patent-list',
+    _metaKey: 'purple-book-patents',
+  },
+  'therapeutic-landscape': {
+    source: 'Multi-source join',
+    api: 'ChEMBL · Open Targets · CT.gov · literature',
+    description:
+      'Deterministic therapeutic landscape strip from free public bags on this page (indications, targets, trials). Not competitive ranking or clinical advice.',
+    docs: 'https://www.ebi.ac.uk/chembl/',
+    endpoint: 'join://profile/clinical-safety+bioactivity-targets',
+  },
+  'research-orgs-lit': {
+    source: 'ROR · literature',
+    api: 'Research Organization Registry',
+    description:
+      'Research organization IDs and literature-side affiliation samples (ROR + free literature APIs).',
+    docs: 'https://ror.readme.io/docs/rest-api',
+    endpoint: 'https://api.ror.org/v2/organizations',
+    _metaKey: 'ror',
+  },
+  'eu-research-orgs': {
+    source: 'ROR (EU pack)',
+    api: 'Research Organization Registry',
+    description:
+      'EU multi-country ROR organization packs (education, healthcare, facility) for affiliation context.',
+    docs: 'https://ror.readme.io/docs/api-filtering',
+    endpoint: 'https://api.ror.org/v2/organizations',
+    _metaKey: 'ror-eu-pack',
+  },
+  'openaire-projects': {
+    source: 'OpenAIRE',
+    api: 'OpenAIRE Graph Search (projects)',
+    description:
+      'Free public research projects (EC/CORDIS, NIH, NSF, …) from OpenAIRE Graph Search. No API key.',
+    docs: 'https://graph.openaire.eu/docs/apis/search-api/projects/',
+    endpoint: 'https://api.openaire.eu/search/projects',
+  },
+  'openaire-publications': {
+    source: 'OpenAIRE',
+    api: 'OpenAIRE Graph Search (publications)',
+    description:
+      'Free public research publications from OpenAIRE Graph Search. No API key.',
+    docs: 'https://graph.openaire.eu/docs/apis/search-api/publications/',
+    endpoint: 'https://api.openaire.eu/search/publications',
+  },
+  /** Gene detail virtual tabs — provenance points at free primary APIs used on gene page */
+  'gene-overview': {
+    source: 'NCBI · MyGene · UniProt',
+    api: 'NCBI Gene / MyGene.info',
+    description: 'Gene identity and summary from free public gene annotation APIs.',
+    docs: 'https://www.ncbi.nlm.nih.gov/gene/',
+    endpoint: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
+    _metaKey: 'ncbi-gene',
+  },
+  'gene_drugs': {
+    source: 'DGIdb · ChEMBL · Open Targets',
+    api: 'DGIdb v5',
+    description: 'Drug–gene interaction samples for gene detail (free public gather).',
+    docs: 'https://www.dgidb.org/api',
+    endpoint: 'https://dgidb.org/api/graphql',
+    _metaKey: 'dgidb',
+  },
+  'gene-diseases': {
+    source: 'Open Targets · DisGeNET · Monarch',
+    api: 'Open Targets / DisGeNET',
+    description: 'Disease association samples for gene detail from free public sources.',
+    docs: 'https://platform.opentargets.org/api',
+    endpoint: 'https://api.platform.opentargets.org/api/v4/graphql',
+    _metaKey: 'opentargets',
+  },
+  'gene-variants': {
+    source: 'ClinVar · dbSNP',
+    api: 'ClinVar',
+    description: 'Variant/disease samples for gene detail from free NCBI ClinVar.',
+    docs: 'https://www.ncbi.nlm.nih.gov/clinvar/api/',
+    endpoint: 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils',
+    _metaKey: 'clinvar',
+  },
+  'gene-expression': {
+    source: 'GTEx · Bgee · Expression Atlas',
+    api: 'GTEx / Expression Atlas',
+    description: 'Tissue expression samples for gene detail from free public expression APIs.',
+    docs: 'https://gtexportal.org/home/api',
+    endpoint: 'https://gtexportal.org/api/v2',
+  },
+  'gene-pathways': {
+    source: 'Reactome · WikiPathways · Pathway Commons',
+    api: 'Reactome',
+    description: 'Pathway membership samples for gene detail from free public pathway APIs.',
+    docs: 'https://reactome.org/dev/content-service',
+    endpoint: 'https://reactome.org/ContentService',
+    _metaKey: 'reactome',
+  },
+}
+
+/** All panelIds registered in panelSources (for catalog completeness gates). */
+export function listPanelSourceIds(): string[] {
+  return Object.keys(PANEL_SOURCE_MAP).sort()
 }
 
 const PANEL_SOURCE_MAP: Record<string, PanelSourceInfo> = {}
@@ -229,4 +379,17 @@ for (const [panelId, entry] of Object.entries(ENTRIES)) {
 
 export function getPanelSource(panelId: string): PanelSourceInfo | null {
   return PANEL_SOURCE_MAP[panelId] ?? null
+}
+
+/**
+ * Catalog completeness: every CATEGORIES panel must have provenance.
+ * Call from tests — fails when a new panel ships without panelSources.
+ */
+export function panelsMissingSources(
+  panelIds: readonly string[],
+): string[] {
+  return panelIds.filter((id) => {
+    const s = getPanelSource(id)
+    return !s || !s.api?.trim() || !s.docs?.trim()
+  })
 }

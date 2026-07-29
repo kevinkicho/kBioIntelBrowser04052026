@@ -75,6 +75,10 @@ Run **`npm run test:precommit`** before committing product behavior changes:
 
 Optional: `npm run test:precommit:full` · `npm run test:e2e:full-app` (all routes) · `npm run test:e2e:fixture:auto` (north-star). Free-API fields in JSX: use `safeDisplayString` (`src/lib/reactSafe.ts`) to avoid React error #31.
 
+**Husky** runs `test:precommit` on every `git commit` (install via `npm install`). Escape hatch: `SKIP_PRECOMMIT=1 git commit …`. **CI:** `.github/workflows/precommit.yml` on push/PR; nightly e2e: `e2e-nightly.yml`.
+
+**Catalog law:** every `CATEGORIES` panel id must have `panelSources` (`api` + `docs`). No allowlist — add ENTRIES when you add a card.
+
 ## BioIntel CLI v0 (agents / operators)
 
 Zero-dep CLI wrapping free APIs + repo gates. App must be running for HTTP commands (`npm run dev`).

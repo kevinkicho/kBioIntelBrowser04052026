@@ -1,0 +1,10 @@
+#!/usr/bin/env sh
+# BioIntel: block commits that fail the capability / full-app gate.
+# Skip only when deliberately needed: SKIP_PRECOMMIT=1 git commit ...
+
+if [ "$SKIP_PRECOMMIT" = "1" ]; then
+  echo "Skipping pre-commit gate (SKIP_PRECOMMIT=1)"
+  exit 0
+fi
+
+npm run test:precommit

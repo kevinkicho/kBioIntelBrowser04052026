@@ -35,8 +35,13 @@ npx jest --testPathPatterns=lib     # all under __tests__/lib
 | `04-diagnostics-and-availability` | Request metrics, SourceStatusStrip, sourceAvailability, runtime-config |
 | `05-chrome-buttons-and-routes` | Cite/Share/Export files, testids, AGENTS product law |
 | `06-panel-empty-render.smoke` | Mount every profile panel with empty props (React crash net) |
+| `07-panel-loaded-render.smoke` | Key cards with loaded fixtures (ChEMBL, CT.gov, HC, OpenAIRE, …) |
 
-Inventory SSOT: `src/lib/fullAppCoverage/inventory.ts`.
+Inventory SSOT: `src/lib/fullAppCoverage/inventory.ts`.  
+**Catalog law:** every `CATEGORIES` panel id must have `panelSources` (`api` + `docs`) — zero allowlist.
+
+**Husky** (after `npm install`): `.husky/pre-commit` → `npm run test:precommit`. Skip: `SKIP_PRECOMMIT=1`.  
+**CI:** `.github/workflows/precommit.yml` on push/PR; `.github/workflows/e2e-nightly.yml` for route surface.
 
 New free-API DTO fields rendered in JSX **must** use `safeDisplayString` from `src/lib/reactSafe.ts` (or extract strings in the API mapper). Nested objects as React children throw minified error #31.
 

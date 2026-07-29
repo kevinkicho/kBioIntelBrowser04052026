@@ -97,6 +97,19 @@ export const API_METADATA: Record<string, ApiMeta> = {
     apiDocs: 'https://platform-docs.opentargets.org/data-access/graphql-api',
     apiEndpoint: 'https://api.platform.opentargets.org/api/v4/graphql',
   },
+  'health-canada-dpd': {
+    organization: 'Health Canada',
+    description:
+      'Drug Product Database free public API — DIN, brand, company, status, ingredients',
+    apiDocs: 'https://health-products.canada.ca/api/documentation/dpd-documentation-en.html',
+    apiEndpoint: 'https://health-products.canada.ca/api/drug/drugproduct.json',
+  },
+  openaire: {
+    organization: 'OpenAIRE',
+    description: 'OpenAIRE Graph Search API for projects and publications (no key)',
+    apiDocs: 'https://graph.openaire.eu/docs/apis/search-api/projects/',
+    apiEndpoint: 'https://api.openaire.eu/search/projects',
+  },
   nadac: { organization: 'CMS', description: 'National Average Drug Acquisition Cost from Medicaid', apiDocs: 'https://data.medicaid.gov/dataset/nadac', apiEndpoint: 'https://data.medicaid.gov/resource/a4y5-998d.json' },
   rxnorm: { organization: 'NLM (NIH)', description: 'RxNorm provides normalized names for clinical drugs', apiDocs: 'https://rxnav.nlm.nih.gov/RESTfulInteraction.html', apiEndpoint: 'https://rxnav.nlm.nih.gov/REST' },
   dailymed: { organization: 'NLM (NIH)', description: 'Provides FDA drug labeling information', apiDocs: 'https://dailymed.nlm.nih.gov/dailymed/app-support.cfm#api', apiEndpoint: 'https://dailymed.nlm.nih.gov/dailymed/services/v2' },
