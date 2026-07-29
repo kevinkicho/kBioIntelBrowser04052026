@@ -47,13 +47,18 @@ Coding agents and human implementers: read this before changing product behavior
 npm run dev                              # required before e2e (no Playwright webServer by default)
 npx tsc --noEmit
 npm test
-npm run test:precommit                   # **before commit** — tsc + fullApp + of-record suites
+npm run test:precommit                   # **before commit** — tsc + lint + fullApp + of-record
 npm run test:precommit:full              # precommit + broader component smoke
 npm run test:full-app                    # all cards/provenance/diagnostics/chrome inventory
 npm run test:capabilities                # capability inventory + fullApp + brittleness
 npm run test:brittle                     # React-safe / expand / data-hub UI suites
 npm run test:gate                        # tsc + of-record + fullApp + brittleness
-npm run test:e2e:full-app                # Playwright: all major routes + molecule chrome
+npm run test:e2e:full-app                # Playwright full-app (needs app or E2E_WEBSERVER)
+npm run test:e2e:full-app:auto           # full-app e2e + Playwright starts next dev
+npm run ship:verify                      # local precommit + git hygiene (agents)
+npm run ship:verify:ci                   # + watch GitHub Pre-commit gate for HEAD
+npm run ship:verify:e2e                  # + full-app Playwright with webServer
+npm run ship:verify:all                  # --ci --e2e
 npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
 npm run test:e2e:fixture                 # north-star + data-hub e2e (needs npm run dev, E2E_FIXTURE=1)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
@@ -68,16 +73,103 @@ npm run build
 
 Run **`npm run test:precommit`** before committing product behavior changes:
 
-1. `tsc --noEmit`
+1. `tsc --noEmit` + **`next lint`** (same errors that fail production `next build`)
 2. **Full-app** inventory (`__tests__/fullApp/*`): every category card resolves, empty-mount smoke, Panel chrome, API/AI provenance, diagnostics, chrome testids/routes
 3. Brittleness suites (`reactSafe`, ExpandableItems, CrossSourceStrip, DataHubLedger, UniProt nested DTOs)
 4. Of-record product suites (Discover scores, packs, data hub builders, events, research catalog)
+5. Catalog completeness (`fullApp/01-inventory`)
 
-Optional: `npm run test:precommit:full` · `npm run test:e2e:full-app` (all routes) · `npm run test:e2e:fixture:auto` (north-star). Free-API fields in JSX: use `safeDisplayString` (`src/lib/reactSafe.ts`) to avoid React error #31.
+Optional: `npm run test:precommit:full` · `npm run test:e2e:full-app:auto` (routes + smoke with webServer) · `npm run test:e2e:fixture:auto` (north-star). Free-API fields in JSX: use `safeDisplayString` (`src/lib/reactSafe.ts`) to avoid React error #31.
 
-**Husky** runs `test:precommit` on every `git commit` (install via `npm install`). Escape hatch: `SKIP_PRECOMMIT=1 git commit …`. **CI:** `.github/workflows/precommit.yml` on push/PR; nightly e2e: `e2e-nightly.yml`.
+**Husky** runs `test:precommit` on every `git commit` (install via `npm install`). Escape hatch: `SKIP_PRECOMMIT=1 git commit …` — **agents must not use SKIP_PRECOMMIT** unless the user explicitly orders it. **CI:** `.github/workflows/precommit.yml` on push/PR; nightly e2e: `e2e-nightly.yml`.
 
 **Catalog law:** every `CATEGORIES` panel id must have `panelSources` (`api` + `docs`). No allowlist — add ENTRIES when you add a card.
+
+---
+
+## Ship protocol (agents — non-negotiable when user asks to commit / push / deploy)
+
+Goal: never leave main red, and never claim “CI / e2e green” without proof.
+
+### Mandatory sequence
+
+```text
+1. Implement + self-check (tsc / targeted jest)
+2. npm run test:precommit          # or rely on husky at commit — still must pass
+3. git commit …                    # husky blocks on gate failure
+4. git push origin <branch>        # confirm user wants push / main
+5. Prove CI (see below)            # REQUIRED before saying “green”
+6. Rollout                         # App Hosting auto on main; only force if user asks
+```
+
+### Prove CI green (do not invent)
+
+After push, agents **must** verify with the GitHub CLI (or UI) — never assume success from a previous run:
+
+```text
+# Preferred one-liner after push (watches Pre-commit gate for current HEAD):
+npm run ship:verify:ci
+
+# Or manually:
+gh run list --branch main --limit 5
+gh run watch <run-id> --exit-status    # must exit 0
+# On failure: gh run view <run-id> --log-failed → fix → commit → push → watch again
+```
+
+**Rules of evidence**
+
+| Claim | Required proof |
+|--------|----------------|
+| “Precommit passes” | `npm run test:precommit` exit 0 (or husky commit succeeded) |
+| “Pushed” | `git status` shows in sync with `origin/...` (or push output `main -> main`) |
+| “CI green” | `gh run watch … --exit-status` **0** for **this** commit’s Pre-commit gate |
+| “E2E green” | Playwright exit 0 for the suite claimed, or nightly workflow success for that SHA |
+| “Rolled out” | App Hosting / Firebase rollout check success for that SHA (or user-confirmed) |
+
+Do **not** cite an older green run while HEAD has newer failed runs. List runs for the **current SHA**.
+
+### When to run e2e before push
+
+Run **`npm run test:e2e:full-app:auto`** (or `npm run ship:verify:e2e`) when the change touches:
+
+- Profile chrome (loading overlay, Cite/Share/Export, copilot FAB)
+- Data hub / cross-source strip / empty toggles
+- Smoke routes (`e2e/smoke.spec.ts`, `full-app-surface`, `data-hub-coverage`)
+- `playwright.config.ts` / e2e selectors / `data-testid`s used by e2e
+
+Nightly workflow alone is **not** enough to claim e2e safety for a same-day UI ship — trigger it or run locally:
+
+```text
+gh workflow run "E2E full-app (nightly)" --ref main
+gh run list --workflow e2e-nightly.yml --limit 3
+gh run watch <id> --exit-status
+```
+
+### Rollout (App Hosting)
+
+- Pushes to **main** trigger App Hosting build for backend **biointel** (see `docs/firebase.md`)
+- Agents do **not** force `apphosting:rollouts:create` unless the user asks
+- Env/secret changes: `npm run firebase:apphosting:env` / `…:env:rollout` only with user intent
+- After main push, confirm rollout if user cares about production: Firebase console or `gh`/Firebase CLI status — do not invent “deployed”
+
+### Ship helper scripts
+
+```text
+npm run ship:verify           # local precommit gate + git hygiene hints
+npm run ship:verify:ci        # + wait for GitHub Pre-commit gate on HEAD (must be pushed)
+npm run ship:verify:e2e       # + Playwright full-app with webServer
+npm run ship:verify:all       # --ci --e2e
+```
+
+Implementation: `scripts/ship-verify.js` (pairs with `scripts/precommit-gate.js`).
+
+### Anti-patterns (do not)
+
+- `SKIP_PRECOMMIT=1` to “just land it”
+- `git commit` then push without watching CI when the user asked for a green ship
+- Claiming e2e green from a **previous** successful nightly while the latest dispatch failed
+- Force-push / `--no-verify` without explicit user order
+- Partial “tsc only” as a substitute for `test:precommit`
 
 ## BioIntel CLI v0 (agents / operators)
 
@@ -137,6 +229,8 @@ PowerShell note: chain sequential commands with `;` when the harness does not su
 
 - Prefer **main** when the user asked for main-only; no branch sprawl by default
 - Commit messages: complete sentences explaining *why*
+- After **push**, follow **Ship protocol** above — precommit alone is not “CI green”
+- PowerShell: chain with `;` not `&&` when the shell does not support `&&`
 
 ## Do NOT
 
