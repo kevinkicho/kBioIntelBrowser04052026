@@ -31,10 +31,20 @@ test.describe('Data hub coverage UI', () => {
     // Strip may take a moment while categories hydrate
     const stripEl = strip.first()
     await expect(stripEl).toBeVisible({ timeout: 90_000 })
-    // If empty chips exist, toggle appears
-    const toggle = page.getByTestId(/toggle-empty/)
+
+    // Full-page loading overlay blocks pointer events until categories settle
+    const overlay = page.getByTestId('loading-overlay')
+    if (await overlay.isVisible().catch(() => false)) {
+      await expect(overlay).toBeHidden({ timeout: 120_000 })
+    }
+
+    // Prefer strip-scoped toggle (data hub also has *-toggle-empty)
+    const toggle = page
+      .getByTestId('molecule-cross-source-toggle-empty')
+      .or(page.getByTestId('cross-source-strip-toggle-empty'))
+      .or(page.getByTestId(/toggle-empty/))
     if (await toggle.first().isVisible().catch(() => false)) {
-      await toggle.first().click()
+      await toggle.first().click({ timeout: 30_000 })
       await expect(stripEl).toHaveAttribute('data-hide-empty', 'false')
     }
   })

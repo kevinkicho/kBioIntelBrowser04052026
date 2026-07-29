@@ -130,7 +130,10 @@ export function ExportButton({
   return (
     <div ref={ref} className="relative inline-block">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        data-testid="profile-export-button"
+        aria-label="Export"
         className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-1.5 text-sm text-slate-300 hover:text-slate-100 transition-colors"
       >
         Export ▼

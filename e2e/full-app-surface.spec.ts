@@ -40,10 +40,10 @@ test.describe('full-app molecule chrome', () => {
     await page.goto('/molecule/2244')
     await expect(page.getByText(/CID:2244/)).toBeVisible({ timeout: 90_000 })
 
-    // Header actions
-    await expect(page.getByRole('button', { name: /Cite/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Share/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Export/i })).toBeVisible()
+    // Header actions — unique testids (avoid data-hub row "Cite" buttons)
+    await expect(page.getByTestId('profile-cite-button')).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByTestId('profile-share-button')).toBeVisible()
+    await expect(page.getByTestId('profile-export-button')).toBeVisible()
 
     // Data hub
     const hub = page.getByTestId('molecule-data-hub').or(page.getByTestId('data-hub-ledger'))
@@ -52,8 +52,8 @@ test.describe('full-app molecule chrome', () => {
     // Source coverage
     await expect(page.getByText(/Source coverage/i).first()).toBeVisible({ timeout: 60_000 })
 
-    // AI copilot fab
-    await expect(page.getByTestId('ai-copilot-fab').or(page.locator('button[title*="Copilot" i]')).first()).toBeVisible()
+    // AI copilot fab (aria-label + testid; no title= on the button)
+    await expect(page.getByTestId('ai-copilot-fab')).toBeVisible({ timeout: 30_000 })
   })
 
   test('research view shows research tables prefs chrome', async ({ page }) => {

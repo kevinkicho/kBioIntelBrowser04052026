@@ -72,17 +72,25 @@ export function CiteButton({ data, entityName, entityType, entityId }: CiteButto
     }
   }
 
-  if (sources.length === 0) return null
+  const empty = sources.length === 0
 
   return (
     <div ref={ref} className="relative inline-block">
       <button
-        onClick={() => setOpen(!open)}
-        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-1.5 text-sm text-slate-300 hover:text-slate-100 transition-colors"
+        type="button"
+        onClick={() => {
+          if (empty) return
+          setOpen(!open)
+        }}
+        disabled={empty}
+        data-testid="profile-cite-button"
+        aria-label="Cite"
+        title={empty ? 'Citations available after evidence loads' : 'Cite sources'}
+        className="bg-slate-800 border border-slate-700 rounded-lg px-4 py-1.5 text-sm text-slate-300 hover:text-slate-100 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
       >
         Cite ▼
       </button>
-      {open && (
+      {open && !empty && (
         <div className="absolute right-0 mt-1 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50 min-w-[240px]">
           <div className="px-4 py-2 text-[10px] uppercase tracking-wider text-slate-500 border-b border-slate-700">
             {sources.length} sources contributed

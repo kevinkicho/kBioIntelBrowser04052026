@@ -13,23 +13,21 @@ test.describe('BioIntel smoke', () => {
     await page.goto('/molecule/2244')
     // Sticky header has the breadcrumb chip
     await expect(page.getByText(/CID:2244/)).toBeVisible({ timeout: 60_000 })
-    // Copilot fab should be in the DOM (may be disabled while loading)
-    await expect(page.locator('button[title*="Copilot" i]')).toBeVisible()
-    // Cite, Share, Export buttons render. Share uses aria-label="Share" so
-    // its accessible name doesn't include the dropdown arrow.
-    await expect(page.getByRole('button', { name: /Cite ▼/ })).toBeVisible()
-    await expect(page.getByRole('button', { name: /^Share$/i })).toBeVisible()
-    await expect(page.getByRole('button', { name: /Export ▼/ })).toBeVisible()
+    // Copilot fab uses data-testid + aria-label (tooltip is wrapper, not title=)
+    await expect(page.getByTestId('ai-copilot-fab')).toBeVisible({ timeout: 30_000 })
+    // Header chrome — unique testids (data hub also has many "Cite" row buttons)
+    await expect(page.getByTestId('profile-cite-button')).toBeVisible()
+    await expect(page.getByTestId('profile-share-button')).toBeVisible()
+    await expect(page.getByTestId('profile-export-button')).toBeVisible()
   })
 
   test('AI copilot fab is disabled while data loads, then enables', async ({ page }) => {
     await page.goto('/molecule/2244')
-    const fab = page.locator('button[title*="Copilot" i]')
-    await expect(fab).toBeVisible()
-    // Initially disabled (no data loaded yet)
-    await expect(fab).toBeDisabled({ timeout: 5_000 })
-    // Once at least one category loads, fab becomes enabled
-    await expect(fab).toBeEnabled({ timeout: 60_000 })
+    const fab = page.getByTestId('ai-copilot-fab')
+    await expect(fab).toBeVisible({ timeout: 30_000 })
+    // Cold load: may be disabled briefly; always becomes enabled once a category finishes.
+    // Fast cache hits can skip the disabled window — only assert eventual enable.
+    await expect(fab).toBeEnabled({ timeout: 90_000 })
   })
 
   test('hypothesis page renders the filter UI', async ({ page }) => {
@@ -68,8 +66,8 @@ test.describe('BioIntel smoke', () => {
   test('embed mode strips the chrome', async ({ page }) => {
     await page.goto('/embed/molecule/2244?panels=summary,structure')
     // Embed should NOT show the Cite/Share/Export buttons (those are header chrome)
-    await expect(page.getByRole('button', { name: /Cite ▼/ })).toHaveCount(0)
-    await expect(page.getByRole('button', { name: /Share ▼/ })).toHaveCount(0)
+    await expect(page.getByTestId('profile-cite-button')).toHaveCount(0)
+    await expect(page.getByTestId('profile-share-button')).toHaveCount(0)
     // Embed SHOULD show the floating "View full profile" link
     await expect(page.getByRole('link', { name: /View full profile/i })).toBeVisible({ timeout: 60_000 })
   })

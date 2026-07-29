@@ -107,7 +107,9 @@ export function ShareButton({ entityType, entityId, entityName, data }: ShareBut
   return (
     <div ref={ref} className="relative inline-block">
       <button
+        type="button"
         onClick={() => setOpen(!open)}
+        data-testid="profile-share-button"
         aria-label="Share"
         aria-haspopup="menu"
         aria-expanded={open}
