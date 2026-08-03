@@ -770,7 +770,7 @@ function cmdApiHealth(positionals) {
   if (mode === 'live' || mode === 'prod' || mode === 'production') {
     if (!env.BIOINTEL_BASE) {
       // Prefer App Hosting prod URL when operators say "live" without env set.
-      env.BIOINTEL_BASE = 'https://biointel--biointel.us-central1.hosted.app'
+      env.BIOINTEL_BASE = 'https://biointel--kbiointelbrowser04052026.us-east4.hosted.app'
       console.error(`api health live: BIOINTEL_BASE not set; using ${env.BIOINTEL_BASE}`)
     }
   }
