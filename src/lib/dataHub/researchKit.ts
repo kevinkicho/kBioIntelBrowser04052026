@@ -27,6 +27,7 @@ import { scoreHubCitationCompleteness, scoreClaimCitationCompleteness } from './
 import { buildSafetyTriangulation } from './safetyTriangulation'
 import { buildFiveRegulatorCard } from './fiveRegulatorCard'
 import { buildHubClaimGraph } from './hubClaimGraph'
+import { buildBiologicsKitChapter } from './biologicsKitChapter'
 
 export type ResearchKitDownloadMode = 'single' | 'multi'
 
@@ -95,6 +96,8 @@ export interface ResearchKitBundle {
     'hub-claims-pack.json'?: string
     /** v3 interchange: JSON extras for campaigns / agents */
     'v3-quality.json'?: string
+    /** Biologics/biosimilars enrichment chapter (not biologics-first identity) */
+    'biologics-chapter.json'?: string
   }
   honesty: string[]
   /** Optional bags used to recompute triangulation (not of-record rank) */
@@ -374,6 +377,7 @@ export function buildResearchKitBundle(input: ResearchKitInput): ResearchKitBund
   const safety = buildSafetyTriangulation(bags)
   const five = buildFiveRegulatorCard(bags)
   const v3Quality = buildResearchKitV3QualityJson(input.ledger, claimList, bags)
+  const biologicsChapter = buildBiologicsKitChapter(bags)
 
   const files: ResearchKitBundle['files'] = {
     'data-hub.csv': parts.hubCsv,
@@ -381,6 +385,9 @@ export function buildResearchKitBundle(input: ResearchKitInput): ResearchKitBund
     'README.md': parts.readme,
     'hub-claims-pack.json': hubClaimsPackToJson(handoff),
     'v3-quality.json': v3Quality,
+  }
+  if (biologicsChapter.present) {
+    files['biologics-chapter.json'] = JSON.stringify(biologicsChapter, null, 2)
   }
   if (parts.claimsMd) files['claims.md'] = parts.claimsMd
   if (parts.prefsJson) files['research-view-prefs.json'] = parts.prefsJson

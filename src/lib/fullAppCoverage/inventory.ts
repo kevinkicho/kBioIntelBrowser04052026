@@ -59,6 +59,7 @@ export const APP_ROUTES: InventoryRoute[] = [
   { id: 'analytics', path: '/analytics', pageFile: 'src/app/analytics/page.tsx', role: 'diagnostics' },
   { id: 'methodology', path: '/methodology', pageFile: 'src/app/methodology/page.tsx', role: 'docs' },
   { id: 'how-it-works', path: '/how-it-works', pageFile: 'src/app/how-it-works/page.tsx', role: 'docs' },
+  { id: 'campaign', path: '/campaign', pageFile: 'src/app/campaign/page.tsx', role: 'product' },
   { id: 'ai-history', path: '/ai-history', pageFile: 'src/app/ai-history/page.tsx', role: 'product' },
   { id: 'embed-molecule', path: '/embed/molecule/[id]', pageFile: 'src/app/embed/molecule/[id]/page.tsx', role: 'embed' },
 ]

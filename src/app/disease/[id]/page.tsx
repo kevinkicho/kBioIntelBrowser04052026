@@ -85,6 +85,12 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
     diseaseId: id,
     targets: topTargetSymbols.length > 0 ? topTargetSymbols : undefined,
   })
+  /** Gene-led Discover: same disease + pins; prefs gene-led applied client-side by user/persona */
+  const discoverGeneLedHref = buildDiscoverHref({
+    q: diseaseName,
+    diseaseId: id,
+    targets: topTargetSymbols.length > 0 ? topTargetSymbols : undefined,
+  })
 
   const intelligenceContext = {
     diseaseName,
@@ -140,6 +146,24 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
     orphanetHit: /orphanet/i.test(source) || therapeuticAreas.some((t) => /orphan/i.test(t)),
     openTargetsHit: /open.?target/i.test(source) || Boolean(id),
     whoGhoCount: whoGho.indicators?.length ?? whoGho.facts?.length ?? 0,
+    whoGhoSamples: [
+      ...(whoGho.indicators ?? []).slice(0, 3).map((i) => {
+        const o = i as { name?: string; indicatorName?: string; title?: string }
+        return String(o.name || o.indicatorName || o.title || '').trim()
+      }),
+      ...(whoGho.facts ?? []).slice(0, 3).map((f) => {
+        const o = f as { label?: string; name?: string; value?: string }
+        const lab = String(o.label || o.name || '').trim()
+        const val = o.value != null ? String(o.value) : ''
+        return [lab, val].filter(Boolean).join('=')
+      }),
+    ].filter(Boolean),
+    openTargetsScoreHint:
+      genes[0] && typeof (genes[0] as { score?: number }).score === 'number'
+        ? `top gene ${genes[0].geneSymbol} score≈${Number((genes[0] as { score?: number }).score).toFixed(3)}`
+        : genes[0]?.geneSymbol
+          ? `top gene ${genes[0].geneSymbol}`
+          : null,
   })
 
   /** Map gene association source label → provenance key */
@@ -189,6 +213,24 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
                   >
                     Discover candidates
                     <span aria-hidden>→</span>
+                  </Link>
+                  {topTargetSymbols.length > 0 && (
+                    <Link
+                      href={discoverGeneLedHref}
+                      className="inline-flex items-center gap-1.5 rounded-lg border border-sky-800/50 bg-sky-950/40 px-3 py-1.5 text-[11px] font-medium text-sky-300 transition-colors hover:border-sky-600"
+                      data-testid="disease-page-gene-led-cta"
+                      title="Of-record gene-led mode: enable Gene-led persona in Discover prefs so candidates must hit pinned genes"
+                    >
+                      Gene-led shortlist
+                      <span aria-hidden>→</span>
+                    </Link>
+                  )}
+                  <Link
+                    href="/campaign"
+                    className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1.5 text-[11px] text-slate-400 hover:text-slate-200"
+                    data-testid="disease-page-campaign-cta"
+                  >
+                    Campaign
                   </Link>
                 </div>
               </div>

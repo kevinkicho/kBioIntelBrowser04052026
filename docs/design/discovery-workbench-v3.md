@@ -58,3 +58,16 @@ v3 expands **scope and depth** of that loop without becoming a paid-DB encyclope
 ## 5. Ship notes
 
 Implementers: prefer pure hub builders + playbooks + kit extras over new paid surfaces. Every new fact row must name a free public source.
+
+## 6. Implementation status (2026-08-03)
+
+| Slice | Status |
+|-------|--------|
+| Safety triangulation + five-regulator hub | Shipped |
+| Research kit v2 + v3-quality.json | Shipped |
+| Campaign templates + `/campaign` UI | Shipped |
+| Pack citation export gate (soft M3) | Shipped |
+| Disease spine (WHO GHO samples + gene-led CTA) | Shipped |
+| Gene-led Discover persona / mode | Shipped (`discoverMode`) |
+| Biologics kit chapter | Shipped (`biologics-chapter.json`) |
+| Free-API etiquette agent | Shipped (prior) |

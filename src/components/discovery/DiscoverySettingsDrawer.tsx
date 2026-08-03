@@ -189,7 +189,7 @@ export function DiscoverySettingsDrawer({
             <div className="mb-2 flex items-center gap-1.5 text-xs font-semibold text-slate-300">
               Beachhead persona
               <HelperTip
-                content="One-click presets for repurposing triage (default) vs rare-disease lab. Does not change ranking math — only tour examples, Orphanet pin boost, and soft AE defaults."
+                content="One-click presets: repurposing triage, rare-disease lab, or gene-led mode (must hit pinned genes). Rank stays deterministic — no LLM. Gene-led forces pin-hard-filter only."
                 label="About beachhead persona"
                 testId="prefs-persona-help"
               />
@@ -200,19 +200,30 @@ export function DiscoverySettingsDrawer({
                   [
                     'repurposing',
                     'Repurposing triage (default)',
-                    'Balanced rubric · mixed tour · Orphanet boost off',
+                    'Balanced rubric · mixed tour · molecule mode',
                   ],
                   [
                     'rare-lab',
                     'Rare-disease lab',
                     'Rare-only tour · Orphanet boost on · soft AE',
                   ],
+                  [
+                    'gene-led',
+                    'Gene-led shortlist',
+                    'Must hit ≥1 pinned gene · Orphanet boost on · of-record only',
+                  ],
                 ] as const
               ).map(([id, label, hint]) => {
                 const active =
-                  id === 'rare-lab'
-                    ? prefs.rareDiseaseBoost && prefs.tourExampleSet === 'rare-only'
-                    : !prefs.rareDiseaseBoost && prefs.tourExampleSet === 'mixed'
+                  id === 'gene-led'
+                    ? prefs.discoverMode === 'gene-led'
+                    : id === 'rare-lab'
+                      ? prefs.rareDiseaseBoost &&
+                        prefs.tourExampleSet === 'rare-only' &&
+                        prefs.discoverMode !== 'gene-led'
+                      : !prefs.rareDiseaseBoost &&
+                        prefs.tourExampleSet === 'mixed' &&
+                        prefs.discoverMode !== 'gene-led'
                 return (
                   <StyledTooltip key={id} content={hint} className="w-full">
                     <button
@@ -225,6 +236,8 @@ export function DiscoverySettingsDrawer({
                           harvestTiming: next.harvestTiming,
                           tourExampleSet: next.tourExampleSet,
                           rareDiseaseBoost: next.rareDiseaseBoost,
+                          mustHitPinnedTargets: next.mustHitPinnedTargets,
+                          discoverMode: next.discoverMode,
                           collaborationMode: next.collaborationMode,
                         })
                       }}
@@ -241,6 +254,15 @@ export function DiscoverySettingsDrawer({
                 )
               })}
             </div>
+            {prefs.discoverMode === 'gene-led' && (
+              <p
+                className="mt-2 rounded-lg border border-sky-900/40 bg-sky-950/30 px-2 py-1.5 text-[10px] text-sky-200/90"
+                data-testid="gene-led-mode-banner"
+              >
+                Gene-led mode (of-record): candidates must hit ≥1 pinned gene. Rank stays deterministic — no
+                LLM.
+              </p>
+            )}
           </div>
 
           <div>

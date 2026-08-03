@@ -28,6 +28,10 @@ export interface DiseaseDataHubInput {
   orphanetHit?: boolean
   openTargetsHit?: boolean
   whoGhoCount?: number
+  /** Sample WHO GHO indicator / fact labels (session) */
+  whoGhoSamples?: string[]
+  /** Open Targets association score sample (when known) */
+  openTargetsScoreHint?: string | null
 }
 
 function row(
@@ -172,9 +176,58 @@ export function buildDiseaseDataHub(input: DiseaseDataHubInput): DataHubLedger {
       domain: 'clinical',
       detail: 'Population indicators — not molecule-specific efficacy',
     }),
+    row({
+      id: 'd-who-samples',
+      fact: 'WHO GHO samples (session)',
+      value: input.whoGhoSamples?.length
+        ? input.whoGhoSamples.slice(0, 5).join('; ')
+        : null,
+      source: 'WHO GHO',
+      domain: 'clinical',
+      detail: 'Epidemiology context only — not drug efficacy',
+    }),
+    row({
+      id: 'd-ot-score',
+      fact: 'Open Targets association hint',
+      value: input.openTargetsScoreHint || null,
+      source: 'Open Targets',
+      domain: 'targets',
+      detail: 'Of-record gather signal — not a Discover rank score',
+    }),
   ]
   all.push(...clinical)
   sections.push(section('clinical', 'Clinical & population', 'clinical', clinical))
+
+  // v3 disease spine: densify path into gene-led Discover
+  const spine: DataHubRow[] = [
+    row({
+      id: 'd-spine-genes',
+      fact: 'Disease spine · gene pins available',
+      value: input.topGenes?.length
+        ? `${input.topGenes.length} gene(s) ready for gene-led Discover`
+        : null,
+      source: input.geneSource || 'Open Targets',
+      domain: 'targets',
+      detail: 'Use Discover gene-led mode (must hit pins) for of-record shortlist',
+    }),
+    row({
+      id: 'd-spine-density',
+      fact: 'Disease spine · session density',
+      value: [
+        input.geneCount != null ? `genes=${input.geneCount}` : null,
+        input.trialDrugCount != null ? `trialDrugs=${input.trialDrugCount}` : null,
+        input.moleculeCount != null ? `molecules=${input.moleculeCount}` : null,
+        input.whoGhoCount != null ? `whoGho=${input.whoGhoCount}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ') || null,
+      source: 'BioIntel of-record assemble',
+      domain: 'clinical',
+      detail: 'Session sample counts from free public APIs on this page',
+    }),
+  ]
+  all.push(...spine)
+  sections.push(section('disease-spine', 'Disease epidemiology & densify spine', 'clinical', spine))
 
   const nonEmpty = all.filter((r) => !isDataHubValueEmpty(r.value))
   return {
@@ -186,6 +239,8 @@ export function buildDiseaseDataHub(input: DiseaseDataHubInput): DataHubLedger {
     empty: nonEmpty.length <= 2,
     notes: [
       'Disease facts joined from free public sources on this page.',
+      'WHO GHO is population context — not molecule efficacy.',
+      'Gene-led Discover is optional of-record mode (pin-hard-filter), not LLM ranking.',
       'Not for clinical or regulatory decision support.',
     ],
   }

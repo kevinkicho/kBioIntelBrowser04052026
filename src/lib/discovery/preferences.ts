@@ -38,6 +38,11 @@ export interface DiscoveryPreferences {
    * (shared target / gene association). Hard filter, not soft boost.
    */
   mustHitPinnedTargets: boolean
+  /**
+   * v3 B1: molecule (default) vs gene-led shortlist.
+   * Gene-led forces mustHitPinnedTargets at rank time (deterministic; no LLM).
+   */
+  discoverMode: 'molecule' | 'gene-led'
   /** Optional custom weights; when set, preset shows as "Custom" until reset */
   customWeights?: ScoreAxisWeights
   updatedAt: string
@@ -57,6 +62,7 @@ export const DEFAULT_DISCOVERY_PREFERENCES: DiscoveryPreferences = {
   collaborationMode: 'solo-export',
   rareDiseaseBoost: false,
   mustHitPinnedTargets: false,
+  discoverMode: 'molecule',
   updatedAt: new Date(0).toISOString(),
 }
 
@@ -136,6 +142,11 @@ export function parseDiscoveryPreferences(raw: unknown): DiscoveryPreferences {
       ? o.mustHitPinnedTargets
       : base.mustHitPinnedTargets
 
+  const discoverMode =
+    o.discoverMode === 'gene-led' || o.discoverMode === 'molecule'
+      ? o.discoverMode
+      : base.discoverMode
+
   const customWeights = isScoreAxisWeights(o.customWeights)
     ? { ...o.customWeights }
     : undefined
@@ -155,6 +166,7 @@ export function parseDiscoveryPreferences(raw: unknown): DiscoveryPreferences {
     collaborationMode,
     rareDiseaseBoost,
     mustHitPinnedTargets,
+    discoverMode,
     ...(customWeights ? { customWeights } : {}),
     updatedAt,
   }
@@ -180,6 +192,12 @@ export function mergeDiscoveryPreferences(
   if (patch.rareDiseaseBoost !== undefined) next.rareDiseaseBoost = patch.rareDiseaseBoost
   if (patch.mustHitPinnedTargets !== undefined) {
     next.mustHitPinnedTargets = patch.mustHitPinnedTargets
+  }
+  if (patch.discoverMode !== undefined) {
+    next.discoverMode = patch.discoverMode
+    if (patch.discoverMode === 'gene-led') {
+      next.mustHitPinnedTargets = true
+    }
   }
   if (patch.tourExampleSet !== undefined) next.tourExampleSet = patch.tourExampleSet
   if (patch.collaborationMode !== undefined) next.collaborationMode = patch.collaborationMode
@@ -338,7 +356,7 @@ export function updateDiscoveryPreferences(
 }
 
 /** Beachhead persona presets (v2.1 §0.2) — local prefs only. */
-export type BeachheadPersonaId = 'repurposing' | 'rare-lab'
+export type BeachheadPersonaId = 'repurposing' | 'rare-lab' | 'gene-led'
 
 export function applyBeachheadPersona(persona: BeachheadPersonaId): DiscoveryPreferences {
   if (persona === 'rare-lab') {
@@ -348,6 +366,20 @@ export function applyBeachheadPersona(persona: BeachheadPersonaId): DiscoveryPre
       harvestTiming: 'board-promote',
       tourExampleSet: 'rare-only',
       rareDiseaseBoost: true,
+      mustHitPinnedTargets: false,
+      discoverMode: 'molecule',
+      collaborationMode: 'solo-export',
+    })
+  }
+  if (persona === 'gene-led') {
+    return updateDiscoveryPreferences({
+      rubricPreset: 'balanced',
+      aeAggressiveness: 'soft-flag',
+      harvestTiming: 'board-promote',
+      tourExampleSet: 'mixed',
+      rareDiseaseBoost: true,
+      mustHitPinnedTargets: true,
+      discoverMode: 'gene-led',
       collaborationMode: 'solo-export',
     })
   }
@@ -357,6 +389,8 @@ export function applyBeachheadPersona(persona: BeachheadPersonaId): DiscoveryPre
     harvestTiming: 'board-promote',
     tourExampleSet: 'mixed',
     rareDiseaseBoost: false,
+    mustHitPinnedTargets: false,
+    discoverMode: 'molecule',
     collaborationMode: 'solo-export',
   })
 }

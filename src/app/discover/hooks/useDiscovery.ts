@@ -299,7 +299,10 @@ export function useDiscovery() {
           aeAggressiveness: prefs.aeAggressiveness,
           preferencesSnapshot: snapshotDiscoveryPreferences(prefs),
           rareDiseaseBoost: prefs.rareDiseaseBoost,
-          mustHitPinnedTargets: prefs.mustHitPinnedTargets,
+          // gene-led mode forces pin-hard-filter (deterministic; no LLM)
+          mustHitPinnedTargets:
+            prefs.discoverMode === 'gene-led' ? true : prefs.mustHitPinnedTargets,
+          discoverMode: prefs.discoverMode ?? 'molecule',
         }
 
         // Staged reliable pipeline: cache → network (retry) → validate → store

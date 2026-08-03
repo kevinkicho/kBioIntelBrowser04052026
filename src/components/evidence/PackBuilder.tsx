@@ -21,10 +21,14 @@ import {
 } from '@/lib/evidence'
 import { addPackIndexEntryAndSave, putPackInCache } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
+import { scoreClaimCitationCompleteness } from '@/lib/dataHub/citationCompleteness'
 import { PackView } from './PackView'
 import { PackAiPanel } from './PackAiPanel'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+
+/** M3-ish soft gate: warn before export when citation score &lt; threshold */
+const CITATION_EXPORT_THRESHOLD = 0.6
 
 export interface PackBuilderProps {
   /** Profile merged-data bag or already-shaped Core panels. */
@@ -93,6 +97,14 @@ export function PackBuilder({
   const [landscapeMode, setLandscapeMode] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+  /** Soft M3 gate: block export until force when citation completeness is low */
+  const [forceCitableExport, setForceCitableExport] = useState(false)
+  const [citationGate, setCitationGate] = useState<{
+    format: 'json' | 'md'
+    score: number
+    citable: number
+    total: number
+  } | null>(null)
   const openedEmitted = useRef(false)
   const collabMode = useMemo(() => {
     try {
@@ -234,9 +246,26 @@ export function PackBuilder({
     void putPackInCache(pack)
   }
 
-  const handleDownload = (format: 'json' | 'md') => {
+  const handleDownload = (format: 'json' | 'md', opts?: { force?: boolean }) => {
     try {
       const pack = build()
+      const cite = scoreClaimCitationCompleteness(pack.claims, {
+        threshold: CITATION_EXPORT_THRESHOLD,
+      })
+      if (
+        pack.claims.length > 0 &&
+        !cite.meetsExportThreshold &&
+        !opts?.force &&
+        !forceCitableExport
+      ) {
+        setCitationGate({ format, score: cite.score, citable: cite.citable, total: cite.total })
+        flash(
+          'err',
+          `Citation completeness ${Math.round(cite.score * 100)}% (${cite.citable}/${cite.total} citable) is below ${Math.round(CITATION_EXPORT_THRESHOLD * 100)}% M3 target. Load more Core panels or force export.`,
+        )
+        return
+      }
+      setCitationGate(null)
       setLastPack(pack)
       const body = format === 'json' ? packToJson(pack) : packToMarkdown(pack)
       const mime = format === 'json' ? 'application/json' : 'text/markdown'
@@ -252,10 +281,12 @@ export function PackBuilder({
         citableCount: citable,
         candidateCount: pack.candidates.length,
         projectId: pack.projectId ?? null,
-      })
+        citationScore: cite.score,
+        citationForced: Boolean(opts?.force || forceCitableExport),
+      } as never)
       flash(
         'ok',
-        `Downloaded ${format.toUpperCase()} · ${pack.claimCount} claim${pack.claimCount === 1 ? '' : 's'} (${citable} citable · cap ${MAX_PACK_CLAIMS})`,
+        `Downloaded ${format.toUpperCase()} · ${pack.claimCount} claim${pack.claimCount === 1 ? '' : 's'} (${citable} citable · cap ${MAX_PACK_CLAIMS}${cite.meetsExportThreshold ? '' : ' · below M3 citation target'})`,
       )
       onExported?.(pack, format)
     } catch (err) {
@@ -434,6 +465,44 @@ export function PackBuilder({
         </div>
       )}
 
+      {citationGate && (
+        <div
+          className="mb-3 rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-2 text-[11px] text-amber-100/90"
+          data-testid="pack-citation-gate"
+          role="status"
+        >
+          <p className="font-medium text-amber-100">
+            Citation completeness {Math.round(citationGate.score * 100)}% (
+            {citationGate.citable}/{citationGate.total} citable) is below the{' '}
+            {Math.round(CITATION_EXPORT_THRESHOLD * 100)}% export target.
+          </p>
+          <p className="mt-1 text-[10px] text-amber-200/70">
+            Load more Core panels for of-record sourceUrl/retrievedAt, or force export (still not
+            regulatory decision support).
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="pack-citation-force-export"
+              className="rounded-md border border-amber-700/50 bg-amber-900/40 px-2 py-1 text-[10px] font-medium text-amber-100 hover:bg-amber-800/50"
+              onClick={() => {
+                setForceCitableExport(true)
+                handleDownload(citationGate.format, { force: true })
+              }}
+            >
+              Force export {citationGate.format.toUpperCase()}
+            </button>
+            <button
+              type="button"
+              className="rounded-md border border-slate-700 px-2 py-1 text-[10px] text-slate-400 hover:text-slate-200"
+              onClick={() => setCitationGate(null)}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -464,8 +533,8 @@ export function PackBuilder({
             onClick={() => void handleShare()}
             aria-label={
               shareEnabled
-                ? 'Create a content-hashed snapshot link (30-day TTL). Server stores the pack payload.'
-                : 'Enable “Share links when available” in Discover preferences (collaboration mode) to use server share links. Download always works.'
+                ? 'Share pack — create a content-hashed snapshot link (30-day TTL)'
+                : 'Share pack (enable share links in Discover preferences)'
             }
             className={
               shareEnabled

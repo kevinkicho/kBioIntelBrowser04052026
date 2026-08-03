@@ -135,3 +135,7 @@ export {
 export {
   buildResearchKitV3QualityJson,
 } from './researchKit'
+export {
+  buildBiologicsKitChapter,
+  type BiologicsKitChapter,
+} from './biologicsKitChapter'
