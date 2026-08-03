@@ -1,4 +1,5 @@
 import type { GoAnnotation } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -10,11 +11,12 @@ export async function getGoAnnotationsByAccessions(accessions: string[]): Promis
     const results = await Promise.all(
       limited.map(async (accession): Promise<GoAnnotation[]> => {
         try {
-          const res = await fetch(
+          const res = await timedFetch(
             `https://www.ebi.ac.uk/QuickGO/services/annotation/search?geneProductId=${encodeURIComponent(accession)}&limit=20`,
             {
               ...fetchOptions,
               headers: { Accept: 'application/json' },
+              timeoutMs: 8000,
             },
           )
           if (!res.ok) return []
@@ -27,7 +29,7 @@ export async function getGoAnnotationsByAccessions(accessions: string[]): Promis
             evidence: item.goEvidence ?? '',
             qualifier: item.qualifier ?? '',
             url: `https://www.ebi.ac.uk/QuickGO/term/${item.goId}`,
-          }))
+           timeoutMs: 8000 }))
         } catch {
           return []
         }

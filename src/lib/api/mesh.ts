@@ -1,13 +1,14 @@
 import type { MeshTerm } from '../types'
 import { stripHtml } from '../utils'
 import { LIMITS } from '../api-limits'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getMeshTermsByName(name: string): Promise<MeshTerm[]> {
   try {
     const searchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=mesh&term=${encodeURIComponent(name)}&retmode=json&retmax=${LIMITS.DEFAULT_INITIAL}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
+    const searchRes = await timedFetch(searchUrl, { ...fetchOptions, timeoutMs: 8000 })
     if (!searchRes.ok) return []
     const searchData = await searchRes.json()
 
@@ -15,7 +16,7 @@ export async function getMeshTermsByName(name: string): Promise<MeshTerm[]> {
     if (uids.length === 0) return []
 
     const summaryUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=mesh&id=${uids.join(',')}&retmode=json`
-    const summaryRes = await fetch(summaryUrl, fetchOptions)
+    const summaryRes = await timedFetch(summaryUrl, { ...fetchOptions, timeoutMs: 8000 })
     if (!summaryRes.ok) return []
     const summaryData = await summaryRes.json()
 

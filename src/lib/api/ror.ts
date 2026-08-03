@@ -5,6 +5,8 @@
  * @see docs/design/orgs-hospitals-compendium.md
  */
 
+import { timedFetch } from './timedFetch'
+
 const BASE = 'https://api.ror.org/v2/organizations'
 const fetchOptions: RequestInit = {
   next: { revalidate: 86400 },
@@ -139,7 +141,7 @@ export async function searchRorOrganizations(
   if (filters.length) params.set('filter', filters.join(','))
 
   try {
-    const res = await fetch(`${BASE}?${params.toString()}`, fetchOptions)
+    const res = await timedFetch(`${BASE}?${params.toString()}`, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = (await res.json()) as { items?: unknown[] }
     return (data.items ?? [])

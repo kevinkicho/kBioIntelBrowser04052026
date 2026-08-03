@@ -1,4 +1,5 @@
 import type { Patent } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -14,7 +15,7 @@ export async function getPatentsByMoleculeName(name: string): Promise<Patent[]> 
 
     // Prefer name → PatentID xrefs
     const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/name/${encodeURIComponent(q)}/xrefs/PatentID/JSON`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) {
       // Fallback: CID if numeric
       if (/^\d+$/.test(q)) {
@@ -56,7 +57,7 @@ function mapPatent(patentNumber: string): Patent {
 async function getPatentsByCid(cid: number): Promise<Patent[]> {
   try {
     const url = `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/PatentID/JSON`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const ids: string[] = data?.InformationList?.Information?.[0]?.PatentID ?? []

@@ -1,4 +1,5 @@
 import type { CitationMetric } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -43,7 +44,7 @@ function yearFromPubDate(pubDate: string | undefined): string | undefined {
 
 async function fetchJson(url: string): Promise<unknown | null> {
   try {
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return null
     return await res.json()
   } catch {

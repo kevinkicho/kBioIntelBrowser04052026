@@ -1,25 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getUniprotEntriesByName } from '@/lib/api/uniprot'
-import { getEnsemblGenesBySymbols } from '@/lib/api/ensembl'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ ensemblGenes: [] })
-  }
-
-  const uniprotEntries = await getUniprotEntriesByName(molecule.name)
-  const ensemblGenes = await getEnsemblGenesBySymbols(
-    uniprotEntries.map(e => e.geneName).filter(Boolean),
-  )
-  return NextResponse.json({ ensemblGenes })
+  return moleculeLeafGet(request, params, 'ensemblGenes', (name) => getUniprotEntriesByName(name), {
+    source: 'ensembl',
+  })
 }

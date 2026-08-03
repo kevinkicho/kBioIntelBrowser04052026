@@ -1,21 +1,16 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getGwasAssociationsByName } from '@/lib/api/gwas-catalog'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ gwasAssociations: [] })
-  }
-
-  const gwasAssociations = await getGwasAssociationsByName(molecule.name)
-  return NextResponse.json({ gwasAssociations })
+  return moleculeLeafGet(
+    request,
+    params,
+    'gwasAssociations',
+    (name) => getGwasAssociationsByName(name),
+    { source: 'gwas-catalog' },
+  )
 }

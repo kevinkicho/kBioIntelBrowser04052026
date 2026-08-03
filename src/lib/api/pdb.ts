@@ -1,5 +1,6 @@
 import type { PdbStructure } from '../types'
 import { pdbStructureDeepLink } from '../pdbLinks'
+import { timedFetch } from './timedFetch'
 
 const SEARCH_URL = 'https://search.rcsb.org/rcsbsearch/v2/query'
 const ENTRY_URL = 'https://data.rcsb.org/rest/v1/core/entry'
@@ -48,7 +49,7 @@ export async function getPdbStructuresByName(name: string): Promise<PdbStructure
     const results = await Promise.all(
       pdbIds.map(async (id) => {
         try {
-          const res = await fetch(`${ENTRY_URL}/${id}`, fetchOptions)
+          const res = await timedFetch(`${ENTRY_URL}/${id}`, { ...fetchOptions, timeoutMs: 8000 })
           if (!res.ok) return null
           const entry = await res.json()
 

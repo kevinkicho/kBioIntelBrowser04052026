@@ -1,11 +1,12 @@
 import type { PathwayCommonsResult } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getPathwayCommonsByName(name: string): Promise<PathwayCommonsResult[]> {
   try {
     const url = `https://www.pathwaycommons.org/pc2/search?q=${encodeURIComponent(name)}&type=Pathway&format=json`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 

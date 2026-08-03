@@ -1,6 +1,7 @@
 import type { StringInteraction } from '../types'
 import { LIMITS } from '../api-limits'
 import { resolveDrugTargets } from './drugTargetResolve'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -14,7 +15,7 @@ async function stringPartners(
       `https://string-db.org/api/json/interaction_partners` +
       `?identifiers=${encodeURIComponent(identifier)}&species=9606&limit=${limit}&caller_identity=kNIHexplorer`
     if (requiredScore > 0) url += `&required_score=${requiredScore}`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     if (!Array.isArray(data) || data.length === 0) return []

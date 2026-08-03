@@ -1,21 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getNihGrantsByName } from '@/lib/api/nihreporter'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ grants: [] })
-  }
-
-  const grants = await getNihGrantsByName(molecule.name)
-  return NextResponse.json({ grants })
+  return moleculeLeafGet(request, params, 'grants', (name) => getNihGrantsByName(name), {
+    source: 'nihreporter',
+  })
 }

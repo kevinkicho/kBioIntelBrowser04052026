@@ -1,5 +1,6 @@
 import type { ReactomePathway } from '../types'
 import { stripHtml } from '../utils'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://reactome.org/ContentService/search/query'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -7,9 +8,10 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 export async function getReactomePathwaysByName(name: string): Promise<ReactomePathway[]> {
   try {
     const url = `${BASE_URL}?query=${encodeURIComponent(name)}&types=Pathway&species=Homo+sapiens&cluster=true`
-    const res = await fetch(url, {
+    const res = await timedFetch(url, {
       headers: { Accept: 'application/json' },
       ...fetchOptions,
+      timeoutMs: 8000,
     })
     if (!res.ok) return []
     const data = await res.json()

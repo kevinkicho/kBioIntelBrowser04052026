@@ -1,4 +1,5 @@
 import type { SecFiling } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://efts.sec.gov/LATEST/search-index'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -6,11 +7,12 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 export async function getSecFilingsByName(name: string): Promise<SecFiling[]> {
   try {
     const url = `${BASE_URL}?q=${encodeURIComponent(`"${name}"`)}&dateRange=custom&startdt=2020-01-01&forms=10-K,10-Q`
-    const res = await fetch(url, {
+    const res = await timedFetch(url, {
       headers: {
         'User-Agent': 'kNIHexplorer research@nihexplorer.example.com',
       },
       ...fetchOptions,
+      timeoutMs: 8000,
     })
     if (!res.ok) return []
     const data = await res.json()

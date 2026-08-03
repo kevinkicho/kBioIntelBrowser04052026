@@ -1,4 +1,5 @@
 import type { GwasAssociation } from '../types'
+import { timedFetch } from './timedFetch'
 
 const SEARCH_URL = 'https://www.ebi.ac.uk/gwas/api/search'
 const REST_URL = 'https://www.ebi.ac.uk/gwas/rest/api'
@@ -6,7 +7,7 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 async function searchTraits(query: string, maxResults = 10): Promise<Array<{ trait: string; efoUri: string }>> {
   try {
-    const res = await fetch(`${SEARCH_URL}?q=${encodeURIComponent(query)}&maxResults=${maxResults}`, fetchOptions)
+    const res = await timedFetch(`${SEARCH_URL}?q=${encodeURIComponent(query)}&maxResults=${maxResults}`, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const docs: Record<string, unknown>[] = data?.response?.docs ?? []
@@ -46,7 +47,7 @@ async function fetchAssociationsByEfo(efoUri: string, size = 10): Promise<GwasAs
     if (!efoId) return []
 
     const url = `${REST_URL}/efoTraits/${efoId}/associations?projection=search&page=0&size=${size}`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const associations = data?._embedded?.associations ?? []
@@ -78,7 +79,7 @@ async function fetchAssociationsByEfo(efoUri: string, size = 10): Promise<GwasAs
 async function fetchStudiesByDiseaseTrait(diseaseTrait: string, size = 10): Promise<GwasAssociation[]> {
   try {
     const url = `${REST_URL}/studies/search/findByDiseaseTrait?diseaseTrait=${encodeURIComponent(diseaseTrait)}&size=${size}`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const studies = data?._embedded?.studies ?? []

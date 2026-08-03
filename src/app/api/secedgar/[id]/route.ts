@@ -1,21 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getSecFilingsByName } from '@/lib/api/secedgar'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ filings: [] })
-  }
-
-  const filings = await getSecFilingsByName(molecule.name)
-  return NextResponse.json({ filings })
+  return moleculeLeafGet(request, params, 'filings', (name) => getSecFilingsByName(name), {
+    source: 'secedgar',
+  })
 }

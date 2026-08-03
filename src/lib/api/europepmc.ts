@@ -1,4 +1,5 @@
 import type { LiteratureResult } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://www.ebi.ac.uk/europepmc/webservices/rest/search'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -6,7 +7,7 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 export async function getLiteratureByName(name: string): Promise<LiteratureResult[]> {
   try {
     const url = `${BASE_URL}?query=${encodeURIComponent(name)}&format=json&resultType=core&pageSize=10`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 
@@ -39,7 +40,7 @@ export async function getLiteratureByName(name: string): Promise<LiteratureResul
 export async function getLiteratureHitCount(name: string): Promise<number> {
   try {
     const url = `${BASE_URL}?query=${encodeURIComponent(name)}&format=json&resultType=idlist&pageSize=1`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return 0
     const data = await res.json()
     const n = Number(data.hitCount ?? 0)

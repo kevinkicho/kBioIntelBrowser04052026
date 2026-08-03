@@ -1,21 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getOpenAlexWorksByName } from '@/lib/api/openalex'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ openAlexWorks: [] })
-  }
-
-  const openAlexWorks = await getOpenAlexWorksByName(molecule.name)
-  return NextResponse.json({ openAlexWorks })
+  return moleculeLeafGet(request, params, 'openAlexWorks', (name) => getOpenAlexWorksByName(name), {
+    source: 'openalex',
+  })
 }

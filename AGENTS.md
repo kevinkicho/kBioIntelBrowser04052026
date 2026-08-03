@@ -22,6 +22,7 @@ Coding agents and human implementers: read this before changing product behavior
 - `docs/design/agentic-workflow-cli.md` — full CLI cookbook, playbooks, API surfaces
 - `docs/design/ai-analysis-view.md` — dual-view: of-record rank vs optional AI analysis
 - `docs/design/public-apis-international.md` — free foreign-regulator / research APIs (Health Canada, WHO GHO, …)
+- `docs/design/free-api-agent.md` — policy agent for free-API timeout/retry/empty (not LLM facts)
 
 ## Canonical code areas
 
@@ -31,6 +32,7 @@ Coding agents and human implementers: read this before changing product behavior
 - Extractors: `src/lib/evidence/extractAll.ts`
 - Search history sidebar: `src/lib/searchHistory.ts`, `src/components/layout/SearchHistorySidebar.tsx`
 - Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/profileRevisitIdb.ts`, `src/lib/fetchCategory.ts`
+- **Free-API agent (policy, not LLM):** `src/lib/api/freeApiAgent.ts`, `leafRouteAgent.ts`, `timedFetch.ts` — centralize timeout/retry/abort/empty; molecule leaf routes use `moleculeLeafGet`. Do **not** re-hardcode per-file retry rules. Of-record data still free public HTTP only.
 
 ## UI chrome (agents)
 
@@ -61,6 +63,8 @@ npm run ship:verify:e2e                  # + full-app Playwright with webServer
 npm run ship:verify:all                  # --ci --e2e
 npm run api:health                       # probe all /api routes (app must be running)
 npm run api:health:json                  # same as JSON report
+npm run biointel -- api agent            # free-API agent policy (timeouts/retries — not LLM facts)
+npm run biointel -- api health [live]    # route inventory (live → BIOINTEL_BASE or prod default)
 # Live SLO (post-deploy sample): BIOINTEL_BASE=<prod-url> npm run api:health -- --single-fixture --timeout=25000 --ai-wire-only
 # Targets: high DATA%; category/gene may return 200 partial (_timeout) under load instead of hanging
 npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
@@ -245,3 +249,5 @@ PowerShell note: chain sequential commands with `;` when the harness does not su
 - Re-plumb download→IDB (already in `PackBuilder.registerSideEffects`)
 - Write exploits, malware, or attack scripts
 - Invent regulatory claims or “this drug works” predictions
+- Hardcode timeout/retry/status checks in new `src/lib/api/*` clients — use `freeApiAgent` / `timedFetch` / `moleculeLeafGet`
+- Use LLM to invent panel rows or of-record facts (agent policy ≠ generative evidence)

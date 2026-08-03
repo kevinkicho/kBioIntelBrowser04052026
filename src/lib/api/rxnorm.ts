@@ -1,4 +1,5 @@
 import type { DrugInteraction } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://rxnav.nlm.nih.gov/REST'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -14,7 +15,7 @@ function normalizeSeverity(raw: unknown): InteractionSeverity {
 export async function getRxcuiByName(name: string): Promise<string | null> {
   try {
     let url = `${BASE_URL}/rxcui.json?name=${encodeURIComponent(name)}`
-    let res = await fetch(url, fetchOptions)
+    let res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (res.ok) {
       const data = await res.json()
       const ids = data.idGroup?.rxnormId
@@ -22,7 +23,7 @@ export async function getRxcuiByName(name: string): Promise<string | null> {
     }
 
     url = `${BASE_URL}/approximateTerm.json?term=${encodeURIComponent(name)}&maxEntries=1`
-    res = await fetch(url, fetchOptions)
+    res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (res.ok) {
       const data = await res.json()
       const match = data.approximateGroup?.candidate?.[0]
@@ -45,7 +46,7 @@ export async function getDrugInteractionsByName(name: string): Promise<DrugInter
     for (const other of companionRxcuis) {
       if (other === rxcui) continue
       const listUrl = `${BASE_URL}/interaction/list.json?rxcuis=${rxcui}+${other}`
-      const res = await fetch(listUrl, fetchOptions)
+      const res = await timedFetch(listUrl, { ...fetchOptions, timeoutMs: 8000 })
       if (!res.ok) continue
       const data = await res.json()
       const interactions = parseInteractionGroups(data.fullInteractionTypeGroup ?? data.interactionTypeGroup)
@@ -84,7 +85,7 @@ async function getInteractionsFromOpenFdaLabel(name: string): Promise<DrugIntera
   try {
     const url =
       `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(name)}"+openfda.brand_name:"${encodeURIComponent(name)}"&limit=3`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const results = data.results ?? []

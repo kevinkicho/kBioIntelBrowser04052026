@@ -152,6 +152,8 @@ Commands:
 
   api get <path>               GET any API path (relative)
   api post <path> --body '{}'  POST JSON body
+  api agent                    Free-API agent policy (timeouts/retries — not LLM facts)
+  api health [live]            Full route inventory (local or BIOINTEL_BASE / live)
 
   gate                         npm run test:gate
   e2e [fixture|auto|live]      North-star Playwright e2e
@@ -713,9 +715,89 @@ function cmdLogs(sub, positionals, flags) {
   die(`unknown logs subcommand: ${sub}`)
 }
 
+function cmdApiAgent() {
+  // Policy agent — not LLM inventing of-record facts (product law).
+  console.log(`Free-API Agent (policy runtime — not LLM facts)
+
+Of-record evidence still comes only from free public HTTP APIs.
+This agent centralizes timeout / retry / abort / empty / status so clients
+do not hardcode the same rules in every file.
+
+Layers:
+  freeApiAgent     src/lib/api/freeApiAgent.ts   — timeout, retry, fallback, status
+  leafRouteAgent   src/lib/api/leafRouteAgent.ts — standard /api/{source}/[id] envelope
+  timedFetch       src/lib/api/timedFetch.ts     — wall-clock AbortSignal on fetch
+  Copilot          optional — choose which tools; claim-bound only
+  Discover rank    deterministic scores — never LLM
+
+Defaults:
+  leaf timeout     8s (DEFAULT_LEAF_TIMEOUT_MS)
+  leaf route work  12s
+  molecule lookup  6s
+  retries          0 (set retries on freeApiAgent spec)
+  retry HTTP       429, 502, 503, 504
+
+Usage (code):
+  import { freeApiAgent, freeApiJson } from '@/lib/api/freeApiAgent'
+  import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
+
+  const r = await freeApiAgent({
+    source: 'mesh',
+    empty: [],
+    timeoutMs: 8000,
+    run: async ({ signal }) => { /* free public API only */ },
+  })
+
+  // Route:
+  export async function GET(req, { params }) {
+    return moleculeLeafGet(req, params, 'meshTerms', (name) => getMeshTermsByName(name), {
+      source: 'mesh',
+    })
+  }
+
+Live inventory (declarative probes — no per-route hardcoding):
+  npm run biointel -- api health
+  npm run biointel -- api health live
+  # or: BIOINTEL_BASE=https://… npm run api:health
+
+Design: docs/design/free-api-agent.md
+`)
+}
+
+function cmdApiHealth(positionals) {
+  const mode = (positionals[0] || '').toLowerCase()
+  const env = { ...process.env }
+  if (mode === 'live' || mode === 'prod' || mode === 'production') {
+    if (!env.BIOINTEL_BASE) {
+      // Prefer App Hosting prod URL when operators say "live" without env set.
+      env.BIOINTEL_BASE = 'https://biointel--biointel.us-central1.hosted.app'
+      console.error(`api health live: BIOINTEL_BASE not set; using ${env.BIOINTEL_BASE}`)
+    }
+  }
+  const extra = []
+  if (process.argv.includes('--json')) {
+    extra.push('--', '--json')
+  }
+  const r = spawnSync('npm', ['run', 'api:health', ...extra], {
+    cwd: ROOT,
+    stdio: 'inherit',
+    shell: true,
+    env,
+  })
+  process.exit(r.status ?? 1)
+}
+
 async function cmdApi(sub, positionals, flags) {
+  if (sub === 'agent') {
+    cmdApiAgent()
+    return
+  }
+  if (sub === 'health') {
+    cmdApiHealth(positionals)
+    return
+  }
   const p = positionals[0]
-  if (!p) die('api get|post requires <path>')
+  if (!p) die('api get|post|agent|health — get|post require <path>')
   const pathPart = p.startsWith('/') ? p : `/${p}`
   if (sub === 'get') {
     const { status, data } = await httpJson('GET', pathPart, undefined, { allowError: true })
@@ -739,7 +821,7 @@ async function cmdApi(sub, positionals, flags) {
     if (status >= 400) process.exit(1)
     return
   }
-  die(`unknown api subcommand: ${sub}`)
+  die(`unknown api subcommand: ${sub} (get|post|agent|health)`)
 }
 
 function runNpm(scriptArgs) {

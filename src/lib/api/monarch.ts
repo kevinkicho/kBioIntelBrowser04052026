@@ -1,13 +1,14 @@
 import type { MonarchDisease } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getMonarchDiseasesByName(name: string): Promise<MonarchDisease[]> {
   try {
     // v3 API path is /v3/api/search (not /v3/search)
-    const res = await fetch(
+    const res = await timedFetch(
       `https://api.monarchinitiative.org/v3/api/search?q=${encodeURIComponent(name)}&limit=10&category=biolink:Disease`,
-      fetchOptions,
+      { ...fetchOptions, timeoutMs: 8000 },
     )
     if (!res.ok) return []
     const data = await res.json()

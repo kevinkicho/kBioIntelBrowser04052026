@@ -1,4 +1,5 @@
 import type { UniprotEntry } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://rest.uniprot.org/uniprotkb/search'
 const DETAIL_URL = 'https://rest.uniprot.org/uniprotkb'
@@ -65,7 +66,7 @@ export async function getUniprotEntriesByName(name: string): Promise<UniprotEntr
       q = raw
     }
     const url = `${BASE_URL}?query=${encodeURIComponent(q)}&format=json&size=5`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 
@@ -108,7 +109,7 @@ export async function searchUniProt(
       format: 'json',
     })
     const url = `${BASE_URL}?${params}`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) throw new Error('UniProt search failed')
     const data = await res.json()
     return {
@@ -196,7 +197,7 @@ function extractSubcellularLocation(comments: unknown): string | undefined {
 export async function getUniProtProtein(accession: string): Promise<UniProtProtein | null> {
   try {
     const url = `${DETAIL_URL}/${accession}.json`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return null
     const data = await res.json()
 

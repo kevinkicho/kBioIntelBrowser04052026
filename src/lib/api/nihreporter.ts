@@ -1,4 +1,5 @@
 import type { NihGrant } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.reporter.nih.gov/v2/projects/search'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -17,11 +18,12 @@ export async function getNihGrantsByName(name: string): Promise<NihGrant[]> {
       offset: 0,
     })
 
-    const res = await fetch(BASE_URL, {
+    const res = await timedFetch(BASE_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
       ...fetchOptions,
+      timeoutMs: 8000,
     })
     if (!res.ok) return []
     const data = await res.json()

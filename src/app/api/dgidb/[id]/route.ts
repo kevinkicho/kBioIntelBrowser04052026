@@ -1,19 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getDrugGeneInteractionsByName } from '@/lib/api/dgidb'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ drugGeneInteractions: [] })
-  }
-  const drugGeneInteractions = await getDrugGeneInteractionsByName(molecule.name)
-  return NextResponse.json({ drugGeneInteractions })
+  return moleculeLeafGet(request, params, 'drugGeneInteractions', (name) => getDrugGeneInteractionsByName(name), {
+    source: 'dgidb',
+  })
 }

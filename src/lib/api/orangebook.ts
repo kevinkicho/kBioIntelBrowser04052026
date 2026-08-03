@@ -1,4 +1,5 @@
 import type { OrangeBookEntry } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.fda.gov/drug/drugsfda.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -13,7 +14,7 @@ export async function getOrangeBookByName(name: string): Promise<OrangeBookEntry
     const search = `openfda.generic_name:"${encoded}"+openfda.brand_name:"${encoded}"`
     const url = `${BASE_URL}?search=${search}&limit=10${keyParam}`
 
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 

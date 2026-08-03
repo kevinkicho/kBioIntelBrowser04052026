@@ -1,21 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getClinVarVariantsByName } from '@/lib/api/clinvar'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ clinVarVariants: [] })
-  }
-
-  const clinVarVariants = await getClinVarVariantsByName(molecule.name)
-  return NextResponse.json({ clinVarVariants })
+  return moleculeLeafGet(request, params, 'clinVarVariants', (name) => getClinVarVariantsByName(name), {
+    source: 'clinvar',
+  })
 }

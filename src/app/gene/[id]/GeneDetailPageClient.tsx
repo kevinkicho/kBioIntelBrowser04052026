@@ -36,6 +36,7 @@ import { DescriptionTip, HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
 import { CrossSourceStrip } from '@/components/crossSource/CrossSourceStrip'
 import { DataHubLedgerView } from '@/components/dataHub/DataHubLedger'
+import { PartialTimeoutBanner } from '@/components/ui/PartialTimeoutBanner'
 import { ResearchViewPrefsBar } from '@/components/dataHub/ResearchViewPrefsBar'
 import { useResearchViewPrefs } from '@/hooks/useResearchViewPrefs'
 import { isGeneResearchTableEnabled } from '@/lib/researchViewPrefs'
@@ -3062,6 +3063,22 @@ function GeneDetailPageClientInner({
             )
           })}
         </div>
+
+        {loaded &&
+          categoryData?._partial === true &&
+          (categoryData?._timeout === true || typeof categoryData?._error === 'string') && (
+            <div className="mb-4">
+              <PartialTimeoutBanner
+                scopeLabel="Gene evidence"
+                message={
+                  typeof categoryData._error === 'string' ? categoryData._error : undefined
+                }
+                onRetry={() => void loadGeneCategory({ force: true })}
+                retrying={loading}
+                testId="gene-partial-timeout-banner"
+              />
+            </div>
+          )}
 
         {loaded && (
           <>

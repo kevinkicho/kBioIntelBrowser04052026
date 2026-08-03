@@ -1,4 +1,5 @@
 import type { GeneExpression } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { cache: 'no-store' }
 
@@ -98,9 +99,10 @@ export async function getGeneExpressionBySymbols(symbols: string[]): Promise<Gen
           const baselineUrl =
             `https://www.ebi.ac.uk/gxa/json/baseline_experiments?geneQuery=${encodeURIComponent(symbol)}` +
             `&species=${encodeURIComponent('homo sapiens')}`
-          const baseRes = await fetch(baselineUrl, {
+          const baseRes = await timedFetch(baselineUrl, {
             ...fetchOptions,
             headers: { Accept: 'application/json' },
+            timeoutMs: 8000,
           })
           if (baseRes.ok) {
             const baseJson = await baseRes.json()
@@ -112,9 +114,9 @@ export async function getGeneExpressionBySymbols(symbols: string[]): Promise<Gen
           }
 
           // 2) Fallback: experiment catalog (no numeric levels)
-          const res = await fetch(
+          const res = await timedFetch(
             `https://www.ebi.ac.uk/gxa/json/experiments?geneQuery=${encodeURIComponent(symbol)}`,
-            { ...fetchOptions, headers: { Accept: 'application/json' } },
+            { ...fetchOptions, headers: { Accept: 'application/json' }, timeoutMs: 8000 },
           )
           if (!res.ok) return []
           const data = await res.json()

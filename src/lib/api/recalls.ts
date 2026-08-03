@@ -1,4 +1,5 @@
 import type { DrugRecall } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.fda.gov/drug/enforcement.json'
 const fetchOptions: RequestInit = { next: { revalidate: 3600 } }
@@ -25,7 +26,7 @@ export async function getDrugRecallsByName(name: string): Promise<DrugRecall[]> 
     const dateFilter = `+AND+report_date:[${twoYearsAgoCompact()}+TO+${today}]`
     const url = `${BASE_URL}?search=openfda.generic_name:"${encoded}"+OR+openfda.brand_name:"${encoded}"${dateFilter}&limit=10&sort=report_date:desc${keyParam}`
 
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 

@@ -1,21 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getNdcProductsByName } from '@/lib/api/fda-ndc'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** Leaf route delegated to free-API agent policy (timeout/empty/partial). */
 export async function GET(
-  _request: NextRequest,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  const cid = parseInt(params.id, 10)
-  if (isNaN(cid)) {
-    return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-  }
-
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ ndcProducts: [] })
-  }
-
-  const ndcProducts = await getNdcProductsByName(molecule.name)
-  return NextResponse.json({ ndcProducts })
+  return moleculeLeafGet(request, params, 'ndcProducts', (name) => getNdcProductsByName(name), {
+    source: 'fda-ndc',
+  })
 }

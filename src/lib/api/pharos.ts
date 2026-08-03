@@ -1,4 +1,5 @@
 import type { PharosTarget } from '../types'
+import { timedFetch } from './timedFetch'
 
 const PHAROS_URL = 'https://pharos-api.ncats.io/graphql'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -20,11 +21,12 @@ query targetSearch($name: String!) {
 
 export async function getPharosTargetsByName(name: string): Promise<PharosTarget[]> {
   try {
-    const res = await fetch(PHAROS_URL, {
+    const res = await timedFetch(PHAROS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: QUERY, variables: { name } }),
       ...fetchOptions,
+      timeoutMs: 8000,
     })
     if (!res.ok) return []
     const data = await res.json()
@@ -68,11 +70,12 @@ export async function getPharosTdlBySymbol(
   const sym = symbol.trim()
   if (!sym) return null
   try {
-    const res = await fetch(PHAROS_URL, {
+    const res = await timedFetch(PHAROS_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ query: TARGET_BY_SYM, variables: { sym } }),
       ...fetchOptions,
+      timeoutMs: 8000,
     })
     if (!res.ok) return null
     const data = await res.json()

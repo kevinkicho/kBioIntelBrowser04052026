@@ -1,4 +1,5 @@
 import type { EnsemblGene } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -10,9 +11,9 @@ export async function getEnsemblGenesBySymbols(symbols: string[]): Promise<Ensem
     const results = await Promise.all(
       limited.map(async (symbol): Promise<EnsemblGene | null> => {
         try {
-          const res = await fetch(
+          const res = await timedFetch(
             `https://rest.ensembl.org/lookup/symbol/homo_sapiens/${encodeURIComponent(symbol)}?content-type=application/json`,
-            fetchOptions,
+            { ...fetchOptions, timeoutMs: 8000 },
           )
           if (!res.ok) return null
           const data = await res.json()

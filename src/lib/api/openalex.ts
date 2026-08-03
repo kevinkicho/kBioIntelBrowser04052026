@@ -1,12 +1,13 @@
 import type { OpenAlexWork } from '../types'
 import { openAlexWorkDeepLink, openAlexWorkPageUrl } from '../openalexLinks'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getOpenAlexWorksByName(name: string): Promise<OpenAlexWork[]> {
   try {
     const url = `https://api.openalex.org/works?filter=title.search:${encodeURIComponent(name)}&per_page=10&sort=cited_by_count:desc`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 

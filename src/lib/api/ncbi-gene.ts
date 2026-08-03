@@ -1,6 +1,7 @@
 import type { GeneInfo } from '../types'
 import { LIMITS } from '../api-limits'
 import { getApiKey } from './utils'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -10,18 +11,18 @@ export async function getGeneInfoByName(name: string): Promise<GeneInfo[]> {
     const NCBI_API_KEY = getApiKey('NCBI_API_KEY') ?? ''
     const credsSuffix = (NCBI_API_KEY ? `&api_key=${NCBI_API_KEY}` : '') + (NCBI_EMAIL ? `&email=${encodeURIComponent(NCBI_EMAIL)}` : '')
     const term = `${encodeURIComponent(name)}+AND+Homo+sapiens[Organism]`
-    const searchRes = await fetch(
+    const searchRes = await timedFetch(
       `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=gene&term=${term}&retmode=json&retmax=${LIMITS.NCBI_GENE.initial}${credsSuffix}`,
-      fetchOptions,
+      { ...fetchOptions, timeoutMs: 8000 },
     )
     if (!searchRes.ok) return []
     const searchData = await searchRes.json()
     const ids: string[] = searchData?.esearchresult?.idlist ?? []
     if (ids.length === 0) return []
 
-    const summaryRes = await fetch(
+    const summaryRes = await timedFetch(
       `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=gene&id=${ids.join(',')}&retmode=json${credsSuffix}`,
-      fetchOptions,
+      { ...fetchOptions, timeoutMs: 8000 },
     )
     if (!summaryRes.ok) return []
     const summaryData = await summaryRes.json()

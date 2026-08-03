@@ -1,5 +1,6 @@
 import type { ChemicalProteinInteraction } from '../types'
 import { LIMITS } from '../api-limits'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -30,7 +31,7 @@ export async function getChemicalInteractionsByName(
         `https://string-db.org/api/json/interaction_partners` +
         `?identifiers=${encodeURIComponent(id)}&species=9606&limit=${limit}&caller_identity=kNIHexplorer`
       try {
-        const res = await fetch(url, fetchOptions)
+        const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
         if (!res.ok) continue
         const data = await res.json()
         if (!Array.isArray(data) || data.length === 0) continue

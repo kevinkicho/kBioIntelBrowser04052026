@@ -1,4 +1,5 @@
 import type { ProteinAtlasEntry } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -10,9 +11,9 @@ export async function getProteinAtlasBySymbols(symbols: string[]): Promise<Prote
     const results = await Promise.all(
       limited.map(async (symbol): Promise<ProteinAtlasEntry | null> => {
         try {
-          const res = await fetch(
+          const res = await timedFetch(
             `https://www.proteinatlas.org/api/search_download.php?search=${encodeURIComponent(symbol)}&format=json&columns=g,t,scl,up&compress=no`,
-            fetchOptions,
+            { ...fetchOptions, timeoutMs: 8000 },
           )
           if (!res.ok) return null
           const data = await res.json()

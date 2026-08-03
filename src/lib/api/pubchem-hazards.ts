@@ -1,4 +1,5 @@
 import type { GhsHazardData } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://pubchem.ncbi.nlm.nih.gov/rest/pug_view/data/compound'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -33,7 +34,7 @@ function findSection(sections: PugViewSection[], heading: string): PugViewSectio
 export async function getGhsHazardsByCid(cid: number): Promise<GhsHazardData | null> {
   try {
     const url = `${BASE_URL}/${cid}/JSON?heading=GHS+Classification`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return null
     const data = await res.json()
 

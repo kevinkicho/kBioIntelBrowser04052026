@@ -1,4 +1,5 @@
 import type { NciConcept } from '../types'
+import { timedFetch } from './timedFetch'
 
 const EVS_BASE = 'https://api-evsrest.nci.nih.gov/api/v1/concept/ncit'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -79,7 +80,7 @@ export async function getNciConceptsByName(name: string): Promise<NciConcept[]> 
       `${EVS_BASE}/search?term=${encodeURIComponent(q)}` +
       `&type=contains&pageSize=12&include=summary,definitions,synonyms,properties`
 
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const raw = (data.concepts ?? data) as unknown[]

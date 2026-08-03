@@ -19,6 +19,7 @@ import { Modal } from '@/components/ui/Modal'
 import { Panel } from '@/components/ui/Panel'
 import { isPanelSourceDisabled } from '@/lib/api/sourceAvailability'
 import { CategorySection } from '@/components/profile/CategorySection'
+import { PartialTimeoutBanner } from '@/components/ui/PartialTimeoutBanner'
 import { PanelSearch } from '@/components/profile/PanelSearch'
 import {
   CATEGORIES,
@@ -1571,40 +1572,65 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
     const nError = statusEntries.filter(([, v]) => v.status === 'error').length
     const nDisabled = statusEntries.filter(([, v]) => v.status === 'disabled').length
     const hasActionableStatus = nTimeout > 0 || nError > 0 || nDisabled > 0
+    const isPartialTimeout =
+      catPayload?._partial === true &&
+      (catPayload?._timeout === true || typeof catPayload?._error === 'string')
 
     if (allowedVisible.length === 0) {
       // Compact empty — no full-width “Source status” card that looks like blank UI
       return (
-        <div
-          className="rounded-lg border border-slate-800/80 bg-slate-900/30 px-3 py-2.5 text-[11px] text-slate-500"
-          data-testid={`category-empty-${catId}`}
-        >
-          <p>
-            {status === 'loaded'
-              ? 'No panel data to show for this category (sources empty or timed out — not a missing layout).'
-              : 'No panels to show yet.'}
-          </p>
-          {(hasActionableStatus || fromCache) && (
-            <p className="mt-1 text-[10px] text-slate-600 flex flex-wrap gap-x-2 gap-y-0.5">
-              {fromCache && (
-                <span className="text-cyan-500/80">
-                  cache
-                  {categoryFetchedAt
-                    ? ` · ${categoryFetchedAt.toLocaleString()}`
-                    : ''}
-                </span>
-              )}
-              {nTimeout > 0 && <span className="text-amber-400/80">{nTimeout} timed out</span>}
-              {nError > 0 && <span className="text-red-400/80">{nError} errors</span>}
-              {nDisabled > 0 && <span>{nDisabled} disabled</span>}
-            </p>
+        <div className="space-y-2" data-testid={`category-empty-wrap-${catId}`}>
+          {isPartialTimeout && (
+            <PartialTimeoutBanner
+              scopeLabel="This category"
+              message={typeof catPayload?._error === 'string' ? catPayload._error : undefined}
+              onRetry={() => loadCategory(catId, { force: true })}
+              retrying={isBusy}
+              testId={`partial-timeout-${catId}`}
+            />
           )}
+          <div
+            className="rounded-lg border border-slate-800/80 bg-slate-900/30 px-3 py-2.5 text-[11px] text-slate-500"
+            data-testid={`category-empty-${catId}`}
+          >
+            <p>
+              {status === 'loaded'
+                ? isPartialTimeout
+                  ? 'No panels finished in time for this category (timeout — not proven absence of evidence).'
+                  : 'No panel data to show for this category (sources empty or timed out — not a missing layout).'
+                : 'No panels to show yet.'}
+            </p>
+            {(hasActionableStatus || fromCache) && (
+              <p className="mt-1 text-[10px] text-slate-600 flex flex-wrap gap-x-2 gap-y-0.5">
+                {fromCache && (
+                  <span className="text-cyan-500/80">
+                    cache
+                    {categoryFetchedAt
+                      ? ` · ${categoryFetchedAt.toLocaleString()}`
+                      : ''}
+                  </span>
+                )}
+                {nTimeout > 0 && <span className="text-amber-400/80">{nTimeout} timed out</span>}
+                {nError > 0 && <span className="text-red-400/80">{nError} errors</span>}
+                {nDisabled > 0 && <span>{nDisabled} disabled</span>}
+              </p>
+            )}
+          </div>
         </div>
       )
     }
 
     return (
       <div className="space-y-2" data-testid={`category-panels-${catId}`}>
+        {isPartialTimeout && (
+          <PartialTimeoutBanner
+            scopeLabel="This category"
+            message={typeof catPayload?._error === 'string' ? catPayload._error : undefined}
+            onRetry={() => loadCategory(catId, { force: true })}
+            retrying={isBusy}
+            testId={`partial-timeout-${catId}`}
+          />
+        )}
         {/* Compact strip only when there is something actionable — not a tall empty grid cell */}
         {hasActionableStatus && (
           <div className="text-[10px] text-slate-500 px-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5">

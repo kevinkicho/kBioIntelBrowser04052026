@@ -20,12 +20,14 @@ export interface WhoGhoFact {
   dim1: string
 }
 
+import { timedFetch } from './timedFetch'
+
 const BASE = 'https://ghoapi.azureedge.net/api'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
   try {
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return null
     return (await res.json()) as T
   } catch {

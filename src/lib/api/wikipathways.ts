@@ -1,4 +1,5 @@
 import type { WikiPathway } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -12,7 +13,7 @@ export async function getWikiPathwaysByName(name: string): Promise<WikiPathway[]
     const pcUrl =
       `https://www.pathwaycommons.org/pc2/search.json?q=${encodeURIComponent(q)}` +
       `&type=pathway&organism=9606&page=0`
-    const pcRes = await fetch(pcUrl, fetchOptions)
+    const pcRes = await timedFetch(pcUrl, { ...fetchOptions, timeoutMs: 8000 })
     if (pcRes.ok) {
       const data = await pcRes.json()
       const hits = (data.searchHit ?? data.searchHits ?? []) as Array<Record<string, unknown>>
@@ -39,7 +40,7 @@ export async function getWikiPathwaysByName(name: string): Promise<WikiPathway[]
 
     // Fallback: Reactome pathways API by name (still free, pathway-shaped)
     const rUrl = `https://reactome.org/ContentService/search/query?query=${encodeURIComponent(q)}&species=Homo%20sapiens&types=Pathway&cluster=true`
-    const rRes = await fetch(rUrl, fetchOptions)
+    const rRes = await timedFetch(rUrl, { ...fetchOptions, timeoutMs: 8000 })
     if (rRes.ok) {
       const data = await rRes.json()
       const results = (data.results ?? []) as Array<{

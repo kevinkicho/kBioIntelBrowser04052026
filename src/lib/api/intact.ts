@@ -1,5 +1,6 @@
 import type { MolecularInteraction } from '../types'
 import { resolveDrugTargets } from './drugTargetResolve'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -63,7 +64,7 @@ async function psicquicByAccession(accession: string, max = 10): Promise<Molecul
   try {
     const q = `species:human AND id:${encodeURIComponent(accession)}`
     const url = `${PSICQUIC_URL}/${q}?format=tab25&firstResult=0&maxResults=${max}`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const text = await res.text()
     if (!text.trim() || text.trim().startsWith('<') || text.trim().startsWith('{')) return []
@@ -83,7 +84,7 @@ async function psicquicByAccession(accession: string, max = 10): Promise<Molecul
 async function legacyByName(name: string): Promise<MolecularInteraction[]> {
   try {
     const url = `${LEGACY_URL}/${encodeURIComponent(name)}?format=json&pageSize=10`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
     const entries = data?.content ?? data?.data ?? (Array.isArray(data) ? data : [])
@@ -149,7 +150,7 @@ export async function getMolecularInteractionsByName(name: string): Promise<Mole
     for (const gene of resolved.geneSymbols.slice(0, 2)) {
       try {
         const url = `${PSICQUIC_URL}/${encodeURIComponent(`species:human AND gene:${gene}`)}?format=tab25&firstResult=0&maxResults=10`
-        const res = await fetch(url, fetchOptions)
+        const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
         if (!res.ok) continue
         const text = await res.text()
         const out: MolecularInteraction[] = []

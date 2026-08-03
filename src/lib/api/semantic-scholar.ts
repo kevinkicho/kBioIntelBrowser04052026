@@ -1,12 +1,13 @@
 import type { SemanticPaper } from '../types'
 import { LIMITS } from '../api-limits'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 export async function getSemanticPapersByName(name: string, limit: number = LIMITS.SEMANTIC_SCHOLAR.initial): Promise<SemanticPaper[]> {
   try {
     const url = `https://api.semanticscholar.org/graph/v1/paper/search?query=${encodeURIComponent(name)}&limit=${limit}&fields=title,year,citationCount,abstract,url,tldr`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = await res.json()
 

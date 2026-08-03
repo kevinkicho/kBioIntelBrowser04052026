@@ -1,4 +1,5 @@
 import type { DrugPrice } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -20,7 +21,7 @@ export async function getDrugPricesByName(name: string): Promise<DrugPrice[]> {
     params.set('conditions[0][value]', q.toUpperCase())
     params.set('conditions[0][operator]', 'contains')
 
-    const res = await fetch(`${NADAC_QUERY}?${params.toString()}`, fetchOptions)
+    const res = await timedFetch(`${NADAC_QUERY}?${params.toString()}`, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return []
     const data = (await res.json()) as {
       results?: Record<string, string>[]

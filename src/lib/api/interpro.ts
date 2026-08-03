@@ -1,4 +1,5 @@
 import type { ProteinDomain } from '../types'
+import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
@@ -10,9 +11,9 @@ export async function getProteinDomains(accessions: string[]): Promise<ProteinDo
     const results = await Promise.all(
       limited.map(async (accession): Promise<ProteinDomain[]> => {
         try {
-          const res = await fetch(
+          const res = await timedFetch(
             `https://www.ebi.ac.uk/interpro/api/entry/interpro/protein/UniProt/${encodeURIComponent(accession)}?page_size=10`,
-            fetchOptions,
+            { ...fetchOptions, timeoutMs: 8000 },
           )
           if (!res.ok) return []
           const data = await res.json()
