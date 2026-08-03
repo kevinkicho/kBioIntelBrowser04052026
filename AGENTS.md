@@ -22,7 +22,9 @@ Coding agents and human implementers: read this before changing product behavior
 - `docs/design/agentic-workflow-cli.md` — full CLI cookbook, playbooks, API surfaces
 - `docs/design/ai-analysis-view.md` — dual-view: of-record rank vs optional AI analysis
 - `docs/design/public-apis-international.md` — free foreign-regulator / research APIs (Health Canada, WHO GHO, …)
-- `docs/design/free-api-agent.md` — policy agent for free-API timeout/retry/empty (not LLM facts)
+- `docs/design/free-api-agent.md` — policy agent for free-API timeout/retry/empty + etiquette (not LLM facts)
+- `docs/design/discovery-workbench-v3.md` — ambitious scope expansion (safety triangulation, five-regulator, campaigns, kit v2)
+- `docs/golden/` — beachhead golden disease/CID expectations
 
 ## Canonical code areas
 
@@ -32,7 +34,8 @@ Coding agents and human implementers: read this before changing product behavior
 - Extractors: `src/lib/evidence/extractAll.ts`
 - Search history sidebar: `src/lib/searchHistory.ts`, `src/components/layout/SearchHistorySidebar.tsx`
 - Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/profileRevisitIdb.ts`, `src/lib/fetchCategory.ts`
-- **Free-API agent (policy, not LLM):** `src/lib/api/freeApiAgent.ts`, `leafRouteAgent.ts`, `timedFetch.ts` — centralize timeout/retry/abort/empty; molecule leaf routes use `moleculeLeafGet`. Do **not** re-hardcode per-file retry rules. Of-record data still free public HTTP only.
+- **Free-API agent (policy + etiquette, not LLM):** `src/lib/api/freeApiAgent.ts`, `leafRouteAgent.ts`, `timedFetch.ts`, `freeApiEtiquette.ts`, `src/lib/rateLimit.ts` — centralize timeout/retry/abort/empty **and** free-API etiquette (host rate limits, concurrency, Retry-After, polite User-Agent) so we do not stampede public APIs into 429s. Molecule leaf routes use `moleculeLeafGet`. Do **not** re-hardcode per-file retry/rate-limit rules. Of-record data still free public HTTP only.
+- **v3 of-record expansion:** `safetyTriangulation.ts`, `fiveRegulatorCard.ts`, `citationCompleteness.ts`, `campaign/campaignWorkspace.ts`; research kit `schemaVersion: 2` + `v3-quality.json`
 
 ## UI chrome (agents)
 
@@ -249,5 +252,6 @@ PowerShell note: chain sequential commands with `;` when the harness does not su
 - Re-plumb download→IDB (already in `PackBuilder.registerSideEffects`)
 - Write exploits, malware, or attack scripts
 - Invent regulatory claims or “this drug works” predictions
-- Hardcode timeout/retry/status checks in new `src/lib/api/*` clients — use `freeApiAgent` / `timedFetch` / `moleculeLeafGet`
+- Hardcode timeout/retry/status/rate-limit checks in new `src/lib/api/*` clients — use `freeApiAgent` / `timedFetch` / `moleculeLeafGet` (etiquette is agent-owned)
 - Use LLM to invent panel rows or of-record facts (agent policy ≠ generative evidence)
+- Burst bare `fetch` to free hosts without `timedFetch` / rateLimit (bypasses etiquette)
