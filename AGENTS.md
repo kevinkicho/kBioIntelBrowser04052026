@@ -61,6 +61,8 @@ npm run ship:verify:e2e                  # + full-app Playwright with webServer
 npm run ship:verify:all                  # --ci --e2e
 npm run api:health                       # probe all /api routes (app must be running)
 npm run api:health:json                  # same as JSON report
+# Live SLO (post-deploy sample): BIOINTEL_BASE=<prod-url> npm run api:health -- --single-fixture --timeout=25000 --ai-wire-only
+# Targets: high DATA%; category/gene may return 200 partial (_timeout) under load instead of hanging
 npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
 npm run test:e2e:fixture                 # north-star + data-hub e2e (needs npm run dev, E2E_FIXTURE=1)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)

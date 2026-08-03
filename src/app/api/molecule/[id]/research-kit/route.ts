@@ -101,70 +101,81 @@ export async function GET(
     const loaded: string[] = []
     const failed: string[] = []
 
-    await Promise.all(
-      categories.map(async (categoryId) => {
-        const categoryTimeout = Math.min(getCategoryTimeout(categoryId) || 12_000, 14_000)
-        try {
-          const ac = new AbortController()
-          const data = await runWithApiAbort(
-            ac,
-            async () => {
-              const fetchPromise = (async (): Promise<Record<string, unknown> | null> => {
-                switch (categoryId) {
-                  case 'pharmaceutical':
-                    return (await fetchPharmaceutical(name, synonyms, queryFor, apiParams)) as Record<
-                      string,
-                      unknown
-                    >
-                  case 'clinical-safety':
-                    return (await fetchClinicalSafety(name, queryFor, apiParams)) as Record<
-                      string,
-                      unknown
-                    >
-                  case 'molecular-chemical':
-                    return (await fetchMolecularChemical(
-                      name,
-                      cid,
-                      molecularWeight,
-                      queryFor,
-                      apiParams,
-                    )) as Record<string, unknown>
-                  case 'bioactivity-targets':
-                    return (await fetchBioactivityTargets(name, queryFor, apiParams)) as Record<
-                      string,
-                      unknown
-                    >
-                  case 'research-literature':
-                    return (await fetchResearchLiterature(name, queryFor, apiParams)) as Record<
-                      string,
-                      unknown
-                    >
-                  default:
-                    return null
-                }
-              })()
+    // Sequential categories under a shared wall clock — parallel 5×14s was
+    // starving App Hosting and hanging research-kit for 90s+.
+    const kitWallMs = Number(process.env.RESEARCH_KIT_WALL_MS) || 18_000
+    const kitDeadline = Date.now() + kitWallMs
 
-              return await withTimeout(fetchPromise, categoryTimeout + 2000, {
-                abortController: ac,
-                signal: request.signal,
-              })
-            },
-            [request.signal],
-          )
-          if (data && typeof data === 'object') {
-            for (const [k, v] of Object.entries(data)) {
-              if (k.startsWith('_')) continue
-              bags[k] = v
-            }
-            loaded.push(categoryId)
-          } else {
-            failed.push(categoryId)
+    for (const categoryId of categories) {
+      const remaining = kitDeadline - Date.now()
+      if (remaining < 1_500) {
+        failed.push(categoryId)
+        continue
+      }
+      const categoryTimeout = Math.min(
+        getCategoryTimeout(categoryId) || 10_000,
+        Math.min(10_000, remaining - 200),
+      )
+      try {
+        const ac = new AbortController()
+        const data = await runWithApiAbort(
+          ac,
+          async () => {
+            const fetchPromise = (async (): Promise<Record<string, unknown> | null> => {
+              switch (categoryId) {
+                case 'pharmaceutical':
+                  return (await fetchPharmaceutical(name, synonyms, queryFor, apiParams)) as Record<
+                    string,
+                    unknown
+                  >
+                case 'clinical-safety':
+                  return (await fetchClinicalSafety(name, queryFor, apiParams)) as Record<
+                    string,
+                    unknown
+                  >
+                case 'molecular-chemical':
+                  return (await fetchMolecularChemical(
+                    name,
+                    cid,
+                    molecularWeight,
+                    queryFor,
+                    apiParams,
+                  )) as Record<string, unknown>
+                case 'bioactivity-targets':
+                  return (await fetchBioactivityTargets(name, queryFor, apiParams)) as Record<
+                    string,
+                    unknown
+                  >
+                case 'research-literature':
+                  return (await fetchResearchLiterature(name, queryFor, apiParams)) as Record<
+                    string,
+                    unknown
+                  >
+                default:
+                  return null
+              }
+            })()
+
+            return await withTimeout(fetchPromise, categoryTimeout, {
+              abortController: ac,
+              signal: request.signal,
+            })
+          },
+          [request.signal],
+        )
+        if (data && typeof data === 'object') {
+          for (const [k, v] of Object.entries(data)) {
+            if (k.startsWith('_')) continue
+            bags[k] = v
           }
-        } catch {
+          loaded.push(categoryId)
+        } else {
           failed.push(categoryId)
         }
-      }),
-    )
+      } catch {
+        failed.push(categoryId)
+      }
+    }
 
     const ledger = buildMoleculeDataHub(identity, bags)
     const bundle = buildResearchKitBundle({

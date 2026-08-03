@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getCached, setCache } from '@/lib/cache'
-import { getCategoryTimeout, withTimeout } from '@/lib/utils'
+import { getCategoryTimeout, isTimeoutError, withTimeout } from '@/lib/utils'
 import { flushApiMetrics, runWithApiMetrics } from '@/lib/api-tracker'
 import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { recordMetric } from '@/lib/analytics/db'
@@ -16,6 +16,68 @@ function parseGeneId(id: string): { geneId: string; symbol: string } | null {
   return null
 }
 
+/** Minimal of-record shell when fan-out hits wall clock — never 500 on timeout. */
+function partialGenePayload(geneId: string, symbol: string, message: string) {
+  return {
+    _partial: true,
+    _timeout: true,
+    _error: message,
+    geneOverview: {
+      geneId,
+      symbol,
+      name: '',
+      summary: '',
+      chromosome: '',
+      mapLocation: '',
+      typeOfGene: '',
+      aliases: [] as string[],
+      ensemblId: '',
+      uniprotId: '',
+      pathways: [] as string[],
+      goAnnotations: {
+        biologicalProcess: [] as string[],
+        molecularFunction: [] as string[],
+        cellularComponent: [] as string[],
+      },
+      url: `https://www.ncbi.nlm.nih.gov/gene/${geneId}`,
+    },
+    geneDrugs: [],
+    geneDiseases: {
+      disgenetAssociations: [],
+      ensemblGenes: [],
+      gwasAssociations: [],
+      clingenGeneDiseases: [],
+    },
+    geneVariants: {
+      clinvarVariants: [],
+      dbsnpVariants: [],
+      clingenDosage: null,
+    },
+    geneExpressionData: {
+      gtexExpressions: [],
+      bgeeExpressions: [],
+      expressionAtlasData: [],
+    },
+    genePathways: {
+      reactomePathways: [],
+      wikiPathways: [],
+      goTerms: [],
+      uniprotProteins: [],
+      stringInteractions: [],
+      pharmgkbGenes: [],
+    },
+    _sectionStatus: {
+      overview: { status: 'empty' as const },
+      drugs: { status: 'timeout' as const, error: message },
+      diseases: { status: 'timeout' as const, error: message },
+      variants: { status: 'timeout' as const, error: message },
+      expression: { status: 'timeout' as const, error: message },
+      pathways: { status: 'timeout' as const, error: message },
+    },
+    _sourcesUsed: [] as string[],
+  }
+}
+
 export async function GET(
   request: NextRequest,
   { params }: { params: { id: string; categoryId: string } }
@@ -29,7 +91,10 @@ export async function GET(
 
   const parsed = parseGeneId(geneIdParam)
   if (!parsed) {
-    return NextResponse.json({ error: 'Invalid gene ID format. Use {entrezId}-{symbol}' }, { status: 400 })
+    return NextResponse.json(
+      { error: 'Invalid gene ID format. Use {entrezId}-{symbol}' },
+      { status: 400 },
+    )
   }
 
   const { geneId, symbol } = parsed
@@ -55,7 +120,7 @@ export async function GET(
           const fetchPromise = fetchGene(geneId, symbol)
           return await withTimeout(
             fetchPromise as Promise<Record<string, unknown>>,
-            categoryTimeout + 3000,
+            categoryTimeout,
             {
               abortController: ac,
               signal: request.signal,
@@ -92,11 +157,26 @@ export async function GET(
       })
     }
     console.error(`[api/gene/category] Error fetching ${categoryId} for gene ${geneId}:`, err)
-    return NextResponse.json({
-      error: 'Failed to fetch category data',
-      category: categoryId,
-      message: err instanceof Error ? err.message : 'Unknown error',
-    }, { status: 500 })
+
+    if (isTimeoutError(err)) {
+      // 200 partial — UI shows empty/timeout sections; live health not hard-fail
+      return NextResponse.json(
+        partialGenePayload(
+          geneId,
+          symbol,
+          err instanceof Error ? err.message : 'Gene category budget exceeded',
+        ),
+      )
+    }
+
+    return NextResponse.json(
+      {
+        error: 'Failed to fetch category data',
+        category: categoryId,
+        message: err instanceof Error ? err.message : 'Unknown error',
+      },
+      { status: 500 },
+    )
   }
 
   setCache(cacheKey, data)

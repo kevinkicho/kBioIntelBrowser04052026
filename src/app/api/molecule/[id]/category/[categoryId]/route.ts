@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeById, PubChemUpstreamError } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
-import { getCategoryTimeout, withTimeout } from '@/lib/utils'
+import { getCategoryTimeout, isTimeoutError, withTimeout } from '@/lib/utils'
 import { metricsToSourceStatus, runWithApiMetrics, type ApiMetric } from '@/lib/api-tracker'
 import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { recordMetric } from '@/lib/analytics/db'
@@ -107,8 +107,9 @@ export async function GET(
     return NextResponse.json({ error: 'Too many overrides/params' }, { status: 400 })
   }
 
-  // Always resolve structure + UniChem crosswalk so defaults can use InChIKey/CAS/CID/gene
-  const identifiers = await getMoleculeIdentifiers(cid)
+  // Always resolve structure + UniChem crosswalk so defaults can use InChIKey/CAS/CID/gene.
+  // Bound identity resolution so PubChem hang cannot block the whole category.
+  const identifiers = await withTimeout(getMoleculeIdentifiers(cid), 6_000).catch(() => null)
   const queryFor = (source: string): string => {
     if (identifiers) {
       const q = resolveApiQuery(identifiers, source, overrides)
@@ -203,9 +204,11 @@ export async function GET(
             }
           })()
 
+          // Wall clock = category budget only (no +3s slack) so App Hosting
+          // returns before edge/proxy idle kill; leaf fetches capped by ALS patch.
           return await withTimeout(
             fetchPromise as Promise<Record<string, unknown>>,
-            categoryTimeout + 3000,
+            categoryTimeout,
             {
               abortController: ac,
               signal: request.signal,
@@ -242,6 +245,61 @@ export async function GET(
         has_data: m.has_data,
       })
     }
+
+    // Timeout / abort: return 200 partial so UI + live health get a payload
+    // (empty panels with timeout provenance) instead of hanging or 500.
+    if (isTimeoutError(err)) {
+      const finishedAt = new Date().toISOString()
+      const metricsForTrace = Object.entries(sourceStatus).map(([source, v]) => ({
+        source,
+        status:
+          v.status === 'timeout' ? 408 : v.status === 'error' ? 500 : v.status === 'disabled' ? 503 : 200,
+        duration_ms: v.duration_ms ?? 0,
+        error: v.error,
+        has_data: v.has_data,
+        loadStatus: v.status,
+      }))
+      const payload = {
+        _partial: true,
+        _timeout: true,
+        _error: err instanceof Error ? err.message : 'Category budget exceeded',
+        category: categoryId,
+        _sourceStatus: sourceStatus,
+        _apiTrace: buildCategoryApiTrace({
+          categoryId,
+          cid,
+          moleculeName: name,
+          requestPath,
+          startedAt,
+          finishedAt,
+          fromCache: false,
+          forceRefresh,
+          metrics: metricsForTrace,
+          dataKeys: [],
+        }),
+        _identifiers: identifiers
+          ? {
+              cid: identifiers.cid,
+              inchiKey: identifiers.inchiKey || undefined,
+              cas: identifiers.cas || undefined,
+              chemblId: identifiers.chemblId,
+              geneSymbols: identifiers.geneSymbols.slice(0, 10),
+            }
+          : undefined,
+      }
+      logApiOutcome({
+        route: '/api/molecule/[id]/category/[categoryId]',
+        method: 'GET',
+        status: 200,
+        ms: timer.ms(),
+        cid,
+        categoryId,
+        error: 'partial_timeout',
+      })
+      // Do not cache timeout shells as full success
+      return NextResponse.json(payload)
+    }
+
     logApiOutcome({
       route: '/api/molecule/[id]/category/[categoryId]',
       method: 'GET',

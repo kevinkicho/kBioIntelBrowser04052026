@@ -76,6 +76,23 @@ const API_TIMEOUTS: Record<string, number> = {
   'gene': 12000,
 }
 
+/**
+ * On App Hosting / production, cap category wall clocks so multi-source
+ * fan-outs return partial 200s before the edge/proxy gives up.
+ * Override with CATEGORY_WALL_MS (absolute cap, default 10s in production).
+ */
+function productionCategoryCapMs(): number | null {
+  const envCap = process.env.CATEGORY_WALL_MS
+  if (envCap != null && envCap !== '') {
+    const n = Number(envCap)
+    return Number.isFinite(n) && n > 0 ? n : null
+  }
+  if (process.env.NODE_ENV === 'production' || process.env.BIOINTEL_STRICT_CATEGORY_BUDGET === '1') {
+    return 10_000
+  }
+  return null
+}
+
 export interface WithTimeoutOptions {
   /** Reject immediately / on abort when this signal fires. */
   signal?: AbortSignal
@@ -177,5 +194,18 @@ export function stripHtml(html: string): string {
 }
 
 export function getCategoryTimeout(categoryId: string): number {
-  return API_TIMEOUTS[categoryId] ?? DEFAULT_API_TIMEOUT
+  const base = API_TIMEOUTS[categoryId] ?? DEFAULT_API_TIMEOUT
+  const cap = productionCategoryCapMs()
+  return cap != null ? Math.min(base, cap) : base
+}
+
+/** True when error is a wall-clock / abort timeout from withTimeout or fetch. */
+export function isTimeoutError(err: unknown): boolean {
+  if (!err) return false
+  if (err instanceof DOMException && err.name === 'AbortError') return true
+  if (err instanceof Error) {
+    if (err.name === 'AbortError') return true
+    if (/timed?\s*out|timeout/i.test(err.message)) return true
+  }
+  return false
 }

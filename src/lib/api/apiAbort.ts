@@ -17,6 +17,15 @@ const abortAls = new AsyncLocalStorage<AbortSignal>()
 let fetchPatched = false
 let originalFetch: typeof globalThis.fetch | null = null
 
+/**
+ * Per-leaf cap while a category/request ALS store is active.
+ * Free public APIs that need longer must not block the whole category wall.
+ * Override with BIOINTEL_LEAF_FETCH_MS (ms).
+ */
+export const DEFAULT_ALS_LEAF_FETCH_MS = Number(
+  process.env.BIOINTEL_LEAF_FETCH_MS || 8_000,
+)
+
 function mergeSignals(
   a: AbortSignal | undefined,
   b: AbortSignal | undefined,
@@ -53,7 +62,21 @@ export function ensureApiFetchAbortPatch(): void {
     }
     // RequestInit.signal is typed AbortSignal | null | undefined in DOM libs
     const initSignal = init?.signal ?? undefined
-    const signal = mergeSignals(initSignal ?? undefined, als)
+    // Cap every outbound socket under category/request abort so one hung
+    // PubChem/Orphanet call cannot pin the connection until platform kill.
+    let leafSignal: AbortSignal | undefined
+    try {
+      if (
+        typeof AbortSignal !== 'undefined' &&
+        typeof (AbortSignal as { timeout?: (ms: number) => AbortSignal }).timeout === 'function' &&
+        DEFAULT_ALS_LEAF_FETCH_MS > 0
+      ) {
+        leafSignal = AbortSignal.timeout(DEFAULT_ALS_LEAF_FETCH_MS)
+      }
+    } catch {
+      leafSignal = undefined
+    }
+    const signal = mergeSignals(mergeSignals(initSignal ?? undefined, als), leafSignal)
     if (signal?.aborted) {
       return Promise.reject(
         signal.reason instanceof Error

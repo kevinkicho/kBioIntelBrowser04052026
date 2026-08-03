@@ -64,13 +64,22 @@ export async function getMoleculeIdentifiers(cid: number): Promise<MoleculeIdent
   const uniprotAccessions: string[] = []
 
   try {
-    const [propsRes, synRes] = await Promise.all([
-      fetch(
-        `${PUBCHEM_PUG}/compound/cid/${cid}/property/IsomericSMILES,InChI,InChIKey/JSON`,
-        PC_FETCH_OPTS,
-      ),
-      fetch(`${PUBCHEM_PUG}/compound/cid/${cid}/synonyms/JSON`, PC_FETCH_OPTS),
-    ])
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 5_000)
+    const opts = { ...PC_FETCH_OPTS, signal: controller.signal }
+    let propsRes: Response
+    let synRes: Response
+    try {
+      ;[propsRes, synRes] = await Promise.all([
+        fetch(
+          `${PUBCHEM_PUG}/compound/cid/${cid}/property/IsomericSMILES,InChI,InChIKey/JSON`,
+          opts,
+        ),
+        fetch(`${PUBCHEM_PUG}/compound/cid/${cid}/synonyms/JSON`, opts),
+      ])
+    } finally {
+      clearTimeout(timer)
+    }
 
     if (propsRes.ok) {
       const propsData = await propsRes.json()

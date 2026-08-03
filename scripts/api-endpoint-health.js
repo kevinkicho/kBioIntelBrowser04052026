@@ -211,6 +211,10 @@ function payloadHasData(val) {
   }
   // Meta-ish success envelopes
   if (obj.ok === true || obj.enabled === true) return true
+  // Category/gene partial timeout shells (route alive, sources degraded)
+  if (obj._partial === true && (obj._timeout === true || typeof obj._error === 'string')) {
+    return true
+  }
   if (typeof obj.status === 'string' && obj.status !== 'error') {
     // healthFor returns status without rows — treat as meta structure
     if ('sample_size' in obj || 'reason' in obj || 'p95_ms' in obj) return true
