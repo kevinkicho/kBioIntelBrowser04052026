@@ -40,6 +40,12 @@ export const MOLECULE_EXPECTED_API_BAGS: Array<{
   { key: 'healthCanadaDpd', fact: 'Health Canada DPD', source: 'Health Canada', panelId: 'health-canada-dpd', categoryId: 'pharmaceutical', domain: 'regulatory' },
   { key: 'openAireProjects', fact: 'OpenAIRE projects', source: 'OpenAIRE', panelId: 'openaire-projects', categoryId: 'research-literature', domain: 'literature' },
   { key: 'citationMetrics', fact: 'OpenCitations metrics', source: 'OpenCitations', panelId: 'opencitations', categoryId: 'research-literature', domain: 'literature' },
+  { key: 'hazards', fact: 'PubChem GHS hazards', source: 'PubChem', panelId: 'hazards', categoryId: 'clinical-safety', domain: 'safety' },
+  { key: 'compToxData', fact: 'EPA CompTox', source: 'EPA CompTox', panelId: 'comptox', categoryId: 'clinical-safety', domain: 'safety' },
+  { key: 'alphaFoldPredictions', fact: 'AlphaFold predictions', source: 'AlphaFold DB', panelId: 'alphafold', categoryId: 'protein-structure', domain: 'other' },
+  { key: 'purpleBookProducts', fact: 'FDA Purple Book products', source: 'FDA Purple Book', panelId: 'purple-book', categoryId: 'pharmaceutical', domain: 'regulatory' },
+  { key: 'whoGhoContext', fact: 'WHO GHO disease context', source: 'WHO GHO', panelId: 'who-gho', categoryId: 'clinical-safety', domain: 'clinical' },
+  { key: 'internationalRegulatorLinks', fact: 'International regulator portals', source: 'MHRA/TGA/PMDA portals', panelId: 'international-regulators', categoryId: 'pharmaceutical', domain: 'regulatory' },
 ]
 
 function bagIsEmpty(data: Record<string, unknown>, key: string): boolean {
@@ -74,17 +80,29 @@ export function buildNegativeEvidencePart(
     const keyPresent = Object.prototype.hasOwnProperty.call(data, spec.key)
     if (!keyPresent && !status) continue
 
+    const st = status?.[spec.key] || status?.[spec.panelId || '']
+    const statusTag =
+      st?.status === 'timeout'
+        ? 'timeout'
+        : st?.status === 'error'
+          ? 'error'
+          : keyPresent
+            ? 'empty sample'
+            : 'not in session bags'
+
     rows.push(
       row({
         id: `neg-${spec.key}`,
         fact: `${spec.fact} (retrieval)`,
-        value: keyPresent ? 'empty sample' : 'not in session bags',
+        value: statusTag,
         source: spec.source,
         panelId: spec.panelId,
         categoryId: spec.categoryId,
         domain: spec.domain,
         detail:
-          'Of-record negative evidence: query returned no rows or bag not loaded. Not “no association.”',
+          st?.status === 'timeout'
+            ? 'Of-record negative evidence: free-API source timed out this session — not “no association.”'
+            : 'Of-record negative evidence: query returned no rows or bag not loaded. Not “no association.”',
       }),
     )
   }

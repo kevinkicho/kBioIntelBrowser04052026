@@ -396,12 +396,56 @@ export default function MethodologyPage() {
           </ul>
         </section>
 
+        <section
+          className="mb-8 rounded-xl border border-slate-800 bg-slate-900/40 p-5"
+          data-testid="methodology-v3-expansion"
+        >
+          <h2 className="mb-2 text-sm font-semibold text-slate-100">v3 expansion (scope &amp; depth)</h2>
+          <p className="mb-3 text-[11px] leading-relaxed text-slate-400">
+            Ambitious of-record surfaces that expand what a campaign can finish in one sitting — still free public
+            APIs only; Discover rank stays deterministic; AI remains claim-bound and non-of-record.
+          </p>
+          <ul className="list-inside list-disc space-y-1.5 text-[11px] text-slate-300">
+            <li>
+              <strong className="text-slate-200">Safety triangulation</strong> — multi-source FAERS / recalls /
+              labels / hazards sample coverage (not incidence or risk scores).
+            </li>
+            <li>
+              <strong className="text-slate-200">Five-regulator card</strong> — US · EU · CA plus portal UK/AU/JP
+              session coverage (not multi-region authorization advice).
+            </li>
+            <li>
+              <strong className="text-slate-200">Negative evidence</strong> — empty / timeout / not-in-session bags
+              stay of-record “not retrieved,” never rewritten as zero association.
+            </li>
+            <li>
+              <strong className="text-slate-200">Research kit v2 quality annex</strong> —{' '}
+              <code className="text-slate-500">v3-quality.json</code> with citation completeness, triangulation, and
+              claim-graph summary for lab handoff.
+            </li>
+            <li>
+              <strong className="text-slate-200">Free-API agent etiquette</strong> — host rate limits, Retry-After,
+              polite User-Agent via <code className="text-slate-500">freeApiAgent</code> /{' '}
+              <code className="text-slate-500">timedFetch</code> (see{' '}
+              <code className="text-slate-500">docs/design/free-api-agent.md</code>).
+            </li>
+            <li>
+              <strong className="text-slate-200">Campaign templates &amp; playbooks</strong> — repurposing, rare
+              disease, competitive, lab affiliation; UI/CLI under How it works → tools.
+            </li>
+          </ul>
+          <p className="mt-3 text-[10px] text-slate-500">
+            Design SSOT: <code className="text-slate-600">docs/design/discovery-workbench-v3.md</code> · golden
+            fixtures: <code className="text-slate-600">docs/golden/</code>
+          </p>
+        </section>
+
         <section className="mb-4 text-[11px] leading-relaxed text-slate-600">
           <p>
             Design SSOT: <code className="text-slate-500">docs/design/data-hub-presentation.md</code>,{' '}
             <code className="text-slate-500">docs/design/list-deep-links-and-empty-data.md</code>, discovery workbench
-            v1–v2.1. Software is open for educational and research purposes; upstream databases retain their own
-            licenses and terms.
+            v1–v2.1 + <code className="text-slate-500">v3</code>. Software is open for educational and research
+            purposes; upstream databases retain their own licenses and terms.
           </p>
         </section>
       </div>

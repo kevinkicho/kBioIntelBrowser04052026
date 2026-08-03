@@ -5,6 +5,8 @@
 import type { MoleculeIdentityInput } from './moleculeHubShared'
 import type { DataHubRow, DataHubSection } from './types'
 import { buildNegativeEvidencePart } from './negativeEvidence'
+import { buildSafetyTriangulationPart } from './safetyTriangulation'
+import { buildFiveRegulatorPart } from './fiveRegulatorCard'
 import { buildIdentityPart } from './moleculeHub/sections/identity'
 import { buildKeysPart } from './moleculeHub/sections/keys'
 import { buildRegulatoryPart } from './moleculeHub/sections/regulatory'
@@ -33,6 +35,18 @@ export function buildMoleculeHubParts(
   ]) {
     all.push(...part.rows)
     sections.push(...part.sections)
+  }
+
+  // v3: five-regulator card + safety triangulation (of-record assemble)
+  const five = buildFiveRegulatorPart(data)
+  if (five.section && five.rows.length > 0) {
+    all.push(...five.rows)
+    sections.push(five.section)
+  }
+  const tri = buildSafetyTriangulationPart(data)
+  if (tri.section && tri.rows.length > 0) {
+    all.push(...tri.rows)
+    sections.push(tri.section)
   }
 
   // Of-record negative evidence for empty free-API bags

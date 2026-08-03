@@ -1,0 +1,20 @@
+{
+  "schemaVersion": 2,
+  "kind": "biointel-golden-kit-expectations",
+  "cid": 2244,
+  "name": "Aspirin",
+  "expect": {
+    "hubMinNonEmptyFacts": 1,
+    "kitSchemaVersion": 2,
+    "hasV3QualityFile": true,
+    "safetyTriangulationHonesty": true,
+    "fiveRegulatorSection": true,
+    "negativeEvidenceAllowed": true,
+    "geneLeavesMayBeEmpty": true
+  },
+  "law": [
+    "Free public APIs only",
+    "Not clinical or regulatory decision support",
+    "Empty gene leaves for small-molecule CID are of-record empty, not failures"
+  ]
+}

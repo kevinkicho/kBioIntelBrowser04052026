@@ -204,6 +204,172 @@ export const RESEARCH_PLAYBOOKS: ResearchPlaybook[] = [
       'Prefer main; no dual-emit product event aliases',
     ],
   },
+  {
+    id: 'safety_triangulation_pack',
+    title: 'Safety triangulation → pack honesty',
+    audience: 'both',
+    goal: 'Assemble of-record multi-source safety samples (FAERS, recalls, labels, hazards) without incidence claims.',
+    steps: [
+      {
+        title: 'Load clinical-safety',
+        human: 'Molecule profile → Clinical & safety category; wait for FAERS/recalls/labels.',
+        agent: 'molecule category <cid> clinical-safety; research kit --cid N',
+        tools: ['ui_molecule_profile', 'cli_research_kit'],
+      },
+      {
+        title: 'Read triangulation hub section',
+        human: 'Data hub → Safety triangulation (session coverage score).',
+        agent: 'Inspect hub section safety-triangulation; never rewrite as risk score.',
+        tools: ['ui_molecule_profile'],
+      },
+      {
+        title: 'Pack with warnings',
+        human: 'Board pack including safety extractors; note empty/timeout rows.',
+        agent: 'pack extractors only; preserve subjectCandidateId',
+        tools: ['ui_board_pack'],
+      },
+    ],
+    successSignals: [
+      'Safety triangulation section present when bags loaded',
+      'FAERS labeled as spontaneous reports not incidence',
+      'Research kit v3-quality.json includes safetyTriangulation',
+    ],
+    lawReminders: [
+      'Not clinical decision support',
+      'Empty FAERS ≠ safe forever',
+    ],
+  },
+  {
+    id: 'five_regulator_card',
+    title: 'Five-regulator coverage card',
+    audience: 'both',
+    goal: 'Of-record US/EU/CA + portal UK/AU/JP coverage for one molecule without authorization advice.',
+    steps: [
+      {
+        title: 'Load pharmaceutical + international',
+        human: 'Open pharmaceutical category; international-regulators panel for portals.',
+        agent: 'molecule category <cid> pharmaceutical; inspect hub five-regulators section',
+        tools: ['ui_molecule_profile', 'cli_research_kit'],
+      },
+      {
+        title: 'Export kit',
+        human: 'Research kit; check fiveRegulatorRegions in manifest / v3-quality.json',
+        agent: 'research kit --cid N; jq .manifest research kit',
+        tools: ['cli_research_kit'],
+      },
+    ],
+    successSignals: [
+      'Five-regulator hub section with US/EU/CA/portal rows',
+      'Honesty notes present',
+    ],
+    lawReminders: [
+      'Not multi-region marketing authorization advice',
+      'Portal-only regions are Tier C deep links',
+    ],
+  },
+  {
+    id: 'rare_disease_depth',
+    title: 'Rare-disease depth (Orphanet → shortlist)',
+    audience: 'both',
+    goal: 'Orpha/phenotype path with honest sparse evidence and gene pins.',
+    steps: [
+      {
+        title: 'Persona + Orphanet',
+        human: 'Discover rare persona / Orphanet boost; enter rare disease.',
+        agent: 'discover rank --q "…" ; orphanet genes if orphaCode known',
+        tools: ['ui_discover_rank', 'ui_orphanet_pins'],
+      },
+      {
+        title: 'Pins + rank',
+        human: 'Confirm gene pins; rank; read empty-panel honesty.',
+        agent: 'Never invent gene–disease associations',
+        tools: ['ui_discover_rank'],
+      },
+      {
+        title: 'Negative evidence in kit',
+        human: 'Molecule hub negative-evidence section; export kit',
+        agent: 'research kit; assert neg-* rows when bags empty',
+        tools: ['cli_research_kit', 'ui_molecule_profile'],
+      },
+    ],
+    successSignals: [
+      'Orphanet pins or explicit empty',
+      'Negative evidence rows when free-API bags empty',
+    ],
+    lawReminders: [
+      'Sparse public data is expected for many rare diseases',
+      'No LLM inventing associations',
+    ],
+  },
+  {
+    id: 'org_to_sites',
+    title: 'Org / lab → site context',
+    audience: 'both',
+    goal: 'Build of-record research-lab dossier (ROR/CMS/Scorecard) for affiliation context.',
+    steps: [
+      {
+        title: 'Search org',
+        human: 'Open /orgs; search university or hospital name.',
+        agent: 'biointel api get /api/research-labs?q=… or /api/ror?q=…',
+        tools: ['ui_methodology'],
+      },
+      {
+        title: 'Dossier',
+        human: 'Open research-lab dossier tab; export if needed.',
+        agent: 'GET /api/research-labs?q=…; freeApiAgent etiquette applies',
+        tools: ['cli_research_kit'],
+      },
+      {
+        title: 'Join molecule',
+        human: 'From trials/grants on a molecule, open affiliated org.',
+        agent: 'Do not invent hospital quality rankings',
+        tools: ['ui_molecule_profile'],
+      },
+    ],
+    successSignals: [
+      'ROR or CMS rows present or honest empty',
+      'No “best hospital” language',
+    ],
+    lawReminders: [
+      'Not clinical referral advice',
+      'Free public affiliation data only',
+    ],
+  },
+  {
+    id: 'campaign_workspace_loop',
+    title: 'Full campaign workspace loop',
+    audience: 'both',
+    goal: 'Run a multi-stage campaign (repurposing or rare) to Monday work.',
+    steps: [
+      {
+        title: 'Pick persona template',
+        human: 'How-it-works tools / playbooks → campaign template.',
+        agent: 'Use CAMPAIGN_TEMPLATES in campaignWorkspace.ts',
+        tools: ['cli_tools_catalog'],
+      },
+      {
+        title: 'Execute stages',
+        human: 'Disease → rank → promote → pack → RH.',
+        agent: 'Chain disease_to_shortlist then board_pack_to_rh',
+        tools: ['ui_discover_rank', 'ui_board_pack', 'ui_research_hypothesis'],
+      },
+      {
+        title: 'Export kit + quality',
+        human: 'Research kit v3-quality.json; citation score for pack.',
+        agent: 'research kit --cid N; check schemaVersion 2',
+        tools: ['cli_research_kit'],
+      },
+    ],
+    successSignals: [
+      'Pack with citable claims or explicit warning',
+      'RH claim-bound',
+      'Kit content hash present',
+    ],
+    lawReminders: [
+      'Of-record rank never rewritten by AI views',
+      'Solo export default',
+    ],
+  },
 ]
 
 export function researchToolsByGoal(goal: ResearchGoal): ResearchToolEntry[] {

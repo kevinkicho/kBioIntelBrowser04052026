@@ -23,6 +23,10 @@ import {
 import type { DataHubLedger } from './types'
 import { hashDataHubLedger } from './contentHash'
 import { hubClaimsPackToJson, hubLedgerToPackClaimsHandoff } from './hubClaimsToPack'
+import { scoreHubCitationCompleteness, scoreClaimCitationCompleteness } from './citationCompleteness'
+import { buildSafetyTriangulation } from './safetyTriangulation'
+import { buildFiveRegulatorCard } from './fiveRegulatorCard'
+import { buildHubClaimGraph } from './hubClaimGraph'
 
 export type ResearchKitDownloadMode = 'single' | 'multi'
 
@@ -43,10 +47,16 @@ export interface ResearchKitInput {
    * Download mode: single JSON bundle (default, browser-friendly) or multi-file.
    */
   mode?: ResearchKitDownloadMode
+  /**
+   * Optional category bags for v3 safety triangulation / five-regulator scores
+   * (same DTOs used to build the ledger; pure recompute).
+   */
+  sessionBags?: Record<string, unknown>
 }
 
 export interface ResearchKitManifest {
-  schemaVersion: 1
+  /** v2 adds citation + triangulation extras; still reads as biointel-research-kit */
+  schemaVersion: 1 | 2
   kind: 'biointel-research-kit'
   subjectId: string
   subjectLabel: string
@@ -58,11 +68,17 @@ export interface ResearchKitManifest {
   honesty: string[]
   /** Present when exported as a single-file bundle */
   bundle?: boolean
+  /** v2: hub citation completeness 0–1 */
+  citationScore?: number
+  /** v2: safety triangulation score 0–1 */
+  safetyTriangulationScore?: number
+  /** v2: regulator regions with session evidence */
+  fiveRegulatorRegions?: number
 }
 
 /** Single-file research kit for lab handoff (no multi-download). */
 export interface ResearchKitBundle {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   kind: 'biointel-research-kit-bundle'
   subjectId: string
   subjectLabel: string
@@ -77,8 +93,12 @@ export interface ResearchKitBundle {
     'research-view-prefs.json'?: string
     'README.md': string
     'hub-claims-pack.json'?: string
+    /** v3 interchange: JSON extras for campaigns / agents */
+    'v3-quality.json'?: string
   }
   honesty: string[]
+  /** Optional bags used to recompute triangulation (not of-record rank) */
+  _sessionBags?: Record<string, unknown>
 }
 
 function slug(s: string): string {
@@ -180,10 +200,19 @@ export function buildResearchKitManifest(
   ledger: DataHubLedger,
   files: string[],
   claimCount: number,
+  extras?: {
+    citationScore?: number
+    safetyTriangulationScore?: number
+    fiveRegulatorRegions?: number
+  },
 ): ResearchKitManifest {
   const filled = ledger.rows.filter((r) => r.value && r.value !== '—').length
+  const hasV2 =
+    extras?.citationScore != null ||
+    extras?.safetyTriangulationScore != null ||
+    extras?.fiveRegulatorRegions != null
   return {
-    schemaVersion: 1,
+    schemaVersion: hasV2 ? 2 : 1,
     kind: 'biointel-research-kit',
     subjectId: ledger.subjectId,
     subjectLabel: ledger.subjectLabel,
@@ -196,8 +225,59 @@ export function buildResearchKitManifest(
       'Free public APIs only',
       'Session samples not universe counts',
       'Not clinical or regulatory decision support',
+      ...(hasV2
+        ? ['v2 kit includes citation + safety triangulation + five-regulator coverage scores']
+        : []),
     ],
+    citationScore: extras?.citationScore,
+    safetyTriangulationScore: extras?.safetyTriangulationScore,
+    fiveRegulatorRegions: extras?.fiveRegulatorRegions,
   }
+}
+
+/** v3 quality annex for agents and campaign handoff */
+export function buildResearchKitV3QualityJson(
+  ledger: DataHubLedger,
+  claims: readonly EvidenceClaim[],
+  sessionBags?: Record<string, unknown>,
+): string {
+  const hubCite = scoreHubCitationCompleteness(ledger)
+  const claimCite = scoreClaimCitationCompleteness(claims)
+  const bags = sessionBags || {}
+  const safety = buildSafetyTriangulation(bags)
+  const five = buildFiveRegulatorCard(bags)
+  const graph = buildHubClaimGraph(ledger, { maxClaims: 40 })
+  return JSON.stringify(
+    {
+      schemaVersion: 2,
+      kind: 'biointel-research-kit-v3-quality',
+      hubCitation: hubCite,
+      claimCitation: claimCite,
+      safetyTriangulation: {
+        score: safety.triangulationScore,
+        sourcesWithData: safety.sourcesWithData,
+        sourcesQueried: safety.sourcesQueried,
+        honesty: safety.honesty,
+      },
+      fiveRegulators: {
+        regionsWithData: five.regionsWithData,
+        regions: five.rows.map((r) => ({ region: r.region, status: r.status })),
+        honesty: five.honesty,
+      },
+      claimGraph: {
+        claimCount: graph.claims.length,
+        edgeCount: graph.edges.length,
+        byDomain: graph.byDomain,
+      },
+      productLaw: [
+        'Of-record only from free public APIs',
+        'Not clinical or regulatory decision support',
+        'Discover rank remains deterministic outside this kit',
+      ],
+    },
+    null,
+    2,
+  )
 }
 
 function resolveKitParts(input: ResearchKitInput): {
@@ -287,33 +367,53 @@ export function buildResearchKitBundle(input: ResearchKitInput): ResearchKitBund
   const parts = resolveKitParts({ ...input, mode: 'single' })
   const contentHash = hashDataHubLedger(input.ledger)
   const handoff = hubLedgerToPackClaimsHandoff(input.ledger)
+  const claimList = input.claims ?? []
+  const hubCite = scoreHubCitationCompleteness(input.ledger)
+  const claimCite = scoreClaimCitationCompleteness(claimList)
+  const bags = input.sessionBags || {}
+  const safety = buildSafetyTriangulation(bags)
+  const five = buildFiveRegulatorCard(bags)
+  const v3Quality = buildResearchKitV3QualityJson(input.ledger, claimList, bags)
+
   const files: ResearchKitBundle['files'] = {
     'data-hub.csv': parts.hubCsv,
     'sources.json': parts.sourcesJson,
     'README.md': parts.readme,
     'hub-claims-pack.json': hubClaimsPackToJson(handoff),
+    'v3-quality.json': v3Quality,
   }
   if (parts.claimsMd) files['claims.md'] = parts.claimsMd
   if (parts.prefsJson) files['research-view-prefs.json'] = parts.prefsJson
 
+  const manifest = buildResearchKitManifest(
+    input.ledger,
+    Object.keys(files),
+    claimList.length,
+    {
+      citationScore: claimList.length > 0 ? claimCite.score : hubCite.score,
+      safetyTriangulationScore: safety.triangulationScore,
+      fiveRegulatorRegions: five.regionsWithData,
+    },
+  )
+
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     kind: 'biointel-research-kit-bundle',
     subjectId: input.ledger.subjectId,
     subjectLabel: input.ledger.subjectLabel,
     exportedAt: new Date().toISOString(),
     contentHash,
     manifest: {
-      ...parts.manifest,
+      ...manifest,
       honesty: [
-        ...parts.manifest.honesty,
+        ...manifest.honesty,
         `Content hash: ${contentHash}`,
-        'Includes hub-claims-pack.json for board pack claim import',
+        'Includes hub-claims-pack.json + v3-quality.json (citation, safety triangulation, five-regulator)',
       ],
     },
     files,
     honesty: [
-      ...parts.manifest.honesty,
+      ...manifest.honesty,
       `Content hash: ${contentHash}`,
     ],
   }
