@@ -4,8 +4,9 @@
  * Product law:
  * - Of-record data comes only from free public APIs (deterministic HTTP).
  * - This agent does NOT invent evidence or call an LLM for facts.
- * - It centralizes timeout / retry / abort / empty / metrics so we stop
- *   hardcoding the same rules in every client file.
+ * - It centralizes timeout / retry / abort / empty / metrics **and free-API
+ *   etiquette** (rate limits, Retry-After, polite headers, concurrency) so we
+ *   stop hardcoding the same rules in every client file.
  *
  * Optional LLM agents (copilot) may *orchestrate* which tools to call;
  * they must only consume results from this layer (or category fan-outs).
@@ -16,6 +17,18 @@ import type { DataLoadStatus } from '../dataStatus'
 import { isApiSourceDisabled, getApiSourceDisabledReason } from './sourceAvailability'
 import { timedFetch, DEFAULT_LEAF_TIMEOUT_MS } from './timedFetch'
 import { getApiAbortSignal } from './apiAbort'
+import {
+  acquireRateLimit,
+  etiquetteBackoffMs,
+  noteRateLimited,
+  parseRetryAfterMs,
+} from '../rateLimit'
+import {
+  FreeApiRateLimitError,
+  isRateLimitError,
+  politeHeaders,
+  retryAfterMsFromError,
+} from './freeApiEtiquette'
 
 export type FreeApiAgentStatus = DataLoadStatus
 
@@ -26,6 +39,8 @@ export interface FreeApiAgentResult<T> {
   ms: number
   attempts: number
   error?: string
+  /** True when a 429 / cool-down path was taken */
+  rateLimited?: boolean
 }
 
 export interface FreeApiAgentContext {
@@ -35,16 +50,22 @@ export interface FreeApiAgentContext {
 }
 
 export interface FreeApiAgentSpec<T> {
-  /** Stable source id for metrics / UI (e.g. 'mesh', 'gwas-catalog') */
+  /** Stable source id for metrics / UI / source-level rate limit (e.g. 'mesh') */
   source: string
   /** Value when disabled, timeout, error, or empty parse */
   empty: T
   /** Per-attempt wall clock (default DEFAULT_LEAF_TIMEOUT_MS) */
   timeoutMs?: number
-  /** Extra attempts after first (default 0). Total tries = 1 + retries */
+  /**
+   * Extra attempts after first. Default 0 for freeApiAgent;
+   * freeApiJson defaults to 2 so 429 can recover with etiquette backoff.
+   * Total tries = 1 + retries
+   */
   retries?: number
   /** HTTP statuses that trigger retry (default 429, 502, 503, 504) */
   retryStatuses?: number[]
+  /** Skip source-level rate-limit slot (default false) */
+  skipSourceRateLimit?: boolean
   /** Primary work — free public API only */
   run: (ctx: FreeApiAgentContext) => Promise<T>
   /** Optional free fallback when primary yields empty or fails */
@@ -82,7 +103,7 @@ function mergeSignals(a?: AbortSignal, b?: AbortSignal): AbortSignal | undefined
 }
 
 /**
- * Run a free-API task under unified policy.
+ * Run a free-API task under unified policy + etiquette.
  * Always resolves (never throws) — returns empty + status on failure.
  */
 export async function freeApiAgent<T>(spec: FreeApiAgentSpec<T>): Promise<FreeApiAgentResult<T>> {
@@ -105,109 +126,151 @@ export async function freeApiAgent<T>(spec: FreeApiAgentSpec<T>): Promise<FreeAp
 
   let lastError: string | undefined
   let attempts = 0
+  let sawRateLimit = false
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    attempts = attempt
-    const controller = new AbortController()
-    const timer = setTimeout(() => {
-      try {
-        controller.abort(new DOMException(`freeApiAgent timeout after ${timeoutMs}ms`, 'AbortError'))
-      } catch {
-        controller.abort()
-      }
-    }, timeoutMs)
-    const signal = mergeSignals(getApiAbortSignal(), controller.signal)!
-
+  // Source-level etiquette slot (in addition to host buckets in timedFetch)
+  let sourceSlot: { release: () => void } | undefined
+  if (!spec.skipSourceRateLimit) {
     try {
-      // Hard race: abort alone is not enough if run() ignores signal
-      const data = await raceAbortable(
-        spec.run({ signal, attempt, source: spec.source }),
-        signal,
-      )
-      clearTimeout(timer)
-      if (checkData(data)) {
-        return {
-          data,
-          source: spec.source,
-          status: 'loaded',
-          ms: Date.now() - start,
-          attempts,
-        }
-      }
-      // empty primary — try fallback once on last attempt
-      if (spec.fallback && attempt === maxAttempts) {
-        const fb = await raceAbortable(
-          runFallback(spec, signal, attempt, checkData),
-          signal,
-        )
-        return { ...fb, ms: Date.now() - start, attempts }
-      }
-      lastError = 'empty'
+      sourceSlot = await acquireRateLimit(spec.source, {
+        isSourceKey: true,
+        signal: getApiAbortSignal(),
+      })
     } catch (err) {
-      clearTimeout(timer)
-      lastError = err instanceof Error ? err.message : String(err)
-      const aborted = isAbortErr(err)
-      const httpStatus =
-        err && typeof err === 'object' && 'status' in err && typeof (err as { status: unknown }).status === 'number'
-          ? (err as { status: number }).status
-          : undefined
-      const retryableHttp = httpStatus != null && retryStatuses.has(httpStatus)
-      const retryableMsg = /HTTP\s*(429|502|503|504)|rate\s*limit|ECONNRESET|ETIMEDOUT|fetch failed/i.test(
-        lastError,
-      )
-      // Retry on retryable HTTP statuses / transport blips only (not 4xx hard failures)
-      const shouldRetry =
-        attempt < maxAttempts &&
-        !aborted &&
-        (retryableHttp || retryableMsg || (httpStatus == null && !/^HTTP\s*[45]\d\d/.test(lastError)))
-      if (shouldRetry) {
-        await sleep(200 * attempt)
-        continue
-      }
-      if (spec.fallback && !aborted) {
-        try {
-          const fbController = new AbortController()
-          const fbTimer = setTimeout(() => {
-            try {
-              fbController.abort(new DOMException('fallback timeout', 'AbortError'))
-            } catch {
-              fbController.abort()
-            }
-          }, timeoutMs)
-          const fbSignal = mergeSignals(getApiAbortSignal(), fbController.signal)!
-          try {
-            const fb = await raceAbortable(
-              runFallback(spec, fbSignal, attempt, checkData),
-              fbSignal,
-            )
-            return { ...fb, ms: Date.now() - start, attempts }
-          } finally {
-            clearTimeout(fbTimer)
-          }
-        } catch {
-          /* fall through */
+      if (isAbortErr(err)) {
+        return {
+          data: spec.empty,
+          source: spec.source,
+          status: 'timeout',
+          ms: Date.now() - start,
+          attempts: 0,
+          error: err instanceof Error ? err.message : 'aborted waiting for source slot',
         }
       }
-      return {
-        data: spec.empty,
-        source: spec.source,
-        status: aborted ? 'timeout' : 'error',
-        ms: Date.now() - start,
-        attempts,
-        error: lastError,
-      }
-    } finally {
-      clearTimeout(timer)
     }
   }
 
-  return {
-    data: spec.empty,
-    source: spec.source,
-    status: lastError === 'empty' ? 'empty' : 'error',
-    ms: Date.now() - start,
-    attempts,
-    error: lastError,
+  try {
+    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+      attempts = attempt
+      const controller = new AbortController()
+      const timer = setTimeout(() => {
+        try {
+          controller.abort(new DOMException(`freeApiAgent timeout after ${timeoutMs}ms`, 'AbortError'))
+        } catch {
+          controller.abort()
+        }
+      }, timeoutMs)
+      const signal = mergeSignals(getApiAbortSignal(), controller.signal)!
+
+      try {
+        // Hard race: abort alone is not enough if run() ignores signal
+        const data = await raceAbortable(
+          spec.run({ signal, attempt, source: spec.source }),
+          signal,
+        )
+        clearTimeout(timer)
+        if (checkData(data)) {
+          return {
+            data,
+            source: spec.source,
+            status: 'loaded',
+            ms: Date.now() - start,
+            attempts,
+            rateLimited: sawRateLimit || undefined,
+          }
+        }
+        // empty primary — try fallback once on last attempt
+        if (spec.fallback && attempt === maxAttempts) {
+          const fb = await raceAbortable(
+            runFallback(spec, signal, attempt, checkData),
+            signal,
+          )
+          return { ...fb, ms: Date.now() - start, attempts, rateLimited: sawRateLimit || undefined }
+        }
+        lastError = 'empty'
+      } catch (err) {
+        clearTimeout(timer)
+        lastError = err instanceof Error ? err.message : String(err)
+        const aborted = isAbortErr(err)
+        const httpStatus =
+          err && typeof err === 'object' && 'status' in err && typeof (err as { status: unknown }).status === 'number'
+            ? (err as { status: number }).status
+            : isRateLimitError(err)
+              ? 429
+              : undefined
+        const retryableHttp = httpStatus != null && retryStatuses.has(httpStatus)
+        const rateLimited = isRateLimitError(err) || httpStatus === 429
+        if (rateLimited) {
+          sawRateLimit = true
+          const ra = retryAfterMsFromError(err) ?? 2_000
+          noteRateLimited(spec.source, ra, { isSourceKey: true })
+        }
+        const retryableMsg =
+          /HTTP\s*(429|502|503|504)|rate\s*limit|too many requests|ECONNRESET|ETIMEDOUT|fetch failed/i.test(
+            lastError,
+          )
+        // Retry on retryable HTTP / transport / rate limit only (not hard 4xx)
+        const shouldRetry =
+          attempt < maxAttempts &&
+          !aborted &&
+          (retryableHttp || retryableMsg || rateLimited || (httpStatus == null && !/^HTTP\s*[45]\d\d/.test(lastError)))
+        if (shouldRetry) {
+          const wait = etiquetteBackoffMs(attempt, {
+            retryAfterMs: rateLimited ? retryAfterMsFromError(err) : undefined,
+          })
+          await sleep(wait)
+          continue
+        }
+        if (spec.fallback && !aborted) {
+          try {
+            const fbController = new AbortController()
+            const fbTimer = setTimeout(() => {
+              try {
+                fbController.abort(new DOMException('fallback timeout', 'AbortError'))
+              } catch {
+                fbController.abort()
+              }
+            }, timeoutMs)
+            const fbSignal = mergeSignals(getApiAbortSignal(), fbController.signal)!
+            try {
+              const fb = await raceAbortable(
+                runFallback(spec, fbSignal, attempt, checkData),
+                fbSignal,
+              )
+              return { ...fb, ms: Date.now() - start, attempts, rateLimited: sawRateLimit || undefined }
+            } finally {
+              clearTimeout(fbTimer)
+            }
+          } catch {
+            /* fall through */
+          }
+        }
+        return {
+          data: spec.empty,
+          source: spec.source,
+          status: aborted ? 'timeout' : 'error',
+          ms: Date.now() - start,
+          attempts,
+          error: lastError,
+          rateLimited: sawRateLimit || undefined,
+        }
+      } finally {
+        clearTimeout(timer)
+      }
+    }
+
+    return {
+      data: spec.empty,
+      source: spec.source,
+      status: lastError === 'empty' ? 'empty' : 'error',
+      ms: Date.now() - start,
+      attempts,
+      error: lastError,
+      rateLimited: sawRateLimit || undefined,
+    }
+  } finally {
+    sourceSlot?.release()
   }
 }
 
@@ -276,7 +339,8 @@ function raceAbortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
 }
 
 /**
- * JSON GET via freeApiAgent policy (timeout + empty null).
+ * JSON GET via freeApiAgent policy — etiquette rate limit + 429 retries.
+ * Default retries=2 so temporary rate limits recover with backoff.
  */
 export async function freeApiJson<T = unknown>(
   source: string,
@@ -292,17 +356,26 @@ export async function freeApiJson<T = unknown>(
     source,
     empty: null,
     timeoutMs: options?.timeoutMs,
-    retries: options?.retries ?? 0,
+    retries: options?.retries ?? 2,
     run: async ({ signal }) => {
       const res = await timedFetch(url, {
         ...options?.init,
         signal,
         timeoutMs: options?.timeoutMs ?? DEFAULT_LEAF_TIMEOUT_MS,
-        headers: { Accept: 'application/json', ...options?.headers, ...options?.init?.headers },
+        throwOnRateLimit: true,
+        headers: politeHeaders({
+          Accept: 'application/json',
+          ...options?.headers,
+          ...options?.init?.headers,
+        }),
       })
+      if (res.status === 429) {
+        const ra = parseRetryAfterMs(res.headers.get('retry-after')) ?? 2_000
+        throw new FreeApiRateLimitError(`HTTP 429 ${url}`, ra, source)
+      }
       if (!res.ok) {
-        const err = new Error(`HTTP ${res.status}`)
-        ;(err as { status?: number }).status = res.status
+        const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+        err.status = res.status
         throw err
       }
       const ct = (res.headers.get('content-type') || '').toLowerCase()
@@ -315,4 +388,5 @@ export async function freeApiJson<T = unknown>(
 }
 
 // Note: category fan-outs continue to use trackedSafe() for metrics bags.
-// New clients should call freeApiAgent() directly; leaf routes use leafRouteAgent.
+// New clients should call freeApiAgent() / freeApiJson() / timedFetch (etiquette built-in).
+// leaf routes use leafRouteAgent → freeApiAgent.

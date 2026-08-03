@@ -118,4 +118,27 @@ describe('freeApiAgent', () => {
     expect(r.data).toEqual([])
     expect(r.ms).toBeLessThan(2000)
   })
+
+  it('retries on 429 with etiquette backoff and marks rateLimited', async () => {
+    let n = 0
+    const r = await freeApiAgent({
+      source: 'test-429',
+      empty: [] as number[],
+      retries: 1,
+      skipSourceRateLimit: true,
+      run: async () => {
+        n += 1
+        if (n === 1) {
+          const err = new Error('HTTP 429') as Error & { status?: number; retryAfterMs?: number }
+          err.status = 429
+          err.retryAfterMs = 50
+          throw err
+        }
+        return [1]
+      },
+    })
+    expect(n).toBe(2)
+    expect(r.status).toBe('loaded')
+    expect(r.rateLimited).toBe(true)
+  })
 })

@@ -717,48 +717,53 @@ function cmdLogs(sub, positionals, flags) {
 
 function cmdApiAgent() {
   // Policy agent — not LLM inventing of-record facts (product law).
-  console.log(`Free-API Agent (policy runtime — not LLM facts)
+  console.log(`Free-API Agent (policy + etiquette — not LLM facts)
 
 Of-record evidence still comes only from free public HTTP APIs.
-This agent centralizes timeout / retry / abort / empty / status so clients
-do not hardcode the same rules in every file.
+This agent centralizes timeout / retry / abort / empty / status AND free-API
+etiquette so we do not stampede hosts into rate limits (429).
 
 Layers:
-  freeApiAgent     src/lib/api/freeApiAgent.ts   — timeout, retry, fallback, status
-  leafRouteAgent   src/lib/api/leafRouteAgent.ts — standard /api/{source}/[id] envelope
-  timedFetch       src/lib/api/timedFetch.ts     — wall-clock AbortSignal on fetch
-  Copilot          optional — choose which tools; claim-bound only
-  Discover rank    deterministic scores — never LLM
+  freeApiAgent     freeApiAgent.ts    — timeout, retry, fallback, source slots
+  freeApiEtiquette freeApiEtiquette.ts — User-Agent, Accept, From
+  rateLimit        rateLimit.ts       — host token-bucket + concurrency + 429 cooldown
+  timedFetch       timedFetch.ts      — wall-clock + polite fetch
+  leafRouteAgent   leafRouteAgent.ts  — /api/{source}/[id] envelope
+  Copilot          optional tools; claim-bound only
+  Discover rank    deterministic — never LLM
+
+Etiquette (agent-owned):
+  • Polite User-Agent (+ NCBI_EMAIL From when set)
+  • Per-host token bucket + max concurrent
+  • Source-level slots on freeApiAgent
+  • 429/503 → Retry-After cool-down + jittered backoff
+  • freeApiJson defaults retries=2; leaf routes retries=1
 
 Defaults:
   leaf timeout     8s (DEFAULT_LEAF_TIMEOUT_MS)
-  leaf route work  12s
+  leaf total wall  14s
   molecule lookup  6s
-  retries          0 (set retries on freeApiAgent spec)
   retry HTTP       429, 502, 503, 504
 
 Usage (code):
   import { freeApiAgent, freeApiJson } from '@/lib/api/freeApiAgent'
+  import { timedFetch } from '@/lib/api/timedFetch'
   import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
-  const r = await freeApiAgent({
+  const r = await freeApiJson('openalex', url) // etiquette + 429 retries
+  // or multi-step:
+  await freeApiAgent({
     source: 'mesh',
     empty: [],
-    timeoutMs: 8000,
-    run: async ({ signal }) => { /* free public API only */ },
+    retries: 1,
+    run: async ({ signal }) => {
+      const res = await timedFetch(url, { signal }) // rate-limited
+      /* parse free public API only */
+    },
   })
 
-  // Route:
-  export async function GET(req, { params }) {
-    return moleculeLeafGet(req, params, 'meshTerms', (name) => getMeshTermsByName(name), {
-      source: 'mesh',
-    })
-  }
-
-Live inventory (declarative probes — no per-route hardcoding):
-  npm run biointel -- api health
+Live inventory:
   npm run biointel -- api health live
-  # or: BIOINTEL_BASE=https://… npm run api:health
 
 Design: docs/design/free-api-agent.md
 `)

@@ -42,11 +42,12 @@ export async function moleculeLeafGet(
       ac,
       async () => {
         // Single freeApiAgent wall: raceAbortable settles even when handler ignores abort
+        // retries:1 — one etiquette backoff on 429/502 so we do not stampede free APIs
         const result = await freeApiAgent({
           source,
           empty,
           timeoutMs: LEAF_TOTAL_MS,
-          retries: 0,
+          retries: 1,
           run: async () => {
             const molecule = await withTimeout(getMoleculeById(cid), MOLECULE_LOOKUP_MS, {
               abortController: ac,

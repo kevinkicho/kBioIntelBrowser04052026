@@ -9,8 +9,9 @@
  * - Optional host rate limiting for free public APIs.
  */
 
-import { acquireRateLimit } from '../rateLimit'
+import { acquireRateLimit, noteRateLimitFromResponse } from '../rateLimit'
 import { getApiAbortSignal } from './apiAbort'
+import { politeHeaders } from './freeApiEtiquette'
 
 export const DEFAULT_MAX_RESPONSE_BYTES = 2 * 1024 * 1024
 export const DEFAULT_FETCH_TIMEOUT_MS = 12000
@@ -58,14 +59,18 @@ export async function fetchJsonWithSizeLimit<T = unknown>(
     sig.addEventListener('abort', onOuterAbort, { once: true })
   }
 
+  let slot: { release: () => void } | undefined
   try {
-    await acquireRateLimit(url)
+    slot = await acquireRateLimit(url, { signal: controller.signal })
     const res = await fetch(url, {
-      headers: { Accept: 'application/json', ...options.headers },
+      headers: politeHeaders({ Accept: 'application/json', ...options.headers }),
       cache: options.cache ?? 'no-store',
       signal: controller.signal,
     })
 
+    if (res.status === 429 || res.status === 503) {
+      noteRateLimitFromResponse(url, res)
+    }
     if (!res.ok) return null
 
     const contentType = (res.headers.get('content-type') || '').toLowerCase()
@@ -88,6 +93,7 @@ export async function fetchJsonWithSizeLimit<T = unknown>(
     return null
   } finally {
     clearTimeout(timeout)
+    slot?.release()
     for (const sig of outerSignals) {
       sig.removeEventListener('abort', onOuterAbort)
     }
