@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAxis } from '@/lib/hypothesis/axes'
 import { intersectMatches } from '@/lib/hypothesis/intersect'
 import type { Filter } from '@/lib/hypothesis/types'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 const MAX_FILTERS = 3
 const MAX_RESULTS = 200
@@ -46,28 +48,43 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  try {
-    const perFilterMatches = await Promise.all(
-      filters.map(async f => {
-        const axis = getAxis(f.axis)!
-        return axis.find(f.value)
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'hypothesis',
+        empty: {
+          filters,
+          perFilterCounts: [] as number[],
+          matches: [] as ReturnType<typeof intersectMatches>,
+        },
+        timeoutMs: 16_000,
+        hasData: (d) => Array.isArray(d.matches) && d.matches.length > 0,
+        run: async () => {
+          const perFilterMatches = await Promise.all(
+            filters.map(async (f) => {
+              const axis = getAxis(f.axis)!
+              return axis.find(f.value)
+            }),
+          )
+          const intersected = intersectMatches(perFilterMatches).slice(0, MAX_RESULTS)
+          return {
+            filters,
+            perFilterCounts: perFilterMatches.map((m) => m.length),
+            matches: intersected,
+          }
+        },
       }),
-    )
+    [request.signal],
+  )
 
-    const intersected = intersectMatches(perFilterMatches).slice(0, MAX_RESULTS)
-    return NextResponse.json({
-      filters,
-      perFilterCounts: perFilterMatches.map(m => m.length),
-      matches: intersected,
-    })
-  } catch (error) {
-    console.error('[api/hypothesis] Error:', error)
-    return NextResponse.json(
-      {
-        error: 'Hypothesis evaluation failed',
-        message: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 },
-    )
-  }
+  return NextResponse.json({
+    ...agent.data,
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+    ...(agent.status === 'timeout' || agent.status === 'error'
+      ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+      : {}),
+  })
 }

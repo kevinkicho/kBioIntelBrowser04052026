@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getRelatedCompoundsByTarget } from '@/lib/api/chembl'
 import { getCached, setCache } from '@/lib/cache'
 import type { RelatedCompound } from '@/lib/types'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
+import { timedFetch } from '@/lib/api/timedFetch'
 
 const CHEMBL_TARGET_SEARCH =
   'https://www.ebi.ac.uk/chembl/api/data/target/search.json'
@@ -15,7 +18,7 @@ async function resolveChemblTargetId(raw: string): Promise<string | null> {
 
   try {
     const url = `${CHEMBL_TARGET_SEARCH}?q=${encodeURIComponent(id)}&limit=15`
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return null
     const data = await res.json()
     const targets = (data.targets ?? []) as Array<{
@@ -40,7 +43,7 @@ async function resolveChemblTargetId(raw: string): Promise<string | null> {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { targetId: string } },
 ) {
   const targetId = params.targetId
@@ -54,15 +57,37 @@ export async function GET(
     return NextResponse.json(cached)
   }
 
-  try {
-    const chemblTarget = await resolveChemblTargetId(targetId)
-    if (!chemblTarget) {
-      return NextResponse.json([])
-    }
-    const data = await getRelatedCompoundsByTarget(chemblTarget)
-    setCache(cacheKey, data, 86400000) // 24h cache
-    return NextResponse.json(data)
-  } catch {
-    return NextResponse.json({ error: 'Failed to fetch related compounds' }, { status: 500 })
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'competitive',
+        empty: [] as RelatedCompound[],
+        timeoutMs: 14_000,
+        run: async () => {
+          const chemblTarget = await resolveChemblTargetId(targetId)
+          if (!chemblTarget) return []
+          return getRelatedCompoundsByTarget(chemblTarget)
+        },
+      }),
+    [request.signal],
+  )
+
+  if (agent.status === 'loaded' && agent.data.length > 0) {
+    setCache(cacheKey, agent.data, 86400000)
   }
+
+  return NextResponse.json(
+    agent.data.length > 0
+      ? agent.data
+      : {
+          compounds: agent.data,
+          _agentStatus: agent.status,
+          _agentMs: agent.ms,
+          ...(agent.status === 'timeout' || agent.status === 'error'
+            ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+            : {}),
+        },
+  )
 }

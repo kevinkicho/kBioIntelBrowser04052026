@@ -13,6 +13,8 @@ import {
 } from '@/lib/domain/score'
 import type { DiscoveryPreferencesSnapshot } from '@/lib/discovery/preferences'
 import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 const MAX_LIMIT = 25
 const MIN_QUERY_LENGTH = 2
@@ -158,9 +160,41 @@ export async function GET(request: NextRequest) {
   options.diseaseId = diseaseId
   options.targets = targets
 
+  const ac = new AbortController()
   try {
-    const result = await rankCandidatesForDisease(query, options)
-    return NextResponse.json(result)
+    const agent = await runWithApiAbort(
+      ac,
+      () =>
+        freeApiAgent({
+          source: 'discover-rank',
+          empty: null as Awaited<ReturnType<typeof rankCandidatesForDisease>> | null,
+          timeoutMs: 22_000,
+          hasData: (d) =>
+            d != null &&
+            Array.isArray((d as { candidates?: unknown[] }).candidates) &&
+            ((d as { candidates: unknown[] }).candidates.length > 0 ||
+              Array.isArray((d as { results?: unknown[] }).results)),
+          run: async () => rankCandidatesForDisease(query, options),
+        }),
+      [request.signal],
+    )
+
+    if (!agent.data) {
+      return NextResponse.json({
+        query,
+        candidates: [],
+        _partial: true,
+        _timeout: agent.status === 'timeout',
+        _error: agent.error ?? 'Candidate ranking timed out or failed',
+        _agentStatus: agent.status,
+        _agentMs: agent.ms,
+      })
+    }
+    return NextResponse.json({
+      ...agent.data,
+      _agentStatus: agent.status,
+      _agentMs: agent.ms,
+    })
   } catch (error) {
     if (error instanceof UnknownDiseaseIdError) {
       return NextResponse.json(
@@ -173,6 +207,7 @@ export async function GET(request: NextRequest) {
       {
         error: 'Candidate ranking failed',
         message: error instanceof Error ? error.message : 'Unknown error',
+        _partial: true,
       },
       { status: 500 },
     )

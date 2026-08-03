@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { searchCmsHospitalsByName } from '@/lib/api/cmsHospitals'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')?.trim() || ''
@@ -16,19 +18,30 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     )
   }
-  try {
-    const hospitals = await searchCmsHospitalsByName(q, limit)
-    return NextResponse.json({
-      ok: true,
-      query: q,
-      count: hospitals.length,
-      hospitals,
-      note: 'CMS Medicare hospital registry — not a treatment recommendation.',
-    })
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 502 },
-    )
-  }
+
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'cms-hospitals',
+        empty: [] as Awaited<ReturnType<typeof searchCmsHospitalsByName>>,
+        timeoutMs: 14_000,
+        run: async () => searchCmsHospitalsByName(q, limit),
+      }),
+    [request.signal],
+  )
+
+  return NextResponse.json({
+    ok: agent.status === 'loaded' || agent.status === 'empty',
+    query: q,
+    count: agent.data.length,
+    hospitals: agent.data,
+    note: 'CMS Medicare hospital registry — not a treatment recommendation.',
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+    ...(agent.status === 'timeout' || agent.status === 'error'
+      ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+      : {}),
+  })
 }

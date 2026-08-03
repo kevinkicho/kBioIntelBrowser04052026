@@ -9,6 +9,8 @@ import {
   searchEuResearchOrgsPack,
   EU_CORE_RESEARCH_COUNTRIES,
 } from '@/lib/api/euResearchOrgs'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')?.trim() || ''
@@ -22,26 +24,38 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     )
   }
-  try {
-    const orgs = pack
-      ? await searchEuResearchOrgsPack(q)
-      : country
-        ? await searchEuResearchOrgsByCountry(q, country, 20)
-        : await searchEuResearchOrgsPack(q)
-    return NextResponse.json({
-      ok: true,
-      query: q,
-      country: country || null,
-      pack: pack || !country,
-      coreCountries: [...EU_CORE_RESEARCH_COUNTRIES],
-      count: orgs.length,
-      orgs,
-      note: 'ROR EU research orgs (not a complete EU hospital census). Free public ROR API.',
-    })
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 502 },
-    )
-  }
+
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'eu-orgs',
+        empty: [] as Awaited<ReturnType<typeof searchEuResearchOrgsPack>>,
+        timeoutMs: 14_000,
+        run: async () =>
+          pack
+            ? searchEuResearchOrgsPack(q)
+            : country
+              ? searchEuResearchOrgsByCountry(q, country, 20)
+              : searchEuResearchOrgsPack(q),
+      }),
+    [request.signal],
+  )
+
+  return NextResponse.json({
+    ok: agent.status === 'loaded' || agent.status === 'empty',
+    query: q,
+    country: country || null,
+    pack: pack || !country,
+    coreCountries: [...EU_CORE_RESEARCH_COUNTRIES],
+    count: agent.data.length,
+    orgs: agent.data,
+    note: 'ROR EU research orgs (not a complete EU hospital census). Free public ROR API.',
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+    ...(agent.status === 'timeout' || agent.status === 'error'
+      ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+      : {}),
+  })
 }
