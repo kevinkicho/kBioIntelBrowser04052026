@@ -1,29 +1,19 @@
-import { NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getOrphanetData } from '@/lib/api/orphanet'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  try {
-    const cid = parseInt(params.id, 10)
-    if (isNaN(cid)) {
-      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-    }
-
-    const molecule = await getMoleculeById(cid)
-    if (!molecule) {
-      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
-    }
-
-    const data = await getOrphanetData(molecule.name)
-
-    return NextResponse.json({
-      diseases: data.diseases
-    })
-  } catch (error) {
-    console.error('Orphanet API error:', error)
-    return NextResponse.json({ error: 'Failed to fetch Orphanet data' }, { status: 500 })
-  }
+  return moleculeLeafGet(
+    request,
+    params,
+    'diseases',
+    async (name) => {
+      const data = await getOrphanetData(name)
+      return data.diseases ?? []
+    },
+    { source: 'orphanet' },
+  )
 }

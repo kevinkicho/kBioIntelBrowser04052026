@@ -4,6 +4,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getMoleculeById } from '@/lib/api/pubchem'
 import { getCached, setCache } from '@/lib/cache'
 import { LIMITS } from '@/lib/api-limits'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 // Panel-specific imports - only what's used in PANEL_CONFIG
 import { getDrugsByIngredient } from '@/lib/api/openfda'
@@ -978,35 +980,70 @@ export async function GET(
   )
   const offset = parseInt(searchParams.get('offset') || '0')
 
-  // Get molecule info
-  const molecule = await getMoleculeById(cid)
-  if (!molecule) {
-    return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
+  const emptyPanel: PanelResponse<unknown> = {
+    data: [],
+    total: 0,
+    hasMore: false,
+    offset,
   }
 
-  const name = molecule.name
-  const synonyms = molecule.synonyms || []
-
-  // Check cache
+  // Check cache before agent work
   const cacheKey = `panel:${cid}:${panelId}:${limit}:${offset}`
   const cached = getCached<PanelResponse<unknown>>(cacheKey)
   if (cached) {
     return NextResponse.json(cached)
   }
 
-  // Fetch panel data
+  const ac = new AbortController()
   try {
-    const result = await config.fetcher(name, synonyms, limit, offset)
-    result.offset = offset
+    const agent = await runWithApiAbort(
+      ac,
+      () =>
+        freeApiAgent({
+          source: `panel:${panelId}`,
+          empty: emptyPanel,
+          timeoutMs: 14_000,
+          hasData: (p) => Array.isArray(p.data) && p.data.length > 0,
+          run: async () => {
+            const molecule = await getMoleculeById(cid)
+            if (!molecule) {
+              return emptyPanel
+            }
+            const result = await config.fetcher(
+              molecule.name,
+              molecule.synonyms || [],
+              limit,
+              offset,
+            )
+            result.offset = offset
+            if (Array.isArray(result.data) && result.data.length > 0) {
+              setCache(cacheKey, result)
+            }
+            return result
+          },
+        }),
+      [request.signal],
+    )
 
-    setCache(cacheKey, result)
-    return NextResponse.json(result)
+    return NextResponse.json({
+      ...agent.data,
+      _agentStatus: agent.status,
+      _agentMs: agent.ms,
+      ...(agent.status === 'timeout' || agent.status === 'error'
+        ? {
+            _partial: true,
+            _timeout: agent.status === 'timeout',
+            _error: agent.error,
+          }
+        : {}),
+    })
   } catch (error) {
     console.error(`Error fetching panel ${panelId}:`, error)
     return NextResponse.json({
-      error: 'Failed to fetch panel data',
-      panelId,
-      message: error instanceof Error ? error.message : 'Unknown error'
-    }, { status: 500 })
+      ...emptyPanel,
+      _partial: true,
+      _error: error instanceof Error ? error.message : 'Unknown error',
+      _agentStatus: 'error',
+    })
   }
 }

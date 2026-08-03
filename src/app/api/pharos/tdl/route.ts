@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getPharosTdlBatch } from '@/lib/api/pharos'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 /**
  * GET /api/pharos/tdl?symbols=EGFR,BRAF
@@ -17,13 +19,26 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ tdl: {} })
   }
 
-  try {
-    const tdl = await getPharosTdlBatch(symbols, 3)
-    return NextResponse.json({ tdl })
-  } catch (err) {
-    return NextResponse.json(
-      { tdl: {}, error: err instanceof Error ? err.message : 'Pharos TDL failed' },
-      { status: 200 },
-    )
-  }
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'pharos-tdl',
+        empty: {} as Record<string, string>,
+        timeoutMs: 12_000,
+        hasData: (d) => Object.keys(d).length > 0,
+        run: async () => getPharosTdlBatch(symbols, 3),
+      }),
+    [request.signal],
+  )
+
+  return NextResponse.json({
+    tdl: agent.data,
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+    ...(agent.status === 'timeout' || agent.status === 'error'
+      ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+      : {}),
+  })
 }

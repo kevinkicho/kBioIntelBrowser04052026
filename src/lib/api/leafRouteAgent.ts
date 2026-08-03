@@ -12,7 +12,8 @@ import { runWithApiAbort } from './apiAbort'
 import { withTimeout, isTimeoutError } from '../utils'
 
 const MOLECULE_LOOKUP_MS = 6_000
-const LEAF_WORK_MS = 12_000
+/** Hard wall for lookup + source work (raceAbortable wins even if handler ignores signal) */
+const LEAF_TOTAL_MS = 14_000
 
 export type MoleculeLeafHandler = (name: string, cid: number) => Promise<unknown>
 
@@ -40,24 +41,23 @@ export async function moleculeLeafGet(
     const payload = await runWithApiAbort(
       ac,
       async () => {
-        const molecule = await withTimeout(getMoleculeById(cid), MOLECULE_LOOKUP_MS, {
-          abortController: ac,
-          signal: request.signal,
-        }).catch((err) => {
-          if (err instanceof PubChemUpstreamError) throw err
-          return null
-        })
-
-        if (!molecule) {
-          return { [responseKey]: empty, _partial: false }
-        }
-
+        // Single freeApiAgent wall: raceAbortable settles even when handler ignores abort
         const result = await freeApiAgent({
           source,
           empty,
-          timeoutMs: LEAF_WORK_MS,
+          timeoutMs: LEAF_TOTAL_MS,
           retries: 0,
-          run: async () => handler(molecule.name, cid),
+          run: async () => {
+            const molecule = await withTimeout(getMoleculeById(cid), MOLECULE_LOOKUP_MS, {
+              abortController: ac,
+              signal: request.signal,
+            }).catch((err) => {
+              if (err instanceof PubChemUpstreamError) throw err
+              return null
+            })
+            if (!molecule) return empty
+            return handler(molecule.name, cid)
+          },
         })
 
         return {

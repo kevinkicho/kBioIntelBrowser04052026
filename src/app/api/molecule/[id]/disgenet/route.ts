@@ -1,29 +1,19 @@
-import { NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getDisGeNetData } from '@/lib/api/disgenet'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  try {
-    const cid = parseInt(params.id, 10)
-    if (isNaN(cid)) {
-      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-    }
-
-    const molecule = await getMoleculeById(cid)
-    if (!molecule) {
-      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
-    }
-
-    const data = await getDisGeNetData(molecule.name)
-
-    return NextResponse.json({
-      associations: data.associations
-    })
-  } catch (error) {
-    console.error('DisGeNET API error:', error)
-    return NextResponse.json({ error: 'Failed to fetch DisGeNET data' }, { status: 500 })
-  }
+  return moleculeLeafGet(
+    request,
+    params,
+    'associations',
+    async (name) => {
+      const data = await getDisGeNetData(name)
+      return data.associations ?? []
+    },
+    { source: 'disgenet' },
+  )
 }

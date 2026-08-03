@@ -1,29 +1,19 @@
-import { NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getHMDBData } from '@/lib/api/hmdb'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  try {
-    const cid = parseInt(params.id, 10)
-    if (isNaN(cid)) {
-      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-    }
-
-    const molecule = await getMoleculeById(cid)
-    if (!molecule) {
-      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
-    }
-
-    const data = await getHMDBData(molecule.name)
-
-    return NextResponse.json({
-      metabolites: data.metabolites
-    })
-  } catch (error) {
-    console.error('HMDB API error:', error)
-    return NextResponse.json({ error: 'Failed to fetch HMDB data' }, { status: 500 })
-  }
+  return moleculeLeafGet(
+    request,
+    params,
+    'metabolites',
+    async (name) => {
+      const data = await getHMDBData(name)
+      return data.metabolites ?? []
+    },
+    { source: 'hmdb' },
+  )
 }

@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { searchGenes } from '@/lib/api/mygene'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')
@@ -11,27 +13,42 @@ export async function GET(request: NextRequest) {
   }
 
   const query = q.trim()
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'search-gene',
+        empty: [] as Awaited<ReturnType<typeof searchGenes>>,
+        timeoutMs: 12_000,
+        run: async () => searchGenes(query),
+      }),
+    [request.signal],
+  )
 
-  try {
-    const genes = await searchGenes(query)
-    const results = genes.slice(0, limit).map(g => ({
-      geneId: g.geneId,
-      symbol: g.symbol,
-      name: g.name,
-      summary: g.summary?.slice(0, 200) || '',
-      chromosome: g.mapLocation || '',
-      typeOfGene: g.typeOfGene || '',
-      aliases: (Array.isArray(g.aliases)
+  const results = agent.data.slice(0, limit).map((g) => ({
+    geneId: g.geneId,
+    symbol: g.symbol,
+    name: g.name,
+    summary: g.summary?.slice(0, 200) || '',
+    chromosome: g.mapLocation || '',
+    typeOfGene: g.typeOfGene || '',
+    aliases: (
+      Array.isArray(g.aliases)
         ? g.aliases
         : typeof g.aliases === 'string' && g.aliases
           ? [g.aliases]
           : []
-      ).slice(0, 5),
-    }))
+    ).slice(0, 5),
+  }))
 
-    return NextResponse.json({ results, searchType: 'gene' })
-  } catch (error) {
-    console.error('[api/search/gene] Error:', error)
-    return NextResponse.json({ error: 'Gene search failed', message: error instanceof Error ? error.message : 'Unknown error' }, { status: 500 })
-  }
+  return NextResponse.json({
+    results,
+    searchType: 'gene',
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+    ...(agent.status === 'timeout' || agent.status === 'error'
+      ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+      : {}),
+  })
 }

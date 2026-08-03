@@ -1,29 +1,20 @@
-import { NextResponse } from 'next/server'
-import { getMoleculeById } from '@/lib/api/pubchem'
+import { NextRequest } from 'next/server'
 import { getSIDERData } from '@/lib/api/sider'
+import { moleculeLeafGet } from '@/lib/api/leafRouteAgent'
 
+/** SIDER side-effects — free-API agent policy. */
 export async function GET(
-  request: Request,
-  { params }: { params: { id: string } }
+  request: NextRequest,
+  { params }: { params: { id: string } },
 ) {
-  try {
-    const cid = parseInt(params.id, 10)
-    if (isNaN(cid)) {
-      return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
-    }
-
-    const molecule = await getMoleculeById(cid)
-    if (!molecule) {
-      return NextResponse.json({ error: 'Molecule not found' }, { status: 404 })
-    }
-
-    const data = await getSIDERData(molecule.name)
-
-    return NextResponse.json({
-      sideEffects: data.sideEffects
-    })
-  } catch (error) {
-    console.error('SIDER API error:', error)
-    return NextResponse.json({ error: 'Failed to fetch SIDER data' }, { status: 500 })
-  }
+  return moleculeLeafGet(
+    request,
+    params,
+    'sideEffects',
+    async (name) => {
+      const data = await getSIDERData(name)
+      return data.sideEffects ?? []
+    },
+    { source: 'sider' },
+  )
 }

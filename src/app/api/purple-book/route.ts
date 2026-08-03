@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { searchPurpleBookByName } from '@/lib/api/purpleBookCache'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')?.trim() || ''
@@ -16,20 +18,45 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     )
   }
-  try {
-    const { meta, products } = await searchPurpleBookByName(q, limit)
+
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'purple-book',
+        empty: null as Awaited<ReturnType<typeof searchPurpleBookByName>> | null,
+        timeoutMs: 14_000,
+        hasData: (d) => d != null && Array.isArray(d.products) && d.products.length > 0,
+        run: async () => searchPurpleBookByName(q, limit),
+      }),
+    [request.signal],
+  )
+
+  if (!agent.data) {
     return NextResponse.json({
-      ok: true,
+      ok: false,
       query: q,
-      meta,
-      count: products.length,
-      products,
+      meta: null,
+      count: 0,
+      products: [],
       note: 'FDA Purple Book monthly public CSV — not clinical decision support.',
+      _agentStatus: agent.status,
+      _agentMs: agent.ms,
+      _partial: true,
+      _timeout: agent.status === 'timeout',
+      _error: agent.error,
     })
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 502 },
-    )
   }
+
+  return NextResponse.json({
+    ok: true,
+    query: q,
+    meta: agent.data.meta,
+    count: agent.data.products.length,
+    products: agent.data.products,
+    note: 'FDA Purple Book monthly public CSV — not clinical decision support.',
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+  })
 }

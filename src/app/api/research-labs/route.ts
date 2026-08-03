@@ -5,6 +5,8 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import { runResearchLabPipeline } from '@/lib/researchLabs'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
 
 export async function GET(request: NextRequest) {
   const q = request.nextUrl.searchParams.get('q')?.trim() || ''
@@ -20,26 +22,48 @@ export async function GET(request: NextRequest) {
     )
   }
 
-  try {
-    const result = await runResearchLabPipeline({
-      query: q,
-      countryCode: country,
-      includeEuPack: euPack || !country,
-      includeGrants: !noGrants,
-      includeOpenAire: !noOpenAire,
-      includeHospitals: true,
-    })
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'research-labs',
+        empty: null as Awaited<ReturnType<typeof runResearchLabPipeline>> | null,
+        timeoutMs: 16_000,
+        hasData: (d) => d != null && d.ok === true,
+        run: async () =>
+          runResearchLabPipeline({
+            query: q,
+            countryCode: country,
+            includeEuPack: euPack || !country,
+            includeGrants: !noGrants,
+            includeOpenAire: !noOpenAire,
+            includeHospitals: true,
+          }),
+      }),
+    [request.signal],
+  )
+
+  if (!agent.data) {
     return NextResponse.json({
-      ok: result.ok,
+      ok: false,
       query: q,
-      dossier: result.dossier,
-      warnings: result.warnings,
-      note: 'Free public affiliation dossier — not admissions or clinical referral advice.',
+      _agentStatus: agent.status,
+      _agentMs: agent.ms,
+      _partial: true,
+      _timeout: agent.status === 'timeout',
+      _error: agent.error,
+      error: agent.error ?? 'research labs pipeline failed',
     })
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: e instanceof Error ? e.message : String(e) },
-      { status: 502 },
-    )
   }
+
+  return NextResponse.json({
+    ok: agent.data.ok,
+    query: q,
+    dossier: agent.data.dossier,
+    warnings: agent.data.warnings,
+    note: 'Free public affiliation dossier — not admissions or clinical referral advice.',
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+  })
 }

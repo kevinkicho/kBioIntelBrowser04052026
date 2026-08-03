@@ -5,6 +5,9 @@ import {
   SUPPLIER_CATALOG_TEMPLATES,
   type CatalogLinkVars,
 } from '@/lib/vendorCatalogLinks'
+import { freeApiAgent } from '@/lib/api/freeApiAgent'
+import { runWithApiAbort } from '@/lib/api/apiAbort'
+import { timedFetch } from '@/lib/api/timedFetch'
 
 const CACHE_DURATION = 86400
 
@@ -101,8 +104,18 @@ function isMoleculeDeepLink(url: string): boolean {
   }
 }
 
+type VendorsPayload = {
+  suppliers: VendorResult[]
+  databases: VendorResult[]
+  total: number
+  moleculeName?: string
+  cas?: string | null
+  inchiKey?: string | null
+  searchTerm?: string
+}
+
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   { params }: { params: { id: string } },
 ) {
   const cid = parseInt(params.id, 10)
@@ -110,158 +123,181 @@ export async function GET(
     return NextResponse.json({ error: 'Invalid molecule ID' }, { status: 400 })
   }
 
-  let moleculeName: string | null = null
-  let inchiKey: string | null = null
-  let cas: string | null = null
-  try {
-    const [molRes, synRes] = await Promise.all([
-      fetch(
-        `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,IUPACName,InChIKey/JSON`,
-        { next: { revalidate: CACHE_DURATION } },
-      ),
-      fetch(
-        `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/synonyms/JSON`,
-        { next: { revalidate: CACHE_DURATION } },
-      ),
-    ])
-    if (molRes.ok) {
-      const molData = await molRes.json()
-      const props = molData.PropertyTable?.Properties?.[0]
-      moleculeName = props?.Title || props?.IUPACName || null
-      inchiKey = props?.InChIKey || null
-    }
-    if (synRes.ok) {
-      const synData = await synRes.json()
-      const syns: string[] =
-        synData.InformationList?.Information?.[0]?.Synonym?.slice(0, 40) ?? []
-      cas = extractCasFromSynonyms(syns)
-    }
-  } catch {
-    /* non-fatal */
-  }
-
-  const displayName = moleculeName || String(cid)
-  // Prefer CAS for catalog queries when present (disambiguates salts / forms)
-  const searchName = cas || displayName
-  const linkVars: CatalogLinkVars = {
-    name: searchName,
-    cid,
-    cas,
-    inchiKey,
-  }
-
-  let sburls: string[] = []
-  try {
-    const sbRes = await fetch(
-      `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/SBURL/JSON`,
-      { next: { revalidate: CACHE_DURATION } },
-    )
-    if (sbRes.ok) {
-      const sbData = await sbRes.json()
-      const raw: unknown = sbData.InformationList?.Information?.[0]?.SBURL
-      if (Array.isArray(raw)) {
-        sburls = raw.filter((u): u is string => typeof u === 'string' && isMoleculeDeepLink(u))
-      }
-    }
-  } catch {
-    /* non-fatal */
-  }
-
-  const sburlByName = new Map<string, string>()
-  for (const url of sburls) {
-    const host = hostnameOf(url)
-    for (const hint of SBURL_HOST_HINTS) {
-      if (hint.host.test(url) || hint.host.test(host)) {
-        if (!sburlByName.has(hint.name)) sburlByName.set(hint.name, url)
-      }
-    }
-  }
-
-  try {
-    const res = await fetch(
-      `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/SourceName/JSON`,
-      { next: { revalidate: CACHE_DURATION } },
-    )
-    if (!res.ok) {
-      return NextResponse.json({
-        suppliers: [],
-        databases: [],
-        total: 0,
-        moleculeName: displayName,
-        cas,
-        inchiKey,
-      })
-    }
-    const data = await res.json()
-    const sources: string[] = data.InformationList?.Information?.[0]?.SourceName ?? []
-
-    const seen = new Set<string>()
-    const suppliers: VendorResult[] = []
-    const databases: VendorResult[] = []
-
-    for (const source of sources) {
-      const supplierMatch = SUPPLIER_CATALOG_TEMPLATES.find((t) => t.pattern.test(source))
-      if (supplierMatch) {
-        if (seen.has(supplierMatch.name)) continue
-        seen.add(supplierMatch.name)
-        // Prefer PubChem SBURL when it is a true record deep link for this supplier
-        const sb = sburls.find((u) => {
+  const empty: VendorsPayload = { suppliers: [], databases: [], total: 0 }
+  const ac = new AbortController()
+  const agent = await runWithApiAbort(
+    ac,
+    () =>
+      freeApiAgent({
+        source: 'vendors',
+        empty,
+        timeoutMs: 14_000,
+        hasData: (d) =>
+          (Array.isArray(d.suppliers) && d.suppliers.length > 0) ||
+          (Array.isArray(d.databases) && d.databases.length > 0),
+        run: async () => {
+          let moleculeName: string | null = null
+          let inchiKey: string | null = null
+          let cas: string | null = null
           try {
-            return supplierMatch.pattern.test(u) || u.toLowerCase().includes(supplierMatch.name.split(' ')[0]!.toLowerCase())
+            const [molRes, synRes] = await Promise.all([
+              timedFetch(
+                `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/property/Title,IUPACName,InChIKey/JSON`,
+                { timeoutMs: 8000, next: { revalidate: CACHE_DURATION } },
+              ),
+              timedFetch(
+                `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/synonyms/JSON`,
+                { timeoutMs: 8000, next: { revalidate: CACHE_DURATION } },
+              ),
+            ])
+            if (molRes.ok) {
+              const molData = await molRes.json()
+              const props = molData.PropertyTable?.Properties?.[0]
+              moleculeName = props?.Title || props?.IUPACName || null
+              inchiKey = props?.InChIKey || null
+            }
+            if (synRes.ok) {
+              const synData = await synRes.json()
+              const syns: string[] =
+                synData.InformationList?.Information?.[0]?.Synonym?.slice(0, 40) ?? []
+              cas = extractCasFromSynonyms(syns)
+            }
           } catch {
-            return false
+            /* non-fatal */
           }
-        })
-        suppliers.push({
-          name: supplierMatch.name,
-          url: sb && isMoleculeDeepLink(sb)
-            ? sb
-            : fillCatalogTemplate(supplierMatch.urlTemplate, linkVars),
-          sourceType: 'supplier',
-        })
-        continue
-      }
 
-      if (DATABASE_BLACKLIST.has(source)) continue
+          const displayName = moleculeName || String(cid)
+          const searchName = cas || displayName
+          const linkVars: CatalogLinkVars = {
+            name: searchName,
+            cid,
+            cas,
+            inchiKey,
+          }
 
-      const dbMatch = DATABASE_TEMPLATES.find((t) => t.pattern.test(source))
-      const key = dbMatch ? dbMatch.name : source
-      if (seen.has(key)) continue
-      seen.add(key)
+          let sburls: string[] = []
+          try {
+            const sbRes = await timedFetch(
+              `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/SBURL/JSON`,
+              { timeoutMs: 8000, next: { revalidate: CACHE_DURATION } },
+            )
+            if (sbRes.ok) {
+              const sbData = await sbRes.json()
+              const raw: unknown = sbData.InformationList?.Information?.[0]?.SBURL
+              if (Array.isArray(raw)) {
+                sburls = raw.filter((u): u is string => typeof u === 'string' && isMoleculeDeepLink(u))
+              }
+            }
+          } catch {
+            /* non-fatal */
+          }
 
-      let url: string | null = null
-      if (dbMatch) {
-        url = fillDbTemplate(dbMatch.urlTemplate, linkVars)
-        if (dbMatch.urlTemplate.includes('{inchikey') && !inchiKey) {
-          url = sburlByName.get(key) ?? null
-        }
-      }
-      if (!url) url = sburlByName.get(key) ?? null
-      if (!url) url = `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`
+          const sburlByName = new Map<string, string>()
+          for (const url of sburls) {
+            const host = hostnameOf(url)
+            for (const hint of SBURL_HOST_HINTS) {
+              if (hint.host.test(url) || hint.host.test(host)) {
+                if (!sburlByName.has(hint.name)) sburlByName.set(hint.name, url)
+              }
+            }
+          }
 
-      databases.push({ name: key, url, sourceType: 'database' })
-    }
+          const res = await timedFetch(
+            `https://pubchem.ncbi.nlm.nih.gov/rest/pug/compound/cid/${cid}/xrefs/SourceName/JSON`,
+            { timeoutMs: 8000, next: { revalidate: CACHE_DURATION } },
+          )
+          if (!res.ok) {
+            return {
+              suppliers: [],
+              databases: [],
+              total: 0,
+              moleculeName: displayName,
+              cas,
+              inchiKey,
+            }
+          }
+          const data = await res.json()
+          const sources: string[] = data.InformationList?.Information?.[0]?.SourceName ?? []
 
-    sburlByName.forEach((url, name) => {
-      if (seen.has(name)) return
-      seen.add(name)
-      databases.push({ name, url, sourceType: 'database' })
-    })
+          const seen = new Set<string>()
+          const suppliers: VendorResult[] = []
+          const databases: VendorResult[] = []
 
-    return NextResponse.json(
-      {
-        suppliers,
-        databases,
-        total: sources.length,
-        moleculeName: displayName,
-        cas,
-        inchiKey,
-        searchTerm: searchName,
-      },
-      { headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` } },
-    )
-  } catch (error) {
-    console.error('[api/molecule/vendors] Error:', error)
-    return NextResponse.json({ suppliers: [], databases: [], total: 0 })
-  }
+          for (const source of sources) {
+            const supplierMatch = SUPPLIER_CATALOG_TEMPLATES.find((t) => t.pattern.test(source))
+            if (supplierMatch) {
+              if (seen.has(supplierMatch.name)) continue
+              seen.add(supplierMatch.name)
+              const sb = sburls.find((u) => {
+                try {
+                  return (
+                    supplierMatch.pattern.test(u) ||
+                    u.toLowerCase().includes(supplierMatch.name.split(' ')[0]!.toLowerCase())
+                  )
+                } catch {
+                  return false
+                }
+              })
+              suppliers.push({
+                name: supplierMatch.name,
+                url:
+                  sb && isMoleculeDeepLink(sb)
+                    ? sb
+                    : fillCatalogTemplate(supplierMatch.urlTemplate, linkVars),
+                sourceType: 'supplier',
+              })
+              continue
+            }
+
+            if (DATABASE_BLACKLIST.has(source)) continue
+
+            const dbMatch = DATABASE_TEMPLATES.find((t) => t.pattern.test(source))
+            const key = dbMatch ? dbMatch.name : source
+            if (seen.has(key)) continue
+            seen.add(key)
+
+            let url: string | null = null
+            if (dbMatch) {
+              url = fillDbTemplate(dbMatch.urlTemplate, linkVars)
+              if (dbMatch.urlTemplate.includes('{inchikey') && !inchiKey) {
+                url = sburlByName.get(key) ?? null
+              }
+            }
+            if (!url) url = sburlByName.get(key) ?? null
+            if (!url) url = `https://pubchem.ncbi.nlm.nih.gov/compound/${cid}`
+
+            databases.push({ name: key, url, sourceType: 'database' })
+          }
+
+          sburlByName.forEach((url, name) => {
+            if (seen.has(name)) return
+            seen.add(name)
+            databases.push({ name, url, sourceType: 'database' })
+          })
+
+          return {
+            suppliers,
+            databases,
+            total: sources.length,
+            moleculeName: displayName,
+            cas,
+            inchiKey,
+            searchTerm: searchName,
+          }
+        },
+      }),
+    [request.signal],
+  )
+
+  return NextResponse.json(
+    {
+      ...agent.data,
+      _agentStatus: agent.status,
+      _agentMs: agent.ms,
+      ...(agent.status === 'timeout' || agent.status === 'error'
+        ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
+        : {}),
+    },
+    { headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` } },
+  )
 }

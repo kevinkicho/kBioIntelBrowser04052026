@@ -103,4 +103,19 @@ describe('freeApiAgent', () => {
       }),
     ).resolves.toMatchObject({ status: 'error', source: 'test-never-throw' })
   })
+
+  it('settles timeout even when run() ignores abort signal (hang forever)', async () => {
+    const r = await freeApiAgent({
+      source: 'test-hang',
+      empty: [] as number[],
+      timeoutMs: 80,
+      run: async () =>
+        new Promise<number[]>(() => {
+          /* never resolves, never checks signal */
+        }),
+    })
+    expect(r.status).toBe('timeout')
+    expect(r.data).toEqual([])
+    expect(r.ms).toBeLessThan(2000)
+  })
 })

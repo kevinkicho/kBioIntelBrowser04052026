@@ -119,7 +119,11 @@ export async function freeApiAgent<T>(spec: FreeApiAgentSpec<T>): Promise<FreeAp
     const signal = mergeSignals(getApiAbortSignal(), controller.signal)!
 
     try {
-      const data = await spec.run({ signal, attempt, source: spec.source })
+      // Hard race: abort alone is not enough if run() ignores signal
+      const data = await raceAbortable(
+        spec.run({ signal, attempt, source: spec.source }),
+        signal,
+      )
       clearTimeout(timer)
       if (checkData(data)) {
         return {
@@ -132,7 +136,10 @@ export async function freeApiAgent<T>(spec: FreeApiAgentSpec<T>): Promise<FreeAp
       }
       // empty primary — try fallback once on last attempt
       if (spec.fallback && attempt === maxAttempts) {
-        const fb = await runFallback(spec, signal, attempt, checkData)
+        const fb = await raceAbortable(
+          runFallback(spec, signal, attempt, checkData),
+          signal,
+        )
         return { ...fb, ms: Date.now() - start, attempts }
       }
       lastError = 'empty'
@@ -157,13 +164,22 @@ export async function freeApiAgent<T>(spec: FreeApiAgentSpec<T>): Promise<FreeAp
         await sleep(200 * attempt)
         continue
       }
-      if (spec.fallback) {
+      if (spec.fallback && !aborted) {
         try {
           const fbController = new AbortController()
-          const fbTimer = setTimeout(() => fbController.abort(), timeoutMs)
+          const fbTimer = setTimeout(() => {
+            try {
+              fbController.abort(new DOMException('fallback timeout', 'AbortError'))
+            } catch {
+              fbController.abort()
+            }
+          }, timeoutMs)
           const fbSignal = mergeSignals(getApiAbortSignal(), fbController.signal)!
           try {
-            const fb = await runFallback(spec, fbSignal, attempt, checkData)
+            const fb = await raceAbortable(
+              runFallback(spec, fbSignal, attempt, checkData),
+              fbSignal,
+            )
             return { ...fb, ms: Date.now() - start, attempts }
           } finally {
             clearTimeout(fbTimer)
@@ -222,6 +238,41 @@ async function runFallback<T>(
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms))
+}
+
+/**
+ * Race work against AbortSignal. Critical: many free-API clients ignore
+ * `signal`, so abort alone does not settle the promise. This forces the
+ * agent wall clock to win even when run() never checks abort.
+ */
+function raceAbortable<T>(work: Promise<T>, signal: AbortSignal): Promise<T> {
+  if (signal.aborted) {
+    const reason =
+      signal.reason instanceof Error
+        ? signal.reason
+        : new DOMException('freeApiAgent aborted', 'AbortError')
+    return Promise.reject(reason)
+  }
+  return new Promise<T>((resolve, reject) => {
+    const onAbort = () => {
+      const reason =
+        signal.reason instanceof Error
+          ? signal.reason
+          : new DOMException('freeApiAgent aborted', 'AbortError')
+      reject(reason)
+    }
+    signal.addEventListener('abort', onAbort, { once: true })
+    work.then(
+      (v) => {
+        signal.removeEventListener('abort', onAbort)
+        resolve(v)
+      },
+      (e) => {
+        signal.removeEventListener('abort', onAbort)
+        reject(e)
+      },
+    )
+  })
 }
 
 /**
