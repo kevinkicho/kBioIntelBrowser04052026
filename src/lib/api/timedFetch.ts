@@ -4,11 +4,10 @@
  * Prefer these over bare `fetch` for any public-API client so App Hosting
  * cannot hang indefinitely on a single upstream (PubChem, Orphanet, …).
  *
- * When running under `runWithApiAbort`, the global patch also caps leaf
- * sockets; timedFetch is still recommended for code outside category ALS.
+ * Intentionally does NOT import `apiAbort` (Node async_hooks) so modules that
+ * use timedFetch remain importable from client components (e.g. expression-atlas
+ * helpers). Under `runWithApiAbort`, the global fetch patch still merges ALS.
  */
-
-import { getApiAbortSignal } from './apiAbort'
 
 export const DEFAULT_LEAF_TIMEOUT_MS = 8_000
 
@@ -35,12 +34,13 @@ function mergeAbortSignals(
 }
 
 export interface TimedFetchOptions extends RequestInit {
-  /** Wall-clock timeout (default 8s). Pass 0 to disable timer (still merges ALS). */
+  /** Wall-clock timeout (default 8s). Pass 0 to disable timer. */
   timeoutMs?: number
 }
 
 /**
- * `fetch` with timeout + ALS category abort merge.
+ * `fetch` with wall-clock timeout.
+ * Category ALS abort is applied by the server fetch patch when active.
  * Throws on network/abort (caller decides fallback).
  */
 export async function timedFetch(
@@ -61,10 +61,7 @@ export async function timedFetch(
     }, timeoutMs)
   }
 
-  const signal = mergeAbortSignals(
-    mergeAbortSignals(outerSignal ?? undefined, getApiAbortSignal()),
-    controller.signal,
-  )
+  const signal = mergeAbortSignals(outerSignal ?? undefined, controller.signal)
 
   try {
     return await fetch(url, { ...init, signal })
