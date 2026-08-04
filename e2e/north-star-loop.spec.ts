@@ -182,10 +182,12 @@ test.describe('North-star loop', () => {
     })
 
     await page.goto('/projects')
-    await expect(page.getByRole('link', { name: /ATTR amyloidosis board|E2E|ATTR/i }).first()).toBeVisible({
-      timeout: 30_000,
+    await expect(page.getByTestId('projects-list')).toBeVisible({ timeout: 30_000 })
+    // Project title is a row button (not a link); open via stable test id
+    await expect(page.getByText(/ATTR amyloidosis|Tafamidis|Board/i).first()).toBeVisible({
+      timeout: 15_000,
     })
-    await page.getByRole('link', { name: /Open board/i }).first().click()
+    await page.locator('[data-testid^="project-open-"]').first().click()
 
     await expect(page.getByText(/Tafamidis/i).first()).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('pack-builder')).toBeVisible({ timeout: 30_000 })
@@ -229,7 +231,8 @@ test.describe('North-star loop', () => {
     await expect(page.getByTestId('research-hypotheses-list')).toBeVisible()
     await page.locator('[data-testid^="rh-edit-"]').first().click()
     await expect(page).toHaveURL(/\/hypothesis\//)
-    await expect(page.getByText(/Research hypothesis/i)).toBeVisible()
+    // Heading only — subtitle also contains "Research hypothesis" (strict mode)
+    await expect(page.getByRole('heading', { name: /Research hypothesis/i })).toBeVisible()
   })
 
   test('RH rehydrate loads claim statements from IDB pack cache', async ({ page }) => {
@@ -238,15 +241,17 @@ test.describe('North-star loop', () => {
     await seedBoardAndPack(page)
 
     await page.goto(`/projects/${PROJECT_ID}/hypothesis/${HYP_ID}`)
-    await expect(page.getByText(/Research hypothesis/i)).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole('heading', { name: /Research hypothesis/i })).toBeVisible({
+      timeout: 30_000,
+    })
     // IDB rehydrate should show statement (not bare claim id list only)
     await expect(page.getByTestId('rehydrated-claims')).toBeVisible({ timeout: 30_000 })
     await expect(
       page.getByText(/Tafamidis stabilizes TTR|fixture claim for e2e/i),
     ).toBeVisible({ timeout: 15_000 })
     await expect(page.getByText(CLAIM_ID)).toBeVisible()
-    // Source label
-    await expect(page.getByText(/pack cache \(IndexedDB\)|rebuilt from Core/i)).toBeVisible({
+    // Source label (idb → "IDB pack cache"; core rebuild → "Core panels")
+    await expect(page.getByText(/IDB pack cache|Core panels|pack cache|rebuilt from Core/i)).toBeVisible({
       timeout: 10_000,
     })
   })

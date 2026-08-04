@@ -19,6 +19,7 @@ import {
 } from '@/lib/dataHub'
 import { copyDataHubFactCitation, ledgerSampleStats } from '@/lib/dataHub/citeFact'
 import { downloadMondayPack } from '@/lib/dataHub/mondayPack'
+import { emitProductEvent } from '@/lib/productEvents'
 import { filterHubRowsATier } from '@/lib/dataHub/aTier'
 import type { EvidenceClaim } from '@/lib/domain'
 import { downloadFile } from '@/lib/exportData'
@@ -263,6 +264,12 @@ export function DataHubLedgerView({
       includeEmpty: !hideEmpty,
       contextLabel: contextLabel ?? null,
       includePrefs: true,
+    })
+    // Feeds /campaign monday_experiment stage (solo local product-event queue)
+    emitProductEvent('ui_surface_action', {
+      surface: 'monday_pack',
+      action: 'export',
+      subjectId: ledger.subjectId,
     })
   }
 

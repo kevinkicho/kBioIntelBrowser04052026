@@ -62,8 +62,9 @@ npm run test:e2e:full-app                # Playwright full-app (needs app or E2E
 npm run test:e2e:full-app:auto           # full-app e2e + Playwright starts next dev
 npm run ship:verify                      # local precommit + git hygiene (agents)
 npm run ship:verify:ci                   # + watch GitHub Pre-commit gate for HEAD
-npm run ship:verify:e2e                  # + full-app Playwright with webServer
-npm run ship:verify:all                  # --ci --e2e
+npm run ship:verify:e2e                  # + **north-star fixture** Playwright (required loop proof)
+npm run ship:verify:e2e:full             # + full-app surface Playwright (optional; nightly default)
+npm run ship:verify:all                  # --ci --e2e (fixture)
 npm run api:health                       # probe all /api routes (app must be running)
 npm run api:health:json                  # same as JSON report
 npm run biointel -- api agent            # free-API agent policy (timeouts/retries — not LLM facts)
@@ -71,7 +72,7 @@ npm run biointel -- api health [live]    # route inventory (live → BIOINTEL_BA
 # Live SLO (post-deploy sample): BIOINTEL_BASE=<prod-url> npm run api:health -- --single-fixture --timeout=25000 --ai-wire-only
 # Targets: high DATA%; category/gene may return 200 partial (_timeout) under load instead of hanging
 npm run export:api-sources               # regenerate free-API name/docs/endpoint manifest
-npm run test:e2e:fixture                 # north-star + data-hub e2e (needs npm run dev, E2E_FIXTURE=1)
+npm run test:e2e:fixture                 # **hard loop gate** — north-star + campaign + data-hub (needs dev or :auto)
 npm run test:e2e:fixture:auto            # same + Playwright starts next dev (E2E_WEBSERVER=1)
 npm run test:e2e:live                    # north-star e2e against live APIs (optional)
 npm run logs:tail                        # last lines of today's agent activity JSONL
@@ -90,9 +91,9 @@ Run **`npm run test:precommit`** before committing product behavior changes:
 4. Of-record product suites (Discover scores, packs, data hub builders, events, research catalog)
 5. Catalog completeness (`fullApp/01-inventory`)
 
-Optional: `npm run test:precommit:full` · `npm run test:e2e:full-app:auto` (routes + smoke with webServer) · `npm run test:e2e:fixture:auto` (north-star). Free-API fields in JSX: use `safeDisplayString` (`src/lib/reactSafe.ts`) to avoid React error #31.
+Optional: `npm run test:precommit:full` · `npm run test:e2e:full-app:auto` (routes + smoke with webServer). **Loop / Discover / pack / RH / campaign PRs:** run `npm run test:e2e:fixture:auto` before claiming green (CI: `e2e-fixture.yml`). Free-API fields in JSX: use `safeDisplayString` (`src/lib/reactSafe.ts`) to avoid React error #31.
 
-**Husky** runs `test:precommit` on every `git commit` (install via `npm install`). Escape hatch: `SKIP_PRECOMMIT=1 git commit …` — **agents must not use SKIP_PRECOMMIT** unless the user explicitly orders it. **CI:** `.github/workflows/precommit.yml` on push/PR; nightly e2e: `e2e-nightly.yml`.
+**Husky** runs `test:precommit` on every `git commit` (install via `npm install`). Escape hatch: `SKIP_PRECOMMIT=1 git commit …` — **agents must not use SKIP_PRECOMMIT** unless the user explicitly orders it. **CI:** `.github/workflows/precommit.yml` (unit gate) + **`e2e-fixture.yml`** (north-star fixture loop) on push/PR; nightly full-app: `e2e-nightly.yml`.
 
 **Catalog law:** every `CATEGORIES` panel id must have `panelSources` (`api` + `docs`). No allowlist — add ENTRIES when you add a card.
 
@@ -133,22 +134,31 @@ gh run watch <run-id> --exit-status    # must exit 0
 |--------|----------------|
 | “Precommit passes” | `npm run test:precommit` exit 0 (or husky commit succeeded) |
 | “Pushed” | `git status` shows in sync with `origin/...` (or push output `main -> main`) |
-| “CI green” | `gh run watch … --exit-status` **0** for **this** commit’s Pre-commit gate |
-| “E2E green” | Playwright exit 0 for the suite claimed, or nightly workflow success for that SHA |
+| “CI green” | `gh run watch … --exit-status` **0** for **this** commit’s Pre-commit gate **and** E2E fixture workflow when loop surface changed |
+| “Loop e2e green” | `npm run test:e2e:fixture:auto` exit 0, or `e2e-fixture.yml` success for **this** SHA |
+| “E2E green” (full-app) | Playwright full-app exit 0, or `e2e-nightly.yml` success for that SHA |
 | “Rolled out” | App Hosting / Firebase rollout check success for that SHA (or user-confirmed) |
 
 Do **not** cite an older green run while HEAD has newer failed runs. List runs for the **current SHA**.
 
 ### When to run e2e before push
 
-Run **`npm run test:e2e:full-app:auto`** (or `npm run ship:verify:e2e`) when the change touches:
+Run **`npm run test:e2e:fixture:auto`** (or `npm run ship:verify:e2e`) when the change touches the **north-star loop**:
+
+- Discover rank / save-to-project / board promote / harvest
+- Pack builder export / share / RH rehydrate
+- Campaign workspace / product-event stage progress
+- AI analysis view (fixture path)
+- Data hub export / Monday pack / citation gate
+
+Run **`npm run test:e2e:full-app:auto`** (or `npm run ship:verify:e2e:full`) when the change touches broader chrome:
 
 - Profile chrome (loading overlay, Cite/Share/Export, copilot FAB)
 - Data hub / cross-source strip / empty toggles
 - Smoke routes (`e2e/smoke.spec.ts`, `full-app-surface`, `data-hub-coverage`)
 - `playwright.config.ts` / e2e selectors / `data-testid`s used by e2e
 
-Nightly workflow alone is **not** enough to claim e2e safety for a same-day UI ship — trigger it or run locally:
+Nightly full-app alone is **not** enough to claim loop e2e safety for a same-day ship — fixture CI must be green for this SHA:
 
 ```text
 gh workflow run "E2E full-app (nightly)" --ref main
@@ -168,8 +178,9 @@ gh run watch <id> --exit-status
 ```text
 npm run ship:verify           # local precommit gate + git hygiene hints
 npm run ship:verify:ci        # + wait for GitHub Pre-commit gate on HEAD (must be pushed)
-npm run ship:verify:e2e       # + Playwright full-app with webServer
-npm run ship:verify:all       # --ci --e2e
+npm run ship:verify:e2e       # + north-star fixture Playwright (loop proof)
+npm run ship:verify:e2e:full  # + full-app surface Playwright
+npm run ship:verify:all       # --ci --e2e (fixture)
 ```
 
 Implementation: `scripts/ship-verify.js` (pairs with `scripts/precommit-gate.js`).

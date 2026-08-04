@@ -29,6 +29,30 @@ async function stubRank(page: Page) {
       body: JSON.stringify({ candidates: [] }),
     })
   })
+  await page.route(/\/api\/orphanet\//, async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ genes: ['TTR'], orphaCode: '70', diseaseName: 'ATTR amyloidosis' }),
+    })
+  })
+}
+
+/** Same reliable rank bootstrap as north-star-loop (avoids URL bootstrap / Strict Mode races). */
+async function discoverWithFixture(page: Page, q = 'ATTR amyloidosis') {
+  await page.goto(`/discover?q=${encodeURIComponent(q)}`)
+  await expect(page.getByPlaceholder(/What disease/i)).toBeVisible({ timeout: 30_000 })
+
+  const rankWait = page.waitForResponse(
+    (r) => r.url().includes('/api/discover/rank') && r.request().method() === 'POST',
+    { timeout: 45_000 },
+  )
+  const input = page.getByPlaceholder(/What disease/i)
+  await input.fill(q)
+  await page.getByRole('button', { name: /^Discover$/i }).click()
+  const res = await rankWait
+  expect(res.ok(), `rank status ${res.status()}`).toBeTruthy()
+  await expect(page.getByTestId('candidate-card').first()).toBeVisible({ timeout: 30_000 })
 }
 
 test.describe('Discover AI analysis view', () => {
@@ -36,21 +60,10 @@ test.describe('Discover AI analysis view', () => {
 
   test('disclaimer and of-record / analysis toggle', async ({ page }) => {
     await stubRank(page)
-    await page.goto('/discover?q=ATTR%20amyloidosis')
-    await expect(page.getByPlaceholder(/What disease/i)).toBeVisible({ timeout: 30_000 })
+    await discoverWithFixture(page)
 
-    const rankWait = page.waitForResponse(
-      (r) => r.url().includes('/api/discover/rank') && r.request().method() === 'POST',
-      { timeout: 45_000 },
-    )
-    await page.getByRole('button', { name: /Discover|Search|Rank/i }).first().click().catch(async () => {
-      // fallback: press Enter in disease field
-      await page.getByPlaceholder(/What disease/i).press('Enter')
-    })
-    await rankWait.catch(() => undefined)
-
-    // Wait for candidates or analysis UI
-    await expect(page.getByTestId('ai-analysis-view')).toBeVisible({ timeout: 60_000 })
+    // AiAnalysisView mounts only after successful rank shortlist
+    await expect(page.getByTestId('ai-analysis-view')).toBeVisible({ timeout: 30_000 })
     await expect(page.getByTestId('ai-view-of-record')).toBeVisible()
     await expect(page.getByTestId('ai-view-analysis')).toBeVisible()
 

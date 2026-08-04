@@ -4,7 +4,8 @@
  *
  *   npm run ship:verify              # precommit + git cleanliness hints
  *   npm run ship:verify -- --ci      # also wait for GitHub Pre-commit gate on HEAD
- *   npm run ship:verify -- --e2e     # also run full-app Playwright (E2E_WEBSERVER=1)
+ *   npm run ship:verify -- --e2e     # north-star fixture e2e (required loop proof; E2E_WEBSERVER=1)
+ *   npm run ship:verify -- --e2e-full # full-app Playwright surface (slower; optional)
  *   npm run ship:verify -- --ci --e2e
  *
  * Exit non-zero on any failure. Print exact next steps.
@@ -16,7 +17,10 @@ const path = require('path')
 const root = path.join(__dirname, '..')
 const args = new Set(process.argv.slice(2))
 const wantCi = args.has('--ci')
-const wantE2e = args.has('--e2e')
+/** North-star fixture loop (deterministic) — preferred e2e gate for loop PRs. */
+const wantE2e = args.has('--e2e') || args.has('--e2e-fixture')
+/** Full-app route/chrome surface (may hit live free APIs for some pages). */
+const wantE2eFull = args.has('--e2e-full')
 const wantBuild = args.has('--build')
 
 function run(label, command, cmdArgs, opts = {}) {
@@ -55,7 +59,9 @@ function runCapture(command, cmdArgs) {
 console.log('BioIntel agent ship-verify')
 console.log('==========================')
 console.log(`  platform: ${process.platform}  node: ${process.version}`)
-console.log(`  flags: ${[wantCi && '--ci', wantE2e && '--e2e', wantBuild && '--build'].filter(Boolean).join(' ') || '(local gate only)'}`)
+console.log(
+  `  flags: ${[wantCi && '--ci', wantE2e && '--e2e', wantE2eFull && '--e2e-full', wantBuild && '--build'].filter(Boolean).join(' ') || '(local gate only)'}`,
+)
 
 // 1) Local gate = what husky + GitHub precommit.yml run
 run('Pre-commit gate (tsc · lint · fullApp · of-record)', 'npm', ['run', 'test:precommit'])
@@ -64,9 +70,19 @@ if (wantBuild) {
   run('Production build (next build)', 'npx', ['next', 'build'])
 }
 
+// 2) Loop proof — north-star fixture (same suite as e2e-fixture.yml CI)
 if (wantE2e) {
   run(
-    'E2E full-app (Playwright + auto webServer)',
+    'E2E north-star fixture (rank → pack → RH; Playwright + webServer)',
+    'npm',
+    ['run', 'test:e2e:fixture'],
+    { env: { E2E_FIXTURE: '1', E2E_WEBSERVER: '1', CI: process.env.CI || '1' } },
+  )
+}
+
+if (wantE2eFull) {
+  run(
+    'E2E full-app surface (Playwright + auto webServer)',
     'npm',
     ['run', 'test:e2e:full-app'],
     { env: { E2E_WEBSERVER: '1', CI: process.env.CI || '1' } },
@@ -172,6 +188,7 @@ if (wantCi) {
 console.log('==========================')
 console.log('✓ ship-verify passed')
 console.log('  Claim "CI green" only after --ci succeeded (or you watched gh yourself).')
+console.log('  Claim "loop e2e green" only after --e2e (fixture) or e2e-fixture.yml for this SHA.')
 console.log('  App Hosting: auto on main push — confirm rollout in Firebase console if needed.')
-console.log('  Nightly e2e: gh workflow run "E2E full-app (nightly)" --ref main')
+console.log('  Nightly full-app: gh workflow run "E2E full-app (nightly)" --ref main')
 console.log('==========================\n')

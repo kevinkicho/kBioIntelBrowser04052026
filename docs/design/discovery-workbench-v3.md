@@ -66,6 +66,8 @@ Implementers: prefer pure hub builders + playbooks + kit extras over new paid su
 | Safety triangulation + five-regulator hub | Shipped |
 | Research kit v2 + v3-quality.json | Shipped |
 | Campaign templates + `/campaign` UI | Shipped |
+| Campaign stages from product events | Shipped (`campaignStageProgress.ts` + auto badges) |
+| North-star fixture e2e hard gate | Shipped (`e2e-fixture.yml` + `ship:verify:e2e`) |
 | Pack citation export gate (soft M3) | Shipped |
 | Disease spine (WHO GHO samples + gene-led CTA) | Shipped |
 | Gene-led Discover persona / mode | Shipped (`discoverMode`) |

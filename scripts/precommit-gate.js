@@ -130,6 +130,8 @@ const PRODUCT_PATTERNS = [
   'similarityExpand',
   'exportResearchCatalog',
   'researchToolCatalog',
+  'campaignStageProgress',
+  'v3RemainingSlices',
   'crossSource',
   'summaryEmpty',
   'ErrorBoundary',
@@ -201,6 +203,7 @@ console.log('  Included: tsc · next lint · fullApp · of-record · 01-inventor
 console.log('  Optional: PRECOMMIT_FULL=1 for broader legacy component smoke')
 console.log('  Optional: PRECOMMIT_BUILD=1 for next build (slow)')
 console.log('  Optional: PRECOMMIT_SKIP_LINT=1 emergency only')
-console.log('  Optional: npm run test:e2e:full-app (routes + molecule chrome)')
-console.log('  Optional: npm run test:e2e:fixture:auto for Playwright north-star')
+console.log('  Required for loop PRs: npm run test:e2e:fixture:auto (CI: e2e-fixture.yml)')
+console.log('  Optional: npm run test:e2e:full-app:auto (routes + molecule chrome; nightly)')
+console.log('  ship: npm run ship:verify:e2e  # precommit + north-star fixture')
 console.log('==================================\n')

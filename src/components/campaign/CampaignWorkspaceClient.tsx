@@ -2,10 +2,13 @@
 
 /**
  * Campaign workspace UI (v3 G1) — stage checklist from CAMPAIGN_TEMPLATES.
+ * Stages auto-complete from the solo product-event queue when the user has
+ * already ranked / promoted / packed / opened RH / exported Monday pack.
+ * Manual checkboxes remain for notes and stages without events.
  * Solo local default; does not change of-record Discover rank.
  */
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import {
   CAMPAIGN_TEMPLATES,
@@ -14,7 +17,14 @@ import {
   type CampaignWorkspaceTemplate,
   campaignTemplatesByPersona,
 } from '@/lib/campaign/campaignWorkspace'
+import {
+  campaignProgressPercent,
+  mergeCampaignStageProgress,
+  type StageDoneSource,
+} from '@/lib/campaign/campaignStageProgress'
+import { readQueuedProductEvents } from '@/lib/productEvents'
 import { researchPlaybookById } from '@/lib/methods/researchToolCatalog'
+
 const PERSONA_LABELS: Record<CampaignPersona, string> = {
   repurposing: 'Repurposing triage',
   'rare-disease': 'Rare-disease lab',
@@ -23,6 +33,7 @@ const PERSONA_LABELS: Record<CampaignPersona, string> = {
 }
 
 const DONE_KEY = 'biointel-campaign-done-v1'
+const PRODUCT_QUEUE_KEY = 'biointel-product-events-v1'
 
 function loadDoneMap(): Record<string, CampaignStageId[]> {
   if (typeof window === 'undefined') return {}
@@ -45,6 +56,13 @@ function saveDoneMap(map: Record<string, CampaignStageId[]>) {
   }
 }
 
+function sourceBadge(source: StageDoneSource | undefined): string | null {
+  if (source === 'event') return 'Auto'
+  if (source === 'both') return 'Auto + manual'
+  if (source === 'manual') return 'Manual'
+  return null
+}
+
 export function CampaignWorkspaceClient() {
   const [persona, setPersona] = useState<CampaignPersona>('repurposing')
   const templates = useMemo(() => campaignTemplatesByPersona(persona), [persona])
@@ -53,7 +71,51 @@ export function CampaignWorkspaceClient() {
     templates.find((t) => t.id === templateId) || templates[0] || CAMPAIGN_TEMPLATES[0]!
 
   const [doneMap, setDoneMap] = useState<Record<string, CampaignStageId[]>>(() => loadDoneMap())
-  const done = useMemo(() => new Set(doneMap[template.id] || []), [doneMap, template.id])
+  /** Bump when product-event queue changes so auto progress re-derives. */
+  const [eventTick, setEventTick] = useState(0)
+
+  const refreshEvents = useCallback(() => {
+    setEventTick((n) => n + 1)
+  }, [])
+
+  useEffect(() => {
+    refreshEvents()
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === PRODUCT_QUEUE_KEY || e.key === DONE_KEY || e.key === null) {
+        refreshEvents()
+        if (e.key === DONE_KEY || e.key === null) {
+          setDoneMap(loadDoneMap())
+        }
+      }
+    }
+    const onFocus = () => refreshEvents()
+    window.addEventListener('storage', onStorage)
+    window.addEventListener('focus', onFocus)
+    document.addEventListener('visibilitychange', onFocus)
+    return () => {
+      window.removeEventListener('storage', onStorage)
+      window.removeEventListener('focus', onFocus)
+      document.removeEventListener('visibilitychange', onFocus)
+    }
+  }, [refreshEvents])
+
+  const stageIds = useMemo(
+    () => template.stages.map((s) => s.id),
+    [template.stages],
+  )
+
+  const progressSnap = useMemo(() => {
+    void eventTick
+    const events =
+      typeof window !== 'undefined' ? readQueuedProductEvents() : []
+    const manual = doneMap[template.id] || []
+    return mergeCampaignStageProgress(events, stageIds, manual)
+  }, [doneMap, template.id, stageIds, eventTick])
+
+  const done = useMemo(
+    () => new Set(progressSnap.effectiveDone),
+    [progressSnap.effectiveDone],
+  )
 
   const toggleStage = useCallback(
     (stageId: CampaignStageId) => {
@@ -69,9 +131,8 @@ export function CampaignWorkspaceClient() {
     [template.id],
   )
 
-  const progress = template.stages.length
-    ? Math.round((done.size / template.stages.length) * 100)
-    : 0
+  const progress = campaignProgressPercent(done.size, template.stages.length)
+  const autoCount = progressSnap.autoDone.length
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-100" data-testid="campaign-workspace">
@@ -90,6 +151,11 @@ export function CampaignWorkspaceClient() {
             Multi-stage scientific loop: shortlist → pack → hypothesis → Monday work. Of-record Discover
             rank stays <strong className="text-slate-300">deterministic</strong> (no LLM). Free public APIs
             only. Not clinical or regulatory decision support.
+          </p>
+          <p className="mt-2 text-[11px] leading-relaxed text-slate-500">
+            Stages <strong className="text-slate-400">auto-complete</strong> from your solo product-event
+            history (rank, promote, pack export, RH open, Monday pack). Manual checks still work for
+            notes or stages without telemetry.
           </p>
           <div className="mt-4 flex flex-wrap gap-2">
             {(Object.keys(PERSONA_LABELS) as CampaignPersona[]).map((p) => (
@@ -119,6 +185,7 @@ export function CampaignWorkspaceClient() {
             <h2 className="text-sm font-semibold text-slate-100">{template.title}</h2>
             <span className="text-[10px] tabular-nums text-slate-500" data-testid="campaign-progress">
               {progress}% · {done.size}/{template.stages.length} stages
+              {autoCount > 0 ? ` · ${autoCount} auto` : ''}
             </span>
           </div>
           <p className="mb-3 text-[11px] text-slate-400">{template.description}</p>
@@ -126,12 +193,16 @@ export function CampaignWorkspaceClient() {
             <div
               className="h-full rounded-full bg-emerald-600/80 transition-all"
               style={{ width: `${progress}%` }}
+              data-testid="campaign-progress-bar"
             />
           </div>
 
           <ol className="space-y-2" data-testid="campaign-stages">
             {template.stages.map((stage, i) => {
               const isDone = done.has(stage.id)
+              const source = progressSnap.sources[stage.id]
+              const auto = source === 'event' || source === 'both'
+              const badge = sourceBadge(source)
               const pb = stage.playbookId ? researchPlaybookById(stage.playbookId) : undefined
               return (
                 <li
@@ -142,6 +213,8 @@ export function CampaignWorkspaceClient() {
                       : 'border-slate-800 bg-slate-950/40'
                   }`}
                   data-testid={`campaign-stage-${stage.id}`}
+                  data-done={isDone ? 'true' : 'false'}
+                  data-source={source || 'none'}
                 >
                   <div className="flex flex-wrap items-start gap-2">
                     <button
@@ -153,12 +226,31 @@ export function CampaignWorkspaceClient() {
                           : 'border-slate-600 bg-slate-900 text-slate-500'
                       }`}
                       aria-pressed={isDone}
+                      title={
+                        auto
+                          ? 'Completed from product events — click to also mark manual'
+                          : 'Toggle manual complete'
+                      }
                       data-testid={`campaign-stage-toggle-${stage.id}`}
                     >
                       {isDone ? '✓' : i + 1}
                     </button>
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-medium text-slate-200">{stage.title}</div>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-[12px] font-medium text-slate-200">{stage.title}</span>
+                        {badge && (
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide ${
+                              auto
+                                ? 'bg-sky-950/80 text-sky-300 ring-1 ring-sky-800/60'
+                                : 'bg-slate-800 text-slate-400 ring-1 ring-slate-700'
+                            }`}
+                            data-testid={`campaign-stage-badge-${stage.id}`}
+                          >
+                            {badge}
+                          </span>
+                        )}
+                      </div>
                       <p className="mt-0.5 text-[10px] text-slate-500">{stage.doneHint}</p>
                       <div className="mt-2 flex flex-wrap gap-2">
                         <Link
@@ -197,7 +289,8 @@ export function CampaignWorkspaceClient() {
 
         <p className="text-[10px] text-slate-600">
           Design: <code className="text-slate-500">docs/design/discovery-workbench-v3.md</code> · templates in{' '}
-          <code className="text-slate-500">campaignWorkspace.ts</code>
+          <code className="text-slate-500">campaignWorkspace.ts</code> · auto-progress{' '}
+          <code className="text-slate-500">campaignStageProgress.ts</code>
         </p>
       </div>
     </main>

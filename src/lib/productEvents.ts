@@ -75,6 +75,16 @@ export const UI_SURFACE_CATALOG = {
     actions: ['export'] as const,
     purpose: 'Filterable list CSV download',
   },
+  /** Monday research pack download from data hub (campaign monday_experiment stage). */
+  monday_pack: {
+    actions: ['export'] as const,
+    purpose: 'Monday pack JSON handoff from data hub',
+  },
+  /** NextExperiment row added on research hypothesis (campaign monday_experiment). */
+  next_experiment: {
+    actions: ['add'] as const,
+    purpose: 'Monday experiment line on RH',
+  },
 } as const
 
 export type UiSurfaceName = keyof typeof UI_SURFACE_CATALOG

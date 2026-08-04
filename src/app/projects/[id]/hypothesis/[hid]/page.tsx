@@ -227,7 +227,16 @@ export default function ResearchHypothesisEditorPage() {
       experimentType: 'other',
       costTier: 'medium',
     })
-    if (persist(next, 'Experiment added')) setExpText('')
+    if (persist(next, 'Experiment added')) {
+      setExpText('')
+      // Feeds /campaign monday_experiment stage
+      emitProductEvent('ui_surface_action', {
+        surface: 'next_experiment',
+        action: 'add',
+        hypId: hyp.id,
+        projectId: hyp.projectId,
+      })
+    }
   }, [hyp, expText, persist])
 
   const applyInsight = useCallback(

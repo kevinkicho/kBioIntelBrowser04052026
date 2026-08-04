@@ -431,7 +431,8 @@ export default function MethodologyPage() {
             </li>
             <li>
               <strong className="text-slate-200">Campaign templates &amp; playbooks</strong> — repurposing, rare
-              disease, competitive, lab affiliation; UI/CLI under How it works → tools.
+              disease, competitive, lab affiliation; stages auto-complete from solo product events (rank, promote,
+              pack, RH, Monday pack); UI at <code className="text-slate-500">/campaign</code>.
             </li>
           </ul>
           <p className="mt-3 text-[10px] text-slate-500">
