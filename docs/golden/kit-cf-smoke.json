@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "kind": "biointel-golden-kit-expectations",
+  "pathId": "cf",
+  "diseaseQuery": "cystic fibrosis",
+  "targets": ["CFTR"],
+  "exampleCid": null,
+  "name": "CFTR rare-disease depth",
+  "expect": {
+    "orphanetPinsPreferred": true,
+    "negativeEvidenceAllowed": true,
+    "sparseHonestEmpties": true
+  },
+  "law": [
+    "Free public APIs only",
+    "Never invent gene–disease associations",
+    "Sparse public data is expected"
+  ]
+}

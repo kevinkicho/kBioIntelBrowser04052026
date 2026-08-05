@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 2,
+  "kind": "biointel-golden-kit-expectations",
+  "pathId": "attr",
+  "diseaseQuery": "ATTR amyloidosis",
+  "targets": ["TTR"],
+  "exampleCid": 208901,
+  "name": "Tafamidis-class exploration",
+  "expect": {
+    "hubMinNonEmptyFacts": 1,
+    "kitSchemaVersion": 2,
+    "hasV3QualityFile": true,
+    "negativeEvidenceAllowed": true,
+    "rareSparseHonesty": true
+  },
+  "rankFixture": "rank-result-attr-like.json",
+  "law": [
+    "Free public APIs only",
+    "Not clinical or regulatory decision support",
+    "Empty free-API bags are not-retrieved, not zero association forever"
+  ]
+}

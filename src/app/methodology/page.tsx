@@ -432,7 +432,19 @@ export default function MethodologyPage() {
             <li>
               <strong className="text-slate-200">Campaign templates &amp; playbooks</strong> — repurposing, rare
               disease, competitive, lab affiliation; stages auto-complete from solo product events (rank, promote,
-              pack, RH, Monday pack); UI at <code className="text-slate-500">/campaign</code>.
+              pack, RH, Monday pack); golden entity spine + Monday experiment library; UI at{' '}
+              <code className="text-slate-500">/campaign</code>.
+            </li>
+            <li>
+              <strong className="text-slate-200">Free-API SLO honesty</strong> — partial 200 shells under load (
+              <code className="text-slate-500">_timeout</code> / empty bags), not hangs; empty ≠ zero association
+              forever. Live inventory: <code className="text-slate-500">npm run api:health</code> (DATA% includes
+              partials). Pack JSON attaches honesty lines for sparse/not-retrieved claims.
+            </li>
+            <li>
+              <strong className="text-slate-200">Golden beachhead paths</strong> — ATTR, EGFR-NSCLC, CF, T2D, aspirin
+              control under <code className="text-slate-500">docs/golden/</code> +{' '}
+              <code className="text-slate-500">goldenPaths.ts</code>.
             </li>
           </ul>
           <p className="mt-3 text-[10px] text-slate-500">

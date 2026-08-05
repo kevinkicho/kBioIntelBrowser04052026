@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 2,
+  "kind": "biointel-golden-kit-expectations",
+  "pathId": "t2d",
+  "diseaseQuery": "type 2 diabetes",
+  "targets": ["INS", "GLP1R"],
+  "exampleCid": 4091,
+  "name": "Metformin / T2D density path",
+  "expect": {
+    "hubMinNonEmptyFacts": 1,
+    "kitSchemaVersion": 2,
+    "hasV3QualityFile": true,
+    "highPublicDensity": true
+  },
+  "law": [
+    "Free public APIs only",
+    "Aspirin (2244) is control empty-gene only — not a T2D drug claim"
+  ]
+}

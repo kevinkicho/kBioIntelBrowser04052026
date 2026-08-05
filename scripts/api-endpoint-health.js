@@ -1110,11 +1110,18 @@ function buildAiProbeSeries(routeDir) {
   }
 
   if (routeDir === 'ai/pack') {
+    // Wire validation first so inventory is green without a live model;
+    // live attempt is optional second probe (never required for DATA).
     out.push({
       method: 'POST',
       label: 'ai/pack',
       dataCheck: 'ai',
       attempts: [
+        {
+          path: '/api/ai/pack',
+          note: 'wire-invalid-mode',
+          body: { mode: 'not_a_mode' },
+        },
         ...(live
           ? [
               {
@@ -1129,11 +1136,6 @@ function buildAiProbeSeries(routeDir) {
               },
             ]
           : []),
-        {
-          path: '/api/ai/pack',
-          note: 'wire-invalid-mode',
-          body: { mode: 'not_a_mode' },
-        },
       ],
     })
     return out
@@ -1145,6 +1147,11 @@ function buildAiProbeSeries(routeDir) {
       label: 'ai/rh',
       dataCheck: 'ai',
       attempts: [
+        {
+          path: '/api/ai/rh',
+          note: 'wire-invalid-mode',
+          body: { mode: 'not_a_mode' },
+        },
         ...(live
           ? [
               {
@@ -1160,11 +1167,6 @@ function buildAiProbeSeries(routeDir) {
               },
             ]
           : []),
-        {
-          path: '/api/ai/rh',
-          note: 'wire-invalid-mode',
-          body: { mode: 'not_a_mode' },
-        },
       ],
     })
     return out

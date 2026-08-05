@@ -10,6 +10,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import {
   CAMPAIGN_TEMPLATES,
   type CampaignPersona,
@@ -24,6 +25,14 @@ import {
 } from '@/lib/campaign/campaignStageProgress'
 import { readQueuedProductEvents } from '@/lib/productEvents'
 import { researchPlaybookById } from '@/lib/methods/researchToolCatalog'
+import {
+  GOLDEN_PATHS,
+  goldenPathById,
+  goldenPathsByPersona,
+  spineLinksForGoldenPath,
+} from '@/lib/golden/goldenPaths'
+import { mondayTemplatesForPersona } from '@/lib/dataHub/mondayExperimentLibrary'
+import { planEvidenceOrchestration } from '@/lib/evidence/evidenceOrchestration'
 
 const PERSONA_LABELS: Record<CampaignPersona, string> = {
   repurposing: 'Repurposing triage',
@@ -64,11 +73,43 @@ function sourceBadge(source: StageDoneSource | undefined): string | null {
 }
 
 export function CampaignWorkspaceClient() {
-  const [persona, setPersona] = useState<CampaignPersona>('repurposing')
+  const searchParams = useSearchParams()
+  const [persona, setPersona] = useState<CampaignPersona>(() => {
+    const p = searchParams?.get('persona') as CampaignPersona | null
+    if (p && ['repurposing', 'rare-disease', 'competitive', 'lab-affiliation'].includes(p)) {
+      return p
+    }
+    return 'repurposing'
+  })
   const templates = useMemo(() => campaignTemplatesByPersona(persona), [persona])
   const [templateId, setTemplateId] = useState(templates[0]?.id || CAMPAIGN_TEMPLATES[0]!.id)
   const template: CampaignWorkspaceTemplate =
     templates.find((t) => t.id === templateId) || templates[0] || CAMPAIGN_TEMPLATES[0]!
+
+  const [goldenId, setGoldenId] = useState<string | null>(() => searchParams?.get('path') || null)
+  const goldenPaths = useMemo(() => goldenPathsByPersona(persona), [persona])
+  const golden = useMemo(() => {
+    if (goldenId) return goldenPathById(goldenId) || goldenPaths[0] || GOLDEN_PATHS[0]!
+    return goldenPaths[0] || GOLDEN_PATHS[0]!
+  }, [goldenId, goldenPaths])
+  const spine = useMemo(() => spineLinksForGoldenPath(golden), [golden])
+  const mondayTemplates = useMemo(() => mondayTemplatesForPersona(persona), [persona])
+  const orchestration = useMemo(
+    () =>
+      planEvidenceOrchestration(
+        persona === 'rare-disease' ? 'rare' : persona === 'competitive' ? 'compare' : 'shortlist',
+        {
+          diseaseQuery: golden.diseaseQuery || undefined,
+          targets: [...golden.targets],
+          cid: golden.exampleCid,
+        },
+      ),
+    [persona, golden],
+  )
+  const primaryPlaybook = useMemo(() => {
+    const pbId = template.stages.find((s) => s.playbookId)?.playbookId
+    return pbId ? researchPlaybookById(pbId) : undefined
+  }, [template.stages])
 
   const [doneMap, setDoneMap] = useState<Record<string, CampaignStageId[]>>(() => loadDoneMap())
   /** Bump when product-event queue changes so auto progress re-derives. */
@@ -179,6 +220,119 @@ export function CampaignWorkspaceClient() {
             ))}
           </div>
         </header>
+
+        <section
+          className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 p-4"
+          data-testid="campaign-spine"
+        >
+          <h2 className="mb-2 text-sm font-semibold text-slate-100">Entity spine · golden path</h2>
+          <p className="mb-2 text-[10px] text-slate-500">
+            Disease → gene → molecule → org connected so finish rate beats panel thrash (v3 E4 / campaign spine).
+          </p>
+          <div className="mb-3 flex flex-wrap gap-1.5">
+            {goldenPaths.map((g) => (
+              <button
+                key={g.id}
+                type="button"
+                data-testid={`campaign-golden-${g.id}`}
+                onClick={() => setGoldenId(g.id)}
+                className={`rounded-full border px-2.5 py-0.5 text-[10px] ${
+                  golden.id === g.id
+                    ? 'border-sky-600/60 bg-sky-950/40 text-sky-200'
+                    : 'border-slate-700 text-slate-400 hover:border-slate-600'
+                }`}
+              >
+                {g.label}
+              </button>
+            ))}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {spine.map((link) => (
+              <Link
+                key={`${link.kind}-${link.label}`}
+                href={link.href}
+                data-testid={`campaign-spine-${link.kind}`}
+                className="rounded-md border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] text-emerald-300 hover:border-emerald-700"
+              >
+                <span className="text-slate-500">{link.kind}:</span> {link.label}
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        {primaryPlaybook && (
+          <section
+            className="mb-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4"
+            data-testid="campaign-playbook-steps"
+          >
+            <h2 className="text-sm font-semibold text-slate-100">
+              Playbook · {primaryPlaybook.title}
+            </h2>
+            <p className="mt-1 text-[10px] text-slate-500">{primaryPlaybook.goal}</p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] text-slate-400">
+              {primaryPlaybook.steps.slice(0, 6).map((step, i) => (
+                <li key={i}>
+                  <span className="font-medium text-slate-300">{step.title}</span>
+                  {step.human ? (
+                    <span className="text-slate-500"> — {step.human}</span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </section>
+        )}
+
+        <section
+          className="mb-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4"
+          data-testid="campaign-orchestration"
+        >
+          <h2 className="text-sm font-semibold text-slate-100">{orchestration.title}</h2>
+          <p className="mt-1 text-[10px] text-slate-500">
+            Evidence orchestration — ordered steps that raise loop finish rate (not more panels).
+          </p>
+          <ul className="mt-2 space-y-1.5">
+            {orchestration.steps.map((s) => (
+              <li key={s.id} className="flex flex-wrap items-baseline gap-2 text-[11px]">
+                <Link
+                  href={s.href}
+                  className="font-medium text-emerald-300 hover:underline"
+                  data-testid={`campaign-orch-${s.id}`}
+                >
+                  {s.title}
+                </Link>
+                <span className="text-slate-500">{s.why}</span>
+                {s.freeApiHint && (
+                  <span className="text-[9px] text-slate-600">{s.freeApiHint}</span>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+
+        <section
+          className="mb-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4"
+          data-testid="campaign-monday-library"
+        >
+          <h2 className="text-sm font-semibold text-slate-100">Monday experiment library</h2>
+          <p className="mt-1 text-[10px] text-slate-500">
+            Curated free-API experiments (A6) — attach as NextExperiment or export via Monday pack.
+          </p>
+          <ul className="mt-2 space-y-2">
+            {mondayTemplates.slice(0, 5).map((t) => (
+              <li
+                key={t.id}
+                className="rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-2"
+                data-testid={`campaign-monday-${t.id}`}
+              >
+                <div className="text-[11px] font-medium text-slate-200">{t.title}</div>
+                <p className="mt-0.5 text-[10px] text-slate-500">{t.description}</p>
+                <p className="mt-1 text-[9px] text-slate-600">
+                  {t.freeApiSurfaces.join(' · ')} · {t.costTier} cost · {t.lawReminder}
+                </p>
+              </li>
+            ))}
+          </ul>
+        </section>
 
         <section className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

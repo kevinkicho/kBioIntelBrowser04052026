@@ -12,12 +12,15 @@ import {
   type ResearchKitInput,
 } from './researchKit'
 import type { DataHubLedger } from './types'
+import { mondayLibraryAgenda } from './mondayExperimentLibrary'
 
 export interface MondayPackInput extends ResearchKitInput {
   /** Optional disease/context for title */
   contextLabel?: string | null
   /** ISO date override for tests */
   asOf?: string
+  /** Persona for Monday experiment library agenda */
+  persona?: 'repurposing' | 'rare-disease' | 'competitive' | 'lab-affiliation'
 }
 
 export interface MondayPackDocument {
@@ -64,9 +67,10 @@ export function buildMondayPackTitle(
 export function buildMondayPackAgenda(
   ledger: DataHubLedger,
   claims: readonly EvidenceClaim[] | null | undefined,
+  persona?: MondayPackInput['persona'],
 ): string[] {
   const filled = ledger.rows.filter((r) => r.value && r.value !== '—').length
-  return [
+  const base = [
     `Review of-record data hub (${filled} facts · ${ledger.sourceCount} sources)`,
     'Open primary registry links for any decision-critical rows',
     claims && claims.length > 0
@@ -75,6 +79,9 @@ export function buildMondayPackAgenda(
     'Confirm identity keys (CID / InChIKey / ChEMBL) before wet-lab',
     'Not clinical or regulatory decision support — verify upstream',
   ]
+  // A6: curated library raises finish rate vs ad-hoc thrash
+  const library = mondayLibraryAgenda(persona ?? 'repurposing', 3)
+  return [...base, ...library.map((line) => `Library · ${line}`)]
 }
 
 export function buildMondayPack(input: MondayPackInput): MondayPackDocument {
@@ -102,7 +109,7 @@ export function buildMondayPack(input: MondayPackInput): MondayPackDocument {
     ],
     kit,
     claimCount: claims.length,
-    agenda: buildMondayPackAgenda(input.ledger, claims),
+    agenda: buildMondayPackAgenda(input.ledger, claims, input.persona),
     provenance: {
       api: {
         factCount: filled,

@@ -1,0 +1,21 @@
+{
+  "schemaVersion": 2,
+  "kind": "biointel-golden-kit-expectations",
+  "pathId": "egfr-nsclc",
+  "diseaseQuery": "non-small cell lung cancer",
+  "targets": ["EGFR"],
+  "exampleCid": 176870,
+  "name": "Gefitinib-class exploration",
+  "expect": {
+    "hubMinNonEmptyFacts": 1,
+    "kitSchemaVersion": 2,
+    "hasV3QualityFile": true,
+    "densePublicChemTrials": true
+  },
+  "rankFixture": "rank-result-egfr-like.json",
+  "law": [
+    "Free public APIs only",
+    "No invented competitors",
+    "Not clinical decision support"
+  ]
+}

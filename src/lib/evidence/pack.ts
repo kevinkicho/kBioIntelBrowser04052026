@@ -29,6 +29,7 @@ import {
   type CorePanelEvidenceInput,
   type ExtractAllOptions,
 } from './extractAll'
+import { summarizePackHonesty } from './packHonesty'
 
 /** Wire schema version for EvidencePack JSON. */
 export const EVIDENCE_PACK_SCHEMA_VERSION = 1 as const
@@ -201,9 +202,10 @@ export function buildEvidencePack(input: BuildEvidencePackInput): EvidencePack {
   }
 }
 
-/** Pretty-print pack JSON for download. */
+/** Pretty-print pack JSON for download (attaches honesty — not part of contentHash body). */
 export function packToJson(pack: EvidencePack): string {
-  return JSON.stringify(pack, null, 2)
+  const honesty = summarizePackHonesty(pack.claims)
+  return JSON.stringify({ ...pack, honesty }, null, 2)
 }
 
 function mdEscape(s: string): string {
@@ -219,6 +221,13 @@ export function packToMarkdown(pack: EvidencePack): string {
   lines.push('')
   lines.push(`> Point-in-time evidence pack (schema v${pack.schemaVersion}, doc v${pack.version}).`)
   lines.push(`> Not clinical advice. Scores and claims are triage aids only.`)
+  lines.push('')
+  const honesty = summarizePackHonesty(pack.claims)
+  lines.push('## Honesty')
+  lines.push('')
+  for (const h of honesty.honestyLines) {
+    lines.push(`- ${mdEscape(h)}`)
+  }
   lines.push('')
   lines.push('| Field | Value |')
   lines.push('| --- | --- |')

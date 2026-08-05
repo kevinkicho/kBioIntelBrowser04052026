@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import { Suspense } from 'react'
 import { CampaignWorkspaceClient } from '@/components/campaign/CampaignWorkspaceClient'
 
 export const metadata: Metadata = {
@@ -8,5 +9,15 @@ export const metadata: Metadata = {
 }
 
 export default function CampaignPage() {
-  return <CampaignWorkspaceClient />
+  return (
+    <Suspense
+      fallback={
+        <main className="min-h-screen bg-slate-950 px-4 py-8 text-slate-400" data-testid="campaign-workspace-loading">
+          Loading campaign workspace…
+        </main>
+      }
+    >
+      <CampaignWorkspaceClient />
+    </Suspense>
+  )
 }

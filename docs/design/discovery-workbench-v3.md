@@ -73,3 +73,9 @@ Implementers: prefer pure hub builders + playbooks + kit extras over new paid su
 | Gene-led Discover persona / mode | Shipped (`discoverMode`) |
 | Biologics kit chapter | Shipped (`biologics-chapter.json`) |
 | Free-API etiquette agent | Shipped (prior) |
+| Golden beachhead paths (E4) | Shipped (`goldenPaths.ts` + `docs/golden/*`) |
+| Monday experiment library (A6) | Shipped (`mondayExperimentLibrary.ts` + pack agenda) |
+| Evidence orchestration planner | Shipped (`evidenceOrchestration.ts` + campaign UI) |
+| Pack honesty / negative-evidence export | Shipped (`packHonesty.ts` on pack JSON/MD) |
+| AI pack/RH never hard-500 | Shipped (refuse 200 + wire-first inventory) |
+| Campaign spine + playbook steps UI | Shipped (`/campaign`) |
