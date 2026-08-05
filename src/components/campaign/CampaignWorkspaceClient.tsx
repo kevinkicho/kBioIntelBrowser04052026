@@ -10,32 +10,32 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import {
+  CAMPAIGN_DONE_KEY,
   CAMPAIGN_TEMPLATES,
+  campaignProgressPercent,
+  campaignTemplatesByPersona,
+  loadCampaignDoneMap,
+  mergeCampaignStageProgress,
+  saveCampaignDoneMap,
   type CampaignPersona,
   type CampaignStageId,
   type CampaignWorkspaceTemplate,
-  campaignTemplatesByPersona,
-} from '@/lib/campaign/campaignWorkspace'
-import {
-  campaignProgressPercent,
-  mergeCampaignStageProgress,
   type StageDoneSource,
-} from '@/lib/campaign/campaignStageProgress'
+} from '@/lib/campaign'
 import { readQueuedProductEvents } from '@/lib/productEvents'
 import { researchPlaybookById } from '@/lib/methods/researchToolCatalog'
 import {
   GOLDEN_PATHS,
+  applyGoldenPath,
   goldenPathById,
   goldenPathsByPersona,
   spineLinksForGoldenPath,
-} from '@/lib/golden/goldenPaths'
-import { applyGoldenPath } from '@/lib/golden/applyGoldenPath'
+} from '@/lib/golden'
 import { mondayTemplatesForPersona } from '@/lib/dataHub/mondayExperimentLibrary'
-import { planEvidenceOrchestration } from '@/lib/evidence/evidenceOrchestration'
+import { planEvidenceOrchestration } from '@/lib/evidence'
 import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
-import { useRouter } from 'next/navigation'
 
 const PERSONA_LABELS: Record<CampaignPersona, string> = {
   repurposing: 'Repurposing triage',
@@ -44,29 +44,7 @@ const PERSONA_LABELS: Record<CampaignPersona, string> = {
   'lab-affiliation': 'Lab / site context',
 }
 
-const DONE_KEY = 'biointel-campaign-done-v1'
 const PRODUCT_QUEUE_KEY = 'biointel-product-events-v1'
-
-function loadDoneMap(): Record<string, CampaignStageId[]> {
-  if (typeof window === 'undefined') return {}
-  try {
-    const raw = localStorage.getItem(DONE_KEY)
-    if (!raw) return {}
-    const o = JSON.parse(raw) as unknown
-    if (!o || typeof o !== 'object') return {}
-    return o as Record<string, CampaignStageId[]>
-  } catch {
-    return {}
-  }
-}
-
-function saveDoneMap(map: Record<string, CampaignStageId[]>) {
-  try {
-    localStorage.setItem(DONE_KEY, JSON.stringify(map))
-  } catch {
-    /* quota */
-  }
-}
 
 function sourceBadge(source: StageDoneSource | undefined): string | null {
   if (source === 'event') return 'Auto'
@@ -120,7 +98,9 @@ export function CampaignWorkspaceClient() {
     router.push(result.discoverHref)
   }, [golden, router])
 
-  const [doneMap, setDoneMap] = useState<Record<string, CampaignStageId[]>>(() => loadDoneMap())
+  const [doneMap, setDoneMap] = useState<Record<string, CampaignStageId[]>>(() =>
+    loadCampaignDoneMap(),
+  )
   /** Bump when product-event queue changes so auto progress re-derives. */
   const [eventTick, setEventTick] = useState(0)
 
@@ -131,10 +111,10 @@ export function CampaignWorkspaceClient() {
   useEffect(() => {
     refreshEvents()
     const onStorage = (e: StorageEvent) => {
-      if (e.key === PRODUCT_QUEUE_KEY || e.key === DONE_KEY || e.key === null) {
+      if (e.key === PRODUCT_QUEUE_KEY || e.key === CAMPAIGN_DONE_KEY || e.key === null) {
         refreshEvents()
-        if (e.key === DONE_KEY || e.key === null) {
-          setDoneMap(loadDoneMap())
+        if (e.key === CAMPAIGN_DONE_KEY || e.key === null) {
+          setDoneMap(loadCampaignDoneMap())
         }
       }
     }
@@ -174,7 +154,7 @@ export function CampaignWorkspaceClient() {
         if (cur.has(stageId)) cur.delete(stageId)
         else cur.add(stageId)
         const next = { ...prev, [template.id]: Array.from(cur) }
-        saveDoneMap(next)
+        saveCampaignDoneMap(next)
         return next
       })
     },
@@ -284,79 +264,86 @@ export function CampaignWorkspaceClient() {
           </div>
         </section>
 
-        {primaryPlaybook && (
-          <section
-            className="mb-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4"
-            data-testid="campaign-playbook-steps"
+        {/* Secondary depth — collapsed by default to keep stages primary */}
+        <div className="mb-4 space-y-2">
+          {primaryPlaybook && (
+            <details
+              className="rounded-xl border border-slate-800 bg-slate-900/30 p-3"
+              data-testid="campaign-playbook-steps"
+            >
+              <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+                Playbook · {primaryPlaybook.title}
+              </summary>
+              <p className="mt-1 text-[10px] text-slate-500">{primaryPlaybook.goal}</p>
+              <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] text-slate-400">
+                {primaryPlaybook.steps.slice(0, 6).map((step, i) => (
+                  <li key={i}>
+                    <span className="font-medium text-slate-300">{step.title}</span>
+                    {step.human ? (
+                      <span className="text-slate-500"> — {step.human}</span>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </details>
+          )}
+
+          <details
+            className="rounded-xl border border-slate-800 bg-slate-900/30 p-3"
+            data-testid="campaign-orchestration"
           >
-            <h2 className="text-sm font-semibold text-slate-100">
-              Playbook · {primaryPlaybook.title}
-            </h2>
-            <p className="mt-1 text-[10px] text-slate-500">{primaryPlaybook.goal}</p>
-            <ol className="mt-2 list-decimal space-y-1 pl-4 text-[11px] text-slate-400">
-              {primaryPlaybook.steps.slice(0, 6).map((step, i) => (
-                <li key={i}>
-                  <span className="font-medium text-slate-300">{step.title}</span>
-                  {step.human ? (
-                    <span className="text-slate-500"> — {step.human}</span>
-                  ) : null}
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+              {orchestration.title}
+            </summary>
+            <p className="mt-1 text-[10px] text-slate-500">
+              Ordered steps that raise loop finish rate (not more panels).
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {orchestration.steps.map((s) => (
+                <li key={s.id} className="flex flex-wrap items-baseline gap-2 text-[11px]">
+                  <Link
+                    href={s.href}
+                    className="font-medium text-emerald-300 hover:underline"
+                    data-testid={`campaign-orch-${s.id}`}
+                  >
+                    {s.title}
+                  </Link>
+                  <span className="text-slate-500">{s.why}</span>
+                  {s.freeApiHint && (
+                    <span className="text-[9px] text-slate-600">{s.freeApiHint}</span>
+                  )}
                 </li>
               ))}
-            </ol>
-          </section>
-        )}
+            </ul>
+          </details>
 
-        <section
-          className="mb-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4"
-          data-testid="campaign-orchestration"
-        >
-          <h2 className="text-sm font-semibold text-slate-100">{orchestration.title}</h2>
-          <p className="mt-1 text-[10px] text-slate-500">
-            Evidence orchestration — ordered steps that raise loop finish rate (not more panels).
-          </p>
-          <ul className="mt-2 space-y-1.5">
-            {orchestration.steps.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-baseline gap-2 text-[11px]">
-                <Link
-                  href={s.href}
-                  className="font-medium text-emerald-300 hover:underline"
-                  data-testid={`campaign-orch-${s.id}`}
+          <details
+            className="rounded-xl border border-slate-800 bg-slate-900/30 p-3"
+            data-testid="campaign-monday-library"
+          >
+            <summary className="cursor-pointer text-sm font-semibold text-slate-100">
+              Monday experiment library
+            </summary>
+            <p className="mt-1 text-[10px] text-slate-500">
+              Curated free-API experiments — NextExperiment or pack Monday handoff.
+            </p>
+            <ul className="mt-2 space-y-2">
+              {mondayTemplates.slice(0, 5).map((t) => (
+                <li
+                  key={t.id}
+                  className="rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-2"
+                  data-testid={`campaign-monday-${t.id}`}
                 >
-                  {s.title}
-                </Link>
-                <span className="text-slate-500">{s.why}</span>
-                {s.freeApiHint && (
-                  <span className="text-[9px] text-slate-600">{s.freeApiHint}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        </section>
-
-        <section
-          className="mb-4 rounded-xl border border-slate-800 bg-slate-900/30 p-4"
-          data-testid="campaign-monday-library"
-        >
-          <h2 className="text-sm font-semibold text-slate-100">Monday experiment library</h2>
-          <p className="mt-1 text-[10px] text-slate-500">
-            Curated free-API experiments (A6) — attach as NextExperiment or export via Monday pack.
-          </p>
-          <ul className="mt-2 space-y-2">
-            {mondayTemplates.slice(0, 5).map((t) => (
-              <li
-                key={t.id}
-                className="rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-2"
-                data-testid={`campaign-monday-${t.id}`}
-              >
-                <div className="text-[11px] font-medium text-slate-200">{t.title}</div>
-                <p className="mt-0.5 text-[10px] text-slate-500">{t.description}</p>
-                <p className="mt-1 text-[9px] text-slate-600">
-                  {t.freeApiSurfaces.join(' · ')} · {t.costTier} cost · {t.lawReminder}
-                </p>
-              </li>
-            ))}
-          </ul>
-        </section>
+                  <div className="text-[11px] font-medium text-slate-200">{t.title}</div>
+                  <p className="mt-0.5 text-[10px] text-slate-500">{t.description}</p>
+                  <p className="mt-1 text-[9px] text-slate-600">
+                    {t.freeApiSurfaces.join(' · ')} · {t.costTier} cost
+                  </p>
+                </li>
+              ))}
+            </ul>
+          </details>
+        </div>
 
         <section className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 p-4">
           <div className="mb-2 flex flex-wrap items-center justify-between gap-2">

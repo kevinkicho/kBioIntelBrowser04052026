@@ -33,21 +33,22 @@ const MOLECULE_EXAMPLES = [
 ]
 const GENE_EXAMPLES = ['BRCA1', 'TP53', 'EGFR', 'APOE']
 
+/** Primary loop surfaces first — secondary tools stay reachable but de-emphasized. */
 const NAV_LINKS = [
   { href: '/discover', label: 'Discover', color: 'emerald' },
   { href: '/campaign', label: 'Campaign', color: 'emerald' },
   { href: '/projects', label: 'Projects', color: 'emerald' },
-  { href: '/hypothesis', label: 'Hypothesis Builder', color: 'emerald' },
-  { href: '/browse', label: 'Browse by Category', color: 'slate' },
-  { href: '/gene', label: 'Gene Search', color: 'slate' },
-  { href: '/compare', label: 'Compare Molecules', color: 'slate' },
-  { href: '/cohort', label: 'Cohort Comparison', color: 'emerald' },
-  { href: '/interactions', label: 'Interaction Checker', color: 'slate' },
-  { href: '/batch', label: 'Batch Lookup', color: 'slate' },
-  { href: '/analytics', label: 'API Analytics', color: 'emerald' },
+  { href: '/compare', label: 'Compare', color: 'slate' },
+  { href: '/orgs', label: 'Orgs', color: 'violet' },
+  { href: '/analytics', label: 'Analytics', color: 'emerald' },
+  { href: '/methodology', label: 'Methodology', color: 'slate' },
+  { href: '/gene', label: 'Genes', color: 'slate' },
+  { href: '/browse', label: 'Browse', color: 'slate' },
+  { href: '/hypothesis', label: 'Hypothesis', color: 'emerald' },
+  { href: '/cohort', label: 'Cohort', color: 'slate' },
+  { href: '/batch', label: 'Batch', color: 'slate' },
+  { href: '/interactions', label: 'Interactions', color: 'slate' },
   { href: '/watchlist', label: 'Watchlist', color: 'amber' },
-  { href: '/orgs', label: 'Research labs & orgs', color: 'violet' },
-  { href: '/methodology', label: 'How we present data', color: 'slate' },
 ]
 
 function LinkChip({

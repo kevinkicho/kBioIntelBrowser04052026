@@ -1,7 +1,7 @@
 # BioIntel Discovery Workbench v3 — Ambitious scope expansion
 
 **Product:** BioIntel Discovery Workbench  
-**Status:** Active plan + partial implementation (2026-08-03)  
+**Status:** Implemented on main (finish-rate productization 2026-08-05)  
 **Predecessor:** `discovery-workbench-v2.1.md` (hardening shipped)  
 **Constraint law (binding):** Free public APIs only · evidence-first · no regulatory decision support · solo + file export default · deterministic Discover rank (no LLM) · AI claim-bound only  
 
@@ -59,7 +59,7 @@ v3 expands **scope and depth** of that loop without becoming a paid-DB encyclope
 
 Implementers: prefer pure hub builders + playbooks + kit extras over new paid surfaces. Every new fact row must name a free public source.
 
-## 6. Implementation status (2026-08-03)
+## 6. Implementation status (2026-08-05)
 
 | Slice | Status |
 |-------|--------|

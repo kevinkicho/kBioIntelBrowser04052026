@@ -149,7 +149,7 @@ describe('PackBuilder', () => {
     jest.clearAllMocks()
   })
 
-  it('renders download actions and disabled share', () => {
+  it('renders download, share (IDB cache path), and Monday handoff', () => {
     render(
       <PackBuilder
         panels={FIXTURE_CORE_PANELS}
@@ -160,7 +160,9 @@ describe('PackBuilder', () => {
     expect(screen.getByTestId('pack-builder')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Download JSON/i })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Download Markdown/i })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: /Share pack/i })).toBeDisabled()
+    // Solo default: share stays enabled so IDB rehydrate cache is always writable
+    expect(screen.getByTestId('pack-share')).not.toBeDisabled()
+    expect(screen.getByTestId('pack-monday-handoff')).toBeInTheDocument()
   })
 
   it('downloads JSON pack with claims from Core panels', () => {

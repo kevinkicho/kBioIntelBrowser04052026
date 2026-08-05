@@ -163,38 +163,20 @@ export function ProductFunnelPanel() {
         </div>
       </div>
 
-      {/* M1 north-star strip with completedLoops — empty tiles at opacity 0.3 */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        {(
-          [
-            ['Discover started', funnel.startedCount, 'M1'],
-            ['Rank completed', funnel.rankedCount, 'M1'],
-            ['Board added', funnel.boardedCount, 'M1'],
-            ['Completed loops', funnel.completedLoops, 'M1'],
-          ] as const
-        ).map(([label, count, metric]) => {
-          const empty = count == null || count === 0
-          return (
-            <div
-              key={label}
-              className={`rounded-lg border border-slate-800 bg-slate-900/50 px-3 py-2 ${
-                empty ? 'opacity-30' : ''
-              }`}
-              data-empty={empty ? 'true' : undefined}
-            >
-              <div className="text-[10px] font-medium uppercase tracking-wide text-indigo-400/80">
-                {metric}
-              </div>
-              <div className="text-2xl font-bold text-slate-100">
-                {count == null ? '—' : count}
-              </div>
-              <div className="text-[11px] text-slate-500">{label}</div>
-            </div>
-          )
-        })}
-      </div>
-
+      {/* FinishRateStrip above owns M1/M3/M7 tiles — keep only pack/RH depth extras here */}
       <div className="mb-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div
+          className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
+            funnel.startedCount === 0 ? 'opacity-30' : ''
+          }`}
+          data-empty={funnel.startedCount === 0 ? 'true' : undefined}
+        >
+          <div className="text-[10px] uppercase text-slate-500">Funnel volume</div>
+          <div className="text-lg font-semibold text-slate-100">
+            {funnel.startedCount} → {funnel.rankedCount} → {funnel.boardedCount}
+          </div>
+          <div className="text-[10px] text-slate-600">started · ranked · boarded</div>
+        </div>
         <div
           className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
             !funnel.packOrRhCount ? 'opacity-30' : ''
@@ -209,33 +191,15 @@ export function ProductFunnelPanel() {
         </div>
         <div
           className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
-            funnel.medianCitable == null ? 'opacity-30' : ''
+            funnel.meanClaimCount == null ? 'opacity-30' : ''
           }`}
-          data-empty={funnel.medianCitable == null ? 'true' : undefined}
+          data-empty={funnel.meanClaimCount == null ? 'true' : undefined}
         >
-          <div className="text-[10px] uppercase text-slate-500">M3 median citable</div>
+          <div className="text-[10px] uppercase text-slate-500">Mean claims / pack</div>
           <div className="text-lg font-semibold text-slate-100">
-            {funnel.medianCitable != null ? funnel.medianCitable : '—'}
-          </div>
-          <div className="text-[10px] text-slate-600">
-            target ≥5 · mean claims{' '}
             {funnel.meanClaimCount != null ? funnel.meanClaimCount.toFixed(1) : '—'}
           </div>
-        </div>
-        <div
-          className={`rounded-lg border border-slate-800 bg-slate-900/40 px-3 py-2 text-xs ${
-            funnel.m7.p50 == null && funnel.m7.p95 == null ? 'opacity-30' : ''
-          }`}
-          data-empty={funnel.m7.p50 == null && funnel.m7.p95 == null ? 'true' : undefined}
-        >
-          <div className="text-[10px] uppercase text-slate-500">M7 shortlist (rank ms)</div>
-          <div className="text-lg font-semibold text-slate-100">
-            P50 {funnel.m7.p50 != null ? `${Math.round(funnel.m7.p50)}ms` : '—'} · P95{' '}
-            {funnel.m7.p95 != null ? `${Math.round(funnel.m7.p95)}ms` : '—'}
-          </div>
-          <div className="text-[10px] text-slate-600">
-            {funnel.m7.samples} samples · harvest excluded
-          </div>
+          <div className="text-[10px] text-slate-600">from pack_exported dual-read props</div>
         </div>
       </div>
 
