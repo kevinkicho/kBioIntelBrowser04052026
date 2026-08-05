@@ -36,6 +36,7 @@ import {
 import { mondayTemplatesForPersona } from '@/lib/dataHub/mondayExperimentLibrary'
 import { planEvidenceOrchestration } from '@/lib/evidence'
 import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
+import { LoopCoachStrip } from '@/components/loop/LoopCoachStrip'
 
 const PERSONA_LABELS: Record<CampaignPersona, string> = {
   repurposing: 'Repurposing triage',
@@ -210,7 +211,8 @@ export function CampaignWorkspaceClient() {
           </div>
         </header>
 
-        <div className="mb-4">
+        <div className="mb-4 space-y-3">
+          <LoopCoachStrip />
           <FinishRateStrip compact />
         </div>
 

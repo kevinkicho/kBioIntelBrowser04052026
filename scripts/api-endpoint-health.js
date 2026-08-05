@@ -215,6 +215,14 @@ function payloadHasData(val) {
   if (obj._partial === true && (obj._timeout === true || typeof obj._error === 'string')) {
     return true
   }
+  // Honest empty / not-retrieved envelopes (route alive; sparse free-API session)
+  if (obj._emptyHonest === true || obj._notRetrieved === true) {
+    return true
+  }
+  // Source-status map present → category/pipeline responded with provenance
+  if (obj._sourceStatus && typeof obj._sourceStatus === 'object') {
+    return true
+  }
   if (typeof obj.status === 'string' && obj.status !== 'error') {
     // healthFor returns status without rows — treat as meta structure
     if ('sample_size' in obj || 'reason' in obj || 'p95_ms' in obj) return true

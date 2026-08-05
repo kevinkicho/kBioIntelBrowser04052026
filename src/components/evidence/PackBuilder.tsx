@@ -27,6 +27,11 @@ import {
   mondayHandoffFilename,
   mondayHandoffToJson,
 } from '@/lib/evidence/mondayHandoff'
+import {
+  buildDecisionBrief,
+  decisionBriefFilename,
+  decisionBriefToJson,
+} from '@/lib/evidence/decisionBrief'
 import { PackView } from './PackView'
 import { PackAiPanel } from './PackAiPanel'
 import { HelperTip } from '@/components/ui/HelperTip'
@@ -113,6 +118,7 @@ export function PackBuilder({
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [shareRehydrateNote, setShareRehydrateNote] = useState<string | null>(null)
   const [mondayBusy, setMondayBusy] = useState(false)
+  const [briefBusy, setBriefBusy] = useState(false)
   /** Soft M3 gate: block export until force when citation completeness is low */
   const [forceCitableExport, setForceCitableExport] = useState(false)
   const [citationGate, setCitationGate] = useState<{
@@ -451,6 +457,31 @@ export function PackBuilder({
     }
   }
 
+  /** Of-record decision brief (no LLM) — kill flags + top claims. */
+  const handleDecisionBrief = () => {
+    setBriefBusy(true)
+    try {
+      const pack = lastPack ?? build()
+      setLastPack(pack)
+      registerSideEffects(pack)
+      const brief = buildDecisionBrief(pack)
+      downloadFile(decisionBriefToJson(brief), decisionBriefFilename(brief), 'application/json')
+      emitProductEvent('ui_surface_action', {
+        surface: 'decision_brief',
+        action: 'export',
+        packId: pack.id,
+      } as never)
+      flash(
+        'ok',
+        `Decision brief · ${brief.citableCount} citable · ${brief.killFlags.length} gap flags (of-record, no LLM)`,
+      )
+    } catch (err) {
+      flash('err', err instanceof Error ? err.message : 'Decision brief failed')
+    } finally {
+      setBriefBusy(false)
+    }
+  }
+
   const shareEnabled = collabMode === 'share-links-when-available'
 
   return (
@@ -657,6 +688,17 @@ export function PackBuilder({
             className="rounded-lg border border-violet-800/50 bg-violet-950/30 px-3 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-900/40 disabled:opacity-50"
           >
             {mondayBusy ? 'Building…' : 'Monday handoff'}
+          </button>
+        </StyledTooltip>
+        <StyledTooltip content="Of-record decision brief (deterministic kill flags + top claims). No LLM text.">
+          <button
+            type="button"
+            data-testid="pack-decision-brief"
+            disabled={briefBusy}
+            onClick={() => handleDecisionBrief()}
+            className="rounded-lg border border-amber-800/50 bg-amber-950/30 px-3 py-1.5 text-xs font-medium text-amber-100 hover:bg-amber-900/40 disabled:opacity-50"
+          >
+            {briefBusy ? 'Building…' : 'Decision brief'}
           </button>
         </StyledTooltip>
         <button

@@ -139,6 +139,8 @@ const PRODUCT_PATTERNS = [
   'evidenceOrchestration',
   'packHonesty',
   'notRetrievedBanner',
+  'loopCoach',
+  'decisionBrief',
   'crossSource',
   'summaryEmpty',
   'ErrorBoundary',

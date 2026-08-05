@@ -329,8 +329,25 @@ export async function GET(
   }))
 
   // Attach per-source status for UI honesty (data vs empty vs timeout vs error vs disabled)
+  const dataKeys = Object.keys(data ?? {}).filter((k) => !k.startsWith('_'))
+  const hasPanelPayload = dataKeys.some((k) => {
+    const v = (data as Record<string, unknown>)[k]
+    if (v == null) return false
+    if (Array.isArray(v)) return v.length > 0
+    if (typeof v === 'object') return Object.keys(v as object).length > 0
+    return true
+  })
   const payload = {
     ...data,
+    // Soft-empty honesty: 200 with no panel rows is of-record "not retrieved this session"
+    ...(!hasPanelPayload
+      ? {
+          _emptyHonest: true,
+          _notRetrieved: true,
+          _honesty:
+            'Empty free-API sample this session — not proof of zero association forever. Retry or densify later.',
+        }
+      : {}),
     _sourceStatus: sourceStatus,
     _apiTrace: buildCategoryApiTrace({
       categoryId,

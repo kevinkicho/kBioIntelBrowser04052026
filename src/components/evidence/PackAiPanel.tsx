@@ -349,9 +349,10 @@ export function PackAiPanel({ pack, className = '', onInsight }: PackAiPanelProp
       )}
 
       {gated ? (
-        <p className="text-[11px] text-amber-400/90">
+        <p className="text-[11px] text-amber-400/90" data-testid="pack-ai-gated-hint">
           Add at least {minClaims} claims to the pack for this mode (you have {claimCount}).
-          Download the pack after Core panels finish loading, or open more molecule evidence first.
+          Prefer of-record <strong className="font-semibold">Decision brief</strong> (pack toolbar) until densified —
+          AI is non-of-record and refuses free invention. Download after Core panels load or open more evidence.
         </p>
       ) : (
         <div className="mb-2 flex flex-wrap gap-2">

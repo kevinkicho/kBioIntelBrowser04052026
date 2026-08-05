@@ -33,6 +33,7 @@
     "ship:verify:e2e": "node scripts/ship-verify.js --e2e",
     "ship:verify:e2e:full": "node scripts/ship-verify.js --e2e-full",
     "ship:verify:all": "node scripts/ship-verify.js --ci --e2e",
+    "ship:rollout": "node scripts/check-rollout.js",
     "api:health": "node scripts/api-endpoint-health.js",
     "api:health:json": "node scripts/api-endpoint-health.js --json",
     "api:health:ai-wire": "node scripts/api-endpoint-health.js --ai-wire-only",

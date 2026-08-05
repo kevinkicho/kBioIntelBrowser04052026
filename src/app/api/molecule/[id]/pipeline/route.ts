@@ -120,6 +120,28 @@ export async function GET(
     }
   }
 
+  // Honest empty envelope when all free-API bags are empty (still a live route)
+  const bagKeys = [
+    'clinicalTrials',
+    'chemblIndications',
+    'chemblMechanisms',
+    'orangeBookEntries',
+    'ndcProducts',
+    'drugLabels',
+    'drugShortages',
+    'myChemAnnotations',
+  ] as const
+  const anyRows = bagKeys.some((k) => {
+    const v = payload[k]
+    return Array.isArray(v) && v.length > 0
+  })
+  if (!anyRows) {
+    payload._emptyHonest = true
+    payload._notRetrieved = true
+    payload._honesty =
+      'Pipeline free-API bags empty this session — not proof of zero pipeline activity forever.'
+  }
+
   setCache(cacheKey, payload, PIPELINE_CACHE_TTL_MS)
 
   return NextResponse.json(payload, {

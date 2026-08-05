@@ -1589,10 +1589,14 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
               retrying={isBusy}
               testId={`partial-timeout-${catId}`}
             />
-          ) : status === 'loaded' ? (
+          ) : status === 'loaded' || catPayload?._emptyHonest === true ? (
             <NotRetrievedBanner
               scopeLabel="This category"
-              detail={catId}
+              detail={
+                typeof catPayload?._honesty === 'string'
+                  ? catPayload._honesty
+                  : catId
+              }
               onRetry={() => loadCategory(catId, { force: true })}
               retrying={isBusy}
               testId={`not-retrieved-${catId}`}

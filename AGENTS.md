@@ -24,6 +24,7 @@ Coding agents and human implementers: read this before changing product behavior
 - `docs/design/public-apis-international.md` — free foreign-regulator / research APIs (Health Canada, WHO GHO, …)
 - `docs/design/free-api-agent.md` — policy agent for free-API timeout/retry/empty + etiquette (not LLM facts)
 - `docs/design/discovery-workbench-v3.md` — scope expansion + finish-rate productization (shipped)
+- `docs/design/discovery-workbench-v4.md` — finish-rate OS, decision brief, honest EMPTY, rollout proof
 - `docs/design/refuse-breadth.md` — no new free-API panels unless finish-rate/M3 rises
 - `docs/golden/` — beachhead golden disease/CID expectations
 
@@ -37,7 +38,8 @@ Coding agents and human implementers: read this before changing product behavior
 - Profile revisit cache: `src/lib/profileClientCache.ts`, `src/lib/profileRevisitIdb.ts`, `src/lib/fetchCategory.ts`
 - **Free-API agent (policy + etiquette, not LLM):** `src/lib/api/freeApiAgent.ts`, `leafRouteAgent.ts`, `timedFetch.ts`, `freeApiEtiquette.ts`, `src/lib/rateLimit.ts` — centralize timeout/retry/abort/empty **and** free-API etiquette (host rate limits, concurrency, Retry-After, polite User-Agent) so we do not stampede public APIs into 429s. Molecule leaf routes use `moleculeLeafGet`. Do **not** re-hardcode per-file retry/rate-limit rules. Of-record data still free public HTTP only.
 - **v3 of-record expansion:** `safetyTriangulation.ts`, `fiveRegulatorCard.ts`, `citationCompleteness.ts`, `src/lib/campaign/*`, `src/lib/golden/*`; research kit `schemaVersion: 2` + `v3-quality.json`
-- **Finish-rate loop:** `FinishRateStrip`, `applyGoldenPath`, pack **Monday handoff**, product-event campaign stages, fixture e2e (`e2e-fixture.yml`)
+- **Finish-rate loop:** `LoopCoachStrip`, `FinishRateStrip`, `applyGoldenPath`, pack **Monday handoff** + **Decision brief**, product-event campaign stages, fixture e2e (`e2e-fixture.yml`)
+- **Rollout proof:** `npm run ship:rollout` (App Hosting status + `/campaign` probe; does not force deploy)
 
 ## UI chrome (agents)
 

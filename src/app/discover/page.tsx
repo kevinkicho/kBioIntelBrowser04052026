@@ -41,6 +41,7 @@ import { loadLastCampaignPath } from '@/lib/campaign/lastCampaignPath'
 import { AiAnalysisView } from '@/components/discover/AiAnalysisView'
 import type { AiRankResult } from '@/lib/ai/aiRank'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { LoopCoachStrip } from '@/components/loop/LoopCoachStrip'
 import Link from 'next/link'
 
 /** Stable key for discover URL params — used to re-run rank when history changes q/diseaseId/targets. */
@@ -544,6 +545,10 @@ export default function DiscoverPage() {
                   harvestStatus={state.harvestStatus}
                   onOpenPreferences={() => setSettingsOpen(true)}
                 />
+
+                <div className="mb-4">
+                  <LoopCoachStrip />
+                </div>
 
                 {(state.result.sourceStatuses?.length ?? 0) > 0 && (
                   <SourceStatusStrip

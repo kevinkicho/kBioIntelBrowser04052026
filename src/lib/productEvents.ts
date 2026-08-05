@@ -85,6 +85,11 @@ export const UI_SURFACE_CATALOG = {
     actions: ['add'] as const,
     purpose: 'Monday experiment line on RH',
   },
+  /** Of-record decision brief export from pack (no LLM). */
+  decision_brief: {
+    actions: ['export'] as const,
+    purpose: 'Deterministic pack decision brief for lab/grant framing',
+  },
 } as const
 
 export type UiSurfaceName = keyof typeof UI_SURFACE_CATALOG
