@@ -79,3 +79,10 @@ Implementers: prefer pure hub builders + playbooks + kit extras over new paid su
 | Pack honesty / negative-evidence export | Shipped (`packHonesty.ts` on pack JSON/MD) |
 | AI pack/RH never hard-500 | Shipped (refuse 200 + wire-first inventory) |
 | Campaign spine + playbook steps UI | Shipped (`/campaign`) |
+| Finish-rate strip (M1/M3/M7) | Shipped (`FinishRateStrip` on home/campaign/analytics) |
+| One-click golden path | Shipped (`applyGoldenPath` + Run on `/campaign` + home) |
+| Monday pack handoff | Shipped (`mondayHandoff` + PackBuilder button) |
+| Soft not-retrieved category banner | Shipped (`NotRetrievedBanner`) |
+| Resume last campaign path | Shipped (`lastCampaignPath` · home/discover) |
+| Prod SLO health pulse | Shipped (`.github/workflows/slo-api-health.yml`) |
+| Refuse more breadth | Policy: no new free-API panels unless golden M3/finish rises |

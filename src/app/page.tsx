@@ -17,6 +17,11 @@ import {
   type TourExampleSetPref,
 } from '@/lib/discovery/preferences'
 import { examplesForTourSet } from '@/lib/discovery/tourExamples'
+import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
+import { loadLastCampaignPath } from '@/lib/campaign/lastCampaignPath'
+import { GOLDEN_PATHS } from '@/lib/golden/goldenPaths'
+import { applyGoldenPath } from '@/lib/golden/applyGoldenPath'
+import { useRouter } from 'next/navigation'
 
 /** Mixed example chips — disease / molecule / gene */
 const MOLECULE_EXAMPLES = [
@@ -30,6 +35,7 @@ const GENE_EXAMPLES = ['BRCA1', 'TP53', 'EGFR', 'APOE']
 
 const NAV_LINKS = [
   { href: '/discover', label: 'Discover', color: 'emerald' },
+  { href: '/campaign', label: 'Campaign', color: 'emerald' },
   { href: '/projects', label: 'Projects', color: 'emerald' },
   { href: '/hypothesis', label: 'Hypothesis Builder', color: 'emerald' },
   { href: '/browse', label: 'Browse by Category', color: 'slate' },
@@ -106,16 +112,19 @@ export default function HomePage() {
 }
 
 function HomePageContent() {
+  const router = useRouter()
   const [isNavigating, setIsNavigating] = useState(false)
   /** Advanced chemical ID mode only (CID/CAS/SMILES…); main bar is always unified. */
   const [searchType, setSearchType] = useState<SearchType>('name')
   const [apiOverrides, setApiOverrides] = useState<Record<string, ApiIdentifierType>>({})
   const [apiParams, setApiParams] = useState<Record<string, ApiParamValue>>({})
   const [tourExampleSet, setTourExampleSet] = useState<TourExampleSetPref>('mixed')
+  const [resumePath, setResumePath] = useState<ReturnType<typeof loadLastCampaignPath>>(null)
   const handleNavigating = useCallback((navigating: boolean) => setIsNavigating(navigating), [])
 
   useEffect(() => {
     setTourExampleSet(loadDiscoveryPreferences().tourExampleSet)
+    setResumePath(loadLastCampaignPath())
     const onStorage = (e: StorageEvent) => {
       if (e.key === 'biointel-discovery-prefs-v1' || e.key === null) {
         setTourExampleSet(loadDiscoveryPreferences().tourExampleSet)
@@ -204,11 +213,58 @@ function HomePageContent() {
           BioIntel Explorer
         </h1>
         <p className="text-xl text-slate-400 mb-2">
-          Explore diseases, targets, and molecules from free public databases.
+          Shortlist you trust → cited pack → hypothesis → Monday experiment.
         </p>
         <p className="text-slate-500">
-          One search across diseases, molecules, and genes. Public data only — not for clinical use.
+          Free public APIs only · of-record Discover rank is deterministic (no LLM) · not for clinical
+          use.
         </p>
+      </div>
+
+      <div className="mb-6 w-full max-w-3xl space-y-3" data-testid="home-beachhead">
+        <FinishRateStrip compact />
+        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-left">
+          <h2 className="text-sm font-semibold text-slate-100">Beachhead personas</h2>
+          <p className="mt-1 text-[11px] text-slate-500">
+            Start a golden path (applies prefs + Discover session). Prefer finish rate over browsing
+            more panels.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {GOLDEN_PATHS.filter((p) => p.id !== 'aspirin-control').map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                data-testid={`home-golden-${p.id}`}
+                onClick={() => {
+                  const r = applyGoldenPath(p)
+                  setIsNavigating(true)
+                  router.push(r.discoverHref)
+                }}
+                className="rounded-full border border-emerald-800/50 bg-emerald-950/30 px-3 py-1 text-[11px] font-medium text-emerald-200 hover:bg-emerald-900/40"
+              >
+                {p.label}
+              </button>
+            ))}
+            <a
+              href="/campaign"
+              className="rounded-full border border-slate-700 px-3 py-1 text-[11px] text-slate-400 hover:border-slate-500"
+            >
+              Full campaign workspace
+            </a>
+          </div>
+          {resumePath && (
+            <p className="mt-3 text-[11px] text-slate-400" data-testid="home-resume-campaign">
+              Resume last path:{' '}
+              <a href={resumePath.discoverHref} className="font-medium text-sky-300 hover:underline">
+                {resumePath.label}
+              </a>
+              <span className="text-slate-600">
+                {' '}
+                · {new Date(resumePath.savedAt).toLocaleString()}
+              </span>
+            </p>
+          )}
+        </div>
       </div>
 
       <div className="flex flex-col items-center w-full max-w-2xl">

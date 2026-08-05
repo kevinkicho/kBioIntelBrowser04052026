@@ -20,6 +20,7 @@ import { Panel } from '@/components/ui/Panel'
 import { isPanelSourceDisabled } from '@/lib/api/sourceAvailability'
 import { CategorySection } from '@/components/profile/CategorySection'
 import { PartialTimeoutBanner } from '@/components/ui/PartialTimeoutBanner'
+import { NotRetrievedBanner } from '@/components/ui/NotRetrievedBanner'
 import { PanelSearch } from '@/components/profile/PanelSearch'
 import {
   CATEGORIES,
@@ -1577,10 +1578,10 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
       (catPayload?._timeout === true || typeof catPayload?._error === 'string')
 
     if (allowedVisible.length === 0) {
-      // Compact empty — no full-width “Source status” card that looks like blank UI
+      // Compact empty — partial timeout vs soft not-retrieved honesty
       return (
         <div className="space-y-2" data-testid={`category-empty-wrap-${catId}`}>
-          {isPartialTimeout && (
+          {isPartialTimeout ? (
             <PartialTimeoutBanner
               scopeLabel="This category"
               message={typeof catPayload?._error === 'string' ? catPayload._error : undefined}
@@ -1588,7 +1589,15 @@ function ProfilePageClientInner({ cid, moleculeName, molecularWeight, formula, i
               retrying={isBusy}
               testId={`partial-timeout-${catId}`}
             />
-          )}
+          ) : status === 'loaded' ? (
+            <NotRetrievedBanner
+              scopeLabel="This category"
+              detail={catId}
+              onRetry={() => loadCategory(catId, { force: true })}
+              retrying={isBusy}
+              testId={`not-retrieved-${catId}`}
+            />
+          ) : null}
           <div
             className="rounded-lg border border-slate-800/80 bg-slate-900/30 px-3 py-2.5 text-[11px] text-slate-500"
             data-testid={`category-empty-${catId}`}

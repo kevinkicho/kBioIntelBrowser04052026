@@ -22,10 +22,24 @@ import {
 import { addPackIndexEntryAndSave, putPackInCache } from '@/lib/project'
 import { emitProductEvent } from '@/lib/productEvents'
 import { scoreClaimCitationCompleteness } from '@/lib/dataHub/citationCompleteness'
+import {
+  buildMondayHandoff,
+  mondayHandoffFilename,
+  mondayHandoffToJson,
+} from '@/lib/evidence/mondayHandoff'
 import { PackView } from './PackView'
 import { PackAiPanel } from './PackAiPanel'
 import { HelperTip } from '@/components/ui/HelperTip'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import {
+  appendNextExperiment,
+  getResearchHypothesis,
+  listResearchHypothesesForProject,
+  saveResearchHypothesis,
+  seedResearchHypothesisFromPack,
+} from '@/lib/project'
+import type { CampaignPersona } from '@/lib/campaign/campaignWorkspace'
+import { loadLastCampaignPath } from '@/lib/campaign/lastCampaignPath'
 
 /** M3-ish soft gate: warn before export when citation score &lt; threshold */
 const CITATION_EXPORT_THRESHOLD = 0.6
@@ -97,6 +111,8 @@ export function PackBuilder({
   const [landscapeMode, setLandscapeMode] = useState(false)
   const [shareBusy, setShareBusy] = useState(false)
   const [shareUrl, setShareUrl] = useState<string | null>(null)
+  const [shareRehydrateNote, setShareRehydrateNote] = useState<string | null>(null)
+  const [mondayBusy, setMondayBusy] = useState(false)
   /** Soft M3 gate: block export until force when citation completeness is low */
   const [forceCitableExport, setForceCitableExport] = useState(false)
   const [citationGate, setCitationGate] = useState<{
@@ -306,11 +322,15 @@ export function PackBuilder({
   const handleShare = async () => {
     setShareBusy(true)
     setShareUrl(null)
+    setShareRehydrateNote(null)
     try {
       const pack = build()
       setLastPack(pack)
       // IDB still written so RH rehydrate works even if share API fails
       registerSideEffects(pack)
+      setShareRehydrateNote(
+        'Pack cached in browser IndexedDB for research-hypothesis rehydrate (solo default).',
+      )
       const res = await fetch('/api/snapshot', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -327,21 +347,32 @@ export function PackBuilder({
         const err = await res.json().catch(() => ({}))
         throw new Error(
           (err as { error?: string }).error ??
-            `Share failed (${res.status}). Pack remains downloadable; cached in browser for RH rehydrate.`,
+            `Share failed (${res.status}). Download still works; pack is cached for RH rehydrate.`,
         )
       }
       const data = (await res.json()) as { id: string }
       const url = `${window.location.origin}/pack/${data.id}`
       setShareUrl(url)
+      let copied = false
       try {
         await navigator.clipboard?.writeText(url)
+        copied = true
       } catch {
-        // ignore clipboard failures
+        // show URL for manual copy
       }
       emitProductEvent('pack_share', { packId: pack.id })
-      flash('ok', 'Share link created (30-day TTL). Copied to clipboard when available.')
+      flash(
+        'ok',
+        copied
+          ? 'Share link created (30-day TTL) and copied. Pack also in IDB for rehydrate.'
+          : 'Share link created (30-day TTL). Copy the URL below — pack also in IDB for rehydrate.',
+      )
     } catch (err) {
       setShareUrl(null)
+      // Keep rehydrate note so share failure is not opaque
+      setShareRehydrateNote(
+        'Share unavailable — pack remains downloadable and cached in IndexedDB for RH rehydrate.',
+      )
       flash(
         'err',
         err instanceof Error
@@ -350,6 +381,73 @@ export function PackBuilder({
       )
     } finally {
       setShareBusy(false)
+    }
+  }
+
+  /** Pack export + Monday library experiments + optional RH seed (finish-rate handoff). */
+  const handleMondayHandoff = () => {
+    setMondayBusy(true)
+    try {
+      const pack = lastPack ?? build()
+      setLastPack(pack)
+      registerSideEffects(pack)
+      const last = loadLastCampaignPath()
+      const persona = (last?.persona ?? 'repurposing') as CampaignPersona
+      const handoff = buildMondayHandoff(pack, { persona })
+      downloadFile(mondayHandoffToJson(handoff), mondayHandoffFilename(handoff), 'application/json')
+      // Seed or extend RH with library experiments when project-bound
+      if (pack.projectId) {
+        const existing = listResearchHypothesesForProject(pack.projectId)
+        let hyp = existing[0]
+        if (!hyp) {
+          hyp = seedResearchHypothesisFromPack({
+            projectId: pack.projectId,
+            packId: pack.id,
+            packTitle: pack.title,
+            claimIds: pack.claims.map((c) => c.id),
+            candidateIds: pack.candidates.map((c) => c.candidateId),
+            diseaseId: pack.disease?.id,
+            targetIds: pack.targets?.map((t) => t.symbol || t.id).filter(Boolean) as string[],
+          })
+          const saved = saveResearchHypothesis(hyp)
+          if (!saved.ok) {
+            flash('err', saved.message)
+            return
+          }
+          hyp = saved.value
+        }
+        const got = getResearchHypothesis(hyp.id)
+        let cur = got.ok ? got.value : hyp
+        for (const exp of handoff.experiments.slice(0, 3)) {
+          cur = appendNextExperiment(cur, {
+            description: `${exp.title}: ${exp.description}`,
+            priority: exp.costTier === 'low' ? 'high' : 'medium',
+            relatedClaimIds: pack.claims.slice(0, 5).map((c) => c.id),
+            rationale: exp.lawReminder,
+          })
+        }
+        const savedExp = saveResearchHypothesis(cur)
+        if (!savedExp.ok) {
+          flash('err', savedExp.message)
+          return
+        }
+      }
+      emitProductEvent('ui_surface_action', {
+        surface: 'monday_pack',
+        action: 'export',
+        packId: pack.id,
+        handoff: true,
+      } as never)
+      flash(
+        'ok',
+        pack.projectId
+          ? 'Monday handoff downloaded · library experiments added to RH when possible'
+          : 'Monday handoff downloaded (open a project board to seed RH experiments)',
+      )
+    } catch (err) {
+      flash('err', err instanceof Error ? err.message : 'Monday handoff failed')
+    } finally {
+      setMondayBusy(false)
     }
   }
 
@@ -523,26 +621,42 @@ export function PackBuilder({
         <StyledTooltip
           content={
             shareEnabled
-              ? 'Create a content-hashed snapshot link (30-day TTL). Server stores the pack payload.'
-              : 'Enable “Share links when available” in Discover preferences (collaboration mode) to use server share links. Download always works.'
+              ? 'Create a content-hashed snapshot link (30-day TTL). Server stores the pack payload. Always caches IDB for RH rehydrate.'
+              : 'Enable “Share links when available” in Discover preferences (collaboration mode) to use server share links. Download always works; IDB cache still written on share attempt.'
           }
         >
           <button
             type="button"
-            disabled={!shareEnabled || shareBusy}
+            disabled={shareBusy}
             onClick={() => void handleShare()}
+            data-testid="pack-share"
             aria-label={
               shareEnabled
                 ? 'Share pack — create a content-hashed snapshot link (30-day TTL)'
-                : 'Share pack (enable share links in Discover preferences)'
+                : 'Share pack (enable share links in Discover preferences for server URL)'
             }
             className={
               shareEnabled
                 ? 'rounded-lg border border-cyan-800/50 bg-cyan-950/30 px-3 py-1.5 text-xs font-medium text-cyan-300 hover:bg-cyan-900/40 disabled:opacity-50'
-                : 'cursor-not-allowed rounded-lg border border-slate-800 px-3 py-1.5 text-xs text-slate-600'
+                : 'rounded-lg border border-slate-700 bg-slate-900/40 px-3 py-1.5 text-xs font-medium text-slate-400 hover:border-slate-600 disabled:opacity-50'
             }
           >
-            {shareBusy ? 'Sharing…' : shareEnabled ? 'Share pack' : 'Share pack (enable in prefs)'}
+            {shareBusy
+              ? 'Sharing…'
+              : shareEnabled
+                ? 'Share pack'
+                : 'Share (solo: caches IDB)'}
+          </button>
+        </StyledTooltip>
+        <StyledTooltip content="Download Monday handoff JSON (pack honesty + library experiments). Seeds NextExperiment rows when project-bound.">
+          <button
+            type="button"
+            data-testid="pack-monday-handoff"
+            disabled={mondayBusy}
+            onClick={() => handleMondayHandoff()}
+            className="rounded-lg border border-violet-800/50 bg-violet-950/30 px-3 py-1.5 text-xs font-medium text-violet-200 hover:bg-violet-900/40 disabled:opacity-50"
+          >
+            {mondayBusy ? 'Building…' : 'Monday handoff'}
           </button>
         </StyledTooltip>
         <button
@@ -568,8 +682,13 @@ export function PackBuilder({
       )}
 
       {shareUrl && (
-        <p className="mt-2 break-all text-[10px] font-mono text-cyan-500/80">
+        <p className="mt-2 break-all text-[10px] font-mono text-cyan-500/80" data-testid="pack-share-url">
           Share URL: <a href={shareUrl} className="underline hover:text-cyan-300">{shareUrl}</a>
+        </p>
+      )}
+      {shareRehydrateNote && (
+        <p className="mt-1 text-[10px] text-slate-500" data-testid="pack-rehydrate-note">
+          {shareRehydrateNote}
         </p>
       )}
 

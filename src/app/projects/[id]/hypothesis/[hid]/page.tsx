@@ -745,11 +745,23 @@ export default function ResearchHypothesisEditorPage() {
                 {claims.length > 0 ? ` · ${claims.length}` : hyp.claimIds.length ? ` · ${hyp.claimIds.length} ids` : ''}
               </h2>
               <div className="flex items-center gap-2">
-                {rehydrateSource && claims.length > 0 && (
-                  <span className="text-[9px] text-slate-600">
-                    {rehydrateSource === 'idb' ? 'IDB pack cache' : 'Core panels'}
-                  </span>
-                )}
+                <span
+                  className="text-[9px] text-slate-500"
+                  data-testid="rehydrate-source-badge"
+                  data-source={rehydrateSource || (rehydrateBusy ? 'loading' : 'pending')}
+                >
+                  {rehydrateBusy
+                    ? 'Rehydrating…'
+                    : rehydrateSource === 'idb'
+                      ? 'Source · IDB pack cache'
+                      : rehydrateSource === 'rebuild'
+                        ? 'Source · rebuilt from Core'
+                        : rehydrateSource === 'none'
+                          ? 'Source · none (re-export pack)'
+                          : hyp.claimIds.length > 0
+                            ? 'Source · pending rehydrate'
+                            : 'Source · no claim ids'}
+                </span>
                 {hyp.claimIds.length > 0 && (
                   <button
                     type="button"

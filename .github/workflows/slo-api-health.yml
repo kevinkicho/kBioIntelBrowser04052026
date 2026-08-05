@@ -1,0 +1,55 @@
+# Live free-API SLO pulse — DATA% trend; hard FAIL only (EMPTY is soft).
+# Post-deploy / nightly sample against App Hosting production.
+name: SLO API health (prod)
+
+on:
+  schedule:
+    # 07:00 UTC daily (after e2e nightly)
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: slo-api-health
+  cancel-in-progress: true
+
+jobs:
+  prod-health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Prod single-fixture health (hard FAIL only fails job)
+        env:
+          BIOINTEL_BASE: https://biointel--kbiointelbrowser04052026.us-east4.hosted.app
+        # Exit 0 even with EMPTY soft misses — only fail on hard FAIL count > 0.
+        # Script exits 1 on empty; wrap to parse FAIL hard from output.
+        run: |
+          set +e
+          npm run api:health -- --single-fixture --timeout=25000 --ai-wire-only 2>&1 | tee /tmp/health.txt
+          code=${PIPESTATUS[0]}
+          if grep -qE 'FAIL hard:\s*[1-9]' /tmp/health.txt; then
+            echo "::error::Hard FAIL probes present in prod inventory"
+            exit 1
+          fi
+          if grep -qE '0 hard' /tmp/health.txt || grep -qE 'FAIL hard:\s*0' /tmp/health.txt; then
+            echo "No hard FAILs — SLO pulse soft-pass (EMPTY may remain)"
+            exit 0
+          fi
+          # Fallback: if script green, ok; if red only from empty, still pass
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          if grep -q 'Empty after alternate' /tmp/health.txt && ! grep -qE 'FAIL  [45][0-9]{2}' /tmp/health.txt; then
+            echo "Script non-zero from EMPTY only — soft-pass"
+            exit 0
+          fi
+          exit "$code"

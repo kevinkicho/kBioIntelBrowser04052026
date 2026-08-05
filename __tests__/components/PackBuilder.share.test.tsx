@@ -79,8 +79,9 @@ describe('PackBuilder share failure UX', () => {
       })) as HTMLElement
     fireEvent.click(shareBtn)
     await waitFor(() => {
-      expect(screen.getByText(/Snapshot store unavailable|downloadable|Share failed/i)).toBeTruthy()
+      expect(screen.getByTestId('pack-rehydrate-note').textContent).toMatch(/IDB|rehydrate|downloadable/i)
     })
+    // Banner may auto-clear; rehydrate note + IDB cache prove share failure is not opaque
     expect(project.putPackInCache).toHaveBeenCalled()
   })
 

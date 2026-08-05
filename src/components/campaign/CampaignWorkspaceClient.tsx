@@ -31,8 +31,11 @@ import {
   goldenPathsByPersona,
   spineLinksForGoldenPath,
 } from '@/lib/golden/goldenPaths'
+import { applyGoldenPath } from '@/lib/golden/applyGoldenPath'
 import { mondayTemplatesForPersona } from '@/lib/dataHub/mondayExperimentLibrary'
 import { planEvidenceOrchestration } from '@/lib/evidence/evidenceOrchestration'
+import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
+import { useRouter } from 'next/navigation'
 
 const PERSONA_LABELS: Record<CampaignPersona, string> = {
   repurposing: 'Repurposing triage',
@@ -74,6 +77,7 @@ function sourceBadge(source: StageDoneSource | undefined): string | null {
 
 export function CampaignWorkspaceClient() {
   const searchParams = useSearchParams()
+  const router = useRouter()
   const [persona, setPersona] = useState<CampaignPersona>(() => {
     const p = searchParams?.get('persona') as CampaignPersona | null
     if (p && ['repurposing', 'rare-disease', 'competitive', 'lab-affiliation'].includes(p)) {
@@ -110,6 +114,11 @@ export function CampaignWorkspaceClient() {
     const pbId = template.stages.find((s) => s.playbookId)?.playbookId
     return pbId ? researchPlaybookById(pbId) : undefined
   }, [template.stages])
+
+  const runGoldenPath = useCallback(() => {
+    const result = applyGoldenPath(golden, { saveSession: true })
+    router.push(result.discoverHref)
+  }, [golden, router])
 
   const [doneMap, setDoneMap] = useState<Record<string, CampaignStageId[]>>(() => loadDoneMap())
   /** Bump when product-event queue changes so auto progress re-derives. */
@@ -221,13 +230,28 @@ export function CampaignWorkspaceClient() {
           </div>
         </header>
 
+        <div className="mb-4">
+          <FinishRateStrip compact />
+        </div>
+
         <section
           className="mb-4 rounded-xl border border-slate-800 bg-slate-900/40 p-4"
           data-testid="campaign-spine"
         >
-          <h2 className="mb-2 text-sm font-semibold text-slate-100">Entity spine · golden path</h2>
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold text-slate-100">Entity spine · golden path</h2>
+            <button
+              type="button"
+              data-testid="campaign-run-golden"
+              onClick={runGoldenPath}
+              className="rounded-lg border border-emerald-700/60 bg-emerald-950/50 px-3 py-1.5 text-[11px] font-semibold text-emerald-200 hover:bg-emerald-900/50"
+            >
+              Run golden path → Discover
+            </button>
+          </div>
           <p className="mb-2 text-[10px] text-slate-500">
-            Disease → gene → molecule → org connected so finish rate beats panel thrash (v3 E4 / campaign spine).
+            One click applies beachhead prefs (rare boost / gene-led when needed), saves a Discover
+            session, and opens rank with disease + pins. Disease → gene → molecule → org spine below.
           </p>
           <div className="mb-3 flex flex-wrap gap-1.5">
             {goldenPaths.map((g) => (

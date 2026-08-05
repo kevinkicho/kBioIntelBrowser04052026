@@ -18,6 +18,7 @@ import {
 } from '@/lib/analytics/m1Funnel'
 import { downloadFile } from '@/lib/exportData'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
 
 interface ServerCall {
   endpoint?: string
@@ -122,11 +123,15 @@ export function ProductFunnelPanel() {
       className="mb-8 rounded-xl border border-indigo-900/40 bg-indigo-950/20 p-5"
       data-testid="product-funnel-panel"
     >
+      <div className="mb-4">
+        <FinishRateStrip />
+      </div>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-lg font-semibold text-indigo-100">Product funnel</h2>
+          <h2 className="text-lg font-semibold text-indigo-100">Product funnel detail</h2>
           <p className="mt-0.5 text-xs text-slate-500">
-            M1 temporal join · M3 citation density · M7 rank ms · {sourceNote}
+            M1 temporal join · M3 citation density · M7 rank ms · completion{' '}
+            {Math.round((funnel.completionRate || 0) * 100)}% · {sourceNote}
             {loadingServer && ' · loading server…'}
           </p>
         </div>

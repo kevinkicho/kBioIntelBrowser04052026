@@ -37,9 +37,11 @@ import {
   deleteDiscoverSession,
   type DiscoverSessionSnapshot,
 } from '@/lib/discovery/discoverSessions'
+import { loadLastCampaignPath } from '@/lib/campaign/lastCampaignPath'
 import { AiAnalysisView } from '@/components/discover/AiAnalysisView'
 import type { AiRankResult } from '@/lib/ai/aiRank'
 import { StyledTooltip } from '@/components/ui/StyledTooltip'
+import Link from 'next/link'
 
 /** Stable key for discover URL params — used to re-run rank when history changes q/diseaseId/targets. */
 function discoverUrlKey(
@@ -91,6 +93,7 @@ export default function DiscoverPage() {
   searchRef.current = search
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [sessions, setSessions] = useState<DiscoverSessionSnapshot[]>([])
+  const [lastCampaign, setLastCampaign] = useState<ReturnType<typeof loadLastCampaignPath>>(null)
   const [aiRankResult, setAiRankResult] = useState<AiRankResult | null>(null)
   const [showingAiList, setShowingAiList] = useState(false)
 
@@ -121,6 +124,7 @@ export default function DiscoverPage() {
 
   useEffect(() => {
     setSessions(listDiscoverSessions())
+    setLastCampaign(loadLastCampaignPath())
   }, [state.status, state.targets.length])
 
   const forceRefresh =
@@ -335,6 +339,22 @@ export default function DiscoverPage() {
 
         {/* Local saved sessions (v2.1) — restore does not auto-rank */}
         <div className="mb-4 flex flex-wrap items-center gap-2 text-[11px]" data-testid="discover-sessions">
+          {lastCampaign && (
+            <Link
+              href={lastCampaign.discoverHref}
+              data-testid="discover-resume-campaign"
+              className="rounded border border-sky-800/50 bg-sky-950/30 px-2 py-1 text-sky-300 hover:border-sky-700"
+              title="Last golden/campaign path (solo local)"
+            >
+              Resume · {lastCampaign.label}
+            </Link>
+          )}
+          <Link
+            href="/campaign"
+            className="rounded border border-slate-700 px-2 py-1 text-slate-400 hover:text-slate-200"
+          >
+            Campaign
+          </Link>
           <button
             type="button"
             onClick={() => {
