@@ -1,6 +1,6 @@
 import type { PharmacologyTarget } from '../types'
 import { stripHtml } from '../utils'
-import { fetchJsonWithSizeLimit } from './fetchJsonWithSizeLimit'
+import { timedFetch } from './timedFetch'
 
 const LIGANDS_URL = 'https://www.guidetopharmacology.org/services/ligands'
 const MAX_IUPHAR_BYTES = 2 * 1024 * 1024
@@ -25,6 +25,51 @@ interface InteractionResult {
   affinityParameter: string | null
   primaryTarget: boolean
   refIds: number[]
+}
+
+/**
+ * IUPHAR harvest leaf. HTTP / HTML / timeout / oversize are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+async function fetchIupharJson<T>(url: string): Promise<T> {
+  const res = await timedFetch(url, {
+    timeoutMs: 15000,
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  })
+  throwIfHttpFailed(res, 'IUPHAR')
+
+  const contentLength = res.headers?.get?.('content-length')
+  if (contentLength) {
+    const len = parseInt(contentLength, 10)
+    if (!Number.isNaN(len) && len > MAX_IUPHAR_BYTES) {
+      throw new Error('IUPHAR response too large')
+    }
+  }
+
+  const text = await res.text()
+  if (text.length > MAX_IUPHAR_BYTES) {
+    throw new Error('IUPHAR response too large')
+  }
+
+  const trimmed = text.trimStart()
+  if (!trimmed || trimmed.startsWith('<')) {
+    throw new Error('HTML response from IUPHAR')
+  }
+
+  return JSON.parse(text) as T
 }
 
 function pickBestLigand(hits: LigandResult[], query: string): LigandResult | null {
@@ -71,63 +116,51 @@ function mapInteractions(
 }
 
 export async function getPharmacologyTargetsByName(name: string): Promise<PharmacologyTarget[]> {
-  try {
-    const q = name?.trim()
-    if (!q || q.length < 2) return []
+  const q = name?.trim()
+  if (!q || q.length < 2) return []
 
-    // Prefer exact name= (search= returns huge unranked dumps)
-    let hits =
-      (await fetchJsonWithSizeLimit<LigandResult[]>(
-        `${LIGANDS_URL}?name=${encodeURIComponent(q)}`,
-        { maxBytes: MAX_IUPHAR_BYTES, timeoutMs: 15000 },
-      )) || []
+  // Prefer exact name= (search= returns huge unranked dumps)
+  let hits = await fetchIupharJson<LigandResult[]>(
+    `${LIGANDS_URL}?name=${encodeURIComponent(q)}`,
+  )
 
-    if (!Array.isArray(hits) || hits.length === 0) {
-      hits =
-        (await fetchJsonWithSizeLimit<LigandResult[]>(
-          `${LIGANDS_URL}?search=${encodeURIComponent(q)}`,
-          { maxBytes: MAX_IUPHAR_BYTES, timeoutMs: 15000 },
-        )) || []
-    }
-    if (!Array.isArray(hits) || hits.length === 0) return []
-
-    const ordered = [
-      pickBestLigand(hits, q),
-      ...hits.filter((h) => h !== pickBestLigand(hits, q)),
-    ].filter(Boolean) as LigandResult[]
-
-    const seenLigand = new Set<number>()
-    for (const ligand of ordered.slice(0, 3)) {
-      const ligandId = ligand.ligandId
-      if (!ligandId || seenLigand.has(ligandId)) continue
-      seenLigand.add(ligandId)
-
-      // Path form filters correctly; ?ligandId= often ignores filter
-      let interactions =
-        (await fetchJsonWithSizeLimit<InteractionResult[]>(
-          `${LIGANDS_URL}/${ligandId}/interactions`,
-          { maxBytes: MAX_IUPHAR_BYTES, timeoutMs: 15000 },
-        )) || []
-
-      if (!Array.isArray(interactions) || interactions.length === 0) {
-        interactions =
-          (await fetchJsonWithSizeLimit<InteractionResult[]>(
-            `https://www.guidetopharmacology.org/services/interactions?ligandId=${ligandId}`,
-            { maxBytes: MAX_IUPHAR_BYTES, timeoutMs: 15000 },
-          )) || []
-        // If query-param form returned foreign ligands, filter client-side
-        if (Array.isArray(interactions) && interactions.length > 0) {
-          const filtered = interactions.filter((i) => i.ligandId === ligandId)
-          if (filtered.length > 0) interactions = filtered
-          else if (interactions[0]?.ligandId !== ligandId) interactions = []
-        }
-      }
-
-      if (!Array.isArray(interactions) || interactions.length === 0) continue
-      return mapInteractions(interactions, ligand, q)
-    }
-    return []
-  } catch {
-    return []
+  if (!Array.isArray(hits) || hits.length === 0) {
+    hits = await fetchIupharJson<LigandResult[]>(
+      `${LIGANDS_URL}?search=${encodeURIComponent(q)}`,
+    )
   }
+  if (!Array.isArray(hits) || hits.length === 0) return []
+
+  const ordered = [
+    pickBestLigand(hits, q),
+    ...hits.filter((h) => h !== pickBestLigand(hits, q)),
+  ].filter(Boolean) as LigandResult[]
+
+  const seenLigand = new Set<number>()
+  for (const ligand of ordered.slice(0, 3)) {
+    const ligandId = ligand.ligandId
+    if (!ligandId || seenLigand.has(ligandId)) continue
+    seenLigand.add(ligandId)
+
+    // Path form filters correctly; ?ligandId= often ignores filter
+    let interactions = await fetchIupharJson<InteractionResult[]>(
+      `${LIGANDS_URL}/${ligandId}/interactions`,
+    )
+
+    if (!Array.isArray(interactions) || interactions.length === 0) {
+      interactions = await fetchIupharJson<InteractionResult[]>(
+        `https://www.guidetopharmacology.org/services/interactions?ligandId=${ligandId}`,
+      )
+      // If query-param form returned foreign ligands, filter client-side
+      if (Array.isArray(interactions) && interactions.length > 0) {
+        const filtered = interactions.filter((i) => i.ligandId === ligandId)
+        if (filtered.length > 0) interactions = filtered
+        else if (interactions[0]?.ligandId !== ligandId) interactions = []
+      }
+    }
+
+    if (!Array.isArray(interactions) || interactions.length === 0) continue
+    return mapInteractions(interactions, ligand, q)
+  }
+  return []
 }

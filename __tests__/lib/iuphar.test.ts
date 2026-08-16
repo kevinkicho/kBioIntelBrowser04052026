@@ -6,11 +6,9 @@ beforeEach(() => jest.resetAllMocks())
 
 describe('getPharmacologyTargetsByName', () => {
   test('returns parsed pharmacology targets on success', async () => {
-    // First fetch: ligand search
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse([{ ligandId: 7314, name: 'liraglutide' }])
     )
-    // Second fetch: interactions
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse([
         {
@@ -50,48 +48,41 @@ describe('getPharmacologyTargetsByName', () => {
     expect(results[0].affinity).toBe(0.52)
     expect(results[0].species).toBe('Human')
     expect(results[0].primaryTarget).toBe(true)
-    expect(results[0].url).toBe('https://www.guidetopharmacology.org/GRAC/LigandDisplayForward?ligandId=7314')
-    expect(results[1].type).toBe('')
-    // actionType falls back to action when type is null
+    expect(results[0].url).toBe('https://www.guidetopharmacology.org/GRAC/ObjectDisplayForward?objectId=1')
+    expect(results[1].type).toBe('partial agonist')
     expect(results[1].actionType).toBe('partial agonist')
   })
 
-  test('returns empty array when ligand search returns no results', async () => {
+  test('true empty ligand search JSON is [] (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse([]))
     ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse([]))
     const results = await getPharmacologyTargetsByName('unknownxyz')
     expect(results).toEqual([])
   })
 
-  test('returns empty array when ligand search is not ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce(
-      mockJsonResponse({}, { status: 500 })
-    )
-    const results = await getPharmacologyTargetsByName('unknownxyz')
-    expect(results).toEqual([])
+  test('throws when ligand search HTTP-fail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({}, { status: 503 }))
+    await expect(getPharmacologyTargetsByName('unknownxyz')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array when interactions fetch is not ok', async () => {
+  test('throws when interactions fetch HTTP-fail (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse([{ ligandId: 7314, name: 'liraglutide' }])
     )
-    ;(fetch as jest.Mock).mockResolvedValueOnce(
-      mockJsonResponse({}, { status: 500 })
-    )
-    const results = await getPharmacologyTargetsByName('liraglutide')
-    expect(results).toEqual([])
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({}, { status: 503 }))
+    await expect(getPharmacologyTargetsByName('liraglutide')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const results = await getPharmacologyTargetsByName('aspirin')
-    expect(results).toEqual([])
+    await expect(getPharmacologyTargetsByName('aspirin')).rejects.toThrow(/network/)
   })
 
-  test('limits results to 10', async () => {
+  test('limits results to 15', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse([{ ligandId: 1, name: 'aspirin' }])
     )
-    const manyTargets = Array.from({ length: 15 }, (_, i) => ({
+    const manyTargets = Array.from({ length: 20 }, (_, i) => ({
       targetId: i,
       targetName: `Target${i}`,
       targetSpecies: 'Human',
@@ -107,7 +98,7 @@ describe('getPharmacologyTargetsByName', () => {
     }))
     ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse(manyTargets))
     const results = await getPharmacologyTargetsByName('aspirin')
-    expect(results).toHaveLength(10)
+    expect(results).toHaveLength(15)
   })
 
   test('handles missing affinity values gracefully', async () => {
@@ -138,24 +129,28 @@ describe('getPharmacologyTargetsByName', () => {
     expect(results[0].affinity).toBeUndefined()
   })
 
-  test('returns empty when ligand response exceeds size limit (content-length)', async () => {
+  test('throws when ligand response exceeds size limit (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse([{ ligandId: 1 }], {
         headers: { 'content-length': String(3 * 1024 * 1024) },
       }),
     )
-    const results = await getPharmacologyTargetsByName('huge')
-    expect(results).toEqual([])
+    await expect(getPharmacologyTargetsByName('huge')).rejects.toThrow(/too large/)
   })
 
-  test('returns empty when body is HTML', async () => {
+  test('throws when body is HTML (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       new Response('<!doctype html><html></html>', {
         status: 200,
         headers: { 'content-type': 'text/html' },
       }),
     )
-    const results = await getPharmacologyTargetsByName('html')
-    expect(results).toEqual([])
+    await expect(getPharmacologyTargetsByName('html')).rejects.toThrow(/HTML/)
+  })
+
+  test('blank or short query is empty without fetch', async () => {
+    expect(await getPharmacologyTargetsByName('')).toEqual([])
+    expect(await getPharmacologyTargetsByName('a')).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
