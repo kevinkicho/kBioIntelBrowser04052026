@@ -901,7 +901,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'MY_GENE',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getMyGeneData(name)
-      const data = result ? [result] : []
+      const data = result.genes?.length ? [result] : []
       return { data, total: data.length, hasMore: false }
     }
   },

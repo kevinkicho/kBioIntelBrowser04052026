@@ -36,4 +36,13 @@ describe('gatherOpenTargetsKnownDrugs', () => {
     expect(result.names).toEqual([])
     expect(result.status.status).toBe('empty')
   })
+
+  it('HTTP error is ERROR, not EMPTY', async () => {
+    ;(getKnownDrugsForDisease as jest.Mock).mockRejectedValue(new Error('HTTP 503'))
+    const result = await gatherOpenTargetsKnownDrugs('MONDO_0004975')
+    expect(result.names).toEqual([])
+    expect(result.status.status).toBe('error')
+    expect(result.status.has_data).toBe(false)
+    expect(result.status.error).toMatch(/HTTP 503/)
+  })
 })

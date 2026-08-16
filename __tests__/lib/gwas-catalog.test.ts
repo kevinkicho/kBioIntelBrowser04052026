@@ -3,42 +3,42 @@ import { getGwasAssociationsByName } from '@/lib/api/gwas-catalog'
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+  }
+}
+
 // The source flow:
 // 1. searchTraits(name) -> hits SEARCH_URL returning { response: { docs: [...] } }
 // 2. For each trait, fetchAssociationsByEfo or fetchStudiesByDiseaseTrait
 // 3. If no results, fallback to fetchStudiesByDiseaseTrait(name)
 
 function mockSearchTraitsResponse(traits: { trait: string; efoUri: string }[]) {
-  return {
-    ok: true,
-    json: async () => ({
-      response: {
-        docs: traits.map(t => ({
-          resourcename: 'trait',
-          mappedTrait: t.trait,
-          mappedUri: [t.efoUri],
-        })),
-      },
-    }),
-  }
+  return jsonRes({
+    response: {
+      docs: traits.map(t => ({
+        resourcename: 'trait',
+        mappedTrait: t.trait,
+        mappedUri: [t.efoUri],
+      })),
+    },
+  })
 }
 
 function mockEfoAssociationsResponse(associations: Record<string, unknown>[]) {
-  return {
-    ok: true,
-    json: async () => ({
-      _embedded: { associations },
-    }),
-  }
+  return jsonRes({
+    _embedded: { associations },
+  })
 }
 
 function mockDiseaseTraitStudiesResponse(studies: Record<string, unknown>[]) {
-  return {
-    ok: true,
-    json: async () => ({
-      _embedded: { studies },
-    }),
-  }
+  return jsonRes({
+    _embedded: { studies },
+  })
 }
 
 describe('getGwasAssociationsByName', () => {
@@ -92,10 +92,10 @@ describe('getGwasAssociationsByName', () => {
     expect(results[0].traitName).toBe('Test Trait')
   })
 
-  test('falls back to direct disease trait search when searchTraits fails', async () => {
+  test('falls back to direct disease trait search when searchTraits HTTP-fails', async () => {
     ;(fetch as jest.Mock)
       // 1. searchTraits fails
-      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce(jsonRes({}, 503))
       // 2. final fallback: fetchStudiesByDiseaseTrait(name)
       .mockResolvedValueOnce(mockDiseaseTraitStudiesResponse([
         {
@@ -112,15 +112,17 @@ describe('getGwasAssociationsByName', () => {
     expect(results[0].traitName).toBe('Aspirin Response')
   })
 
-  test('returns empty array when all endpoints fail', async () => {
+  test('throws when all endpoints HTTP-fail (not EMPTY)', async () => {
     ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: false })
-    expect(await getGwasAssociationsByName('aspirin')).toEqual([])
+      .mockResolvedValueOnce(jsonRes({}, 503))
+      .mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getGwasAssociationsByName('aspirin')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array on network error', async () => {
-    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getGwasAssociationsByName('aspirin')).toEqual([])
+  test('throws on network error (not EMPTY)', async () => {
+    ;(fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockRejectedValueOnce(new Error('network'))
+    await expect(getGwasAssociationsByName('aspirin')).rejects.toThrow(/network/)
   })
 })
