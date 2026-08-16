@@ -1,25 +1,31 @@
 import { getSemanticPapersByName } from '@/lib/api/semantic-scholar'
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+  }
+}
+
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getSemanticPapersByName', () => {
   test('returns parsed papers on success', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: [
-          {
-            paperId: 'abc123',
-            title: 'Effects of Aspirin',
-            year: 2023,
-            citationCount: 42,
-            url: 'https://semanticscholar.org/paper/abc123',
-            tldr: { text: 'Aspirin reduces inflammation.' },
-          },
-        ],
-      }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      data: [
+        {
+          paperId: 'abc123',
+          title: 'Effects of Aspirin',
+          year: 2023,
+          citationCount: 42,
+          url: 'https://semanticscholar.org/paper/abc123',
+          tldr: { text: 'Aspirin reduces inflammation.' },
+        },
+      ],
+    }))
     const results = await getSemanticPapersByName('aspirin')
     expect(results).toHaveLength(1)
     expect(results[0].paperId).toBe('abc123')
@@ -31,21 +37,18 @@ describe('getSemanticPapersByName', () => {
   })
 
   test('uses Number() coercion and falls back to 0', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: [
-          {
-            paperId: 'x1',
-            title: 'Test',
-            year: null,
-            citationCount: null,
-            url: '',
-            tldr: null,
-          },
-        ],
-      }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      data: [
+        {
+          paperId: 'x1',
+          title: 'Test',
+          year: null,
+          citationCount: null,
+          url: '',
+          tldr: null,
+        },
+      ],
+    }))
     const results = await getSemanticPapersByName('test')
     expect(results[0].year).toBe(0)
     expect(results[0].citationCount).toBe(0)
@@ -53,31 +56,25 @@ describe('getSemanticPapersByName', () => {
   })
 
   test('handles papers key instead of data key', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        papers: [
-          {
-            paperId: 'p1',
-            title: 'Paper via papers key',
-            year: 2022,
-            citationCount: 5,
-            url: 'https://example.com',
-            tldr: { text: 'Summary' },
-          },
-        ],
-      }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      papers: [
+        {
+          paperId: 'p1',
+          title: 'Paper via papers key',
+          year: 2022,
+          citationCount: 5,
+          url: 'https://example.com',
+          tldr: { text: 'Summary' },
+        },
+      ],
+    }))
     const results = await getSemanticPapersByName('test')
     expect(results).toHaveLength(1)
     expect(results[0].paperId).toBe('p1')
   })
 
   test('encodes query and includes correct fields', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ data: [] }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ data: [] }))
     await getSemanticPapersByName('ace inhibitor')
     const calledUrl = (fetch as jest.Mock).mock.calls[0][0] as string
     expect(calledUrl).toContain('ace%20inhibitor')
@@ -85,13 +82,23 @@ describe('getSemanticPapersByName', () => {
     expect(calledUrl).toContain('fields=title,year,citationCount,abstract,url,tldr')
   })
 
-  test('returns empty array when fetch returns non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    expect(await getSemanticPapersByName('aspirin')).toEqual([])
+  test('true empty papers is honest EMPTY', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ data: [] }))
+    expect(await getSemanticPapersByName('unknownxyz')).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getSemanticPapersByName('aspirin')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getSemanticPapersByName('aspirin')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getSemanticPapersByName('aspirin')).toEqual([])
+    await expect(getSemanticPapersByName('aspirin')).rejects.toThrow(/network/)
   })
 })

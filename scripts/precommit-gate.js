@@ -155,6 +155,8 @@ const PRODUCT_PATTERNS = [
   'adverseeventsHonesty',
   'harvestHonesty',
   'siderHonesty',
+  'recallsHonesty',
+  'semanticScholarHonesty',
   'PipelinePanel',
   'VendorsPanel',
   'readmeHonesty',
