@@ -14,7 +14,7 @@ Search any molecule by name, CAS, SMILES, InChIKey, CID, formula, or InChI. When
 
 - [Getting Started](#getting-started)
 - [Built With Claude Code](#built-with-claude-code)
-- [Data Sources (110+ Free Public APIs)](#data-sources-110-free-public-apis)
+- [Data Sources (free public APIs)](#data-sources-free-public-apis)
   - [Shareable API sources manifest](#shareable-api-sources-manifest) — full name / docs / endpoint list for other apps
 - [Features](#features)
 - [Tech Stack](#tech-stack)
@@ -68,13 +68,13 @@ Traffic: browser → same-origin `/api/ai/*` → `https://ollama.com` with the u
 
 ## Built With Claude Code
 
-This project was designed and engineered almost entirely by [Claude Code](https://claude.ai/claude-code) (Anthropic's AI coding agent), working in collaboration with a bioengineering domain expert who provided the scientific vision, feature direction, and quality review. Claude Code authored the architecture, all API integrations, UI components, test suite, and documentation — from initial scaffold through 110+ data source integrations across multiple iterative development cycles.
+This project was designed and engineered almost entirely by [Claude Code](https://claude.ai/claude-code) (Anthropic's AI coding agent), working in collaboration with a bioengineering domain expert who provided the scientific vision, feature direction, and quality review. Claude Code authored the architecture, API integrations, UI components, test suite, and documentation — from initial scaffold through the shipped v4 finish-rate workbench. Live free-API inventory is the generated manifest, not a frozen 110+ marketing count.
 
-## Data Sources (110+ Free Public APIs)
+## Data Sources (free public APIs)
 
 ### Shareable API sources manifest
 
-Combined free-public API list (name, organization, docs URL, endpoint) for sharing with other apps:
+Live free-public API list (name, organization, docs URL, endpoint). Prefer the generated manifest over any headline count in this README. A-tier sources still carry scientific trust:
 
 | File | Format |
 |------|--------|
@@ -232,11 +232,11 @@ Prefer ChEMBL, Open Targets, openFDA, and ClinicalTrials.gov for production use.
 ## Features
 
 ### Advanced Search System
-- **7 Identifier Types** — Search by Name, CID, CAS, SMILES, InChIKey, InChI, or Formula
-- **Per-API Identifier Overrides** — Each of the 80+ APIs can be configured to use a different identifier type (e.g., search ChEMBL by SMILES, UniProt by gene symbol, PDB by InChIKey)
+- **Discover of-record rank** — Deterministic shortlist (no LLM in the rank path). Optional AI analysis views are labeled non-of-record.
+- **7 identifier types** — Search by Name, CID, CAS, SMILES, InChIKey, InChI, or Formula. Per-API identifier overrides (e.g. ChEMBL by SMILES, UniProt by gene symbol).
 - **Per-API Parameters** — Configure maxResults, filters (clinical trial status, assay type, p-value thresholds, confidence scores), and toggles per API
 - **API Health Checks** — Click any API name to see description, data fields, organization, docs link, endpoint URL, and live health check with latency
-- **Dense Table Layout** — All 80+ APIs visible at once with no-wrap rows, category filter pills, and text filter
+- **Dense Table Layout** — Catalog APIs visible at once with no-wrap rows, category filter pills, and text filter
 - **Navigation Guard** — Page dims and blocks all clicks during navigation to prevent double-submits
 
 ### Core
@@ -248,15 +248,15 @@ Prefer ChEMBL, Open Targets, openFDA, and ClinicalTrials.gov for production use.
 - **Full-Width Content** — No sidebar; content uses the entire viewport width
 - **Lazy Category Loading** — Tier-1 first paint, Tier-2/3 background prefetch
 - **Virtual Scrolling** — Large datasets (>20 items) use virtual scrolling for smooth performance
-- **AI Research Summarizer** — Plain-English intelligence briefs from 60+ data points
-- **BioIntel Copilot** — AI sidebar with retrieval monitor, evidence-cited insights, completeness gate (refuses deep synthesis when data is sparse), optional claim-bound / non-of-record AI (user Ollama Cloud key); Discover rank stays deterministic
+- **Finish-rate loop** — Loop coach, campaign workspace, board packs, Monday handoff + decision brief. Distinct empty / timeout / error / disabled.
+- **BioIntel Copilot** — AI sidebar with retrieval monitor, evidence-cited insights, completeness gate (refuses deep synthesis when data is sparse), optional claim-bound / non-of-record AI via the user Ollama Cloud key only (no local Ollama product fallback)
 - **Shareable URLs** — Active tab, view mode, and per-API overrides synced to URL for deep linking
 - **Error Boundaries** — Individual panel isolation prevents cascading failures
 - **Request Deduplication** — In-flight API requests are shared across components
 
 ### Source Transparency
 - **Panel Source Footer** — Every data card shows the source organization, API name, documentation link, endpoint URL, and "Fetch JSON" button
-- **API Metadata Registry** — 80+ APIs cataloged with organization, description, docs URL, and endpoint
+- **API Metadata Registry** — catalog APIs with organization, description, docs URL, and endpoint — see the generated manifest
 
 ### Visualization
 - **Interactive Network Graph** — D3.js force-directed graph showing molecule relationships
@@ -292,10 +292,14 @@ Prefer ChEMBL, Open Targets, openFDA, and ClinicalTrials.gov for production use.
 ```
 src/
   app/
-    page.tsx                     # Home page with advanced search
+    page.tsx                     # Home beachhead + loop coach
+    discover/                    # Deterministic Discover rank
+    campaign/                    # Finish-rate campaign workspace
+    methodology/                 # Public of-record methodology
     browse/                      # Category browsing
     compare/                     # Side-by-side comparison
     disease/                     # Disease explorer
+    gene/                        # Gene profile
     batch/                       # Batch lookup (3-10 molecules)
     interactions/                # Drug interaction checker
     molecule/[id]/               # Profile page (server + client)
@@ -327,7 +331,11 @@ docs/
 
 ### v4 (shipped) — finish-rate OS
 
-Matches `AGENTS.md`: deterministic Discover rank (no LLM of-record); claim-bound / non-of-record AI via user Ollama Cloud key; solo local default; canonical product events only; board packs 5 extractor panels max and keep subjectCandidateId; distinct empty vs timeout vs error vs disabled (timeout not cached as success); M7 discover_rank_completed.ms only; pack props dual-read count|claimCount and citable|citableCount; north-star fixture e2e as the hard loop gate. Not clinical or regulatory decision support.
+Matches `AGENTS.md`: deterministic Discover rank (no LLM of-record); claim-bound / non-of-record AI via user Ollama Cloud key; solo local default; canonical product events only; board packs 5 extractor panels max and keep subjectCandidateId; distinct empty vs timeout vs error vs disabled (timeout not cached as success); M7 discover_rank_completed.ms only; pack props dual-read count|claimCount and citable|citableCount; north-star fixture e2e as the hard loop gate. Not clinical or regulatory decision support. There is no local Ollama / :11434 product fallback.
+
+### Historical notes (pre-v4)
+
+The entries below are changelog archaeology. They do not describe the shipped product: AI is Ollama Cloud only, and the live API inventory is the generated manifest rather than a frozen 80+/110+ count.
 
 ### v0.6.0 (2026-04-16)
 
@@ -360,7 +368,7 @@ Matches `AGENTS.md`: deterministic Discover rank (no LLM of-record); claim-bound
 ### v0.5.0 (2026-04-15)
 
 **Security**
-- **SSRF Protection:** All AI routes (`/api/ai/chat`, `/api/ai/health`, `/api/ai/pull`, `/api/ai/show`, `/api/ai-brief`) validate `ollamaUrl` with `forServer: true` — loopback always; private LAN only with `OLLAMA_ALLOW_LAN=1`; public hostnames never proxied. Blocks reserved ranges (169.254.x, 100.64–127.x, etc.). Client UI allows localhost + private LAN with a warning.
+- **SSRF Protection:** All AI routes (`/api/ai/chat`, `/api/ai/health`, `/api/ai/pull`, `/api/ai/show`, `/api/ai-brief`) validate `ollamaUrl` with `forServer: true` — loopback always; private LAN only with `OLLAMA_ALLOW_LAN=1`; public hostnames never proxied. Blocks reserved ranges (169.254.x, 100.64–127.x, etc.). Client UI historically allowed localhost + private LAN with a warning. Current product UI is Ollama Cloud only — users paste a Cloud API key; no local host/port in Configure AI.
 - **XSS Protection:** AI copilot markdown rendering and ChEBI panel HTML now use a DOMParser-based sanitizer (`src/lib/sanitize.ts`) instead of raw `dangerouslySetInnerHTML`, preventing script injection from AI model responses or third-party API data
 - **Analytics Rate Limiting:** `POST /api/analytics` now enforces 120 req/min per-IP rate limiting, input string truncation (source 100 chars, endpoint 500, error 500), and numeric caps on duration/items_count
 
@@ -383,7 +391,7 @@ Matches `AGENTS.md`: deterministic Discover rank (no LLM of-record); claim-bound
 
 ### v0.4.0 (2026-04-14)
 
-- **BioIntel Copilot:** AI-powered sidebar with real-time data retrieval monitoring, auto-generated insights (executive brief, safety deep dive, gap analysis), and free-form Q&A — all processed locally via Ollama
+- **BioIntel Copilot:** AI-powered sidebar with real-time data retrieval monitoring, auto-generated insights (executive brief, safety deep dive, gap analysis), and free-form Q&A — originally local Ollama; superseded — product is Ollama Cloud only
 - **Unified AI Provider:** Single persistent `AIProvider` at root layout survives page navigations; connection state, model selection, and config persist across the entire app
 - **AI Connection Resilience:** Config restore/save race condition fixed — localStorage no longer overwritten with defaults before restore; auto-reconnect with exponential backoff (up to 20 retries)
 - **API Proxy Improvements:** `/api/ai/show` returns `{ available: false }` (HTTP 200) instead of forwarding Ollama error status codes, eliminating spurious 404 console errors

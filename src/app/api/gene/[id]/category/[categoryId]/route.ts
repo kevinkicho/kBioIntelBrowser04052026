@@ -5,6 +5,7 @@ import { flushApiMetrics, runWithApiMetrics } from '@/lib/api-tracker'
 import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { recordMetric } from '@/lib/analytics/db'
 import { fetchGene } from '@/lib/categoryFetchers'
+import { shouldCacheHonestyEnvelope } from '@/lib/honestyEnvelope'
 
 const VALID_CATEGORIES = ['gene']
 
@@ -14,6 +15,34 @@ function parseGeneId(id: string): { geneId: string; symbol: string } | null {
     return { geneId: parts[0], symbol: parts.slice(1).join('-') }
   }
   return null
+}
+
+/** True when a gene category payload has of-record rows (not an empty/timeout shell). */
+export function hasGenePanelPayload(data: Record<string, unknown>): boolean {
+  const status = data._sectionStatus
+  if (status && typeof status === 'object' && !Array.isArray(status)) {
+    const loaded = Object.values(status as Record<string, { status?: string }>).some(
+      (s) => s?.status === 'loaded',
+    )
+    if (loaded) return true
+  }
+  const overview = data.geneOverview
+  if (overview && typeof overview === 'object' && !Array.isArray(overview)) {
+    const o = overview as { name?: unknown; summary?: unknown }
+    if (String(o.name ?? '').trim() || String(o.summary ?? '').trim()) return true
+  }
+  if (Array.isArray(data.geneDrugs) && data.geneDrugs.length > 0) return true
+  for (const key of ['geneDiseases', 'geneVariants', 'geneExpressionData', 'genePathways'] as const) {
+    const bag = data[key]
+    if (!bag || typeof bag !== 'object' || Array.isArray(bag)) continue
+    for (const v of Object.values(bag as Record<string, unknown>)) {
+      if (Array.isArray(v) && v.length > 0) return true
+      if (v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v as object).length > 0) {
+        return true
+      }
+    }
+  }
+  return false
 }
 
 /** Minimal of-record shell when fan-out hits wall clock — never 500 on timeout. */
@@ -104,7 +133,8 @@ export async function GET(
     request.nextUrl.searchParams.get('refresh') === '1' ||
     request.nextUrl.searchParams.get('refresh') === 'true'
   const cached = forceRefresh ? undefined : getCached<Record<string, unknown>>(cacheKey)
-  if (cached) {
+  // Skip leftover empty/timeout shells so they cannot pin as success for 1h.
+  if (cached && shouldCacheHonestyEnvelope(cached) && hasGenePanelPayload(cached)) {
     return NextResponse.json(cached)
   }
 
@@ -179,6 +209,22 @@ export async function GET(
     )
   }
 
-  setCache(cacheKey, data)
-  return NextResponse.json(data)
+  const hasRows = hasGenePanelPayload(data)
+  const payload = {
+    ...data,
+    ...(!hasRows
+      ? {
+          _emptyHonest: true,
+          _notRetrieved: true,
+          _honesty:
+            'Empty free-API sample this session — not proof of zero gene association forever. Retry or densify later.',
+        }
+      : {}),
+  }
+
+  // Empty-as-success must not be stored as a 1h success shell (same rule as molecule category).
+  if (shouldCacheHonestyEnvelope(payload) && hasRows) {
+    setCache(cacheKey, payload)
+  }
+  return NextResponse.json(payload)
 }

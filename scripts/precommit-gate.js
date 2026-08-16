@@ -142,6 +142,8 @@ const PRODUCT_PATTERNS = [
   'loopCoach',
   'honestyEnvelope',
   'categoryHonestyCache',
+  'geneHonestyCache',
+  'readmeHonesty',
   'homeCampaignChrome',
   'decisionBrief',
   'crossSource',
