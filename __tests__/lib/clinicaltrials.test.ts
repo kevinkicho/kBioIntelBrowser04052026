@@ -1,39 +1,45 @@
-import { getClinicalTrialsByName, sortTrials, extractDrugInterventions } from '@/lib/api/clinicaltrials'
+import { getClinicalTrialsByName, searchClinicalTrialsByCondition, sortTrials, extractDrugInterventions } from '@/lib/api/clinicaltrials'
 import type { ClinicalTrial } from '@/lib/types'
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+  }
+}
 
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getClinicalTrialsByName', () => {
   test('returns parsed trials on success', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        studies: [
-          {
-            protocolSection: {
-              identificationModule: {
-                nctId: 'NCT01272284',
-                briefTitle: 'Liraglutide in Type 2 Diabetes',
-              },
-              statusModule: {
-                overallStatus: 'COMPLETED',
-                startDateStruct: { date: '2011-01-01' },
-              },
-              designModule: {
-                phases: ['PHASE3'],
-              },
-              sponsorCollaboratorsModule: {
-                leadSponsor: { name: 'Novo Nordisk' },
-              },
-              conditionsModule: {
-                conditions: ['Type 2 Diabetes Mellitus'],
-              },
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      studies: [
+        {
+          protocolSection: {
+            identificationModule: {
+              nctId: 'NCT01272284',
+              briefTitle: 'Liraglutide in Type 2 Diabetes',
+            },
+            statusModule: {
+              overallStatus: 'COMPLETED',
+              startDateStruct: { date: '2011-01-01' },
+            },
+            designModule: {
+              phases: ['PHASE3'],
+            },
+            sponsorCollaboratorsModule: {
+              leadSponsor: { name: 'Novo Nordisk' },
+            },
+            conditionsModule: {
+              conditions: ['Type 2 Diabetes Mellitus'],
             },
           },
-        ],
-      }),
-    })
+        },
+      ],
+    }))
     const results = await getClinicalTrialsByName('liraglutide')
     expect(results).toHaveLength(1)
     expect(results[0].nctId).toBe('NCT01272284')
@@ -45,25 +51,54 @@ describe('getClinicalTrialsByName', () => {
     expect(results[0].conditions).toEqual(['Type 2 Diabetes Mellitus'])
   })
 
-  test('returns empty array when API response is not ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    const results = await getClinicalTrialsByName('unknownxyz')
-    expect(results).toEqual([])
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getClinicalTrialsByName('unknownxyz')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getClinicalTrialsByName('aspirin')).rejects.toThrow(/HTML/)
   })
 
   test('returns empty array when studies key is missing', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}))
     const results = await getClinicalTrialsByName('aspirin')
     expect(results).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const results = await getClinicalTrialsByName('aspirin')
-    expect(results).toEqual([])
+    await expect(getClinicalTrialsByName('aspirin')).rejects.toThrow(/network/)
+  })
+})
+
+describe('searchClinicalTrialsByCondition', () => {
+  test('throws on HTTP 503 so Discover can mark error, not empty', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(searchClinicalTrialsByCondition('type 2 diabetes')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('returns parsed trials on success', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      studies: [
+        {
+          protocolSection: {
+            identificationModule: { nctId: 'NCT1', briefTitle: 'T2D' },
+            statusModule: { overallStatus: 'RECRUITING' },
+            designModule: { phases: ['PHASE2'] },
+            sponsorCollaboratorsModule: { leadSponsor: { name: 'NIH' } },
+            conditionsModule: { conditions: ['Type 2 Diabetes'] },
+            armsInterventionsModule: {
+              interventions: [{ type: 'DRUG', name: 'Metformin' }],
+            },
+          },
+        },
+      ],
+    }))
+    const results = await searchClinicalTrialsByCondition('type 2 diabetes')
+    expect(results).toHaveLength(1)
+    expect(results[0].nctId).toBe('NCT1')
   })
 })
 
