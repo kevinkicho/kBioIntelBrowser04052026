@@ -48,21 +48,19 @@ describe('fetchImmPortData', () => {
     )
   })
 
-  test('returns empty array when response is HTML', async () => {
+  test('throws on HTML responses (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       new Response('<!doctype html><html><body>ImmPort</body></html>', {
         status: 200,
         headers: { 'content-type': 'text/html; charset=utf-8' },
       }),
     )
-    const response = await fetchImmPortData('COVID-19')
-    expect(response.data.studies).toEqual([])
+    await expect(fetchImmPortData('COVID-19')).rejects.toThrow(/HTML/)
   })
 
-  test('returns empty array when API response is not ok', async () => {
+  test('throws when API response is not ok (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({}, { status: 500 }))
-    const response = await fetchImmPortData('unknownxyz')
-    expect(response.data.studies).toEqual([])
+    await expect(fetchImmPortData('unknownxyz')).rejects.toThrow(/HTTP/)
   })
 
   test('returns empty array when hits are missing', async () => {
@@ -71,9 +69,8 @@ describe('fetchImmPortData', () => {
     expect(response.data.studies).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const response = await fetchImmPortData('COVID-19')
-    expect(response.data.studies).toEqual([])
+    await expect(fetchImmPortData('COVID-19')).rejects.toThrow(/network/)
   })
 })

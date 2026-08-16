@@ -90,8 +90,8 @@ npm run export:api-sources
 ### NIH High-Impact (experimental / partial)
 | Source | Status |
 |--------|--------|
-| NCI caDSR | **Disabled** — host does not resolve |
-| NIAID ImmPort | **Disabled** — public URL returns HTML, not JSON |
+| NCI EVS/NCIt | Live — NCI Thesaurus concepts via free public EVS REST |
+| NIAID ImmPort | Live — ImmPort Shared Data Search API |
 | NCATS Translator | Experimental entity search (not full KG edges) |
 | NHGRI AnVIL | Experimental |
 | NINDS NeuroMMSig | Experimental |
@@ -249,7 +249,7 @@ Prefer ChEMBL, Open Targets, openFDA, and ClinicalTrials.gov for production use.
 - **Lazy Category Loading** — Tier-1 first paint, Tier-2/3 background prefetch
 - **Virtual Scrolling** — Large datasets (>20 items) use virtual scrolling for smooth performance
 - **AI Research Summarizer** — Plain-English intelligence briefs from 60+ data points
-- **BioIntel Copilot** — AI sidebar with retrieval monitor, evidence-cited insights, completeness gate (refuses deep synthesis when data is sparse), local Ollama + optional Cloud fallback
+- **BioIntel Copilot** — AI sidebar with retrieval monitor, evidence-cited insights, completeness gate (refuses deep synthesis when data is sparse), optional claim-bound / non-of-record AI (user Ollama Cloud key); Discover rank stays deterministic
 - **Shareable URLs** — Active tab, view mode, and per-API overrides synced to URL for deep linking
 - **Error Boundaries** — Individual panel isolation prevents cascading failures
 - **Request Deduplication** — In-flight API requests are shared across components
@@ -281,7 +281,7 @@ Prefer ChEMBL, Open Targets, openFDA, and ClinicalTrials.gov for production use.
 - **Framework:** Next.js 14 (App Router)
 - **Language:** TypeScript (strict mode)
 - **Styling:** Tailwind CSS (dark-mode-first)
-- **AI Engine:** Ollama (local LLM) for summarization and copilot
+- **AI Engine:** Optional Ollama Cloud (user-supplied browser key) — claim-bound / non-of-record
 - **Charts:** Recharts
 - **Visualization:** D3.js, 3Dmol.js
 - **Virtualization:** @tanstack/react-virtual
@@ -324,6 +324,10 @@ docs/
 ```
 
 ## Recent Changes
+
+### v4 (shipped) — finish-rate OS
+
+Matches `AGENTS.md`: deterministic Discover rank (no LLM of-record); claim-bound / non-of-record AI via user Ollama Cloud key; solo local default; canonical product events only; board packs 5 extractor panels max and keep subjectCandidateId; distinct empty vs timeout vs error vs disabled (timeout not cached as success); M7 discover_rank_completed.ms only; pack props dual-read count|claimCount and citable|citableCount; north-star fixture e2e as the hard loop gate. Not clinical or regulatory decision support.
 
 ### v0.6.0 (2026-04-16)
 

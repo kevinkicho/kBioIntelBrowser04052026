@@ -309,7 +309,7 @@ export const CATEGORIES: CategoryDef[] = [
     label: 'NIH High-Impact',
     icon: '🏥',
     panels: [
-      { id: 'nci-cadsr', title: 'NCI caDSR', propKey: 'cadsrData', isNullable: true, tier: 'experimental' },
+      { id: 'nci-cadsr', title: 'NCI EVS/NCIt', propKey: 'cadsrData', isNullable: true, tier: 'experimental' },
       { id: 'ncats-translator', title: 'NCATS Translator', propKey: 'translatorData', isNullable: true, tier: 'experimental' },
       { id: 'nhgri-anvil', title: 'NHGRI AnVIL', propKey: 'anvilData', isNullable: true, tier: 'experimental' },
       { id: 'niaid-immport', title: 'NIAID ImmPort', propKey: 'immPortData', isNullable: true, tier: 'experimental' },

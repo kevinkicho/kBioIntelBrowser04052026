@@ -50,8 +50,8 @@ export const NciCadsrPanel = memo(function NciCadsrPanel({
     <Panel
       title={
         isEmpty
-          ? 'NCI caDSR / EVS (NCIt)'
-          : `NCI caDSR / EVS (NCIt) (${list.length})`
+          ? 'NCI EVS/NCIt'
+          : `NCI EVS/NCIt (${list.length})`
       }
       panelId={panelId}
       lastFetched={lastFetched}

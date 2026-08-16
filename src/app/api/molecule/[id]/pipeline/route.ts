@@ -9,8 +9,9 @@ import { getDrugLabelsByName } from '@/lib/api/dailymed'
 import { searchDrugShortages } from '@/lib/api/fda-drug-shortages'
 import { getMyChemData } from '@/lib/api/mychem'
 import { trackedSafe } from '@/lib/api-tracker'
-import { withTimeout } from '@/lib/utils'
+import { isTimeoutError, withTimeout } from '@/lib/utils'
 import { getCached, setCache } from '@/lib/cache'
+import { shouldCacheHonestyEnvelope } from '@/lib/honestyEnvelope'
 
 const CACHE_DURATION = 86400
 const PIPELINE_SOURCE_TIMEOUT_MS = 8000
@@ -107,7 +108,9 @@ export async function GET(
       })(),
       PIPELINE_OVERALL_TIMEOUT_MS,
     )
-  } catch {
+  } catch (err) {
+    // 15s wall-clock must not be stored as "not retrieved this session" for 24h.
+    const timedOut = isTimeoutError(err)
     payload = {
       clinicalTrials: [],
       chemblIndications: [],
@@ -117,7 +120,11 @@ export async function GET(
       drugLabels: [],
       drugShortages: [],
       myChemAnnotations: [],
+      _partial: true,
+      ...(timedOut ? { _timeout: true } : {}),
+      _error: err instanceof Error ? err.message : 'Pipeline budget exceeded',
     }
+    return NextResponse.json(payload)
   }
 
   // Honest empty envelope when all free-API bags are empty (still a live route)
@@ -142,9 +149,13 @@ export async function GET(
       'Pipeline free-API bags empty this session — not proof of zero pipeline activity forever.'
   }
 
-  setCache(cacheKey, payload, PIPELINE_CACHE_TTL_MS)
+  // Do not cache timeout / empty-as-success as full success (CDN or process cache).
+  if (shouldCacheHonestyEnvelope(payload) && anyRows) {
+    setCache(cacheKey, payload, PIPELINE_CACHE_TTL_MS)
+    return NextResponse.json(payload, {
+      headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` },
+    })
+  }
 
-  return NextResponse.json(payload, {
-    headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` },
-  })
+  return NextResponse.json(payload)
 }
