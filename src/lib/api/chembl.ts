@@ -218,16 +218,15 @@ export async function getRelatedCompoundsByTarget(
   limit: number = 15,
 ): Promise<RelatedCompound[]> {
   if (!targetId?.trim()) return []
-  try {
-    const cap = Math.max(1, Math.min(limit, 50))
+  const cap = Math.max(1, Math.min(limit, 50))
     // Over-fetch activities so dedupe can still fill `cap` unique molecules
     const fetchLimit = Math.min(cap * 4, 120)
     // Prefer potency-ranked IC50 rows when available
     const url =
       `${ACTIVITY_URL}?target_chembl_id=${encodeURIComponent(targetId)}` +
       `&standard_type=IC50&limit=${fetchLimit}&order_by=standard_value&format=json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+    throwIfHttpFailed(res, 'ChEMBL')
     const data = await res.json()
 
     const seenMolecules = new Set<string>()
@@ -288,9 +287,6 @@ export async function getRelatedCompoundsByTarget(
       const vb = b.activityValue ?? Number.POSITIVE_INFINITY
       return va - vb
     })
-  } catch {
-    return []
-  }
 }
 
 /**
@@ -302,28 +298,24 @@ export async function searchTargetsByName(query: string, limit: number = 10): Pr
   targetType: string
   organism: string
 }>> {
-  try {
-    const url = `${TARGET_URL}/search.json?q=${encodeURIComponent(query)}&limit=${limit}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    
-    const data = await res.json()
-    const targets = data.targets ?? []
-    
-    return targets.map((t: {
-      target_chembl_id: string
-      pref_name: string
-      target_type: string
-      organism: string
-    }) => ({
-      targetChemblId: t.target_chembl_id,
-      targetName: t.pref_name,
-      targetType: t.target_type,
-      organism: t.organism
-    }))
-  } catch {
-    return []
-  }
+  if (!query?.trim()) return []
+  const url = `${TARGET_URL}/search.json?q=${encodeURIComponent(query)}&limit=${limit}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'ChEMBL')
+  const data = await res.json()
+  const targets = data.targets ?? []
+
+  return targets.map((t: {
+    target_chembl_id: string
+    pref_name: string
+    target_type: string
+    organism: string
+  }) => ({
+    targetChemblId: t.target_chembl_id,
+    targetName: t.pref_name,
+    targetType: t.target_type,
+    organism: t.organism
+  }))
 }
 
 /**

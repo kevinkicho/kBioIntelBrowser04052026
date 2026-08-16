@@ -1,4 +1,4 @@
-import { getChemblIdByName, getChemblActivitiesByName } from '@/lib/api/chembl'
+import { getChemblIdByName, getChemblActivitiesByName, searchTargetsByName } from '@/lib/api/chembl'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
   return {
@@ -117,5 +117,51 @@ describe('getChemblActivitiesByName', () => {
   test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
     await expect(getChemblActivitiesByName('aspirin')).rejects.toThrow(/network/)
+  })
+})
+
+describe('searchTargetsByName', () => {
+  test('returns parsed targets on success', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      jsonRes({
+        targets: [
+          {
+            target_chembl_id: 'CHEMBL203',
+            pref_name: 'Epidermal growth factor receptor',
+            target_type: 'SINGLE PROTEIN',
+            organism: 'Homo sapiens',
+          },
+        ],
+      }),
+    )
+    const rows = await searchTargetsByName('EGFR')
+    expect(rows).toHaveLength(1)
+    expect(rows[0].targetChemblId).toBe('CHEMBL203')
+    expect(rows[0].targetName).toBe('Epidermal growth factor receptor')
+  })
+
+  test('true empty target JSON is [] (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ targets: [] }))
+    expect(await searchTargetsByName('obscurexyz')).toEqual([])
+  })
+
+  test('blank query is empty without fetch', async () => {
+    expect(await searchTargetsByName('')).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(searchTargetsByName('EGFR')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html></html>', 200, 'text/html'))
+    await expect(searchTargetsByName('EGFR')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    await expect(searchTargetsByName('EGFR')).rejects.toThrow(/network/)
   })
 })

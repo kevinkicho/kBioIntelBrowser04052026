@@ -179,6 +179,8 @@ const PRODUCT_PATTERNS = [
   'gatherHonesty',
   'chemblIndicationsHonesty',
   'gatherIndicationsHonesty',
+  'gatherChemblByTargetHonesty',
+  'lib/chemblRelated',
   'lib/chembl-indications.test',
   'lib/disgenet.test',
   'lib/orphanet.test',
