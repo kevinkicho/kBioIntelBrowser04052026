@@ -91,6 +91,7 @@ export async function gatherChemblByTarget(
     'ChEMBL (by-target)',
     async () => {
       const byName = new Map<string, ChemblByTargetMolecule>()
+      const errors: unknown[] = []
 
       // Sequential per gene to stay gentle on free ChEMBL REST
       for (const symbol of geneSymbols) {
@@ -125,12 +126,18 @@ export async function gatherChemblByTarget(
               byName.set(key, entry)
             }
           }
-        } catch {
+        } catch (err) {
           // Continue other genes on single-target failure
+          errors.push(err)
         }
       }
 
-      return Array.from(byName.values())
+      const molecules = Array.from(byName.values())
+      if (molecules.length === 0 && errors.length > 0) {
+        const reason = errors[0]
+        throw reason instanceof Error ? reason : new Error(String(reason))
+      }
+      return molecules
     },
     { fallback: [] as ChemblByTargetMolecule[], hasData: hasDataArray },
   )

@@ -1,5 +1,15 @@
 import { getRelatedCompoundsByTarget } from '@/lib/api/chembl'
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
@@ -7,9 +17,8 @@ describe('getRelatedCompoundsByTarget', () => {
   test('maps units, pchembl, and enriches missing pref_name / max_phase', async () => {
     ;(fetch as jest.Mock)
       // activities
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonRes({
           activities: [
             {
               molecule_chembl_id: 'CHEMBL297008',
@@ -33,11 +42,10 @@ describe('getRelatedCompoundsByTarget', () => {
             },
           ],
         }),
-      })
+      )
       // molecule enrich for CHEMBL297008
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonRes({
           molecules: [
             {
               molecule_chembl_id: 'CHEMBL297008',
@@ -46,7 +54,7 @@ describe('getRelatedCompoundsByTarget', () => {
             },
           ],
         }),
-      })
+      )
 
     const results = await getRelatedCompoundsByTarget('CHEMBL230', 10)
     expect(results.length).toBe(2)
@@ -63,8 +71,28 @@ describe('getRelatedCompoundsByTarget', () => {
     expect(aspirin.maxPhase).toBe(4)
   })
 
-  test('returns empty on non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
+  test('true empty activities JSON is [] (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ activities: [] }))
     expect(await getRelatedCompoundsByTarget('CHEMBL230')).toEqual([])
+  })
+
+  test('blank target id is empty without fetch', async () => {
+    expect(await getRelatedCompoundsByTarget('')).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getRelatedCompoundsByTarget('CHEMBL230')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html></html>', 200, 'text/html'))
+    await expect(getRelatedCompoundsByTarget('CHEMBL230')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    await expect(getRelatedCompoundsByTarget('CHEMBL230')).rejects.toThrow(/network/)
   })
 })
