@@ -35,7 +35,6 @@ import {
 } from '@/lib/golden'
 import { mondayTemplatesForPersona } from '@/lib/dataHub/mondayExperimentLibrary'
 import { planEvidenceOrchestration } from '@/lib/evidence'
-import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
 import { LoopCoachStrip } from '@/components/loop/LoopCoachStrip'
 
 const PERSONA_LABELS: Record<CampaignPersona, string> = {
@@ -213,7 +212,6 @@ export function CampaignWorkspaceClient() {
 
         <div className="mb-4 space-y-3">
           <LoopCoachStrip />
-          <FinishRateStrip compact />
         </div>
 
         <section

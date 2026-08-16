@@ -7,6 +7,7 @@ import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { recordMetric } from '@/lib/analytics/db'
 import { buildCategoryApiTrace } from '@/lib/panelApiTrace'
 import { logApiOutcome, startApiTimer } from '@/lib/serverLog'
+import { shouldCacheHonestyEnvelope } from '@/lib/honestyEnvelope'
 
 import type { ApiIdentifierType, ApiParamValue } from '@/lib/apiIdentifiers'
 import { getMoleculeIdentifiers, resolveApiQuery } from '@/lib/resolveApiQuery'
@@ -126,7 +127,8 @@ export async function GET(
   const requestPath = `/api/molecule/${cid}/category/${categoryId}${request.nextUrl.search || ''}`
   const startedAt = new Date().toISOString()
   const cached = forceRefresh ? undefined : getCached<Record<string, unknown>>(cacheKey)
-  if (cached) {
+  // Skip leftover empty/timeout shells so they cannot pin as success for 1h.
+  if (cached && shouldCacheHonestyEnvelope(cached)) {
     const finishedAt = new Date().toISOString()
     const existingTrace = cached._apiTrace as ReturnType<typeof buildCategoryApiTrace> | undefined
     const payload = {
@@ -372,7 +374,10 @@ export async function GET(
       : undefined,
   }
 
-  setCache(cacheKey, payload)
+  // Empty-as-success must not be stored as a 1h success shell (same rule as pipeline).
+  if (shouldCacheHonestyEnvelope(payload) && hasPanelPayload) {
+    setCache(cacheKey, payload)
+  }
   logApiOutcome({
     route: '/api/molecule/[id]/category/[categoryId]',
     method: 'GET',
