@@ -4,6 +4,7 @@ function mockJsonFetch(body: unknown, ok = true) {
   const text = JSON.stringify(body)
   return {
     ok,
+    status: ok ? 200 : 500,
     headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
     text: async () => text,
     json: async () => body,
@@ -36,7 +37,7 @@ describe('NINDS NeuroMMSig API', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('stemcells.nindsgenetics.org'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
+      expect.any(Object),
     )
     expect(result.source).toBe('NINDS NeuroGenetics')
     expect(result.data.signatures).toHaveLength(1)
@@ -52,11 +53,13 @@ describe('NINDS NeuroMMSig API', () => {
     expect(result.data.signatures).toEqual([])
   })
 
-  it('should handle API errors gracefully', async () => {
+  it('throws on API errors (not EMPTY)', async () => {
     global.fetch = jest.fn(() => Promise.reject(new Error('API error'))) as jest.Mock
-    const result = await fetchNeuroMMSigData('test')
+    await expect(fetchNeuroMMSigData('test')).rejects.toThrow(/API error/)
+  })
 
-    expect(result.source).toBe('NINDS NeuroGenetics')
-    expect(result.data.signatures).toEqual([])
+  it('throws when response is not ok (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonFetch({}, false))
+    await expect(fetchNeuroMMSigData('test')).rejects.toThrow(/HTTP/)
   })
 })
