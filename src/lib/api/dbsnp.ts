@@ -1,6 +1,7 @@
 import type { dbSNPVariant } from '../types'
 import { LIMITS } from '../api-limits'
 import { getApiKey } from './utils'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://eutils.ncbi.nlm.nih.gov/entrez/eutils'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
@@ -19,86 +20,86 @@ const withNCBICreds = (url: string): string => {
 }
 
 /**
+ * dbSNP harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * 404, missing query, and zero-hit JSON remain empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function mapSnp(id: string, snp: Record<string, unknown>, clinicalOverride?: boolean): dbSNPVariant {
+  return {
+    rsId: `rs${id}`,
+    refSNPId: id,
+    chromosome: String(snp.chromosome || ''),
+    position: parseInt(String(snp.chromosomepos || '0'), 10),
+    alleles: String(snp.alleles || ''),
+    clinicalSignificance: String(snp.clinical_significance || snp.clinicalsignificance || ''),
+    clinical: clinicalOverride ?? (snp.clinical === '1' || snp.clinical === true),
+    frequency: parseFloat(String(snp.frequency || '0')),
+    genes: (snp.genes as string[]) || [],
+    clinicalAllele: String(snp.clinical_allele || ''),
+    reviewed: snp.reviewed === '1' || snp.reviewed === true,
+    url: `https://www.ncbi.nlm.nih.gov/snp/rs${id}`,
+  }
+}
+
+/**
  * Search dbSNP for variants by gene symbol
  */
 export async function searchdbSNPByGene(geneSymbol: string, limit: number = LIMITS.DBSNP.initial): Promise<dbSNPVariant[]> {
-  try {
-    // Search for SNPs in the gene
-    const searchUrl = withNCBICreds(`${BASE_URL}/esearch.fcgi?db=snp&term=${encodeURIComponent(geneSymbol)}[Gene]&retmax=${limit}&retmode=json`)
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
+  const q = geneSymbol?.trim()
+  if (!q) return []
 
-    const searchData = await searchRes.json()
-    const ids = searchData?.esearchresult?.idlist || []
+  const searchUrl = withNCBICreds(`${BASE_URL}/esearch.fcgi?db=snp&term=${encodeURIComponent(q)}[Gene]&retmax=${limit}&retmode=json`)
+  const searchRes = await timedFetch(searchUrl, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(searchRes.status)) return []
+  throwIfHttpFailed(searchRes, 'dbSNP')
 
-    if (ids.length === 0) return []
+  const searchData = await searchRes.json()
+  const ids = searchData?.esearchresult?.idlist || []
+  if (ids.length === 0) return []
 
-    // Fetch summaries
-    const summaryUrl = withNCBICreds(`${BASE_URL}/esummary.fcgi?db=snp&id=${ids.join(',')}&retmode=json`)
-    const summaryRes = await fetch(summaryUrl, fetchOptions)
-    if (!summaryRes.ok) return []
+  const summaryUrl = withNCBICreds(`${BASE_URL}/esummary.fcgi?db=snp&id=${ids.join(',')}&retmode=json`)
+  const summaryRes = await timedFetch(summaryUrl, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(summaryRes.status)) return []
+  throwIfHttpFailed(summaryRes, 'dbSNP')
 
-    const summaryData = await summaryRes.json()
-    const result = summaryData?.result || {}
+  const summaryData = await summaryRes.json()
+  const result = summaryData?.result || {}
 
-    return ids.map((id: string) => {
-      const snp = result[id] || {}
-      return {
-        rsId: `rs${id}`,
-        refSNPId: id,
-        chromosome: snp.chromosome || '',
-        position: parseInt(snp.chromosomepos || '0', 10),
-        alleles: snp.alleles || '',
-        clinicalSignificance: snp.clinical_significance || snp.clinicalsignificance || '',
-        clinical: snp.clinical === '1' || snp.clinical === true,
-        frequency: parseFloat(snp.frequency || '0'),
-        genes: snp.genes || [],
-        clinicalAllele: snp.clinical_allele || '',
-        reviewed: snp.reviewed === '1' || snp.reviewed === true,
-        url: `https://www.ncbi.nlm.nih.gov/snp/rs${id}`,
-      }
-    }).filter((v: dbSNPVariant) => v.rsId)
-  } catch (error) {
-    console.error('dbSNP search error:', error)
-    return []
-  }
+  return ids.map((id: string) => mapSnp(id, result[id] || {})).filter((v: dbSNPVariant) => v.rsId)
 }
 
 /**
  * Get variant details by rsId
  */
 export async function getdbSNPVariant(rsId: string): Promise<dbSNPVariant | null> {
-  try {
-    // Remove 'rs' prefix if present
-    const id = rsId.replace(/^rs/i, '')
+  const id = rsId?.replace(/^rs/i, '').trim()
+  if (!id) return null
 
-    const summaryUrl = withNCBICreds(`${BASE_URL}/esummary.fcgi?db=snp&id=${id}&retmode=json`)
-    const summaryRes = await fetch(summaryUrl, fetchOptions)
-    if (!summaryRes.ok) return null
+  const summaryUrl = withNCBICreds(`${BASE_URL}/esummary.fcgi?db=snp&id=${id}&retmode=json`)
+  const summaryRes = await timedFetch(summaryUrl, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(summaryRes.status)) return null
+  throwIfHttpFailed(summaryRes, 'dbSNP')
 
-    const summaryData = await summaryRes.json()
-    const snp = summaryData?.result?.[id]
+  const summaryData = await summaryRes.json()
+  const snp = summaryData?.result?.[id]
+  if (!snp) return null
 
-    if (!snp) return null
-
-    return {
-      rsId: `rs${id}`,
-      refSNPId: id,
-      chromosome: snp.chromosome || '',
-      position: parseInt(snp.chromosomepos || '0', 10),
-      alleles: snp.alleles || '',
-      clinicalSignificance: snp.clinical_significance || '',
-      clinical: snp.clinical === '1' || snp.clinical === true,
-      frequency: parseFloat(snp.frequency || '0'),
-      genes: snp.genes || [],
-      clinicalAllele: snp.clinical_allele || '',
-      reviewed: snp.reviewed === '1' || snp.reviewed === true,
-      url: `https://www.ncbi.nlm.nih.gov/snp/rs${id}`,
-    }
-  } catch (error) {
-    console.error('dbSNP variant fetch error:', error)
-    return null
-  }
+  return mapSnp(id, snp)
 }
 
 /**
@@ -112,42 +113,25 @@ export async function getDbSNPVariants(moleculeName: string, limit: number = LIM
  * Search for clinically significant variants
  */
 export async function searchClinicalVariants(geneSymbol: string, limit: number = LIMITS.DBSNP.initial): Promise<dbSNPVariant[]> {
-  try {
-    const searchUrl = withNCBICreds(`${BASE_URL}/esearch.fcgi?db=snp&term=${encodeURIComponent(geneSymbol)}[Gene]+AND+clinical[Filter]&retmax=${limit}&retmode=json`)
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
+  const q = geneSymbol?.trim()
+  if (!q) return []
 
-    const searchData = await searchRes.json()
-    const ids = searchData?.esearchresult?.idlist || []
+  const searchUrl = withNCBICreds(`${BASE_URL}/esearch.fcgi?db=snp&term=${encodeURIComponent(q)}[Gene]+AND+clinical[Filter]&retmax=${limit}&retmode=json`)
+  const searchRes = await timedFetch(searchUrl, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(searchRes.status)) return []
+  throwIfHttpFailed(searchRes, 'dbSNP')
 
-    if (ids.length === 0) return []
+  const searchData = await searchRes.json()
+  const ids = searchData?.esearchresult?.idlist || []
+  if (ids.length === 0) return []
 
-    const summaryUrl = withNCBICreds(`${BASE_URL}/esummary.fcgi?db=snp&id=${ids.join(',')}&retmode=json`)
-    const summaryRes = await fetch(summaryUrl, fetchOptions)
-    if (!summaryRes.ok) return []
+  const summaryUrl = withNCBICreds(`${BASE_URL}/esummary.fcgi?db=snp&id=${ids.join(',')}&retmode=json`)
+  const summaryRes = await timedFetch(summaryUrl, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(summaryRes.status)) return []
+  throwIfHttpFailed(summaryRes, 'dbSNP')
 
-    const summaryData = await summaryRes.json()
-    const result = summaryData?.result || {}
+  const summaryData = await summaryRes.json()
+  const result = summaryData?.result || {}
 
-    return ids.map((id: string) => {
-      const snp = result[id] || {}
-      return {
-        rsId: `rs${id}`,
-        refSNPId: id,
-        chromosome: snp.chromosome || '',
-        position: parseInt(snp.chromosomepos || '0', 10),
-        alleles: snp.alleles || '',
-        clinicalSignificance: snp.clinical_significance || '',
-        clinical: true,
-        frequency: parseFloat(snp.frequency || '0'),
-        genes: snp.genes || [],
-        clinicalAllele: snp.clinical_allele || '',
-        reviewed: snp.reviewed === '1' || snp.reviewed === true,
-        url: `https://www.ncbi.nlm.nih.gov/snp/rs${id}`,
-      }
-    }).filter((v: dbSNPVariant) => v.rsId)
-  } catch (error) {
-    console.error('Clinical variants search error:', error)
-    return []
-  }
+  return ids.map((id: string) => mapSnp(id, result[id] || {}, true)).filter((v: dbSNPVariant) => v.rsId)
 }
