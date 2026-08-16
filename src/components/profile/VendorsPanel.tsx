@@ -23,6 +23,31 @@ interface VendorsData {
   databases: VendorResult[]
   total: number
   moleculeName?: string
+  _timeout?: boolean
+  _partial?: boolean
+  _emptyHonest?: boolean
+  _agentStatus?: string
+  _error?: string
+  _honesty?: string
+}
+
+export function vendorsHasRows(data: VendorsData | null | undefined): boolean {
+  if (!data) return false
+  return (
+    (Array.isArray(data.suppliers) && data.suppliers.length > 0) ||
+    (Array.isArray(data.databases) && data.databases.length > 0)
+  )
+}
+
+function isHonestyShell(data: VendorsData | null | undefined): boolean {
+  if (!data) return false
+  return (
+    data._timeout === true ||
+    data._emptyHonest === true ||
+    data._partial === true ||
+    data._agentStatus === 'timeout' ||
+    data._agentStatus === 'error'
+  )
 }
 
 export function VendorsPanel({ cid }: { cid: number }) {
@@ -42,7 +67,7 @@ export function VendorsPanel({ cid }: { cid: number }) {
     try {
       if (!refresh) {
         const cached = await getProfileClientCacheAsync<VendorsData>(cacheKey)
-        if (cached) {
+        if (cached && vendorsHasRows(cached) && !isHonestyShell(cached)) {
           const finishedAt = new Date().toISOString()
           setData(cached)
           setTrace({
@@ -75,7 +100,9 @@ export function VendorsPanel({ cid }: { cid: number }) {
       const finishedAt = new Date().toISOString()
       if (!res.ok) throw new Error(`Failed to fetch vendors (${res.status})`)
       const json: VendorsData = await res.json()
-      setProfileClientCache(cacheKey, json)
+      if (vendorsHasRows(json) && !isHonestyShell(json)) {
+        setProfileClientCache(cacheKey, json)
+      }
       setData(json)
       setTrace({
         categoryId: 'vendors',
@@ -141,6 +168,26 @@ export function VendorsPanel({ cid }: { cid: number }) {
           <span>🛒</span> Chemical Suppliers
         </h3>
         <p className="text-xs text-red-400">{error}</p>
+      </div>
+    )
+  }
+
+  const timedOut = data?._timeout === true || data?._agentStatus === 'timeout'
+  const errored = data?._agentStatus === 'error' || (data?._partial === true && !timedOut)
+  if (data && !vendorsHasRows(data) && (timedOut || errored)) {
+    return (
+      <div
+        className="bg-slate-900/60 border border-amber-800/40 rounded-xl p-5 mb-2"
+        data-testid="vendors-honesty"
+      >
+        <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+          <span>🛒</span> Chemical Suppliers
+        </h3>
+        <p className="text-xs text-amber-200/90">
+          {timedOut
+            ? 'Vendor lookup timed out this session — not proof of zero suppliers.'
+            : 'Vendor lookup failed this session — retry rather than treating as empty.'}
+        </p>
       </div>
     )
   }
