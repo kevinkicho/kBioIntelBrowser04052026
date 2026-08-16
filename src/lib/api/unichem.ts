@@ -1,7 +1,25 @@
 import type { UniChemMapping, UniChemSource } from '../types'
+import { timedFetch } from './timedFetch'
 
 const UNICHEM_API = 'https://www.ebi.ac.uk/unichem/api/v1'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
+
+/**
+ * UniChem harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 
 /** UniChem sourceID → short name (stable public IDs). */
 const SOURCE_ID_NAMES: Record<string, string> = {
@@ -195,23 +213,20 @@ interface UniChemApiCompound {
 }
 
 async function postCompounds(body: Record<string, unknown>): Promise<UniChemApiCompound[]> {
-  try {
-    const res = await fetch(`${UNICHEM_API}/compounds`, {
-      ...fetchOptions,
-      method: 'POST',
-      headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    // Response shapes: { compounds: [...] } or plain array
-    if (Array.isArray(data)) return data
-    if (Array.isArray(data?.compounds)) return data.compounds
-    if (Array.isArray(data?.response)) return data.response
-    return []
-  } catch {
-    return []
-  }
+  const res = await timedFetch(`${UNICHEM_API}/compounds`, {
+    ...fetchOptions,
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+    timeoutMs: 8000,
+  })
+  throwIfHttpFailed(res, 'UniChem')
+  const data = await res.json()
+  // Response shapes: { compounds: [...] } or plain array
+  if (Array.isArray(data)) return data
+  if (Array.isArray(data?.compounds)) return data.compounds
+  if (Array.isArray(data?.response)) return data.response
+  return []
 }
 
 /** Coarse category for denser list chips (free public UniChem sources). */
@@ -286,41 +301,35 @@ function mapApiSources(sources: UniChemApiSource[]): UniChemMapping[] {
  * Get UniChem sources (v1).
  */
 export async function getUniChemSources(): Promise<UniChemSource[]> {
-  try {
-    const res = await fetch(`${UNICHEM_API}/sources/`, { ...fetchOptions, headers: { Accept: 'application/json' } })
-    if (!res.ok) return []
-    const data = await res.json()
-    const list = Array.isArray(data) ? data : data?.sources ?? []
-    return list.map((source: Record<string, unknown>) => ({
-      sourceId: String(source.sourceID ?? source.src_id ?? ''),
-      name: String(source.name || source.nameLabel || ''),
-      fullName: String(source.nameLong || source.name_long || source.nameLabel || ''),
-      url: String(source.baseIdUrl || source.srcUrl || source.url || ''),
-      description: String(source.description || ''),
-    }))
-  } catch (error) {
-    console.error('UniChem sources fetch error:', error)
-    return []
-  }
+  const res = await timedFetch(`${UNICHEM_API}/sources/`, {
+    ...fetchOptions,
+    headers: { Accept: 'application/json' },
+    timeoutMs: 8000,
+  })
+  throwIfHttpFailed(res, 'UniChem')
+  const data = await res.json()
+  const list = Array.isArray(data) ? data : data?.sources ?? []
+  return list.map((source: Record<string, unknown>) => ({
+    sourceId: String(source.sourceID ?? source.src_id ?? ''),
+    name: String(source.name || source.nameLabel || ''),
+    fullName: String(source.nameLong || source.name_long || source.nameLabel || ''),
+    url: String(source.baseIdUrl || source.srcUrl || source.url || ''),
+    description: String(source.description || ''),
+  }))
 }
 
 /**
  * Get cross-references for a compound by InChIKey (UniChem 2.0 POST API).
  */
 export async function getUniChemMappings(inchiKey: string): Promise<UniChemMapping[]> {
-  try {
-    const key = (inchiKey || '').trim()
-    if (!key) return []
-    const compounds = await postCompounds({ type: 'inchikey', compound: key })
-    const mappings: UniChemMapping[] = []
-    for (const c of compounds) {
-      mappings.push(...mapApiSources(c.sources ?? []))
-    }
-    return mappings
-  } catch (error) {
-    console.error('UniChem mappings fetch error:', error)
-    return []
+  const key = (inchiKey || '').trim()
+  if (!key) return []
+  const compounds = await postCompounds({ type: 'inchikey', compound: key })
+  const mappings: UniChemMapping[] = []
+  for (const c of compounds) {
+    mappings.push(...mapApiSources(c.sources ?? []))
   }
+  return mappings
 }
 
 /**
@@ -334,32 +343,27 @@ export async function getUniChemCrossRefs(
   toSource?: string,
 ): Promise<UniChemMapping[]> {
   void toSource
-  try {
-    const sourceNum = resolveSourceNumber(fromSource)
-    if (sourceNum == null) return []
-    const compounds = await postCompounds({
-      type: 'sourceID',
-      sourceID: sourceNum,
-      compound: String(fromId),
-    })
-    const mappings: UniChemMapping[] = []
-    for (const c of compounds) {
-      mappings.push(...mapApiSources(c.sources ?? []))
-    }
-    // Always include the query identity with a proper deep link
-    if (!mappings.some((m) => m.externalId === String(fromId))) {
-      mappings.unshift({
-        sourceId: String(sourceNum),
-        sourceName: SOURCE_ID_NAMES[String(sourceNum)] || fromSource,
-        externalId: String(fromId),
-        url: unichemMappingDeepLink(fromSource, String(fromId), String(sourceNum)),
-      })
-    }
-    return mappings
-  } catch (error) {
-    console.error('UniChem cross-refs fetch error:', error)
-    return []
+  const sourceNum = resolveSourceNumber(fromSource)
+  if (sourceNum == null) return []
+  const compounds = await postCompounds({
+    type: 'sourceID',
+    sourceID: sourceNum,
+    compound: String(fromId),
+  })
+  const mappings: UniChemMapping[] = []
+  for (const c of compounds) {
+    mappings.push(...mapApiSources(c.sources ?? []))
   }
+  // Always include the query identity with a proper deep link
+  if (!mappings.some((m) => m.externalId === String(fromId))) {
+    mappings.unshift({
+      sourceId: String(sourceNum),
+      sourceName: SOURCE_ID_NAMES[String(sourceNum)] || fromSource,
+      externalId: String(fromId),
+      url: unichemMappingDeepLink(fromSource, String(fromId), String(sourceNum)),
+    })
+  }
+  return mappings
 }
 
 function resolveSourceNumber(source: string): number | null {
@@ -379,20 +383,15 @@ function resolveSourceNumber(source: string): number | null {
  * Resolve a compound identifier to InChIKey via UniChem 2.0.
  */
 export async function resolveToInChIKey(source: string, id: string): Promise<string | null> {
-  try {
-    const sourceNum = resolveSourceNumber(source)
-    if (sourceNum == null) return null
-    const compounds = await postCompounds({
-      type: 'sourceID',
-      sourceID: sourceNum,
-      compound: String(id),
-    })
-    const first = compounds[0]
-    return first?.standardInchiKey || first?.inchiKey || null
-  } catch (error) {
-    console.error('UniChem resolve error:', error)
-    return null
-  }
+  const sourceNum = resolveSourceNumber(source)
+  if (sourceNum == null) return null
+  const compounds = await postCompounds({
+    type: 'sourceID',
+    sourceID: sourceNum,
+    compound: String(id),
+  })
+  const first = compounds[0]
+  return first?.standardInchiKey || first?.inchiKey || null
 }
 
 /**
