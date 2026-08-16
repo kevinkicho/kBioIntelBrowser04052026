@@ -22,7 +22,7 @@ import { getProteinAtlasData } from '@/lib/api/human-protein-atlas'
 export async function fetchProteinStructure(name: string, queryFor: (s: string) => string, apiParams: Record<string, ApiParamValue>) {
   const [uniprotEntries, pdbStructures, pdbeLigands, prideProjects, cathDomains, sabdabEntries] = await Promise.all([
     trackedSafe('uniprot', getUniprotEntriesByName(queryFor('uniprot')), []),
-    safe(getPdbStructuresByName(queryFor('pdb')), []),
+    trackedSafe('pdb', getPdbStructuresByName(queryFor('pdb')), []),
     safe(getPdbeLigandsByName(name), []),
     safe(searchPRIDE(name), []),
     safe(searchCATHDomains(name), []),
