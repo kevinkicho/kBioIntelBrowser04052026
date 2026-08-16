@@ -1,3 +1,5 @@
+import { timedFetch } from './timedFetch'
+
 const BASE_URL = 'https://gtexportal.org/rest/v1'
 
 const fetchOptions: RequestInit = {
@@ -99,21 +101,68 @@ const tissueMap: Record<string, string> = {
   'Whole Blood': 'Whole_Blood',
 }
 
+/**
+ * GTEx harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True 404 / missing gene / zero-hit JSON remains null / [].
+ * v2 404 falls through to v1; if both fail with HTTP errors, throw.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 async function resolveGeneSymbol(symbol: string): Promise<string | null> {
-  try {
-    const url = `${BASE_URL}/reference/gene?geneSymbol=${encodeURIComponent(symbol)}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
-    const data = await res.json()
-    const genes = data?.data ?? data
-    if (Array.isArray(genes) && genes.length > 0) {
-      return String(genes[0]?.gencodeId ?? genes[0]?.geneId ?? '')
-    }
-    if (genes?.gencodeId) return String(genes.gencodeId)
-    if (genes?.geneId) return String(genes.geneId)
-    return null
-  } catch {
-    return null
+  const url = `${BASE_URL}/reference/gene?geneSymbol=${encodeURIComponent(symbol)}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res, 'GTEx')
+  const data = await res.json()
+  const genes = data?.data ?? data
+  if (Array.isArray(genes) && genes.length > 0) {
+    return String(genes[0]?.gencodeId ?? genes[0]?.geneId ?? '') || null
+  }
+  if (genes?.gencodeId) return String(genes.gencodeId)
+  if (genes?.geneId) return String(genes.geneId)
+  return null
+}
+
+function mapGeneExpression(data: Record<string, unknown>, gencodeId: string): GTExGeneExpression {
+  const expressionData =
+    (data as { data?: { geneExpression?: unknown[] }; geneExpression?: unknown[] })?.data?.geneExpression ??
+    (data as { geneExpression?: unknown[] })?.geneExpression ??
+    []
+  const geneInfo =
+    (data as { data?: { geneInfo?: Record<string, unknown> }; geneInfo?: Record<string, unknown> })?.data?.geneInfo ??
+    (data as { geneInfo?: Record<string, unknown> })?.geneInfo ??
+    {}
+
+  return {
+    geneId: gencodeId,
+    geneSymbol: String(geneInfo.symbol ?? geneInfo.geneSymbol ?? ''),
+    biotype: String(geneInfo.biotype ?? ''),
+    descriptions: String(geneInfo.description ?? ''),
+    expressions: (expressionData as Record<string, unknown>[]).map((exp) => ({
+      geneId: gencodeId,
+      geneSymbol: String(geneInfo.symbol ?? geneInfo.geneSymbol ?? ''),
+      tissueName: String(exp.tissueName ?? exp.tissueSiteDetail ?? ''),
+      tissueCode: String(exp.tissueSiteDetailId ?? exp.tissueSiteDetail ?? ''),
+      tpm: Number(exp.tpm ?? 0),
+      tpmSd: Number(exp.tpmSd ?? 0),
+      nSamples: Number(exp.nSamples ?? 0),
+      rank: Number(exp.rank ?? 0),
+      percentile: Number(exp.percentile ?? 0),
+    })),
   }
 }
 
@@ -126,112 +175,83 @@ export async function getGTExTissues(): Promise<GTExTissue[]> {
 }
 
 export async function getGTExGeneExpression(geneId: string): Promise<GTExGeneExpression | null> {
-  try {
-    let gencodeId = geneId
-    if (!geneId.startsWith('ENSG')) {
-      const resolved = await resolveGeneSymbol(geneId)
-      if (!resolved) return null
-      gencodeId = resolved
-    }
-
-    const v2Url = `https://gtexportal.org/api/v2/expression/gene?gencodeId=${encodeURIComponent(gencodeId)}`
-    let res = await fetch(v2Url, fetchOptions)
-    
-    if (!res.ok) {
-      const v1Url = `${BASE_URL}/expression/geneExpression?gencodeId=${encodeURIComponent(gencodeId)}`
-      res = await fetch(v1Url, fetchOptions)
-      if (!res.ok) return null
-    }
-
-    const data = await res.json()
-    const expressionData = data?.data?.geneExpression ?? data?.geneExpression ?? []
-    const geneInfo = data?.data?.geneInfo ?? data?.geneInfo ?? {}
-
-    return {
-      geneId: gencodeId,
-      geneSymbol: geneInfo.symbol ?? geneInfo.geneSymbol ?? '',
-      biotype: geneInfo.biotype ?? '',
-      descriptions: geneInfo.description ?? '',
-      expressions: expressionData.map((exp: Record<string, unknown>) => ({
-        geneId: gencodeId,
-        geneSymbol: geneInfo.symbol ?? geneInfo.geneSymbol ?? '',
-        tissueName: exp.tissueName ?? exp.tissueSiteDetail ?? '',
-        tissueCode: exp.tissueSiteDetailId ?? exp.tissueSiteDetail ?? '',
-        tpm: exp.tpm ?? 0,
-        tpmSd: exp.tpmSd ?? exp.tpmSd ?? 0,
-        nSamples: exp.nSamples ?? 0,
-        rank: exp.rank ?? 0,
-        percentile: exp.percentile ?? 0,
-      })),
-    }
-  } catch {
-    return null
+  let gencodeId = geneId
+  if (!geneId.startsWith('ENSG')) {
+    const resolved = await resolveGeneSymbol(geneId)
+    if (!resolved) return null
+    gencodeId = resolved
   }
+
+  const v2Url = `https://gtexportal.org/api/v2/expression/gene?gencodeId=${encodeURIComponent(gencodeId)}`
+  const v2 = await timedFetch(v2Url, { ...fetchOptions, timeoutMs: 8000 })
+  if (v2.ok) {
+    throwIfHttpFailed(v2, 'GTEx')
+    return mapGeneExpression(await v2.json(), gencodeId)
+  }
+
+  const v1Url = `${BASE_URL}/expression/geneExpression?gencodeId=${encodeURIComponent(gencodeId)}`
+  const v1 = await timedFetch(v1Url, { ...fetchOptions, timeoutMs: 8000 })
+  if (v1.ok) {
+    throwIfHttpFailed(v1, 'GTEx')
+    return mapGeneExpression(await v1.json(), gencodeId)
+  }
+  if (isAbsentStatus(v2.status) && isAbsentStatus(v1.status)) return null
+  throwIfHttpFailed(v2.status >= 500 ? v2 : v1, 'GTEx')
+  return null
 }
 
 export async function getGTExEQTL(
   geneId: string,
   tissueName: string,
 ): Promise<GTExEQTL[]> {
-  try {
-    let gencodeId = geneId
-    if (!geneId.startsWith('ENSG')) {
-      const resolved = await resolveGeneSymbol(geneId)
-      if (!resolved) return []
-      gencodeId = resolved
-    }
-
-    const params = new URLSearchParams({
-      gencodeId,
-      tissueSiteDetailId: tissueName,
-    })
-    const url = `${BASE_URL}/association/eQTL?${params}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return (data?.data?.eqtlList ?? data?.eqtlList ?? []).map((eqtl: Record<string, unknown>) => ({
-      variantId: eqtl.variantId ?? '',
-      geneId: gencodeId,
-      geneSymbol: eqtl.geneSymbol ?? '',
-      tissueName: eqtl.tissueName ?? tissueName,
-      slope: eqtl.slope ?? 0,
-      tStat: eqtl.tStat ?? 0,
-      pValue: eqtl.pValue ?? 0,
-      pValueNominal: eqtl.pValueNominal ?? 0,
-      qValue: eqtl.qValue ?? 0,
-    }))
-  } catch {
-    return []
+  let gencodeId = geneId
+  if (!geneId.startsWith('ENSG')) {
+    const resolved = await resolveGeneSymbol(geneId)
+    if (!resolved) return []
+    gencodeId = resolved
   }
+
+  const params = new URLSearchParams({
+    gencodeId,
+    tissueSiteDetailId: tissueName,
+  })
+  const url = `${BASE_URL}/association/eQTL?${params}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'GTEx')
+  const data = await res.json()
+
+  return (data?.data?.eqtlList ?? data?.eqtlList ?? []).map((eqtl: Record<string, unknown>) => ({
+    variantId: eqtl.variantId ?? '',
+    geneId: gencodeId,
+    geneSymbol: eqtl.geneSymbol ?? '',
+    tissueName: eqtl.tissueName ?? tissueName,
+    slope: eqtl.slope ?? 0,
+    tStat: eqtl.tStat ?? 0,
+    pValue: eqtl.pValue ?? 0,
+    pValueNominal: eqtl.pValueNominal ?? 0,
+    qValue: eqtl.qValue ?? 0,
+  }))
 }
 
 export async function getGTExTissueExpression(
   geneId: string,
   tissueName: string,
 ): Promise<GTExExpression | null> {
-  try {
-    const result = await getGTExGeneExpression(geneId)
-    if (!result) return null
+  const result = await getGTExGeneExpression(geneId)
+  if (!result) return null
 
-    const tissueExp = result.expressions.find(
-      (exp) => exp.tissueCode === tissueName || exp.tissueName === tissueName,
-    )
-    return tissueExp ?? null
-  } catch {
-    return null
-  }
+  const tissueExp = result.expressions.find(
+    (exp) => exp.tissueCode === tissueName || exp.tissueName === tissueName,
+  )
+  return tissueExp ?? null
 }
 
 export async function getGTExTopTissues(geneId: string, limit = 5): Promise<GTExExpression[]> {
-  try {
-    const result = await getGTExGeneExpression(geneId)
-    if (!result) return []
+  const result = await getGTExGeneExpression(geneId)
+  if (!result) return []
 
-    return result.expressions
-      .sort((a, b) => b.tpm - a.tpm)
-      .slice(0, limit)
-  } catch {
-    return []
-  }
+  return result.expressions
+    .sort((a, b) => b.tpm - a.tpm)
+    .slice(0, limit)
 }

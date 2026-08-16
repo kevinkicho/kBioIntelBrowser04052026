@@ -36,7 +36,7 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
     safe(getProteinFeaturesByAccessions(accessions), []),
     safe(getProteinAtlasBySymbols(geneSymbols), []),
     trackedSafe('quickgo', getGoAnnotationsByAccessions(accessions), []),
-    safe(getPeptideAtlasData(name), { peptides: [] }),
+    trackedSafe('peptideatlas', getPeptideAtlasData(name), { peptides: [] }),
     safe(
       mapSettled(geneSymbols.slice(0, 5), (s) => searchGene3D(s), []).then((r) => r.flat()),
       [],
