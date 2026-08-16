@@ -17,7 +17,6 @@ import {
   type TourExampleSetPref,
 } from '@/lib/discovery/preferences'
 import { examplesForTourSet } from '@/lib/discovery/tourExamples'
-import { FinishRateStrip } from '@/components/analytics/FinishRateStrip'
 import { LoopCoachStrip } from '@/components/loop/LoopCoachStrip'
 import { loadLastCampaignPath } from '@/lib/campaign/lastCampaignPath'
 import { GOLDEN_PATHS } from '@/lib/golden/goldenPaths'
@@ -225,7 +224,6 @@ function HomePageContent() {
 
       <div className="mb-6 w-full max-w-3xl space-y-3" data-testid="home-beachhead">
         <LoopCoachStrip />
-        <FinishRateStrip compact />
         <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 text-left">
           <h2 className="text-sm font-semibold text-slate-100">Beachhead personas</h2>
           <p className="mt-1 text-[11px] text-slate-500">

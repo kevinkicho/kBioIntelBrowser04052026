@@ -44,7 +44,7 @@ test.describe('Campaign stages from product events', () => {
 
     await page.goto('/campaign')
     await expect(page.getByTestId('campaign-workspace')).toBeVisible({ timeout: 30_000 })
-    await expect(page.getByTestId('finish-rate-strip')).toBeVisible()
+    await expect(page.getByTestId('loop-coach-strip')).toBeVisible()
     await expect(page.getByTestId('campaign-run-golden')).toBeVisible()
     await expect(page.getByTestId('campaign-stage-rank_shortlist')).toHaveAttribute(
       'data-done',
