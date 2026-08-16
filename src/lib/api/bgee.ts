@@ -1,4 +1,5 @@
 import type { BgeeExpression } from '../types'
+import { timedFetch } from './timedFetch'
 
 // Bgee uses SPARQL endpoint
 const SPARQL_URL = 'https://www.bgee.org/sparql'
@@ -18,12 +19,33 @@ const GENERIC_ANAT = new Set([
 ])
 
 /**
- * Query Bgee SPARQL endpoint for gene expression
+ * Bgee harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Blank query, 404, and zero-hit SPARQL JSON remain empty.
+ * Same-source POST may fall through to GET; if the fallback also fails, throw.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+/**
+ * Query Bgee SPARQL endpoint for gene expression.
+ * Prefer POST + Accept; GET is same-source fallback. Last-leg failure throws.
  */
 async function querySparql(query: string): Promise<Record<string, unknown>[]> {
   try {
-    // Prefer POST + Accept so Cloudflare / intermediaries return JSON when possible
-    const res = await fetch(`${SPARQL_URL}/`, {
+    const res = await timedFetch(`${SPARQL_URL}/`, {
       ...fetchOptions,
       method: 'POST',
       headers: {
@@ -31,26 +53,30 @@ async function querySparql(query: string): Promise<Record<string, unknown>[]> {
         'Content-Type': 'application/x-www-form-urlencoded; charset=UTF-8',
       },
       body: `query=${encodeURIComponent(query)}&format=json`,
+      timeoutMs: 8000,
     })
     if (res.ok) {
-      const ct = res.headers.get('content-type') || ''
+      const ct = (res.headers?.get?.('content-type') || '').toLowerCase()
       if (ct.includes('json')) {
         const data = await res.json()
         return data.results?.bindings ?? []
       }
     }
-    // GET fallback (some Bgee deployments only allow GET)
-    const url = `${SPARQL_URL}?query=${encodeURIComponent(query)}&format=json`
-    const getRes = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/sparql-results+json, application/json' },
-    })
-    if (!getRes.ok) return []
-    const data = await getRes.json()
-    return data.results?.bindings ?? []
+    // 404 / 5xx / non-JSON: same-source GET fallback
   } catch {
-    return []
+    // network / timeout: same-source GET fallback
   }
+
+  const url = `${SPARQL_URL}?query=${encodeURIComponent(query)}&format=json`
+  const getRes = await timedFetch(url, {
+    ...fetchOptions,
+    headers: { Accept: 'application/sparql-results+json, application/json' },
+    timeoutMs: 8000,
+  })
+  if (isAbsentStatus(getRes.status)) return []
+  throwIfHttpFailed(getRes, 'Bgee')
+  const data = await getRes.json()
+  return data.results?.bindings ?? []
 }
 
 function lit(binding: Record<string, unknown> | undefined, key: string): string {

@@ -5,13 +5,11 @@ global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getWikiPathwaysByName', () => {
-  test('returns parsed pathways from Homo sapiens', async () => {
-    // Note: parser's URL already filters by species=Homo+sapiens, so this
-    // mock only returns Homo sapiens entries.
+  test('returns parsed pathways from Pathway Commons', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse({
-        result: [
-          { id: 'WP123', name: 'ACE Inhibitor Pathway', species: 'Homo sapiens' },
+        searchHit: [
+          { uri: 'https://www.wikipathways.org/pathways/WP123', name: 'ACE Inhibitor Pathway' },
         ],
       })
     )
@@ -25,31 +23,32 @@ describe('getWikiPathwaysByName', () => {
 
   test('limits results to 10', async () => {
     const manyResults = Array.from({ length: 20 }, (_, i) => ({
-      id: `WP${i}`,
+      uri: `https://www.wikipathways.org/pathways/WP${i}`,
       name: `Pathway ${i}`,
-      species: 'Homo sapiens',
     }))
     ;(fetch as jest.Mock).mockResolvedValueOnce(
-      mockJsonResponse({ result: manyResults })
+      mockJsonResponse({ searchHit: manyResults })
     )
     const results = await getWikiPathwaysByName('test')
     expect(results).toHaveLength(10)
   })
 
-  test('returns empty array when fetch returns non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce(
+  test('throws when Pathway Commons and Reactome both fail', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(
       mockJsonResponse({}, { status: 500 })
     )
-    expect(await getWikiPathwaysByName('test')).toEqual([])
+    await expect(getWikiPathwaysByName('test')).rejects.toThrow(/HTTP 500/)
   })
 
-  test('returns empty array on network error', async () => {
-    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getWikiPathwaysByName('test')).toEqual([])
+  test('throws on network error after both legs fail', async () => {
+    ;(fetch as jest.Mock).mockRejectedValue(new Error('network'))
+    await expect(getWikiPathwaysByName('test')).rejects.toThrow(/network/)
   })
 
-  test('returns empty array when result is missing', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({}))
+  test('returns empty array when both sources have zero hits', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(mockJsonResponse({}))
+      .mockResolvedValueOnce(mockJsonResponse({}))
     expect(await getWikiPathwaysByName('test')).toEqual([])
   })
 })
