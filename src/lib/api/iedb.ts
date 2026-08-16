@@ -1,8 +1,34 @@
 import type { IEDBEpitope } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://www.iedb.org/api/v1'
 const EBI_PROTEINS = 'https://www.ebi.ac.uk/proteins/api'
 const fetchOptions: RequestInit = { next: { revalidate: 604800 } }
+
+/**
+ * IEDB harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True 404 / zero-hit JSON remains []. IEDB REST 5xx falls through
+ * to EBI Proteins antigen; if that fallback also fails, the error is thrown.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function asHttpError(e: unknown): Error & { status?: number } {
+  return e instanceof Error ? e : new Error(String(e))
+}
 
 function mapIedbResult(result: Record<string, unknown>, epitopeType = ''): IEDBEpitope {
   return {
@@ -26,40 +52,39 @@ function mapIedbResult(result: Record<string, unknown>, epitopeType = ''): IEDBE
   }
 }
 
+function dedupEpitopes(combined: IEDBEpitope[]): IEDBEpitope[] {
+  const seen = new Set<number>()
+  return combined.filter((e) => {
+    if (!e.epitopeId || seen.has(e.epitopeId)) return false
+    seen.add(e.epitopeId)
+    return true
+  })
+}
+
+async function iedbSearch(url: string, epitopeType = ''): Promise<IEDBEpitope[]> {
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'IEDB')
+  const data = await res.json()
+  return (data.results ?? []).map((r: Record<string, unknown>) => mapIedbResult(r, epitopeType))
+}
+
 export async function searchEpitopes(query: string): Promise<IEDBEpitope[]> {
-  try {
-    const url = `${BASE_URL}/epitopeSearch?search=${encodeURIComponent(query)}&limit=20`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data.results ?? []).map((r: Record<string, unknown>) => mapIedbResult(r))
-  } catch {
-    return []
-  }
+  return iedbSearch(`${BASE_URL}/epitopeSearch?search=${encodeURIComponent(query)}&limit=20`)
 }
 
 export async function searchBEpitopes(proteinName: string): Promise<IEDBEpitope[]> {
-  try {
-    const url = `${BASE_URL}/bcellSearch?protein=${encodeURIComponent(proteinName)}&limit=20`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data.results ?? []).map((r: Record<string, unknown>) => mapIedbResult(r, 'B cell'))
-  } catch {
-    return []
-  }
+  return iedbSearch(
+    `${BASE_URL}/bcellSearch?protein=${encodeURIComponent(proteinName)}&limit=20`,
+    'B cell',
+  )
 }
 
 export async function searchTEpitopes(proteinName: string): Promise<IEDBEpitope[]> {
-  try {
-    const url = `${BASE_URL}/tcellSearch?protein=${encodeURIComponent(proteinName)}&limit=20`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data.results ?? []).map((r: Record<string, unknown>) => mapIedbResult(r, 'T cell'))
-  } catch {
-    return []
-  }
+  return iedbSearch(
+    `${BASE_URL}/tcellSearch?protein=${encodeURIComponent(proteinName)}&limit=20`,
+    'T cell',
+  )
 }
 
 /**
@@ -67,72 +92,67 @@ export async function searchTEpitopes(proteinName: string): Promise<IEDBEpitope[
  * Used when IEDB REST is unavailable (common).
  */
 async function ebiAntigenEpitopes(accession: string): Promise<IEDBEpitope[]> {
-  try {
-    const url = `${EBI_PROTEINS}/antigen/${encodeURIComponent(accession)}`
-    const res = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
+  const url = `${EBI_PROTEINS}/antigen/${encodeURIComponent(accession)}`
+  const res = await timedFetch(url, {
+    ...fetchOptions,
+    headers: { Accept: 'application/json' },
+    timeoutMs: 8000,
+  })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'IEDB')
+  const data = await res.json()
+  const features = Array.isArray(data) ? data : data.features ?? []
+  const out: IEDBEpitope[] = []
+  let i = 0
+  for (const f of features as Array<Record<string, unknown>>) {
+    const seq = String(f.peptide || f.sequence || f.description || '').trim()
+    const peptideLike = /^[A-Z*]{6,}$/i.test(seq.replace(/\s/g, ''))
+    const sequence = peptideLike ? seq.replace(/\s/g, '') : ''
+    if (!sequence && !f.begin) continue
+    i += 1
+    out.push({
+      epitopeId: i,
+      name: String(f.type || f.category || 'antigen feature'),
+      sequence: sequence || String(f.begin || '') + '-' + String(f.end || ''),
+      length: sequence.length || 0,
+      epitopeType: String(f.type || 'antigen'),
+      antigenName: accession,
+      antigenId: 0,
+      organismName: 'Homo sapiens',
+      organismId: 9606,
+      mhcRestriction: '',
+      assayCount: 0,
+      positiveAssayCount: 0,
+      source: 'EBI Proteins antigen (IEDB fallback)',
+      url: `https://www.ebi.ac.uk/proteins/api/antigen/${accession}`,
     })
-    if (!res.ok) return []
-    const data = await res.json()
-    const features = Array.isArray(data) ? data : data.features ?? []
-    const out: IEDBEpitope[] = []
-    let i = 0
-    for (const f of features as Array<Record<string, unknown>>) {
-      const seq = String(f.peptide || f.sequence || f.description || '').trim()
-      // Prefer peptide-like rows
-      const peptideLike = /^[A-Z*]{6,}$/i.test(seq.replace(/\s/g, ''))
-      const sequence = peptideLike ? seq.replace(/\s/g, '') : ''
-      if (!sequence && !f.begin) continue
-      i += 1
-      out.push({
-        epitopeId: i,
-        name: String(f.type || f.category || 'antigen feature'),
-        sequence: sequence || String(f.begin || '') + '-' + String(f.end || ''),
-        length: sequence.length || 0,
-        epitopeType: String(f.type || 'antigen'),
-        antigenName: accession,
-        antigenId: 0,
-        organismName: 'Homo sapiens',
-        organismId: 9606,
-        mhcRestriction: '',
-        assayCount: 0,
-        positiveAssayCount: 0,
-        source: 'EBI Proteins antigen (IEDB fallback)',
-        url: `https://www.ebi.ac.uk/proteins/api/antigen/${accession}`,
-      })
-      if (out.length >= 20) break
-    }
-    return out
-  } catch {
-    return []
+    if (out.length >= 20) break
   }
+  return out
 }
 
 export async function getIEDBData(proteinName: string): Promise<{ epitopes: IEDBEpitope[] }> {
   const q = proteinName?.trim()
   if (!q) return { epitopes: [] }
 
-  const [allEpitopes, bEpitopes, tEpitopes] = await Promise.all([
+  let primaryError: (Error & { status?: number }) | null = null
+  const settled = await Promise.allSettled([
     searchEpitopes(q),
     searchBEpitopes(q),
     searchTEpitopes(q),
   ])
-
-  const combined = [...allEpitopes, ...bEpitopes, ...tEpitopes]
-  const seen = new Set<number>()
-  let unique = combined.filter((e) => {
-    if (!e.epitopeId || seen.has(e.epitopeId)) return false
-    seen.add(e.epitopeId)
-    return true
-  })
+  const combined: IEDBEpitope[] = []
+  for (const s of settled) {
+    if (s.status === 'fulfilled') combined.push(...s.value)
+    else if (!primaryError) primaryError = asHttpError(s.reason)
+  }
+  let unique = dedupEpitopes(combined)
 
   if (unique.length === 0) {
-    // UniProt accession direct
-    if (/^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(q)) {
-      unique = await ebiAntigenEpitopes(q.toUpperCase())
-    } else {
-      try {
+    try {
+      if (/^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(q)) {
+        unique = await ebiAntigenEpitopes(q.toUpperCase())
+      } else {
         const { getUniprotEntriesByName } = await import('./uniprot')
         const entries = await getUniprotEntriesByName(q)
         for (const e of entries.slice(0, 2)) {
@@ -143,10 +163,12 @@ export async function getIEDBData(proteinName: string): Promise<{ epitopes: IEDB
             break
           }
         }
-      } catch {
-        /* ignore */
       }
+    } catch (e) {
+      if (primaryError) throw primaryError
+      throw e
     }
+    if (unique.length === 0 && primaryError) throw primaryError
   }
 
   return { epitopes: unique.slice(0, 25) }

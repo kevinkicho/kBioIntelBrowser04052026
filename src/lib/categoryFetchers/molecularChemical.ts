@@ -24,7 +24,7 @@ import { searchFooDB } from '@/lib/api/foodb'
 async function fetchSynthesisRoutes(moleculeName: string): Promise<SynthesisRoute[]> {
   const [keggId, rheaRoutes] = await Promise.all([
     safe(getKeggCompoundId(moleculeName), null),
-    safe(getRheaSynthesisRoutes(moleculeName), []),
+    trackedSafe('rhea', getRheaSynthesisRoutes(moleculeName), []),
   ])
   const keggRoutes: SynthesisRoute[] = []
   if (keggId) {
