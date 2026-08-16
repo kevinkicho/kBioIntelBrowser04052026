@@ -1,57 +1,60 @@
 import type { DisGeNetAssociation } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.disgenet.org/api/v1'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
+
+/**
+ * DisGeNET gather leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function mapAssociations(data: { response?: Record<string, unknown>[] }): DisGeNetAssociation[] {
+  return (data.response ?? []).map((item: Record<string, unknown>) => ({
+    geneSymbol: item.gene_symbol as string,
+    geneId: item.gene_id as string,
+    diseaseId: item.disease_id as string,
+    diseaseName: item.disease_name as string,
+    diseaseType: item.disease_type as string,
+    score: item.score as number,
+    source: item.source as string,
+    pmids: ((item.pmids as string[]) ?? []).slice(0, 5),
+  }))
+}
 
 /**
  * Get gene-disease associations by gene symbol
  */
 export async function getDiseasesByGene(geneSymbol: string): Promise<DisGeNetAssociation[]> {
   if (!geneSymbol?.trim()) return []
-  try {
-    const url = `${BASE_URL}/gda?gene_symbol=${encodeURIComponent(geneSymbol)}&limit=50`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return (data.response ?? []).map((item: Record<string, unknown>) => ({
-      geneSymbol: item.gene_symbol as string,
-      geneId: item.gene_id as string,
-      diseaseId: item.disease_id as string,
-      diseaseName: item.disease_name as string,
-      diseaseType: item.disease_type as string,
-      score: item.score as number,
-      source: item.source as string,
-      pmids: (item.pmids as string[] ?? []).slice(0, 5),
-    }))
-  } catch {
-    return []
-  }
+  const url = `${BASE_URL}/gda?gene_symbol=${encodeURIComponent(geneSymbol)}&limit=50`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'DisGeNET')
+  const data = await res.json()
+  return mapAssociations(data)
 }
 
 /**
  * Get gene-disease associations by disease name
  */
 export async function getGenesByDisease(diseaseName: string): Promise<DisGeNetAssociation[]> {
-  try {
-    const url = `${BASE_URL}/gda?disease_name=${encodeURIComponent(diseaseName)}&limit=50`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return (data.response ?? []).map((item: Record<string, unknown>) => ({
-      geneSymbol: item.gene_symbol as string,
-      geneId: item.gene_id as string,
-      diseaseId: item.disease_id as string,
-      diseaseName: item.disease_name as string,
-      diseaseType: item.disease_type as string,
-      score: item.score as number,
-      source: item.source as string,
-      pmids: (item.pmids as string[] ?? []).slice(0, 5),
-    }))
-  } catch {
-    return []
-  }
+  if (!diseaseName?.trim()) return []
+  const url = `${BASE_URL}/gda?disease_name=${encodeURIComponent(diseaseName)}&limit=50`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'DisGeNET')
+  const data = await res.json()
+  return mapAssociations(data)
 }
 
 /**
