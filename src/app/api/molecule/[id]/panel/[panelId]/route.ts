@@ -87,6 +87,8 @@ import { getKEGGData } from '@/lib/api/kegg'
 import { searchMassBank } from '@/lib/api/massbank'
 import { searchChemSpider } from '@/lib/api/chemspider'
 import { searchMetaboLights } from '@/lib/api/metabolights'
+import { searchLipidMaps } from '@/lib/api/lipidmaps'
+import { getEuResearchProjectsByName } from '@/lib/api/openaire'
 import { searchGNPSLibrary, searchGNPSNetworks } from '@/lib/api/gnps'
 
 // Additional APIs for expanded coverage
@@ -317,6 +319,15 @@ const PANEL_CONFIG: Record<string, {
     fetcher: async (name, _synonyms, limit) => {
       const data = await searchMetaboLights(name, limit)
       return { data, total: data.length, hasMore: data.length === limit }
+    }
+  },
+  'lipidMapsLipids': {
+    category: 'molecular-chemical',
+    limitKey: 'LIPID_MAPS',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await searchLipidMaps(name, limit)
+      const data = result.lipids ?? []
+      return { data, total: result.total ?? data.length, hasMore: data.length === limit }
     }
   },
 
@@ -897,6 +908,14 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'OPEN_CITATIONS',
     fetcher: async (name, _synonyms, limit) => {
       const data = await getCitationMetrics([name])
+      return { data: data.slice(0, limit), total: data.length, hasMore: data.length > limit }
+    }
+  },
+  'openAireProjects': {
+    category: 'research-literature',
+    limitKey: 'OPENAIRE',
+    fetcher: async (name, _synonyms, limit) => {
+      const data = await getEuResearchProjectsByName(name)
       return { data: data.slice(0, limit), total: data.length, hasMore: data.length > limit }
     }
   },

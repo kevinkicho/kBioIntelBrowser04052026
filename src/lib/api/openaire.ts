@@ -5,6 +5,8 @@
  * @see docs/design/public-apis-international.md
  */
 
+import { timedFetch } from './timedFetch'
+
 export interface OpenAireProject {
   id: string
   code: string
@@ -35,6 +37,31 @@ export interface OpenAirePublication {
   publisher: string
   /** Best public landing page (DOI or OpenAIRE explore) */
   url: string
+}
+
+/**
+ * OpenAIRE harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True 404 / short query / zero-hit JSON remains [].
+ * EC-funded search 5xx falls through to general search; if that also fails, throw.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function asHttpError(e: unknown): Error & { status?: number } {
+  return e instanceof Error ? e : new Error(String(e))
 }
 
 /** OpenAIRE wraps many scalars as { "$": "value" } */
@@ -139,27 +166,37 @@ export async function getOpenAireProjectsByName(
   })
   if (opts?.hasECFunding) params.set('hasECFunding', 'true')
 
-  try {
-    const res = await fetch(`${PROJECTS_BASE}?${params.toString()}`, fetchOptions)
-    if (!res.ok) return []
-    const data = (await res.json()) as {
-      response?: { results?: unknown }
-    }
-    const rows = asResultArray(data.response?.results)
-    return rows
-      .map(mapProject)
-      .filter((p): p is OpenAireProject => p != null)
-      .slice(0, size)
-  } catch {
-    return []
+  const res = await timedFetch(`${PROJECTS_BASE}?${params.toString()}`, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'OpenAIRE')
+  const data = (await res.json()) as {
+    response?: { results?: unknown }
   }
+  const rows = asResultArray(data.response?.results)
+  return rows
+    .map(mapProject)
+    .filter((p): p is OpenAireProject => p != null)
+    .slice(0, size)
 }
 
 /** Prefer EC-funded projects when available; fall back to general search. */
 export async function getEuResearchProjectsByName(query: string): Promise<OpenAireProject[]> {
-  const ec = await getOpenAireProjectsByName(query, { size: 12, hasECFunding: true })
-  if (ec.length > 0) return ec
-  return getOpenAireProjectsByName(query, { size: 12 })
+  let primaryError: (Error & { status?: number }) | null = null
+  try {
+    const ec = await getOpenAireProjectsByName(query, { size: 12, hasECFunding: true })
+    if (ec.length > 0) return ec
+  } catch (e) {
+    primaryError = asHttpError(e)
+  }
+  try {
+    const all = await getOpenAireProjectsByName(query, { size: 12 })
+    if (all.length > 0) return all
+    if (primaryError) throw primaryError
+    return []
+  } catch (e) {
+    if (primaryError) throw primaryError
+    throw e
+  }
 }
 
 function mapPublication(raw: unknown): OpenAirePublication | null {
@@ -240,16 +277,13 @@ export async function getOpenAirePublicationsByName(
     size: String(Math.min(25, Math.max(1, size))),
     page: '1',
   })
-  try {
-    const res = await fetch(`${PUBLICATIONS_BASE}?${params.toString()}`, fetchOptions)
-    if (!res.ok) return []
-    const data = (await res.json()) as { response?: { results?: unknown } }
-    const rows = asResultArray(data.response?.results)
-    return rows
-      .map(mapPublication)
-      .filter((p): p is OpenAirePublication => p != null)
-      .slice(0, size)
-  } catch {
-    return []
-  }
+  const res = await timedFetch(`${PUBLICATIONS_BASE}?${params.toString()}`, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'OpenAIRE')
+  const data = (await res.json()) as { response?: { results?: unknown } }
+  const rows = asResultArray(data.response?.results)
+  return rows
+    .map(mapPublication)
+    .filter((p): p is OpenAirePublication => p != null)
+    .slice(0, size)
 }
