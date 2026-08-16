@@ -53,7 +53,12 @@ export default async function DiseaseDetailPage({ params, searchParams }: Diseas
     { id, name: diseaseName, source, molecules },
   ])
 
-  const trials = sortTrials(await searchClinicalTrialsByCondition(diseaseName))
+  let trials: Awaited<ReturnType<typeof searchClinicalTrialsByCondition>> = []
+  try {
+    trials = sortTrials(await searchClinicalTrialsByCondition(diseaseName))
+  } catch {
+    /* CT.gov HTTP/timeout is not honest empty; keep the disease page up. */
+  }
   const drugInterventions = extractDrugInterventions(trials)
   let whoGho: Awaited<ReturnType<typeof getWhoGhoContextForDisease>> = {
     indicators: [],

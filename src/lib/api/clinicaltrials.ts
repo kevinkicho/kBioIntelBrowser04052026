@@ -1,6 +1,7 @@
 import type { ClinicalTrial } from '../types'
 import { LIMITS } from '../api-limits'
 import { parseSecondaryTrialIds } from '../euClinicalTrials'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://clinicaltrials.gov/api/v2/studies'
 const fetchOptions: RequestInit = { next: { revalidate: 3600 } }
@@ -51,30 +52,37 @@ function parseStudies(studies: unknown[]): ClinicalTrial[] {
   })
 }
 
-export async function getClinicalTrialsByName(name: string, limit: number = LIMITS.CLINICAL_TRIALS.initial): Promise<ClinicalTrial[]> {
-  try {
-    const url = `${BASE_URL}?query.term=${encodeURIComponent(name)}&pageSize=${limit}&format=json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return parseStudies(data.studies ?? [])
-  } catch {
-    return []
+/**
+ * ClinicalTrials.gov v2. HTTP / HTML / timeout are not EMPTY.
+ * True zero-study JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers.get('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
   }
 }
 
-export async function searchClinicalTrialsByCondition(condition: string, pageSize: number = 50): Promise<ClinicalTrial[]> {
-  try {
-    const url = `${BASE_URL}?query.cond=${encodeURIComponent(condition)}&pageSize=${pageSize}&format=json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
+async function fetchStudies(url: string): Promise<ClinicalTrial[]> {
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'ClinicalTrials.gov')
+  const data = await res.json()
+  return parseStudies(data.studies ?? [])
+}
 
-    return parseStudies(data.studies ?? [])
-  } catch {
-    return []
-  }
+export async function getClinicalTrialsByName(name: string, limit: number = LIMITS.CLINICAL_TRIALS.initial): Promise<ClinicalTrial[]> {
+  const url = `${BASE_URL}?query.term=${encodeURIComponent(name)}&pageSize=${limit}&format=json`
+  return fetchStudies(url)
+}
+
+export async function searchClinicalTrialsByCondition(condition: string, pageSize: number = 50): Promise<ClinicalTrial[]> {
+  const url = `${BASE_URL}?query.cond=${encodeURIComponent(condition)}&pageSize=${pageSize}&format=json`
+  return fetchStudies(url)
 }
 
 export function sortTrials(trials: ClinicalTrial[]): ClinicalTrial[] {
