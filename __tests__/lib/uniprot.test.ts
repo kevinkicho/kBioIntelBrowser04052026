@@ -4,6 +4,16 @@ import {
   getUniProtProtein,
 } from '@/lib/api/uniprot'
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
@@ -39,6 +49,8 @@ describe('getUniProtProtein', () => {
   test('maps proteinDescription object to a string proteinName', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
       json: async () => ({
         primaryAccession: 'P00734',
         uniProtkbId: 'THRB_HUMAN',
@@ -86,6 +98,8 @@ describe('getUniprotEntriesByName', () => {
   test('returns parsed entries on success', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
       json: async () => ({
         results: [
           {
@@ -116,30 +130,32 @@ describe('getUniprotEntriesByName', () => {
     expect(results[0].functionSummary).toBe('Thrombin cleaves fibrinogen to form fibrin.')
   })
 
-  test('returns empty array when API response is not ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    const results = await getUniprotEntriesByName('unknownxyz')
-    expect(results).toEqual([])
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getUniprotEntriesByName('unknownxyz')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getUniprotEntriesByName('aspirin')).rejects.toThrow(/HTML/)
   })
 
   test('returns empty array when results key is missing', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}))
     const results = await getUniprotEntriesByName('aspirin')
     expect(results).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const results = await getUniprotEntriesByName('aspirin')
-    expect(results).toEqual([])
+    await expect(getUniprotEntriesByName('aspirin')).rejects.toThrow(/network/)
   })
 
   test('handles missing optional fields gracefully', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
       json: async () => ({
         results: [
           {

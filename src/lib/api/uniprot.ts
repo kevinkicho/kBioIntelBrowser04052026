@@ -5,6 +5,22 @@ const BASE_URL = 'https://rest.uniprot.org/uniprotkb/search'
 const DETAIL_URL = 'https://rest.uniprot.org/uniprotkb'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
+/**
+ * UniProt harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers.get('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 export interface UniProtProtein {
   accession: string
   id: string
@@ -48,49 +64,45 @@ export interface UniProtSearchResponse {
 export async function getUniprotEntriesByName(name: string): Promise<UniprotEntry[]> {
   // Empty query = missing gene/accession (do not search free-text chemical names for gene APIs)
   if (!name?.trim()) return []
-  try {
-    const raw = name.trim()
-    // Accession-style queries (P12345) use id: filter when possible
-    const isAccession = /^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(raw)
-    // Already a UniProt Lucene-style query
-    const isFielded = /^(gene|gene_exact|accession|organism_id|id):/i.test(raw) || raw.includes(' AND ')
-    let q: string
-    if (isAccession) {
-      q = `accession:${raw}`
-    } else if (isFielded) {
-      q = raw
-    } else if (/^[A-Z][A-Z0-9-]{1,14}$/i.test(raw) && raw.length <= 12) {
-      // Gene symbol → human reviewed first
-      q = `(gene_exact:${raw} OR gene:${raw}) AND organism_id:9606`
-    } else {
-      q = raw
-    }
-    const url = `${BASE_URL}?query=${encodeURIComponent(q)}&format=json&size=5`
-    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return []
-    const data = await res.json()
-
-    return (data.results ?? []).map((entry: {
-      primaryAccession: string
-      proteinDescription?: {
-        recommendedName?: { fullName?: { value?: string } }
-      }
-      genes?: { geneName?: { value?: string } }[]
-      organism?: { scientificName?: string }
-      comments?: { commentType?: string; texts?: { value?: string }[] }[]
-    }) => {
-      const functionComment = entry.comments?.find(c => c.commentType === 'FUNCTION')
-      return {
-        accession: entry.primaryAccession ?? '',
-        proteinName: entry.proteinDescription?.recommendedName?.fullName?.value ?? 'Unknown protein',
-        geneName: entry.genes?.[0]?.geneName?.value ?? '',
-        organism: entry.organism?.scientificName ?? 'Unknown',
-        functionSummary: functionComment?.texts?.[0]?.value ?? '',
-      }
-    })
-  } catch {
-    return []
+  const raw = name.trim()
+  // Accession-style queries (P12345) use id: filter when possible
+  const isAccession = /^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(raw)
+  // Already a UniProt Lucene-style query
+  const isFielded = /^(gene|gene_exact|accession|organism_id|id):/i.test(raw) || raw.includes(' AND ')
+  let q: string
+  if (isAccession) {
+    q = `accession:${raw}`
+  } else if (isFielded) {
+    q = raw
+  } else if (/^[A-Z][A-Z0-9-]{1,14}$/i.test(raw) && raw.length <= 12) {
+    // Gene symbol → human reviewed first
+    q = `(gene_exact:${raw} OR gene:${raw}) AND organism_id:9606`
+  } else {
+    q = raw
   }
+  const url = `${BASE_URL}?query=${encodeURIComponent(q)}&format=json&size=5`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'UniProt')
+  const data = await res.json()
+
+  return (data.results ?? []).map((entry: {
+    primaryAccession: string
+    proteinDescription?: {
+      recommendedName?: { fullName?: { value?: string } }
+    }
+    genes?: { geneName?: { value?: string } }[]
+    organism?: { scientificName?: string }
+    comments?: { commentType?: string; texts?: { value?: string }[] }[]
+  }) => {
+    const functionComment = entry.comments?.find(c => c.commentType === 'FUNCTION')
+    return {
+      accession: entry.primaryAccession ?? '',
+      proteinName: entry.proteinDescription?.recommendedName?.fullName?.value ?? 'Unknown protein',
+      geneName: entry.genes?.[0]?.geneName?.value ?? '',
+      organism: entry.organism?.scientificName ?? 'Unknown',
+      functionSummary: functionComment?.texts?.[0]?.value ?? '',
+    }
+  })
 }
 
 /**

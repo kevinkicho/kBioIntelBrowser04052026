@@ -6,6 +6,7 @@ import {
   chemblTargetUrl,
   normalizeChemblId,
 } from '../chemblLinks'
+import { timedFetch } from './timedFetch'
 
 const SEARCH_URL = 'https://www.ebi.ac.uk/chembl/api/data/molecule/search.json'
 const ACTIVITY_URL = 'https://www.ebi.ac.uk/chembl/api/data/activity.json'
@@ -13,23 +14,35 @@ const TARGET_URL = 'https://www.ebi.ac.uk/chembl/api/data/target.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
 /**
+ * ChEMBL harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [] / null.
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers.get('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+/**
  * Search for molecule by name and get ChEMBL ID
  */
 export async function getChemblIdByName(name: string): Promise<string | null> {
-  try {
-    // InChIKey (preferred default) or free-text name
-    const isInchiKey = /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/i.test(name.trim())
-    const url = isInchiKey
-      ? `https://www.ebi.ac.uk/chembl/api/data/molecule.json?molecule_structures__standard_inchi_key=${encodeURIComponent(name.trim())}&limit=1`
-      : `${SEARCH_URL}?q=${encodeURIComponent(name)}&limit=1`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
-    const data = await res.json()
-    const molecules = data.molecules ?? []
-    return molecules.length > 0 ? molecules[0].molecule_chembl_id : null
-  } catch {
-    return null
-  }
+  // InChIKey (preferred default) or free-text name
+  const isInchiKey = /^[A-Z]{14}-[A-Z]{10}-[A-Z]$/i.test(name.trim())
+  const url = isInchiKey
+    ? `https://www.ebi.ac.uk/chembl/api/data/molecule.json?molecule_structures__standard_inchi_key=${encodeURIComponent(name.trim())}&limit=1`
+    : `${SEARCH_URL}?q=${encodeURIComponent(name)}&limit=1`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'ChEMBL')
+  const data = await res.json()
+  const molecules = data.molecules ?? []
+  return molecules.length > 0 ? molecules[0].molecule_chembl_id : null
 }
 
 /**
@@ -79,14 +92,13 @@ export async function searchTargetsByMoleculeName(name: string, limit: number = 
  * Get bioactivity data for a molecule
  */
 export async function getChemblActivitiesByName(name: string, limit: number = LIMITS.CHEMBL.initial): Promise<ChemblActivity[]> {
-  try {
-    const chemblId = await getChemblIdByName(name)
-    if (!chemblId) return []
+  const chemblId = await getChemblIdByName(name)
+  if (!chemblId) return []
 
-    const url = `${ACTIVITY_URL}?molecule_chembl_id=${chemblId}&limit=${limit}&format=json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
+  const url = `${ACTIVITY_URL}?molecule_chembl_id=${chemblId}&limit=${limit}&format=json`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'ChEMBL')
+  const data = await res.json()
 
     const molId = normalizeChemblId(chemblId) || chemblId
     return (data.activities ?? []).map(
@@ -133,9 +145,6 @@ export async function getChemblActivitiesByName(name: string, limit: number = LI
         } satisfies ChemblActivity
       },
     )
-  } catch {
-    return []
-  }
 }
 
 /** Public helpers re-export for panels that only have an id. */
