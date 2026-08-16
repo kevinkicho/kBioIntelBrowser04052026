@@ -1,8 +1,37 @@
 import type { KEGGPathway, KEGGCompound, KEGGDrug } from '../types'
 import { LIMITS } from '../api-limits'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://rest.kegg.jp'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
+
+/**
+ * KEGG harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit text remains [] / null.
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+async function keggText(urlPath: string): Promise<string> {
+  const res = await timedFetch(`${BASE_URL}${urlPath}`, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'KEGG')
+  const text = await res.text()
+  const trimmed = text.trimStart()
+  if (trimmed.startsWith('<')) {
+    throw new Error('HTML response from KEGG')
+  }
+  return text
+}
+
 
 // Existing types kept for backward compatibility
 export interface KeggReactionDetail {
@@ -16,66 +45,53 @@ export interface KeggReactionDetail {
  * Get KEGG compound ID from name (existing function)
  */
 export async function getKeggCompoundId(name: string): Promise<string | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/find/compound/${encodeURIComponent(name)}`, fetchOptions)
-    if (!res.ok) return null
-    const text = await res.text()
-    const firstLine = text.trim().split('\n')[0]
-    if (!firstLine) return null
-    const match = firstLine.match(/cpd:(C\d+)/)
-    return match ? match[1] : null
-  } catch {
-    return null
-  }
+  const q = (name || '').trim()
+  if (!q) return null
+  const text = await keggText(`/find/compound/${encodeURIComponent(q)}`)
+  const firstLine = text.trim().split('\n')[0]
+  if (!firstLine) return null
+  const match = firstLine.match(/cpd:(C\d+)/)
+  return match ? match[1] : null
 }
 
 /**
  * Get KEGG reactions for a compound (existing function)
  */
 export async function getKeggReactions(compoundId: string): Promise<string[]> {
-  try {
-    const res = await fetch(`${BASE_URL}/link/reaction/${compoundId}`, fetchOptions)
-    if (!res.ok) return []
-    const text = await res.text()
-    return text.trim().split('\n')
-      .map(line => line.match(/rn:(R\d+)/)?.[1])
-      .filter((id): id is string => id !== undefined)
-      .slice(0, 10)
-  } catch {
-    return []
-  }
+  const id = (compoundId || '').trim()
+  if (!id) return []
+  const text = await keggText(`/link/reaction/${encodeURIComponent(id)}`)
+  if (!text.trim()) return []
+  return text.trim().split('\n')
+    .map(line => line.match(/rn:(R\d+)/)?.[1])
+    .filter((id): id is string => id !== undefined)
+    .slice(0, 10)
 }
 
 /**
  * Get KEGG reaction details (existing function)
  */
 export async function getKeggReactionDetail(reactionId: string): Promise<KeggReactionDetail | null> {
-  try {
-    const res = await fetch(`${BASE_URL}/get/${reactionId}`, fetchOptions)
-    if (!res.ok) return null
-    const text = await res.text()
+  const id = (reactionId || '').trim()
+  if (!id) return null
+  const text = await keggText(`/get/${encodeURIComponent(id)}`)
+  if (!text.trim()) return null
 
-    const name = text.match(/^NAME\s+(.+)/m)?.[1]?.trim() ?? reactionId
-    const equation = text.match(/^EQUATION\s+(.+)/m)?.[1]?.trim() ?? ''
-    const enzymeBlock = text.match(/^ENZYME\s+([\s\S]*?)(?=^\w|\Z)/m)?.[1] ?? ''
-    const enzymes = enzymeBlock.trim().split(/\s+/).filter(Boolean).slice(0, 5)
+  const name = text.match(/^NAME\s+(.+)/m)?.[1]?.trim() ?? id
+  const equation = text.match(/^EQUATION\s+(.+)/m)?.[1]?.trim() ?? ''
+  const enzymeBlock = text.match(/^ENZYME\s+([\s\S]*?)(?=^\w|\Z)/m)?.[1] ?? ''
+  const enzymes = enzymeBlock.trim().split(/\s+/).filter(Boolean).slice(0, 5)
 
-    return { id: reactionId, name, equation, enzymes }
-  } catch {
-    return null
-  }
+  return { id, name, equation, enzymes }
 }
 
 /**
  * Search KEGG for pathway information (NEW)
  */
 export async function searchKEGGPathways(query: string, limit: number = LIMITS.KEGG.initial): Promise<KEGGPathway[]> {
-  try {
-    const searchUrl = `${BASE_URL}/find/pathway/${encodeURIComponent(query)}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
-
-    const text = await searchRes.text()
+    const q = (query || '').trim()
+    if (!q) return []
+    const text = await keggText(`/find/pathway/${encodeURIComponent(q)}`)
     const lines = text.trim().split('\n').filter(Boolean)
 
     const pathways: KEGGPathway[] = []
@@ -100,22 +116,15 @@ export async function searchKEGGPathways(query: string, limit: number = LIMITS.K
     }
 
     return pathways
-  } catch (error) {
-    console.error('KEGG pathway search error:', error)
-    return []
-  }
 }
 
 /**
  * Get detailed pathway information (NEW)
  */
 export async function getKEGGPathway(pathwayId: string): Promise<KEGGPathway | null> {
-  try {
-    const infoUrl = `${BASE_URL}/get/${pathwayId}`
-    const infoRes = await fetch(infoUrl, fetchOptions)
-    if (!infoRes.ok) return null
-
-    const text = await infoRes.text()
+    const id = (pathwayId || '').trim()
+    if (!id) return null
+    const text = await keggText(`/get/${encodeURIComponent(id)}`)
 
     const pathway: KEGGPathway = {
       id: pathwayId,
@@ -142,22 +151,15 @@ export async function getKEGGPathway(pathwayId: string): Promise<KEGGPathway | n
     }
 
     return pathway
-  } catch (error) {
-    console.error('KEGG pathway fetch error:', error)
-    return null
-  }
 }
 
 /**
  * Search KEGG for compound information (NEW)
  */
 export async function searchKEGGCompounds(query: string, limit: number = LIMITS.KEGG.initial): Promise<KEGGCompound[]> {
-  try {
-    const searchUrl = `${BASE_URL}/find/compound/${encodeURIComponent(query)}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
-
-    const text = await searchRes.text()
+    const q = (query || '').trim()
+    if (!q) return []
+    const text = await keggText(`/find/compound/${encodeURIComponent(q)}`)
     const lines = text.trim().split('\n').filter(Boolean)
 
     const compounds: KEGGCompound[] = []
@@ -181,22 +183,15 @@ export async function searchKEGGCompounds(query: string, limit: number = LIMITS.
     }
 
     return compounds
-  } catch (error) {
-    console.error('KEGG compound search error:', error)
-    return []
-  }
 }
 
 /**
  * Search KEGG for drug information (NEW)
  */
 export async function searchKEGGDrugs(query: string, limit: number = LIMITS.KEGG.initial): Promise<KEGGDrug[]> {
-  try {
-    const searchUrl = `${BASE_URL}/find/drug/${encodeURIComponent(query)}`
-    const searchRes = await fetch(searchUrl, fetchOptions)
-    if (!searchRes.ok) return []
-
-    const text = await searchRes.text()
+    const q = (query || '').trim()
+    if (!q) return []
+    const text = await keggText(`/find/drug/${encodeURIComponent(q)}`)
     const lines = text.trim().split('\n').filter(Boolean)
 
     const drugs: KEGGDrug[] = []
@@ -220,23 +215,15 @@ export async function searchKEGGDrugs(query: string, limit: number = LIMITS.KEGG
     }
 
     return drugs
-  } catch (error) {
-    console.error('KEGG drug search error:', error)
-    return []
-  }
 }
 
 /**
  * Get compound details by ID (NEW)
  */
 export async function getKEGGCompound(compoundId: string): Promise<KEGGCompound | null> {
-  try {
-    const cleanId = compoundId.replace('cpd:', '')
-    const infoUrl = `${BASE_URL}/get/cpd:${cleanId}`
-    const infoRes = await fetch(infoUrl, fetchOptions)
-    if (!infoRes.ok) return null
-
-    const text = await infoRes.text()
+    const cleanId = (compoundId || '').replace('cpd:', '').trim()
+    if (!cleanId) return null
+    const text = await keggText(`/get/cpd:${encodeURIComponent(cleanId)}`)
 
     const compound: KEGGCompound = {
       id: `cpd:${cleanId}`,
@@ -282,10 +269,6 @@ export async function getKEGGCompound(compoundId: string): Promise<KEGGCompound 
     }
 
     return compound
-  } catch (error) {
-    console.error('KEGG compound fetch error:', error)
-    return null
-  }
 }
 
 /**
@@ -296,16 +279,12 @@ export async function getKEGGData(query: string): Promise<{
   compounds: KEGGCompound[]
   drugs: KEGGDrug[]
 }> {
-  try {
-    const [pathways, compounds, drugs] = await Promise.all([
-      searchKEGGPathways(query, 10),
-      searchKEGGCompounds(query, 10),
-      searchKEGGDrugs(query, 10),
-    ])
-
-    return { pathways, compounds, drugs }
-  } catch (error) {
-    console.error('KEGG data fetch error:', error)
-    return { pathways: [], compounds: [], drugs: [] }
-  }
+  const q = (query || '').trim()
+  if (!q) return { pathways: [], compounds: [], drugs: [] }
+  const [pathways, compounds, drugs] = await Promise.all([
+    searchKEGGPathways(q, 10),
+    searchKEGGCompounds(q, 10),
+    searchKEGGDrugs(q, 10),
+  ])
+  return { pathways, compounds, drugs }
 }
