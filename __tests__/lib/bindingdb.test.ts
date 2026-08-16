@@ -1,140 +1,76 @@
 import { getBindingAffinitiesByName } from '@/lib/api/bindingdb'
+import { getChemblActivitiesByName } from '@/lib/api/chembl'
+
+jest.mock('@/lib/api/chembl', () => ({
+  getChemblActivitiesByName: jest.fn(),
+}))
 
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+  }
+}
+
 describe('getBindingAffinitiesByName', () => {
-  test('returns parsed binding affinities on success', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        molecules: [
-          {
-            monomerID: 'BDBM50420027',
-            target_name: 'GLP-1 receptor',
-            Ki: '0.52',
-            Kd: '',
-            IC50: '',
-            EC50: '',
-            kon: '',
-            koff: '',
-            reference: 'Knudsen et al 2010',
-            doi: '10.1021/jm901513s',
-          },
-          {
-            monomerID: 'BDBM50420028',
-            target_name: 'GLP-2 receptor',
-            Ki: '',
-            Kd: '120.0',
-            IC50: '',
-            EC50: '',
-            kon: '',
-            koff: '',
-            reference: 'Smith et al 2012',
-            doi: '10.1021/jm901999x',
-          },
-        ],
-      }),
-    })
+  test('maps ChEMBL affinity rows', async () => {
+    ;(getChemblActivitiesByName as jest.Mock).mockResolvedValueOnce([
+      {
+        chemblId: 'CHEMBL1',
+        targetName: 'GLP-1 receptor',
+        targetChemblId: 'CHEMBL2',
+        standardType: 'Ki',
+        standardValue: 0.52,
+        standardUnits: 'nM',
+      },
+    ])
     const results = await getBindingAffinitiesByName('liraglutide')
-    expect(results).toHaveLength(2)
+    expect(results).toHaveLength(1)
     expect(results[0].targetName).toBe('GLP-1 receptor')
     expect(results[0].affinityType).toBe('Ki')
     expect(results[0].affinityValue).toBe(0.52)
-    expect(results[0].affinityUnits).toBe('nM')
-    expect(results[0].source).toBe('Knudsen et al 2010')
-    expect(results[0].doi).toBe('10.1021/jm901513s')
-    expect(results[1].affinityType).toBe('Kd')
-    expect(results[1].affinityValue).toBe(120)
+    expect(results[0].source).toBe('ChEMBL')
+    expect(fetch).not.toHaveBeenCalled()
   })
 
-  test('skips entries with no affinity values', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        molecules: [
-          {
-            monomerID: 'BDBM1',
-            target_name: 'Some Target',
-            Ki: '',
-            Kd: '',
-            IC50: '',
-            EC50: '',
-            kon: '',
-            koff: '',
-            reference: '',
-            doi: '',
-          },
-        ],
-      }),
-    })
-    const results = await getBindingAffinitiesByName('liraglutide')
-    expect(results).toEqual([])
+  test('blank query is true empty without fetch', async () => {
+    expect(await getBindingAffinitiesByName('')).toEqual([])
+    expect(getChemblActivitiesByName).not.toHaveBeenCalled()
   })
 
-  test('returns empty array when API response is not ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
+  test('true empty when ChEMBL has no rows and name is not an accession', async () => {
+    ;(getChemblActivitiesByName as jest.Mock).mockResolvedValueOnce([])
     const results = await getBindingAffinitiesByName('unknownxyz')
     expect(results).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
   })
 
-  test('returns empty array when molecules key is missing', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
-    const results = await getBindingAffinitiesByName('aspirin')
+  test('rethrows ChEMBL HTTP error (not EMPTY)', async () => {
+    ;(getChemblActivitiesByName as jest.Mock).mockRejectedValueOnce(new Error('HTTP 503'))
+    await expect(getBindingAffinitiesByName('aspirin')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('BindingDB REST 404 on accession is true empty', async () => {
+    ;(getChemblActivitiesByName as jest.Mock).mockResolvedValueOnce([])
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 404))
+    const results = await getBindingAffinitiesByName('P01308')
     expect(results).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
-    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const results = await getBindingAffinitiesByName('aspirin')
-    expect(results).toEqual([])
+  test('throws on BindingDB REST HTTP 503 (not EMPTY)', async () => {
+    ;(getChemblActivitiesByName as jest.Mock).mockResolvedValueOnce([])
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getBindingAffinitiesByName('P01308')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('limits results to 10', async () => {
-    const manyMolecules = Array.from({ length: 20 }, (_, i) => ({
-      monomerID: `BDBM${i}`,
-      target_name: `Target${i}`,
-      Ki: `${i + 1}.0`,
-      Kd: '',
-      IC50: '',
-      EC50: '',
-      kon: '',
-      koff: '',
-      reference: '',
-      doi: '',
-    }))
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ molecules: manyMolecules }),
-    })
-    const results = await getBindingAffinitiesByName('aspirin')
-    expect(results).toHaveLength(10)
-  })
-
-  test('uses Number() coercion for affinityValue', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        molecules: [
-          {
-            monomerID: 'BDBM1',
-            target_name: 'Target',
-            Ki: '1.5e2',
-            Kd: '',
-            IC50: '',
-            EC50: '',
-            kon: '',
-            koff: '',
-            reference: '',
-            doi: '',
-          },
-        ],
-      }),
-    })
-    const results = await getBindingAffinitiesByName('test')
-    expect(results[0].affinityValue).toBe(150)
+  test('throws on BindingDB REST HTML (not EMPTY)', async () => {
+    ;(getChemblActivitiesByName as jest.Mock).mockResolvedValueOnce([])
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>', 200, 'text/html'))
+    await expect(getBindingAffinitiesByName('P01308')).rejects.toThrow(/HTML/)
   })
 })
