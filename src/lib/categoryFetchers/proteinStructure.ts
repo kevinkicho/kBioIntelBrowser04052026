@@ -32,10 +32,10 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
   const geneSymbols = (uniprotEntries as Array<{geneName: string}>).map(e => e.geneName).filter(Boolean)
   const [alphaFoldPredictions, proteinDomains, proteinFeatures, proteinAtlasEntries, goAnnotations, peptideAtlasData, gene3dEntries, uniprotProteins, ebiVariations, ebiProteomics, ebiCrossRefs, humanProteinAtlas] = await Promise.all([
     safe(getAlphaFoldPredictions(accessions), []),
-    safe(getProteinDomains(accessions), []),
+    trackedSafe('interpro', getProteinDomains(accessions), []),
     safe(getProteinFeaturesByAccessions(accessions), []),
     safe(getProteinAtlasBySymbols(geneSymbols), []),
-    safe(getGoAnnotationsByAccessions(accessions), []),
+    trackedSafe('quickgo', getGoAnnotationsByAccessions(accessions), []),
     safe(getPeptideAtlasData(name), { peptides: [] }),
     safe(
       mapSettled(geneSymbols.slice(0, 5), (s) => searchGene3D(s), []).then((r) => r.flat()),
