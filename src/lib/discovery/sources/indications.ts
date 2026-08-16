@@ -19,6 +19,20 @@ export interface GatherIndicationsResult {
 
 const MAX_INDICATION_LOOKUPS = 20
 
+function mapIndicationRows(
+  indications: Array<{
+    meshHeading?: string
+    efoTerm?: string
+    maxPhaseForIndication?: number
+  }>,
+): IndicationRow[] {
+  return (indications ?? []).map((ind) => ({
+    meshHeading: ind.meshHeading ?? '',
+    efoTerm: ind.efoTerm ?? '',
+    maxPhaseForIndication: ind.maxPhaseForIndication ?? 0,
+  }))
+}
+
 export async function gatherChemblIndications(
   moleculeNames: string[],
 ): Promise<GatherIndicationsResult> {
@@ -37,39 +51,35 @@ export async function gatherChemblIndications(
   const result = await withSourceStatus(
     'ChEMBL (indications)',
     async () => {
-      const indicationMap = new Map<string, IndicationRow[]>()
       const settled = await Promise.allSettled(
         names.map(async (name) => {
-          try {
-            const indications = await getChemblIndicationsByName(name)
-            return { name, indications }
-          } catch {
-            return { name, indications: [] as IndicationRow[] }
-          }
+          const indications = await getChemblIndicationsByName(name)
+          return { name, indications }
         }),
       )
-      for (const r of settled) {
-        if (r.status !== 'fulfilled') continue
-        const mapped = (r.value.indications ?? []).map(
-          (ind: {
-            meshHeading?: string
-            efoTerm?: string
-            maxPhaseForIndication?: number
-          }) => ({
-            meshHeading: ind.meshHeading ?? '',
-            efoTerm: ind.efoTerm ?? '',
-            maxPhaseForIndication: ind.maxPhaseForIndication ?? 0,
-          }),
-        )
-        indicationMap.set(r.value.name, mapped)
+
+      const fulfilled = settled.filter(
+        (r): r is PromiseFulfilledResult<{ name: string; indications: Awaited<ReturnType<typeof getChemblIndicationsByName>> }> =>
+          r.status === 'fulfilled',
+      )
+      const rejected = settled.filter((r): r is PromiseRejectedResult => r.status === 'rejected')
+
+      const indicationMap = new Map<string, IndicationRow[]>()
+      for (const r of fulfilled) {
+        indicationMap.set(r.value.name, mapIndicationRows(r.value.indications))
       }
+
+      const hasRows = Array.from(indicationMap.values()).some((rows) => rows.length > 0)
+      if (!hasRows && rejected.length > 0) {
+        const reason = rejected[0].reason
+        throw reason instanceof Error ? reason : new Error(String(reason))
+      }
+
       return indicationMap
     },
     {
       fallback: new Map<string, IndicationRow[]>(),
-      hasData: (m) => {
-        return Array.from(m.values()).some((rows) => rows.length > 0)
-      },
+      hasData: (m) => Array.from(m.values()).some((rows) => rows.length > 0),
     },
   )
 
