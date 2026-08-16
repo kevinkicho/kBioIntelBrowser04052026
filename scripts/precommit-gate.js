@@ -144,6 +144,7 @@ const PRODUCT_PATTERNS = [
   'categoryHonestyCache',
   'geneHonestyCache',
   'nihLeafHonesty',
+  'similarHonestyCache',
   'readmeHonesty',
   'homeCampaignChrome',
   'decisionBrief',
