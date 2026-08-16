@@ -62,6 +62,8 @@ import { getOpenAlexWorksByName } from '@/lib/api/openalex'
 import { searchCrossRef } from '@/lib/api/crossref'
 import { searchArXiv } from '@/lib/api/arxiv'
 import { getNihGrantsByName } from '@/lib/api/nihreporter'
+import { getNsfAwardsByKeyword } from '@/lib/api/nsfAwards'
+import { searchRorOrganizations } from '@/lib/api/ror'
 import { getPatentsByMoleculeName } from '@/lib/api/patents'
 import { getSecFilingsByName } from '@/lib/api/secedgar'
 import { getLiteratureByName } from '@/lib/api/europepmc'
@@ -632,6 +634,24 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'NIH_REPORTER',
     fetcher: async (name, _synonyms, limit) => {
       const allData = await getNihGrantsByName(name)
+      const data = allData.slice(0, limit)
+      return { data, total: allData.length, hasMore: allData.length > limit }
+    }
+  },
+  'nsfAwards': {
+    category: 'research-literature',
+    limitKey: 'NSF_AWARDS',
+    fetcher: async (name, _synonyms, limit) => {
+      const allData = await getNsfAwardsByKeyword(name, limit)
+      const data = allData.slice(0, limit)
+      return { data, total: allData.length, hasMore: allData.length > limit }
+    }
+  },
+  'researchOrgs': {
+    category: 'research-literature',
+    limitKey: 'ROR',
+    fetcher: async (name, _synonyms, limit) => {
+      const allData = await searchRorOrganizations(name)
       const data = allData.slice(0, limit)
       return { data, total: allData.length, hasMore: allData.length > limit }
     }
