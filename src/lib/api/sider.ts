@@ -42,41 +42,42 @@ export function siderSideEffectDeepLink(effect: {
   return isBrokenSourceShellUrl(href) ? null : href
 }
 
+/**
+ * SIDER-compatible side effects from openFDA FAERS.
+ * HTTP / timeout from FAERS are not honest EMPTY — callers (trackedSafe / leaf)
+ * must see the throw so the panel can show ERROR.
+ */
 export async function getSIDERData(drugName: string): Promise<{
   sideEffects: SIDERSideEffect[]
 }> {
-  try {
-    if (!drugName?.trim()) return { sideEffects: [] }
+  if (!drugName?.trim()) return { sideEffects: [] }
 
-    const events = await getAdverseEventsByName(drugName, 30)
-    if (!events.length) return { sideEffects: [] }
+  const events = await getAdverseEventsByName(drugName, 30)
+  if (!events.length) return { sideEffects: [] }
 
-    const total = events.reduce((s, e) => s + (e.count || 0), 0) || 1
-    const sideEffects: SIDERSideEffect[] = events.map((e) => {
-      const freq = e.count / total
-      let frequency = 'unknown'
-      if (freq >= 0.1) frequency = 'common'
-      else if (freq >= 0.01) frequency = 'infrequent'
-      else if (e.count > 0) frequency = 'rare'
+  const total = events.reduce((s, e) => s + (e.count || 0), 0) || 1
+  const sideEffects: SIDERSideEffect[] = events.map((e) => {
+    const freq = e.count / total
+    let frequency = 'unknown'
+    if (freq >= 0.1) frequency = 'common'
+    else if (freq >= 0.01) frequency = 'infrequent'
+    else if (e.count > 0) frequency = 'rare'
 
-      const name = e.reactionName || 'Unknown'
-      const row: SIDERSideEffect = {
-        drugName,
-        drugId: '',
-        sideEffectName: name,
-        sideEffectId: name,
-        meddraTerm: name,
-        umlsCui: '',
-        frequency: `${frequency} (~${e.count} reports)`,
-        source: 'openFDA FAERS (SIDER-compatible)',
-      }
-      const deep = siderSideEffectDeepLink(row)
-      if (deep) row.url = deep
-      return row
-    })
+    const name = e.reactionName || 'Unknown'
+    const row: SIDERSideEffect = {
+      drugName,
+      drugId: '',
+      sideEffectName: name,
+      sideEffectId: name,
+      meddraTerm: name,
+      umlsCui: '',
+      frequency: `${frequency} (~${e.count} reports)`,
+      source: 'openFDA FAERS (SIDER-compatible)',
+    }
+    const deep = siderSideEffectDeepLink(row)
+    if (deep) row.url = deep
+    return row
+  })
 
-    return { sideEffects }
-  } catch {
-    return { sideEffects: [] }
-  }
+  return { sideEffects }
 }
