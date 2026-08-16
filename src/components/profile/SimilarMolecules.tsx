@@ -22,6 +22,31 @@ interface TargetRelatedMolecule {
 interface SimilarResponse {
   structural: SimilarMolecule[]
   targetRelated: TargetRelatedMolecule[]
+  _timeout?: boolean
+  _partial?: boolean
+  _emptyHonest?: boolean
+  _agentStatus?: string
+  _error?: string
+  _honesty?: string
+}
+
+function similarHasRows(data: SimilarResponse | null | undefined): boolean {
+  if (!data) return false
+  return (
+    (Array.isArray(data.structural) && data.structural.length > 0) ||
+    (Array.isArray(data.targetRelated) && data.targetRelated.length > 0)
+  )
+}
+
+function isHonestyShell(data: SimilarResponse | null | undefined): boolean {
+  if (!data) return false
+  return (
+    data._timeout === true ||
+    data._emptyHonest === true ||
+    data._partial === true ||
+    data._agentStatus === 'timeout' ||
+    data._agentStatus === 'error'
+  )
 }
 
 /** Per-card reason for structural similarity (PubChem 2D fingerprint). */
@@ -62,7 +87,8 @@ export function SimilarMolecules({ cid }: { cid: number }) {
       const cacheKey = profileCacheKey('similar', cid)
       try {
         const cached = await getProfileClientCacheAsync<SimilarResponse>(cacheKey)
-        if (cached && !cancelled) {
+        // Skip leftover empty/timeout shells so they cannot pin as success.
+        if (cached && similarHasRows(cached) && !isHonestyShell(cached) && !cancelled) {
           setData(cached)
           setLoading(false)
           return
@@ -78,7 +104,9 @@ export function SimilarMolecules({ cid }: { cid: number }) {
         } else if (Array.isArray(json)) {
           next = { structural: json, targetRelated: [] }
         }
-        if (next) setProfileClientCache(cacheKey, next)
+        if (next && similarHasRows(next) && !isHonestyShell(next)) {
+          setProfileClientCache(cacheKey, next)
+        }
         if (!cancelled) setData(next)
       } catch {
         if (!cancelled) setData(null)
@@ -107,7 +135,25 @@ export function SimilarMolecules({ cid }: { cid: number }) {
 
   if (!data) return null
   const { structural, targetRelated } = data
-  if (structural.length === 0 && targetRelated.length === 0) return null
+  const timedOut = data._timeout === true || data._agentStatus === 'timeout'
+  const errored = data._agentStatus === 'error' || (data._partial === true && !timedOut)
+  if (structural.length === 0 && targetRelated.length === 0) {
+    if (timedOut || errored) {
+      return (
+        <div
+          className="bg-slate-800/40 border border-amber-800/40 rounded-xl p-4"
+          data-testid="similar-honesty"
+        >
+          <p className="text-xs text-amber-200/90">
+            {timedOut
+              ? 'Similar-molecule lookup timed out this session — not proof of zero neighbors.'
+              : 'Similar-molecule lookup failed this session — retry rather than treating as empty.'}
+          </p>
+        </div>
+      )
+    }
+    return null
+  }
 
   return (
     <div className="space-y-4">

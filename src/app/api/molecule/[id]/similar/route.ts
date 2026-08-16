@@ -5,6 +5,17 @@ import { getCached, setCache } from '@/lib/cache'
 import { freeApiAgent } from '@/lib/api/freeApiAgent'
 import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { timedFetch } from '@/lib/api/timedFetch'
+import { shouldCacheHonestyEnvelope } from '@/lib/honestyEnvelope'
+
+export function similarHasRows(data: {
+  structural?: unknown
+  targetRelated?: unknown
+}): boolean {
+  return (
+    (Array.isArray(data.structural) && data.structural.length > 0) ||
+    (Array.isArray(data.targetRelated) && data.targetRelated.length > 0)
+  )
+}
 
 export async function GET(
   request: NextRequest,
@@ -16,8 +27,11 @@ export async function GET(
   }
 
   const cacheKey = `similar:${cid}`
-  const cached = getCached<unknown>(cacheKey)
-  if (cached) return NextResponse.json(cached)
+  const cached = getCached<Record<string, unknown>>(cacheKey)
+  // Skip leftover empty/timeout shells so they cannot pin as success.
+  if (cached && shouldCacheHonestyEnvelope(cached) && similarHasRows(cached)) {
+    return NextResponse.json(cached)
+  }
 
   const empty = { structural: [] as unknown[], targetRelated: [] as unknown[] }
   const ac = new AbortController()
@@ -28,9 +42,7 @@ export async function GET(
         source: 'similar',
         empty,
         timeoutMs: 14_000,
-        hasData: (r) =>
-          (Array.isArray(r.structural) && r.structural.length > 0) ||
-          (Array.isArray(r.targetRelated) && r.targetRelated.length > 0),
+        hasData: (r) => similarHasRows(r),
         run: async () => {
           const [moleculeName, structural] = await Promise.all([
             resolveMoleculeName(cid),
@@ -54,18 +66,30 @@ export async function GET(
     [request.signal],
   )
 
-  if (agent.status === 'loaded') {
-    setCache(cacheKey, agent.data)
-  }
-
-  return NextResponse.json({
+  const hasRows = similarHasRows(agent.data)
+  const payload: Record<string, unknown> = {
     ...agent.data,
     _agentStatus: agent.status,
     _agentMs: agent.ms,
-    ...(agent.status === 'timeout' || agent.status === 'error'
-      ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
-      : {}),
-  })
+  }
+
+  if (agent.status === 'timeout' || agent.status === 'error') {
+    payload._partial = true
+    if (agent.status === 'timeout') payload._timeout = true
+    payload._error = agent.error
+  } else if (!hasRows) {
+    payload._emptyHonest = true
+    payload._notRetrieved = true
+    payload._honesty =
+      'Empty free-API sample this session — not proof of zero similar neighbors forever.'
+  }
+
+  // Empty-as-success / timeout / error must not be stored as a success shell.
+  if (shouldCacheHonestyEnvelope(payload) && hasRows) {
+    setCache(cacheKey, payload)
+  }
+
+  return NextResponse.json(payload)
 }
 
 async function resolveMoleculeName(cid: number): Promise<string | null> {
