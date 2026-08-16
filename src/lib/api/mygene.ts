@@ -1,7 +1,24 @@
 import type { MyGeneAnnotation } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://mygene.info/v3'
 const fetchOptions: RequestInit = { next: { revalidate: 604800 } } // 7 days
+
+/**
+ * MyGene harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
 
 /**
  * MyGene returns scalar-or-array for alias, pathway.name, go.*.name, etc.
@@ -72,66 +89,49 @@ function mapMyGeneHit(hit: Record<string, unknown>): MyGeneAnnotation {
  * Search genes by symbol or name
  */
 export async function searchGenes(query: string): Promise<MyGeneAnnotation[]> {
-  try {
-    const q = query.trim()
-    if (q.length < 1) return []
-    // Prefer symbol match first, then free-text — improves gene hits in unified search
-    const fields =
-      'symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name'
-    // Parallel symbol + free-text; symbol hits preferred by merge order
-    const queries = [
-      `${BASE_URL}/query?q=symbol:${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
-      `${BASE_URL}/query?q=${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
-    ]
-    const responses = await Promise.all(
-      queries.map(async (url) => {
-        try {
-          const controller = new AbortController()
-          const timer = setTimeout(() => controller.abort(), 4_000)
-          try {
-            const res = await fetch(url, { ...fetchOptions, signal: controller.signal, cache: 'no-store' })
-            if (!res.ok) return [] as unknown[]
-            const data = (await res.json()) as { hits?: unknown[] }
-            return data.hits ?? []
-          } finally {
-            clearTimeout(timer)
-          }
-        } catch {
-          return [] as unknown[]
-        }
-      }),
-    )
-    const seen = new Set<string>()
-    const out: MyGeneAnnotation[] = []
-    for (const hits of responses) {
-      for (const hit of hits) {
-        const mapped = mapMyGeneHit(hit as Record<string, unknown>)
-        const key = mapped.geneId || mapped.symbol
-        if (!key || seen.has(key)) continue
-        seen.add(key)
-        out.push(mapped)
-        if (out.length >= 20) return out
-      }
+  const q = query.trim()
+  if (q.length < 1) return []
+  // Prefer symbol match first, then free-text — improves gene hits in unified search
+  const fields =
+    'symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name'
+  // Parallel symbol + free-text; symbol hits preferred by merge order
+  const queries = [
+    `${BASE_URL}/query?q=symbol:${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
+    `${BASE_URL}/query?q=${encodeURIComponent(q)}&fields=${fields}&size=15&species=human`,
+  ]
+  const responses = await Promise.all(
+    queries.map(async (url) => {
+      const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 4000, cache: 'no-store' })
+      throwIfHttpFailed(res, 'MyGene')
+      const data = (await res.json()) as { hits?: unknown[] }
+      return data.hits ?? []
+    }),
+  )
+  const seen = new Set<string>()
+  const out: MyGeneAnnotation[] = []
+  for (const hits of responses) {
+    for (const hit of hits) {
+      const mapped = mapMyGeneHit(hit as Record<string, unknown>)
+      const key = mapped.geneId || mapped.symbol
+      if (!key || seen.has(key)) continue
+      seen.add(key)
+      out.push(mapped)
+      if (out.length >= 20) return out
     }
-    return out
-  } catch {
-    return []
   }
+  return out
 }
 
 /**
  * Get gene annotation by Entrez ID
  */
 export async function getGeneById(geneId: string): Promise<MyGeneAnnotation | null> {
-  try {
-    const url = `${BASE_URL}/gene/${geneId}?fields=symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
-    const hit = await res.json()
-    return mapMyGeneHit(hit as Record<string, unknown>)
-  } catch {
-    return null
-  }
+  const url = `${BASE_URL}/gene/${geneId}?fields=symbol,name,taxid,entrezgene,ensembl.gene,uniprot.Swiss-Prot,summary,alias,type_of_gene,map_location,pathway.name,go.BP.name,go.MF.name,go.CC.name`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (res.status === 404) return null
+  throwIfHttpFailed(res, 'MyGene')
+  const hit = await res.json()
+  return mapMyGeneHit(hit as Record<string, unknown>)
 }
 
 /**

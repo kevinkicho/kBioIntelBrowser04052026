@@ -1,5 +1,6 @@
 import type { DiseaseAssociation } from '../types'
 import { getChemblIdByName } from './chembl'
+import { timedFetch } from './timedFetch'
 
 function escapeGraphQLString(str: string): string {
   return str.replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r')
@@ -13,26 +14,55 @@ const fetchOptions: RequestInit = {
 }
 
 /**
+ * Open Targets harvest leaf. HTTP / HTML / timeout / GraphQL errors are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function throwIfGraphqlFailed(data: { errors?: unknown }, source: string): void {
+  if (data?.errors) {
+    throw new Error(`GraphQL errors from ${source}`)
+  }
+}
+
+async function postGraphql(body: unknown, timeoutMs: number): Promise<Response> {
+  return timedFetch(API_URL, {
+    method: 'POST',
+    ...fetchOptions,
+    headers: {
+      ...((fetchOptions.headers as Record<string, string>) || {}),
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+    timeoutMs,
+  })
+}
+
+/**
  * Search for disease associations by molecule name using OpenTargets Platform
- * Falls back gracefully if the API is unavailable
  */
 export async function getDiseaseAssociationsByName(name: string): Promise<DiseaseAssociation[]> {
-  try {
-    // Try to get ChEMBL ID for more precise search
-    const chemblId = await getChemblIdByName(name)
-    
-    if (chemblId) {
-      // Try drug-specific query first
-      const drugResults = await queryDrugDiseases(chemblId)
-      if (drugResults.length > 0) return drugResults
-    }
-    
-    // Fallback to disease search
-    return await searchDiseases(name)
-  } catch (error) {
-    console.error('OpenTargets query error:', error)
-    return []
+  // Try to get ChEMBL ID for more precise search
+  const chemblId = await getChemblIdByName(name)
+
+  if (chemblId) {
+    // Try drug-specific query first
+    const drugResults = await queryDrugDiseases(chemblId)
+    if (drugResults.length > 0) return drugResults
   }
+
+  // Fallback to disease search
+  return await searchDiseases(name)
 }
 
 async function queryDrugDiseases(chemblId: string): Promise<DiseaseAssociation[]> {
@@ -57,21 +87,10 @@ async function queryDrugDiseases(chemblId: string): Promise<DiseaseAssociation[]
     }
   `
 
-  const res = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ query }),
-    ...fetchOptions,
-  })
-
-  if (!res.ok) return []
-  
+  const res = await postGraphql({ query }, 8000)
+  throwIfHttpFailed(res, 'Open Targets')
   const data = await res.json()
-  
-  if (data.errors) {
-    console.error('OpenTargets GraphQL errors:', data.errors)
-    return []
-  }
+  throwIfGraphqlFailed(data, 'Open Targets')
 
   const rows = data.data?.drug?.linkedDiseases?.rows ?? []
   return rows.map((row: {
@@ -108,40 +127,13 @@ export async function searchDiseases(queryString: string): Promise<DiseaseAssoci
     }
   `
 
-  const controller = new AbortController()
-  const timer = setTimeout(() => controller.abort(), 4_500)
-  let res: Response
-  try {
-    res = await fetch(API_URL, {
-      method: 'POST',
-      ...fetchOptions,
-      headers: {
-        ...((fetchOptions.headers as Record<string, string>) || {}),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: { q: queryString },
-      }),
-      signal: controller.signal,
-    })
-  } catch {
-    return []
-  } finally {
-    clearTimeout(timer)
-  }
-
-  if (!res.ok) {
-    console.error('[opentargets] searchDiseases HTTP', res.status)
-    return []
-  }
-
+  const res = await postGraphql({
+    query,
+    variables: { q: queryString },
+  }, 4500)
+  throwIfHttpFailed(res, 'Open Targets')
   const data = await res.json()
-
-  if (data.errors) {
-    console.error('OpenTargets GraphQL errors:', data.errors)
-    return []
-  }
+  throwIfGraphqlFailed(data, 'Open Targets')
 
   const hits = (data.data?.search?.hits ?? []) as Array<{
     id?: string
@@ -200,71 +192,58 @@ export async function getKnownDrugsForDisease(
   limit: number = 50,
 ): Promise<KnownDrugForDisease[]> {
   if (!diseaseId?.trim()) return []
-  try {
-    // OT Platform 26.x: Disease.knownDrugs was renamed to drugAndClinicalCandidates.
-    const query = `
-      query {
-        disease(efoId: "${escapeGraphQLString(diseaseId)}") {
-          id
-          name
-          drugAndClinicalCandidates {
-            count
-            rows {
-              maxClinicalStage
-              drug {
-                id
-                name
-                maximumClinicalStage
-              }
+  // OT Platform 26.x: Disease.knownDrugs was renamed to drugAndClinicalCandidates.
+  const query = `
+    query {
+      disease(efoId: "${escapeGraphQLString(diseaseId)}") {
+        id
+        name
+        drugAndClinicalCandidates {
+          count
+          rows {
+            maxClinicalStage
+            drug {
+              id
+              name
+              maximumClinicalStage
             }
           }
         }
       }
-    `
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query }),
-      ...fetchOptions,
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    if (data.errors) {
-      console.error('OpenTargets knownDrugs GraphQL errors:', data.errors)
-      return []
     }
+  `
+  const res = await postGraphql({ query }, 8000)
+  throwIfHttpFailed(res, 'Open Targets')
+  const data = await res.json()
+  throwIfGraphqlFailed(data, 'Open Targets')
 
-    const rows: Array<{
-      maxClinicalStage?: string | null
-      drug?: { id?: string; name?: string; maximumClinicalStage?: string | null } | null
-    }> = data.data?.disease?.drugAndClinicalCandidates?.rows ?? []
+  const rows: Array<{
+    maxClinicalStage?: string | null
+    drug?: { id?: string; name?: string; maximumClinicalStage?: string | null } | null
+  }> = data.data?.disease?.drugAndClinicalCandidates?.rows ?? []
 
-    // Dedupe by drug name (case-insensitive), keep highest phase
-    const byName = new Map<string, KnownDrugForDisease>()
-    for (const row of rows) {
-      const name = row.drug?.name?.trim()
-      if (!name) continue
-      const stage = row.maxClinicalStage ?? row.drug?.maximumClinicalStage ?? null
-      const entry: KnownDrugForDisease = {
-        name,
-        chemblId: row.drug?.id ?? null,
-        maxClinicalStage: stage,
-        maxPhase: clinicalStageToPhase(stage),
-      }
-      const key = name.toLowerCase()
-      const existing = byName.get(key)
-      if (!existing || existing.maxPhase < entry.maxPhase) {
-        byName.set(key, entry)
-      }
+  // Dedupe by drug name (case-insensitive), keep highest phase
+  const byName = new Map<string, KnownDrugForDisease>()
+  for (const row of rows) {
+    const name = row.drug?.name?.trim()
+    if (!name) continue
+    const stage = row.maxClinicalStage ?? row.drug?.maximumClinicalStage ?? null
+    const entry: KnownDrugForDisease = {
+      name,
+      chemblId: row.drug?.id ?? null,
+      maxClinicalStage: stage,
+      maxPhase: clinicalStageToPhase(stage),
     }
-
-    return Array.from(byName.values())
-      .sort((a, b) => b.maxPhase - a.maxPhase || a.name.localeCompare(b.name))
-      .slice(0, Math.max(1, limit))
-  } catch (error) {
-    console.error('OpenTargets getKnownDrugsForDisease error:', error)
-    return []
+    const key = name.toLowerCase()
+    const existing = byName.get(key)
+    if (!existing || existing.maxPhase < entry.maxPhase) {
+      byName.set(key, entry)
+    }
   }
+
+  return Array.from(byName.values())
+    .sort((a, b) => b.maxPhase - a.maxPhase || a.name.localeCompare(b.name))
+    .slice(0, Math.max(1, limit))
 }
 
 /**
@@ -279,6 +258,8 @@ export async function getDrugsForDisease(diseaseId: string): Promise<string[]> {
 /**
  * Resolve a hard disease registry id (EFO_*, MONDO_*, …) via Open Targets.
  * Used when name search hits don't include the pinned id (id namespace drift).
+ * HTTP / GraphQL failure returns null so Discover pin lookup can fall through
+ * (not a list leaf that rank would treat as empty-success).
  */
 export async function getDiseaseById(
   diseaseId: string,
@@ -298,18 +279,10 @@ export async function getDiseaseById(
         }
       }
     `
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      ...fetchOptions,
-      headers: {
-        ...((fetchOptions.headers as Record<string, string>) || {}),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: { efoId: id },
-      }),
-    })
+    const res = await postGraphql({
+      query,
+      variables: { efoId: id },
+    }, 8000)
     if (!res.ok) {
       console.error('[opentargets] getDiseaseById HTTP', res.status)
       return null
@@ -351,60 +324,41 @@ export async function getDiseaseById(
 export async function getTargetsForDisease(diseaseId: string): Promise<{ id: string; name: string; overallScore: number }[]> {
   const id = diseaseId?.trim()
   if (!id) return []
-  try {
-    const query = `
-      query DiseaseTargets($efoId: String!) {
-        disease(efoId: $efoId) {
-          id
-          name
-          associatedTargets(page: { index: 0, size: 40 }) {
-            count
-            rows {
-              score
-              target {
-                id
-                approvedSymbol
-              }
+  const query = `
+    query DiseaseTargets($efoId: String!) {
+      disease(efoId: $efoId) {
+        id
+        name
+        associatedTargets(page: { index: 0, size: 40 }) {
+          count
+          rows {
+            score
+            target {
+              id
+              approvedSymbol
             }
           }
         }
       }
-    `
-    const res = await fetch(API_URL, {
-      method: 'POST',
-      ...fetchOptions,
-      headers: {
-        ...((fetchOptions.headers as Record<string, string>) || {}),
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        query,
-        variables: { efoId: id },
-      }),
-    })
-    if (!res.ok) {
-      console.error('[opentargets] getTargetsForDisease HTTP', res.status)
-      return []
     }
-    const data = await res.json()
-    if (data.errors) {
-      console.error('[opentargets] getTargetsForDisease GraphQL errors:', data.errors)
-      return []
-    }
-    const rows = (data.data?.disease?.associatedTargets?.rows ?? []) as Array<{
-      score?: number
-      target?: { id?: string; approvedSymbol?: string }
-    }>
-    return rows
-      .map((r) => ({
-        id: r.target?.id ?? '',
-        name: (r.target?.approvedSymbol ?? '').trim(),
-        overallScore: typeof r.score === 'number' ? r.score : 0,
-      }))
-      .filter((t) => t.name)
-      .slice(0, 30)
-  } catch (err) {
-    console.error('[opentargets] getTargetsForDisease', err)
-    return []
-  }
+  `
+  const res = await postGraphql({
+    query,
+    variables: { efoId: id },
+  }, 8000)
+  throwIfHttpFailed(res, 'Open Targets')
+  const data = await res.json()
+  throwIfGraphqlFailed(data, 'Open Targets')
+  const rows = (data.data?.disease?.associatedTargets?.rows ?? []) as Array<{
+    score?: number
+    target?: { id?: string; approvedSymbol?: string }
+  }>
+  return rows
+    .map((r) => ({
+      id: r.target?.id ?? '',
+      name: (r.target?.approvedSymbol ?? '').trim(),
+      overallScore: typeof r.score === 'number' ? r.score : 0,
+    }))
+    .filter((t) => t.name)
+    .slice(0, 30)
 }

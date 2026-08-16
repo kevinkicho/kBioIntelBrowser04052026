@@ -13,6 +13,15 @@ jest.mock('@/lib/api/chembl')
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+  }
+}
+
 describe('clinicalStageToPhase', () => {
   test('maps OT stage labels to 0–4', () => {
     expect(clinicalStageToPhase('APPROVAL')).toBe(4)
@@ -28,35 +37,32 @@ describe('clinicalStageToPhase', () => {
 
 describe('getKnownDrugsForDisease', () => {
   test('returns real drug names (not target names) from drugAndClinicalCandidates', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: {
-          disease: {
-            id: 'MONDO_0004975',
-            name: 'Alzheimer disease',
-            drugAndClinicalCandidates: {
-              count: 2,
-              rows: [
-                {
-                  maxClinicalStage: 'APPROVAL',
-                  drug: { id: 'CHEMBL502', name: 'DONEPEZIL', maximumClinicalStage: 'APPROVAL' },
-                },
-                {
-                  maxClinicalStage: 'PHASE_3',
-                  drug: { id: 'CHEMBL1201589', name: 'ADUCANUMAB', maximumClinicalStage: 'PHASE_3' },
-                },
-                // Duplicate lower phase — should keep APPROVAL
-                {
-                  maxClinicalStage: 'PHASE_1',
-                  drug: { id: 'CHEMBL502', name: 'Donepezil', maximumClinicalStage: 'PHASE_1' },
-                },
-              ],
-            },
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      data: {
+        disease: {
+          id: 'MONDO_0004975',
+          name: 'Alzheimer disease',
+          drugAndClinicalCandidates: {
+            count: 2,
+            rows: [
+              {
+                maxClinicalStage: 'APPROVAL',
+                drug: { id: 'CHEMBL502', name: 'DONEPEZIL', maximumClinicalStage: 'APPROVAL' },
+              },
+              {
+                maxClinicalStage: 'PHASE_3',
+                drug: { id: 'CHEMBL1201589', name: 'ADUCANUMAB', maximumClinicalStage: 'PHASE_3' },
+              },
+              // Duplicate lower phase — should keep APPROVAL
+              {
+                maxClinicalStage: 'PHASE_1',
+                drug: { id: 'CHEMBL502', name: 'Donepezil', maximumClinicalStage: 'PHASE_1' },
+              },
+            ],
           },
         },
-      }),
-    })
+      },
+    }))
 
     const drugs = await getKnownDrugsForDisease('MONDO_0004975')
     expect(drugs).toHaveLength(2)
@@ -74,40 +80,40 @@ describe('getKnownDrugsForDisease', () => {
     expect(body.query).not.toContain('linkedTargets')
   })
 
-  test('returns empty array when disease missing or API errors', async () => {
+  test('returns empty array when disease id missing', async () => {
     expect(await getKnownDrugsForDisease('')).toEqual([])
+  })
 
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    expect(await getKnownDrugsForDisease('EFO_0000249')).toEqual([])
+  test('throws on HTTP error (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getKnownDrugsForDisease('EFO_0000249')).rejects.toThrow(/HTTP 503/)
+  })
 
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ errors: [{ message: 'boom' }] }),
-    })
-    expect(await getKnownDrugsForDisease('EFO_0000249')).toEqual([])
+  test('throws on GraphQL errors (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ errors: [{ message: 'boom' }] }))
+    await expect(getKnownDrugsForDisease('EFO_0000249')).rejects.toThrow(/GraphQL/)
+  })
 
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getKnownDrugsForDisease('EFO_0000249')).toEqual([])
+    await expect(getKnownDrugsForDisease('EFO_0000249')).rejects.toThrow(/network/)
   })
 })
 
 describe('getDrugsForDisease', () => {
   test('returns unique name list for disease search enrichment', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        data: {
-          disease: {
-            drugAndClinicalCandidates: {
-              rows: [
-                { maxClinicalStage: 'APPROVAL', drug: { id: 'CHEMBL1', name: 'Galantamine' } },
-                { maxClinicalStage: 'PHASE_2', drug: { id: 'CHEMBL2', name: 'Semagacestat' } },
-              ],
-            },
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      data: {
+        disease: {
+          drugAndClinicalCandidates: {
+            rows: [
+              { maxClinicalStage: 'APPROVAL', drug: { id: 'CHEMBL1', name: 'Galantamine' } },
+              { maxClinicalStage: 'PHASE_2', drug: { id: 'CHEMBL2', name: 'Semagacestat' } },
+            ],
           },
         },
-      }),
-    })
+      },
+    }))
     const names = await getDrugsForDisease('MONDO_0004975')
     expect(names).toEqual(expect.arrayContaining(['Galantamine', 'Semagacestat']))
     // chembl mock unused here but keeps parity with other OT tests
