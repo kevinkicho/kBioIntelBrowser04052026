@@ -109,6 +109,66 @@ describe('pipeline honesty route', () => {
     expect(mockSetCache).toHaveBeenCalled()
     expect(res.headers.get('Cache-Control') || '').toMatch(/s-maxage/)
   })
+  it('does not serve a leftover cached empty shell', async () => {
+    mockGetCached.mockReturnValue({
+      clinicalTrials: [],
+      chemblIndications: [],
+      chemblMechanisms: [],
+      orangeBookEntries: [],
+      ndcProducts: [],
+      drugLabels: [],
+      drugShortages: [],
+      myChemAnnotations: [],
+      _emptyHonest: true,
+      _notRetrieved: true,
+    })
+    mockWithTimeout.mockResolvedValue({
+      clinicalTrials: [{ nctId: 'NCT1' }],
+      chemblIndications: [],
+      chemblMechanisms: [],
+      orangeBookEntries: [],
+      ndcProducts: [],
+      drugLabels: [],
+      drugShortages: [],
+      myChemAnnotations: [],
+    })
+    const res = await pipelineGET(fakeReq(), { params: { id: '2244' } })
+    const json = await res.json()
+    expect(json._emptyHonest).toBeUndefined()
+    expect(json.clinicalTrials).toHaveLength(1)
+    expect(mockGetMoleculeById).toHaveBeenCalled()
+  })
+
+  it('does not serve a leftover cached timeout shell', async () => {
+    mockGetCached.mockReturnValue({
+      clinicalTrials: [],
+      chemblIndications: [],
+      chemblMechanisms: [],
+      orangeBookEntries: [],
+      ndcProducts: [],
+      drugLabels: [],
+      drugShortages: [],
+      myChemAnnotations: [],
+      _partial: true,
+      _timeout: true,
+      _error: 'stale timeout',
+    })
+    mockWithTimeout.mockResolvedValue({
+      clinicalTrials: [{ nctId: 'NCT2' }],
+      chemblIndications: [],
+      chemblMechanisms: [],
+      orangeBookEntries: [],
+      ndcProducts: [],
+      drugLabels: [],
+      drugShortages: [],
+      myChemAnnotations: [],
+    })
+    const res = await pipelineGET(fakeReq(), { params: { id: '2244' } })
+    const json = await res.json()
+    expect(json._timeout).toBeUndefined()
+    expect(json.clinicalTrials).toHaveLength(1)
+    expect(mockGetMoleculeById).toHaveBeenCalled()
+  })
 })
 
 describe('category honesty flags (existing route contract)', () => {

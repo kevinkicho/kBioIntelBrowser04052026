@@ -18,6 +18,25 @@ const PIPELINE_SOURCE_TIMEOUT_MS = 8000
 const PIPELINE_OVERALL_TIMEOUT_MS = 15000
 const PIPELINE_CACHE_TTL_MS = 3600_000
 
+
+const PIPELINE_BAG_KEYS = [
+  'clinicalTrials',
+  'chemblIndications',
+  'chemblMechanisms',
+  'orangeBookEntries',
+  'ndcProducts',
+  'drugLabels',
+  'drugShortages',
+  'myChemAnnotations',
+] as const
+
+function pipelineHasRows(payload: Record<string, unknown>): boolean {
+  return PIPELINE_BAG_KEYS.some((k) => {
+    const v = payload[k]
+    return Array.isArray(v) && v.length > 0
+  })
+}
+
 export async function GET(
   _request: NextRequest,
   { params }: { params: { id: string } }
@@ -29,7 +48,8 @@ export async function GET(
 
   const cacheKey = `pipeline:${cid}`
   const cached = getCached<Record<string, unknown>>(cacheKey)
-  if (cached) {
+  // Skip leftover empty/timeout shells so they cannot pin as success.
+  if (cached && shouldCacheHonestyEnvelope(cached) && pipelineHasRows(cached)) {
     return NextResponse.json(cached, {
       headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` },
     })
@@ -128,20 +148,7 @@ export async function GET(
   }
 
   // Honest empty envelope when all free-API bags are empty (still a live route)
-  const bagKeys = [
-    'clinicalTrials',
-    'chemblIndications',
-    'chemblMechanisms',
-    'orangeBookEntries',
-    'ndcProducts',
-    'drugLabels',
-    'drugShortages',
-    'myChemAnnotations',
-  ] as const
-  const anyRows = bagKeys.some((k) => {
-    const v = payload[k]
-    return Array.isArray(v) && v.length > 0
-  })
+  const anyRows = pipelineHasRows(payload)
   if (!anyRows) {
     payload._emptyHonest = true
     payload._notRetrieved = true
