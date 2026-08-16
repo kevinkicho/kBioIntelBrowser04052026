@@ -8,6 +8,27 @@
 import { timedFetch } from './timedFetch'
 
 const BASE = 'https://api.ror.org/v2/organizations'
+
+/**
+ * ROR harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Short query, 404, and zero-hit JSON remain empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 const fetchOptions: RequestInit = {
   next: { revalidate: 86400 },
   headers: { Accept: 'application/json' },
@@ -140,17 +161,14 @@ export async function searchRorOrganizations(
   }
   if (filters.length) params.set('filter', filters.join(','))
 
-  try {
-    const res = await timedFetch(`${BASE}?${params.toString()}`, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return []
-    const data = (await res.json()) as { items?: unknown[] }
-    return (data.items ?? [])
-      .map((item) => mapOrg(item, 'query'))
-      .filter((o): o is RorOrganization => o != null)
-      .slice(0, 25)
-  } catch {
-    return []
-  }
+  const res = await timedFetch(`${BASE}?${params.toString()}`, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'ROR')
+  const data = (await res.json()) as { items?: unknown[] }
+  return (data.items ?? [])
+    .map((item) => mapOrg(item, 'query'))
+    .filter((o): o is RorOrganization => o != null)
+    .slice(0, 25)
 }
 
 /**
@@ -183,16 +201,13 @@ export async function resolveRorByNames(
 
   const out: RorOrganization[] = []
   const byRor = new Set<string>()
-  // Sequential small batches to respect rate limits
+  // Sequential small batches to respect rate limits. HTTP/network failures throw
+  // so Discover rank cannot treat a down ROR as empty-success.
   for (const name of unique) {
-    try {
-      const hit = await resolveRorByName(name)
-      if (hit && !byRor.has(hit.rorId)) {
-        byRor.add(hit.rorId)
-        out.push({ ...hit, matchSource: `sponsor:${name}` })
-      }
-    } catch {
-      // skip
+    const hit = await resolveRorByName(name)
+    if (hit && !byRor.has(hit.rorId)) {
+      byRor.add(hit.rorId)
+      out.push({ ...hit, matchSource: `sponsor:${name}` })
     }
   }
   return out

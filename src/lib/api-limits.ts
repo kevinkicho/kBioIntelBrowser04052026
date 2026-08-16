@@ -50,6 +50,8 @@ export const LIMITS = {
   WIKI_PATHWAYS: { initial: 5, loadMore: 20, max: 50 },
   PATHWAY_COMMONS: { initial: 10, loadMore: 50, max: 200 },
   NIH_REPORTER: { initial: 5, loadMore: 20, max: 50 },
+  NSF_AWARDS: { initial: 5, loadMore: 20, max: 50 },
+  ROR: { initial: 5, loadMore: 20, max: 50 },
   PATENTS: { initial: 5, loadMore: 20, max: 50 },
   SEC_EDGAR: { initial: 5, loadMore: 20, max: 50 },
 
