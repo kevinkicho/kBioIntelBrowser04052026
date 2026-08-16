@@ -1,5 +1,6 @@
 import type { AtcClassification } from '../types'
 import { getRxcuiByName } from './rxnorm'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://rxnav.nlm.nih.gov/REST/rxclass/class/byRxcui.json'
 /** Official WHO ATC/DDD Index (Norwegian Institute of Public Health / WHOCC) */
@@ -115,26 +116,39 @@ function mapRxClassItems(drugInfoList: unknown[]): AtcClassification[] {
   return dedupeAtcClassifications(raw)
 }
 
-export async function getAtcClassificationsByName(name: string): Promise<AtcClassification[]> {
-  try {
-    const rxcui = await getRxcuiByName(name)
-    if (!rxcui) return []
-
-    // relaSource=ATC keeps WHO ATC; without it RxClass repeats the same classId
-    // once per relation type (often 5× identical L01EK-style rows).
-    const url = `${BASE_URL}?rxcui=${encodeURIComponent(rxcui)}&relaSource=ATC`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-
-    const drugInfoList: unknown[] =
-      data.rxclassDrugInfoList?.rxclassDrugInfo ??
-      data.rxclassMinConceptList?.rxclassMinConcept ??
-      []
-
-    const list = Array.isArray(drugInfoList) ? drugInfoList : [drugInfoList]
-    return mapRxClassItems(list)
-  } catch {
-    return []
+/**
+ * ATC harvest leaf (RxClass WHO ATC). HTTP / HTML / timeout are not EMPTY.
+ * True missing RxCUI or zero-hit JSON remains []. RxClass 404 is absent.
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+export async function getAtcClassificationsByName(name: string): Promise<AtcClassification[]> {
+  const rxcui = await getRxcuiByName(name)
+  if (!rxcui) return []
+
+  // relaSource=ATC keeps WHO ATC; without it RxClass repeats the same classId
+  // once per relation type (often 5x identical L01EK-style rows).
+  const url = `${BASE_URL}?rxcui=${encodeURIComponent(rxcui)}&relaSource=ATC`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (res.status === 404) return []
+  throwIfHttpFailed(res, 'ATC')
+  const data = await res.json()
+
+  const drugInfoList: unknown[] =
+    data.rxclassDrugInfoList?.rxclassDrugInfo ??
+    data.rxclassMinConceptList?.rxclassMinConcept ??
+    []
+
+  const list = Array.isArray(drugInfoList) ? drugInfoList : [drugInfoList]
+  return mapRxClassItems(list)
 }

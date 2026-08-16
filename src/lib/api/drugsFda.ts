@@ -6,6 +6,7 @@
  */
 
 import { getApiKey } from './utils'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.fda.gov/drug/drugsfda.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -44,6 +45,27 @@ export function drugsAtFdaOverviewUrl(applicationNumber: string): string {
 }
 
 /**
+ * Drugs@FDA harvest leaf (openFDA). HTTP / HTML / timeout are not EMPTY.
+ * True 404 (no matches) and zero-hit JSON remain [].
+ */
+function isAbsentStatus(status: number): boolean {
+  // openFDA returns 404 when a drug name has no Drugs@FDA matches.
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+/**
  * Search Drugs@FDA by brand, generic, or active ingredient name.
  */
 export async function getDrugsFdaByName(
@@ -52,80 +74,77 @@ export async function getDrugsFdaByName(
 ): Promise<DrugsFdaApplication[]> {
   const q = name.trim()
   if (q.length < 2) return []
-  try {
-    const enc = encodeURIComponent(`"${q}"`)
-    // Broad free-text OR across brand / generic / ingredient fields (openFDA uses +OR+)
-    const search = [
-      `products.brand_name:${enc}`,
-      `openfda.brand_name:${enc}`,
-      `openfda.generic_name:${enc}`,
-      `products.active_ingredients.name:${enc}`,
-    ].join('+OR+')
-    const url = `${BASE_URL}?search=${search}&limit=${Math.min(25, Math.max(1, limit))}${keyParam()}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = (await res.json()) as {
-      results?: Array<{
-        application_number?: string
-        sponsor_name?: string
-        submissions?: Array<{
-          submission_type?: string
-          submission_status_date?: string
-        }>
-        products?: Array<{
-          brand_name?: string
-          active_ingredients?: Array<{ name?: string; strength?: string }>
-          dosage_form?: string
-          route?: string
-          marketing_status?: string
-        }>
-        openfda?: {
-          brand_name?: string[]
-          generic_name?: string[]
-          application_number?: string[]
-        }
+  const enc = encodeURIComponent(`"${q}"`)
+  // Broad free-text OR across brand / generic / ingredient fields (openFDA uses +OR+)
+  const search = [
+    `products.brand_name:${enc}`,
+    `openfda.brand_name:${enc}`,
+    `openfda.generic_name:${enc}`,
+    `products.active_ingredients.name:${enc}`,
+  ].join('+OR+')
+  const url = `${BASE_URL}?search=${search}&limit=${Math.min(25, Math.max(1, limit))}${keyParam()}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'Drugs@FDA')
+  const data = (await res.json()) as {
+    results?: Array<{
+      application_number?: string
+      sponsor_name?: string
+      submissions?: Array<{
+        submission_type?: string
+        submission_status_date?: string
       }>
-    }
-
-    const out: DrugsFdaApplication[] = []
-    const seen = new Set<string>()
-    for (const r of data.results ?? []) {
-      const appNo = String(r.application_number || r.openfda?.application_number?.[0] || '').trim()
-      if (!appNo || seen.has(appNo)) continue
-      seen.add(appNo)
-      const products: DrugsFdaProduct[] = (r.products ?? []).slice(0, 8).map((p) => ({
-        brandName: String(p.brand_name || '').trim(),
-        activeIngredients: (p.active_ingredients ?? [])
-          .map((a) => [a.name, a.strength].filter(Boolean).join(' '))
-          .filter(Boolean)
-          .join('; '),
-        dosageForm: String(p.dosage_form || '').trim(),
-        route: String(p.route || '').trim(),
-        marketingStatus: String(p.marketing_status || '').trim(),
-      }))
-      const brandName =
-        products[0]?.brandName ||
-        r.openfda?.brand_name?.[0] ||
-        r.openfda?.generic_name?.[0] ||
-        q
-      const genericName = r.openfda?.generic_name?.[0] || products[0]?.activeIngredients || ''
-      const firstSub = r.submissions?.[0]
-      out.push({
-        applicationNumber: appNo,
-        sponsorName: String(r.sponsor_name || '').trim() || 'Unknown sponsor',
-        submissionType: String(firstSub?.submission_type || '').trim(),
-        brandName,
-        genericName,
-        products,
-        approvalDate: firstSub?.submission_status_date
-          ? String(firstSub.submission_status_date)
-          : null,
-        drugsAtFdaUrl: drugsAtFdaOverviewUrl(appNo),
-        openFdaUrl: `https://api.fda.gov/drug/drugsfda.json?search=application_number:"${encodeURIComponent(appNo)}"`,
-      })
-    }
-    return out
-  } catch {
-    return []
+      products?: Array<{
+        brand_name?: string
+        active_ingredients?: Array<{ name?: string; strength?: string }>
+        dosage_form?: string
+        route?: string
+        marketing_status?: string
+      }>
+      openfda?: {
+        brand_name?: string[]
+        generic_name?: string[]
+        application_number?: string[]
+      }
+    }>
   }
+
+  const out: DrugsFdaApplication[] = []
+  const seen = new Set<string>()
+  for (const r of data.results ?? []) {
+    const appNo = String(r.application_number || r.openfda?.application_number?.[0] || '').trim()
+    if (!appNo || seen.has(appNo)) continue
+    seen.add(appNo)
+    const products: DrugsFdaProduct[] = (r.products ?? []).slice(0, 8).map((p) => ({
+      brandName: String(p.brand_name || '').trim(),
+      activeIngredients: (p.active_ingredients ?? [])
+        .map((a) => [a.name, a.strength].filter(Boolean).join(' '))
+        .filter(Boolean)
+        .join('; '),
+      dosageForm: String(p.dosage_form || '').trim(),
+      route: String(p.route || '').trim(),
+      marketingStatus: String(p.marketing_status || '').trim(),
+    }))
+    const brandName =
+      products[0]?.brandName ||
+      r.openfda?.brand_name?.[0] ||
+      r.openfda?.generic_name?.[0] ||
+      q
+    const genericName = r.openfda?.generic_name?.[0] || products[0]?.activeIngredients || ''
+    const firstSub = r.submissions?.[0]
+    out.push({
+      applicationNumber: appNo,
+      sponsorName: String(r.sponsor_name || '').trim() || 'Unknown sponsor',
+      submissionType: String(firstSub?.submission_type || '').trim(),
+      brandName,
+      genericName,
+      products,
+      approvalDate: firstSub?.submission_status_date
+        ? String(firstSub.submission_status_date)
+        : null,
+      drugsAtFdaUrl: drugsAtFdaOverviewUrl(appNo),
+      openFdaUrl: `https://api.fda.gov/drug/drugsfda.json?search=application_number:"${encodeURIComponent(appNo)}"`,
+    })
+  }
+  return out
 }
