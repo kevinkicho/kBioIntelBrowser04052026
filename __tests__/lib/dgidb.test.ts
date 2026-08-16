@@ -77,24 +77,30 @@ describe('getDrugGeneInteractionsByName', () => {
     expect(await getDrugGeneInteractionsByName('unknownxyz')).toEqual([])
   })
 
-  test('returns empty array when API returns non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    expect(await getDrugGeneInteractionsByName('aspirin')).toEqual([])
+  test('throws when API returns non-ok (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      headers: { get: () => 'application/json' },
+    })
+    await expect(getDrugGeneInteractionsByName('aspirin')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getDrugGeneInteractionsByName('aspirin')).toEqual([])
+    await expect(getDrugGeneInteractionsByName('aspirin')).rejects.toThrow(/network/)
   })
 
-  test('returns empty array when GraphQL errors present', async () => {
+  test('throws when GraphQL errors present (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
+      status: 200,
+      headers: { get: () => 'application/json' },
       json: async () => ({
         errors: [{ message: 'some error' }],
       }),
     })
-    expect(await getDrugGeneInteractionsByName('aspirin')).toEqual([])
+    await expect(getDrugGeneInteractionsByName('aspirin')).rejects.toThrow(/GraphQL/)
   })
 
   test('deduplicates interactions by gene+type', async () => {
