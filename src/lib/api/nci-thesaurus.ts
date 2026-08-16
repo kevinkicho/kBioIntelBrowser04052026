@@ -4,6 +4,22 @@ import { timedFetch } from './timedFetch'
 const EVS_BASE = 'https://api-evsrest.nci.nih.gov/api/v1/concept/ncit'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
+/**
+ * NCI Thesaurus harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains []. Detail hydration stays best-effort.
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 function pickDefinition(c: {
   definitions?: Array<{ definition?: string; type?: string; source?: string }>
   definition?: string
@@ -71,57 +87,53 @@ function mapConcept(c: Record<string, unknown>): NciConcept {
  * Search NCI Thesaurus (EVS REST). Requests definitions + synonyms so list items can show meaning.
  */
 export async function getNciConceptsByName(name: string): Promise<NciConcept[]> {
-  try {
-    const q = name.trim()
-    if (q.length < 2) return []
+  const q = name.trim()
+  if (q.length < 2) return []
 
-    // include=summary often carries definitions; fall back to definitions,synonyms if needed
-    const url =
-      `${EVS_BASE}/search?term=${encodeURIComponent(q)}` +
-      `&type=contains&pageSize=12&include=summary,definitions,synonyms,properties`
+  // include=summary often carries definitions; fall back to definitions,synonyms if needed
+  const url =
+    `${EVS_BASE}/search?term=${encodeURIComponent(q)}` +
+    `&type=contains&pageSize=12&include=summary,definitions,synonyms,properties`
 
-    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return []
-    const data = await res.json()
-    const raw = (data.concepts ?? data) as unknown[]
-    if (!Array.isArray(raw)) return []
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'NCI Thesaurus')
+  const data = await res.json()
+  const raw = (data.concepts ?? data) as unknown[]
+  if (!Array.isArray(raw)) return []
 
-    let concepts = raw.slice(0, 10).map((c) => mapConcept(c as Record<string, unknown>))
+  let concepts = raw.slice(0, 10).map((c) => mapConcept(c as Record<string, unknown>))
 
-    // If search omitted definitions, hydrate top hits from detail endpoint (capped)
-    const missing = concepts.filter((c) => !c.definition && c.code).slice(0, 5)
-    if (missing.length > 0) {
-      const details = await Promise.all(
-        missing.map(async (c) => {
-          try {
-            const dRes = await fetch(
-              `${EVS_BASE}/${encodeURIComponent(c.code)}?include=definitions,synonyms,properties`,
-              fetchOptions,
-            )
-            if (!dRes.ok) return null
-            return mapConcept((await dRes.json()) as Record<string, unknown>)
-          } catch {
-            return null
-          }
-        }),
-      )
-      const byCode = new Map(
-        details.filter(Boolean).map((d) => [d!.code, d!] as const),
-      )
-      concepts = concepts.map((c) => {
-        const d = byCode.get(c.code)
-        if (!d) return c
-        return {
-          ...c,
-          definition: c.definition || d.definition,
-          synonyms: c.synonyms.length ? c.synonyms : d.synonyms,
-          semanticType: c.semanticType || d.semanticType,
+  // If search omitted definitions, hydrate top hits from detail endpoint (capped)
+  const missing = concepts.filter((c) => !c.definition && c.code).slice(0, 5)
+  if (missing.length > 0) {
+    const details = await Promise.all(
+      missing.map(async (c) => {
+        try {
+          const dRes = await fetch(
+            `${EVS_BASE}/${encodeURIComponent(c.code)}?include=definitions,synonyms,properties`,
+            fetchOptions,
+          )
+          if (!dRes.ok) return null
+          return mapConcept((await dRes.json()) as Record<string, unknown>)
+        } catch {
+          return null
         }
-      })
-    }
-
-    return concepts
-  } catch {
-    return []
+      }),
+    )
+    const byCode = new Map(
+      details.filter(Boolean).map((d) => [d!.code, d!] as const),
+    )
+    concepts = concepts.map((c) => {
+      const d = byCode.get(c.code)
+      if (!d) return c
+      return {
+        ...c,
+        definition: c.definition || d.definition,
+        synonyms: c.synonyms.length ? c.synonyms : d.synonyms,
+        semanticType: c.semanticType || d.semanticType,
+      }
+    })
   }
+
+  return concepts
 }
