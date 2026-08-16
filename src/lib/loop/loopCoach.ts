@@ -47,7 +47,9 @@ export function nextLoopCoachAdvice(
 ): LoopCoachAdvice {
   const campaign = opts?.campaignHref ?? '/campaign'
   const ranked = has(events, 'discover_rank_completed')
-  const boarded = has(events, 'board_candidate_added')
+  // Campaign path emits board_status_changed + promote (no board_candidate_added).
+  // Treat that (or M1 board_candidate_added) as boarded for loop_complete.
+  const boarded = has(events, 'board_candidate_added') || hasPromote(events)
   const packed =
     has(events, 'pack_exported') || has(events, 'pack_opened')
   const rh = has(events, 'research_hypothesis_opened')

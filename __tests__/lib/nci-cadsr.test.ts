@@ -50,13 +50,13 @@ describe('fetchCadsrData (NCI EVS)', () => {
     )
   })
 
-  test('returns empty array when API response is not ok', async () => {
+  test('throws when API response is not ok (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: false,
+      status: 503,
       headers: { get: () => '' },
     })
-    const response = await fetchCadsrData('unknownxyz')
-    expect(response.data.concepts).toEqual([])
+    await expect(fetchCadsrData('unknownxyz')).rejects.toThrow(/HTTP/)
   })
 
   test('returns empty array when concepts key is missing', async () => {
@@ -69,9 +69,8 @@ describe('fetchCadsrData (NCI EVS)', () => {
     expect(response.data.concepts).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const response = await fetchCadsrData('melanoma')
-    expect(response.data.concepts).toEqual([])
+    await expect(fetchCadsrData('melanoma')).rejects.toThrow(/network/)
   })
 })

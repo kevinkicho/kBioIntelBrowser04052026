@@ -209,20 +209,9 @@ function payloadHasData(val) {
   if ('data' in obj && keys.length <= 3 && obj.data !== undefined) {
     return payloadHasData(obj.data)
   }
-  // Meta-ish success envelopes
+  // Meta-ish success envelopes (not honesty flags)
   if (obj.ok === true || obj.enabled === true) return true
-  // Category/gene partial timeout shells (route alive, sources degraded)
-  if (obj._partial === true && (obj._timeout === true || typeof obj._error === 'string')) {
-    return true
-  }
-  // Honest empty / not-retrieved envelopes (route alive; sparse free-API session)
-  if (obj._emptyHonest === true || obj._notRetrieved === true) {
-    return true
-  }
-  // Source-status map present → category/pipeline responded with provenance
-  if (obj._sourceStatus && typeof obj._sourceStatus === 'object') {
-    return true
-  }
+  // Honesty flags are classified separately (EMPTY vs TIMEOUT vs ERROR) — not DATA.
   if (typeof obj.status === 'string' && obj.status !== 'error') {
     // healthFor returns status without rows — treat as meta structure
     if ('sample_size' in obj || 'reason' in obj || 'p95_ms' in obj) return true
@@ -987,7 +976,27 @@ function aiRouteHasData(json, text) {
   return false
 }
 
+/**
+ * Distinct EMPTY vs TIMEOUT vs ERROR vs DATA for honesty envelopes.
+ * Bare `_sourceStatus` is provenance, not DATA.
+ */
+function classifyHonesty(json) {
+  if (!json || typeof json !== 'object') return null
+  if (json._timeout === true) return 'TIMEOUT'
+  if (json._agentStatus === 'timeout') return 'TIMEOUT'
+  if (json._partial === true && /timeout|timed?\s*out/i.test(String(json._error || ''))) return 'TIMEOUT'
+  if (json._emptyHonest === true || json._notRetrieved === true) return 'EMPTY'
+  if (json._agentStatus === 'error') return 'ERROR'
+  if (json._agentStatus === 'disabled') return 'DISABLED'
+  return null
+}
+
 function hasDataFor(series, json, text) {
+  if (series.dataCheck === 'ai') return aiRouteHasData(json, text)
+  const honesty = classifyHonesty(json)
+  if (honesty === 'TIMEOUT' || honesty === 'EMPTY' || honesty === 'ERROR' || honesty === 'DISABLED') {
+    return false
+  }
   if (series.dataCheck === 'category') return categoryHasData(json)
   if (series.dataCheck === 'discover') {
     if (!json || typeof json !== 'object') return false
@@ -1310,6 +1319,11 @@ async function probeSeries(series) {
     }
 
     // 2xx
+    const honesty = classifyHonesty(res.json)
+    if (honesty === 'TIMEOUT' || honesty === 'ERROR' || honesty === 'EMPTY' || honesty === 'DISABLED') {
+      last = { ...res, path: att.path, note: att.note, honesty }
+      continue
+    }
     const data = hasDataFor(series, res.json, res.text)
     if (data || series.meta || META_OK.has(series.label)) {
       return {
@@ -1364,16 +1378,20 @@ async function probeSeries(series) {
       hasData: false,
     }
   }
-  // empty success after all fixtures
+  // empty / timeout / error success after all fixtures
+  const honesty = last.honesty
+  const outcome =
+    honesty === 'TIMEOUT' ? 'timeout' : honesty === 'ERROR' ? 'error' : 'empty'
   return {
     label: series.label,
-    outcome: 'empty',
+    outcome,
     status: last.status,
     ms: last.ms,
     path: last.path,
     note: last.note,
     attempts: attemptN,
     hasData: false,
+    honesty: honesty || undefined,
   }
 }
 
@@ -1391,11 +1409,15 @@ async function mapPool(items, limit, fn) {
             ? 'DATA'
             : r.outcome === 'empty'
               ? 'EMPTY'
-              : r.outcome === 'client'
-                ? '4xx '
-                : r.outcome === 'skip'
-                  ? 'SKIP'
-                  : 'FAIL'
+              : r.outcome === 'timeout'
+                ? 'TIMEOUT'
+                : r.outcome === 'error'
+                  ? 'ERROR'
+                  : r.outcome === 'client'
+                    ? '4xx '
+                    : r.outcome === 'skip'
+                      ? 'SKIP'
+                      : 'FAIL'
         const st = r.status == null ? '---' : String(r.status)
         console.log(
           `  ${mark}  ${st.padStart(3)}  ${String(r.ms).padStart(5)}ms  x${r.attempts}  ${r.label}${
@@ -1454,6 +1476,8 @@ async function main() {
 
   const green = results.filter((r) => r.outcome === 'green')
   const empty = results.filter((r) => r.outcome === 'empty')
+  const timeout = results.filter((r) => r.outcome === 'timeout')
+  const envError = results.filter((r) => r.outcome === 'error')
   const client = results.filter((r) => r.outcome === 'client')
   const hard = results.filter((r) => r.outcome === 'hard')
   const skip = results.filter((r) => r.outcome === 'skip')
@@ -1467,6 +1491,8 @@ async function main() {
           probes: seriesList.length,
           green: green.length,
           empty: empty.length,
+          timeout: timeout.length,
+          error: envError.length,
           client: client.length,
           hard: hard.length,
           skipped: skip.length,
@@ -1485,6 +1511,8 @@ async function main() {
     console.log(`  probes:          ${results.length}`)
     console.log(`  DATA (green):    ${green.length}`)
     console.log(`  EMPTY (not green): ${empty.length}`)
+    console.log(`  TIMEOUT:         ${timeout.length}`)
+    console.log(`  ERROR envelope:  ${envError.length}`)
     console.log(`  4xx client:      ${client.length}`)
     console.log(`  FAIL hard:       ${hard.length}`)
     console.log(`  skipped:         ${skip.length}`)
@@ -1508,22 +1536,31 @@ async function main() {
       }
     }
 
-    const bad = hard.length + (strictEmpty ? empty.length + client.length : 0)
+    const bad = hard.length + (strictEmpty ? empty.length + timeout.length + envError.length + client.length : 0)
     console.log('')
     if (bad === 0) {
       console.log('✓ All probed endpoints confirmed with data (or allowed meta/404)')
     } else {
       console.log(
-        `✗ Health not fully confirmed: ${hard.length} hard, ${empty.length} empty, ${client.length} 4xx`,
+        `✗ Health not fully confirmed: ${hard.length} hard, ${empty.length} empty, ${timeout.length} timeout, ${envError.length} error, ${client.length} 4xx`,
       )
     }
   }
 
-  const fail = hard.length > 0 || (strictEmpty && (empty.length > 0 || client.length > 0))
+  const fail = hard.length > 0 || (strictEmpty && (empty.length > 0 || timeout.length > 0 || envError.length > 0 || client.length > 0))
   process.exit(fail ? 1 : 0)
 }
 
-main().catch((e) => {
-  console.error(e)
-  process.exit(2)
-})
+if (require.main === module) {
+  main().catch((e) => {
+    console.error(e)
+    process.exit(2)
+  })
+}
+
+module.exports = {
+  payloadHasData,
+  classifyHonesty,
+  categoryHasData,
+  hasDataFor,
+}

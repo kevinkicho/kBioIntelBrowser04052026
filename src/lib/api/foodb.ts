@@ -1,4 +1,5 @@
 import type { FoodBCompound } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://foodb.ca/api/v1'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
@@ -10,8 +11,12 @@ const fetchOptions: RequestInit = { next: { revalidate: 86400 } } // 24 hours
 export async function searchFooDB(query: string, limit: number = 20): Promise<FoodBCompound[]> {
   try {
     const url = `${BASE_URL}/compounds/search.json?q=${encodeURIComponent(query)}&per_page=${limit}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+    if (!res.ok) {
+      const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+      err.status = res.status
+      throw err
+    }
 
     const data = await res.json()
     const compounds = data.compounds || []
@@ -35,7 +40,7 @@ export async function searchFooDB(query: string, limit: number = 20): Promise<Fo
     }).filter((c: FoodBCompound) => c.name)
   } catch (error) {
     console.error('FooDB search error:', error)
-    return []
+    throw error
   }
 }
 
@@ -45,8 +50,12 @@ export async function searchFooDB(query: string, limit: number = 20): Promise<Fo
 export async function getFooDBCompound(id: string): Promise<FoodBCompound | null> {
   try {
     const url = `${BASE_URL}/compounds/${id}.json`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+    if (!res.ok) {
+      const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+      err.status = res.status
+      throw err
+    }
 
     const data = await res.json()
     const c = data.compound || data
@@ -67,7 +76,7 @@ export async function getFooDBCompound(id: string): Promise<FoodBCompound | null
     }
   } catch (error) {
     console.error('FooDB compound fetch error:', error)
-    return null
+    throw error
   }
 }
 

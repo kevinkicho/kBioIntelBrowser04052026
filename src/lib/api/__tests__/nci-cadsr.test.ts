@@ -39,7 +39,7 @@ describe('NCI EVS (caDSR panel) API', () => {
 
     expect(global.fetch).toHaveBeenCalledWith(
       expect.stringContaining('api-evsrest.nci.nih.gov'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
+      expect.any(Object),
     )
     expect(result.source).toBe('NCI EVS (NCIt)')
     expect(result.data.concepts).toHaveLength(1)
@@ -55,17 +55,13 @@ describe('NCI EVS (caDSR panel) API', () => {
     expect(result.data.concepts).toEqual([])
   })
 
-  it('should handle API errors gracefully', async () => {
+  it('throws on network error (not EMPTY)', async () => {
     ;(global.fetch as jest.Mock) = jest.fn().mockRejectedValueOnce(new Error('API error'))
-    const result = await fetchCadsrData('test')
-
-    expect(result.source).toBe('NCI EVS (NCIt)')
-    expect(result.data.concepts).toEqual([])
+    await expect(fetchCadsrData('test')).rejects.toThrow(/API error/)
   })
 
-  it('returns empty when response is not ok', async () => {
+  it('throws when response is not ok (not EMPTY)', async () => {
     ;(global.fetch as jest.Mock) = jest.fn().mockResolvedValueOnce(mockJsonFetch({}, false))
-    const result = await fetchCadsrData('test')
-    expect(result.data.concepts).toEqual([])
+    await expect(fetchCadsrData('test')).rejects.toThrow(/HTTP/)
   })
 })

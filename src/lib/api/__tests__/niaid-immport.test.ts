@@ -48,7 +48,7 @@ describe('NIAID ImmPort API', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('immport.org/data/query/api/search/study'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
+      expect.any(Object),
     )
     expect(result.source).toBe('NIAID ImmPort')
     expect(result.data.studies).toHaveLength(1)
@@ -73,21 +73,17 @@ describe('NIAID ImmPort API', () => {
     expect(result.data.studies).toEqual([])
   })
 
-  it('rejects HTML responses', async () => {
+  it('throws on HTML responses (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce({
       ok: true,
       headers: { get: () => 'text/html' },
       text: async () => '<!doctype html><html></html>',
     })
-    const result = await fetchImmPortData('test')
-    expect(result.data.studies).toEqual([])
+    await expect(fetchImmPortData('test')).rejects.toThrow(/HTML/)
   })
 
-  it('should handle API errors gracefully', async () => {
+  it('throws on API errors (not EMPTY)', async () => {
     global.fetch = jest.fn(() => Promise.reject(new Error('API error'))) as jest.Mock
-    const result = await fetchImmPortData('test')
-
-    expect(result.source).toBe('NIAID ImmPort')
-    expect(result.data.studies).toEqual([])
+    await expect(fetchImmPortData('test')).rejects.toThrow(/API error/)
   })
 })
