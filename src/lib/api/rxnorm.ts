@@ -4,6 +4,27 @@ import { timedFetch } from './timedFetch'
 const BASE_URL = 'https://rxnav.nlm.nih.gov/REST'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
+/**
+ * RxNorm harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [] / null. 404 on pair-list is retryable.
+ */
+function throwIfHttpFailed(
+  res: Response,
+  source: string,
+  opts?: { allowNotFound?: boolean },
+): void {
+  if (!res.ok) {
+    if (opts?.allowNotFound && res.status === 404) return
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 type InteractionSeverity = 'N/A' | 'minor' | 'moderate' | 'major' | 'contraindicated'
 
 function normalizeSeverity(raw: unknown): InteractionSeverity {
@@ -13,51 +34,46 @@ function normalizeSeverity(raw: unknown): InteractionSeverity {
 }
 
 export async function getRxcuiByName(name: string): Promise<string | null> {
-  try {
-    let url = `${BASE_URL}/rxcui.json?name=${encodeURIComponent(name)}`
-    let res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (res.ok) {
-      const data = await res.json()
-      const ids = data.idGroup?.rxnormId
-      if (Array.isArray(ids) && ids.length > 0) return ids[0]
-    }
+  const q = (name || '').trim()
+  if (!q) return null
+  let url = `${BASE_URL}/rxcui.json?name=${encodeURIComponent(q)}`
+  let res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'RxNorm')
+  const data = await res.json()
+  const ids = data.idGroup?.rxnormId
+  if (Array.isArray(ids) && ids.length > 0) return ids[0]
 
-    url = `${BASE_URL}/approximateTerm.json?term=${encodeURIComponent(name)}&maxEntries=1`
-    res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (res.ok) {
-      const data = await res.json()
-      const match = data.approximateGroup?.candidate?.[0]
-      if (match?.rxcui) return match.rxcui
-    }
-    return null
-  } catch {
-    return null
-  }
+  url = `${BASE_URL}/approximateTerm.json?term=${encodeURIComponent(q)}&maxEntries=1`
+  res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'RxNorm')
+  const approx = await res.json()
+  const match = approx.approximateGroup?.candidate?.[0]
+  if (match?.rxcui) return match.rxcui
+  return null
 }
 
 export async function getDrugInteractionsByName(name: string): Promise<DrugInteraction[]> {
-  try {
-    const rxcui = await getRxcuiByName(name)
-    if (!rxcui) return []
+  const q = (name || '').trim()
+  if (!q) return []
+  const rxcui = await getRxcuiByName(q)
+  if (!rxcui) return []
 
-    // NLM single-drug interaction.json is frequently 404; try list with a common co-med
-    // pair set, then fall back to openFDA label drug_interactions text.
-    const companionRxcuis = ['11289', '5640', '161', '7052'] // warfarin, ibuprofen, acetaminophen, morphine
-    for (const other of companionRxcuis) {
-      if (other === rxcui) continue
-      const listUrl = `${BASE_URL}/interaction/list.json?rxcuis=${rxcui}+${other}`
-      const res = await timedFetch(listUrl, { ...fetchOptions, timeoutMs: 8000 })
-      if (!res.ok) continue
-      const data = await res.json()
-      const interactions = parseInteractionGroups(data.fullInteractionTypeGroup ?? data.interactionTypeGroup)
-      if (interactions.length > 0) return interactions.slice(0, 30)
-    }
-
-    // openFDA label sections (free) as last resort
-    return await getInteractionsFromOpenFdaLabel(name)
-  } catch {
-    return []
+  // NLM single-drug interaction.json is frequently 404; try list with a common co-med
+  // pair set, then fall back to openFDA label drug_interactions text.
+  const companionRxcuis = ['11289', '5640', '161', '7052'] // warfarin, ibuprofen, acetaminophen, morphine
+  for (const other of companionRxcuis) {
+    if (other === rxcui) continue
+    const listUrl = `${BASE_URL}/interaction/list.json?rxcuis=${rxcui}+${other}`
+    const res = await timedFetch(listUrl, { ...fetchOptions, timeoutMs: 8000 })
+    throwIfHttpFailed(res, 'RxNorm', { allowNotFound: true })
+    if (!res.ok) continue
+    const data = await res.json()
+    const interactions = parseInteractionGroups(data.fullInteractionTypeGroup ?? data.interactionTypeGroup)
+    if (interactions.length > 0) return interactions.slice(0, 30)
   }
+
+  // openFDA label sections (free) as last resort
+  return await getInteractionsFromOpenFdaLabel(q)
 }
 
 function parseInteractionGroups(groups: unknown[]): DrugInteraction[] {
@@ -82,10 +98,10 @@ function parseInteractionGroups(groups: unknown[]): DrugInteraction[] {
 }
 
 async function getInteractionsFromOpenFdaLabel(name: string): Promise<DrugInteraction[]> {
-  try {
     const url =
       `https://api.fda.gov/drug/label.json?search=openfda.generic_name:"${encodeURIComponent(name)}"+openfda.brand_name:"${encodeURIComponent(name)}"&limit=3`
     const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+    throwIfHttpFailed(res, 'openFDA', { allowNotFound: true })
     if (!res.ok) return []
     const data = await res.json()
     const results = data.results ?? []
@@ -110,7 +126,4 @@ async function getInteractionsFromOpenFdaLabel(name: string): Promise<DrugIntera
       }
     }
     return out.slice(0, 20)
-  } catch {
-    return []
-  }
 }

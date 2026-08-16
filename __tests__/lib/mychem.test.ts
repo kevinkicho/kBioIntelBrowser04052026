@@ -136,3 +136,45 @@ describe('getMyChemData', () => {
     )
   })
 })
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
+describe('MyChem HTTP honesty', () => {
+  test('getMyChemData throws when HTTP-fail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getMyChemData('aspirin', { cid: 2244 })).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('getMyChemData throws on network error (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    await expect(getMyChemData('aspirin', { inchiKey: 'BSYNRYMUTXBXSQ-UHFFFAOYSA-N' })).rejects.toThrow(/network/)
+  })
+
+  test('getMyChemData throws on HTML (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html></html>', 200, 'text/html'))
+    await expect(getMyChemData('aspirin', { cid: 2244 })).rejects.toThrow(/HTML/)
+  })
+
+  test('searchChemicals true empty hits is [] (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({ hits: [] }))
+    expect(await searchChemicals('unknownxyz')).toEqual([])
+  })
+
+  test('searchChemicals throws when every fielded query HTTP-fails', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 502))
+    await expect(searchChemicals('aspirin')).rejects.toThrow(/HTTP 502/)
+  })
+
+  test('blank name is empty without fetch', async () => {
+    expect(await getMyChemData('  ')).toEqual({ chemicals: [] })
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})

@@ -1,99 +1,96 @@
 import { getMolecularInteractionsByName } from '@/lib/api/intact'
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
+function mitabLine(opts?: {
+  nameA?: string
+  nameB?: string
+  ac?: string
+  pubmed?: string
+  method?: string
+  type?: string
+}) {
+  const nameA = opts?.nameA ?? 'EGFR'
+  const nameB = opts?.nameB ?? 'ERBB2'
+  const ac = opts?.ac ?? 'EBI-12345'
+  const pubmed = opts?.pubmed ?? '12345678'
+  const method = opts?.method ?? 'two hybrid'
+  const type = opts?.type ?? 'physical association'
+  const cols = new Array(14).fill('')
+  cols[0] = 'uniprotkb:P00533'
+  cols[1] = 'uniprotkb:P04626'
+  cols[4] = `uniprotkb:${nameA}(gene name)`
+  cols[5] = `uniprotkb:${nameB}(gene name)`
+  cols[6] = `psi-mi:\"MI:0018\"(${method})`
+  cols[8] = `pubmed:${pubmed}`
+  cols[11] = `psi-mi:\"MI:0915\"(${type})`
+  cols[13] = `intact:${ac}`
+  return cols.join('\t')
+}
+
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getMolecularInteractionsByName', () => {
-  test('returns parsed interactions on success', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        content: [
-          {
-            ac: 'EBI-12345',
-            interactorA: { interactorName: 'ACE' },
-            interactorB: { interactorName: 'AGT' },
-            interactionType: 'physical association',
-            detectionMethod: 'two hybrid',
-            pubmedId: '12345678',
-            confidenceScore: 0.85,
-          },
-        ],
-      }),
-    })
+  test('parses PSICQUIC MITAB for a UniProt accession', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      jsonRes(mitabLine(), 200, 'text/plain'),
+    )
+    const results = await getMolecularInteractionsByName('P00533')
+    expect(results).toHaveLength(1)
+    expect(results[0].interactorA).toBe('EGFR')
+    expect(results[0].interactorB).toBe('ERBB2')
+    expect(results[0].interactionType).toBe('physical association')
+    expect(results[0].detectionMethod).toBe('two hybrid')
+    expect(results[0].pubmedId).toBe('12345678')
+    expect(results[0].url).toBe('https://www.ebi.ac.uk/intact/details/interaction/EBI-12345')
+  })
+
+  test('parses PSICQUIC MITAB for a gene symbol', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      jsonRes(mitabLine({ nameA: 'ACE', nameB: 'AGT', ac: 'EBI-99' }), 200, 'text/plain'),
+    )
     const results = await getMolecularInteractionsByName('ACE')
     expect(results).toHaveLength(1)
     expect(results[0].interactorA).toBe('ACE')
     expect(results[0].interactorB).toBe('AGT')
-    expect(results[0].interactionType).toBe('physical association')
-    expect(results[0].detectionMethod).toBe('two hybrid')
-    expect(results[0].pubmedId).toBe('12345678')
-    expect(results[0].confidenceScore).toBe(0.85)
-    expect(results[0].url).toBe('https://www.ebi.ac.uk/intact/details/interaction/EBI-12345')
   })
 
-  test('uses miscore as fallback for confidenceScore', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        content: [
-          {
-            ac: 'EBI-99',
-            interactorA: { interactorName: 'X' },
-            interactorB: { interactorName: 'Y' },
-            miscore: 0.42,
-          },
-        ],
-      }),
-    })
-    const results = await getMolecularInteractionsByName('X')
-    expect(results[0].confidenceScore).toBe(0.42)
+  test('true empty MITAB is [] (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes('', 200, 'text/plain'))
+    expect(await getMolecularInteractionsByName('P00533')).toEqual([])
   })
 
-  test('falls back to empty strings for missing fields', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        content: [
-          { ac: 'EBI-1', interactorA: {}, interactorB: {} },
-        ],
-      }),
-    })
-    const results = await getMolecularInteractionsByName('test')
-    expect(results[0].interactorA).toBe('')
-    expect(results[0].interactorB).toBe('')
-    expect(results[0].interactionType).toBe('')
-    expect(results[0].detectionMethod).toBe('')
-    expect(results[0].pubmedId).toBe('')
-    expect(results[0].confidenceScore).toBe(0)
+  test('blank name is empty without fetch', async () => {
+    expect(await getMolecularInteractionsByName('  ')).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
   })
 
-  test('encodes name in URL', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ content: [] }),
-    })
-    await getMolecularInteractionsByName('test molecule')
-    const calledUrl = (fetch as jest.Mock).mock.calls[0][0] as string
-    expect(calledUrl).toContain('test%20molecule')
-    expect(calledUrl).toContain('pageSize=10')
+  test('throws when HTTP-fail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('', 503, 'text/plain'))
+    await expect(getMolecularInteractionsByName('P00533')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array when fetch returns non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    expect(await getMolecularInteractionsByName('ACE')).toEqual([])
-  })
-
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getMolecularInteractionsByName('ACE')).toEqual([])
+    await expect(getMolecularInteractionsByName('P00533')).rejects.toThrow(/network/)
   })
 
-  test('returns empty array when API returns empty content', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ content: [] }),
-    })
-    expect(await getMolecularInteractionsByName('unknownxyz')).toEqual([])
+  test('throws on HTML (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html></html>', 200, 'text/html'))
+    await expect(getMolecularInteractionsByName('P00533')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on JSON body from PSICQUIC (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ error: 'down' }, 200, 'application/json'))
+    await expect(getMolecularInteractionsByName('P00533')).rejects.toThrow(/non-MITAB/)
   })
 })

@@ -1,7 +1,24 @@
 import type { MyChemAnnotation } from '../types'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://mychem.info/v1'
 const fetchOptions: RequestInit = { next: { revalidate: 604800 } } // 7 days
+
+/**
+ * MyChem harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
 
 /**
  * Fields that carry real chemical identity (not NDC package records).
@@ -234,8 +251,8 @@ async function queryMyChem(
     `${BASE_URL}/query?q=${encodeURIComponent(q)}` +
     `&fields=${encodeURIComponent(ANNOTATION_FIELDS)}` +
     `&size=${size}`
-  const res = await fetch(url, { ...fetchOptions, signal })
-  if (!res.ok) return []
+  const res = await timedFetch(url, { ...fetchOptions, signal, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'MyChem')
   const data = await res.json()
   const hits: Record<string, unknown>[] = Array.isArray(data?.hits) ? data.hits : []
   const out: MyChemAnnotation[] = []
@@ -262,17 +279,13 @@ async function queryMyChem(
  * Accepts InChIKey, ChEMBL, ChEBI, PubChem CID, UNII (per MyChem docs).
  */
 export async function getChemicalById(chemId: string): Promise<MyChemAnnotation | null> {
-  try {
-    const id = (chemId || '').trim()
-    if (!id) return null
-    const url = `${BASE_URL}/chem/${encodeURIComponent(id)}?fields=${encodeURIComponent(ANNOTATION_FIELDS)}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
-    const hit = await res.json()
-    return mapMyChemHit(hit as Record<string, unknown>)
-  } catch {
-    return null
-  }
+  const id = (chemId || '').trim()
+  if (!id) return null
+  const url = `${BASE_URL}/chem/${encodeURIComponent(id)}?fields=${encodeURIComponent(ANNOTATION_FIELDS)}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'MyChem')
+  const hit = await res.json()
+  return mapMyChemHit(hit as Record<string, unknown>)
 }
 
 /** @deprecated use getChemicalById — kept for call-site compatibility */
@@ -289,18 +302,28 @@ async function firstNonEmptyFielded(
 ): Promise<MyChemAnnotation[]> {
   if (fielded.length === 0) return []
   const controller = new AbortController()
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     let remaining = fielded.length
     let settled = false
-    const finish = (hits: MyChemAnnotation[]) => {
-      if (settled) return
-      settled = true
+    let lastError: unknown
+    const abortQuietly = () => {
       try {
         controller.abort()
       } catch {
         /* ignore */
       }
+    }
+    const finish = (hits: MyChemAnnotation[]) => {
+      if (settled) return
+      settled = true
+      abortQuietly()
       resolve(hits)
+    }
+    const fail = (err: unknown) => {
+      if (settled) return
+      settled = true
+      abortQuietly()
+      reject(err)
     }
     for (const fq of fielded) {
       queryMyChem(fq, 12, controller.signal)
@@ -311,12 +334,25 @@ async function firstNonEmptyFielded(
             return
           }
           remaining -= 1
-          if (remaining === 0) finish([])
+          if (remaining === 0) {
+            if (lastError) fail(lastError)
+            else finish([])
+          }
         })
-        .catch(() => {
+        .catch((err) => {
           if (settled) return
+          const msg = err instanceof Error ? err.message : String(err)
+          if (/abort/i.test(msg)) {
+            remaining -= 1
+            if (remaining === 0) {
+              if (lastError) fail(lastError)
+              else finish([])
+            }
+            return
+          }
+          lastError = err
           remaining -= 1
-          if (remaining === 0) finish([])
+          if (remaining === 0) fail(err)
         })
     }
   })
@@ -329,28 +365,24 @@ async function firstNonEmptyFielded(
  * Fielded queries run in parallel; first non-empty result wins (early cancel).
  */
 export async function searchChemicals(query: string): Promise<MyChemAnnotation[]> {
-  try {
-    const q = (query || '').trim()
-    if (!q) return []
+  const q = (query || '').trim()
+  if (!q) return []
 
-    const safe = q.replace(/"/g, '')
-    // Prefer chemical sources that actually carry names/IDs
-    const fielded = [
-      `chembl.pref_name:"${safe}"`,
-      `chebi.name:"${safe}"`,
-      `drugbank.name:"${safe}"`,
-      `_exists_:chembl AND ${q}`,
-      `_exists_:pubchem.cid AND ${q}`,
-    ]
+  const safe = q.replace(/"/g, '')
+  // Prefer chemical sources that actually carry names/IDs
+  const fielded = [
+    `chembl.pref_name:"${safe}"`,
+    `chebi.name:"${safe}"`,
+    `drugbank.name:"${safe}"`,
+    `_exists_:chembl AND ${q}`,
+    `_exists_:pubchem.cid AND ${q}`,
+  ]
 
-    const hits = await firstNonEmptyFielded(fielded)
-    if (hits.length > 0) return hits
+  const hits = await firstNonEmptyFielded(fielded)
+  if (hits.length > 0) return hits
 
-    // Last resort free-text (filter mapper drops pure NDC)
-    return queryMyChem(q, 20)
-  } catch {
-    return []
-  }
+  // Last resort free-text (filter mapper drops pure NDC)
+  return queryMyChem(q, 20)
 }
 
 /**

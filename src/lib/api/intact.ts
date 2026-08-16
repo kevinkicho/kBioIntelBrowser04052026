@@ -4,6 +4,32 @@ import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
+/**
+ * IntAct harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit MITAB / JSON remains [].
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function assertMitabBody(text: string): void {
+  const trimmed = text.trimStart()
+  if (trimmed.startsWith('<')) {
+    throw new Error('HTML response from IntAct')
+  }
+  if (trimmed.startsWith('{') || trimmed.startsWith('[')) {
+    throw new Error('non-MITAB response from IntAct')
+  }
+}
+
 /** Legacy IntAct REST (often 404) */
 const LEGACY_URL =
   'https://www.ebi.ac.uk/intact/ws/interaction/findInteractor'
@@ -61,31 +87,27 @@ function parseMitabLine(line: string): MolecularInteraction | null {
 }
 
 async function psicquicByAccession(accession: string, max = 10): Promise<MolecularInteraction[]> {
-  try {
-    const q = `species:human AND id:${encodeURIComponent(accession)}`
-    const url = `${PSICQUIC_URL}/${q}?format=tab25&firstResult=0&maxResults=${max}`
-    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return []
-    const text = await res.text()
-    if (!text.trim() || text.trim().startsWith('<') || text.trim().startsWith('{')) return []
-    const out: MolecularInteraction[] = []
-    for (const line of text.split('\n')) {
-      if (!line.trim() || line.startsWith('#')) continue
-      const row = parseMitabLine(line)
-      if (row) out.push(row)
-      if (out.length >= max) break
-    }
-    return out
-  } catch {
-    return []
+  const q = `species:human AND id:${encodeURIComponent(accession)}`
+  const url = `${PSICQUIC_URL}/${q}?format=tab25&firstResult=0&maxResults=${max}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'IntAct')
+  const text = await res.text()
+  if (!text.trim()) return []
+  assertMitabBody(text)
+  const out: MolecularInteraction[] = []
+  for (const line of text.split('\n')) {
+    if (!line.trim() || line.startsWith('#')) continue
+    const row = parseMitabLine(line)
+    if (row) out.push(row)
+    if (out.length >= max) break
   }
+  return out
 }
 
 async function legacyByName(name: string): Promise<MolecularInteraction[]> {
-  try {
     const url = `${LEGACY_URL}/${encodeURIComponent(name)}?format=json&pageSize=10`
     const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return []
+    throwIfHttpFailed(res, 'IntAct')
     const data = await res.json()
     const entries = data?.content ?? data?.data ?? (Array.isArray(data) ? data : [])
     if (!Array.isArray(entries)) return []
@@ -108,9 +130,6 @@ async function legacyByName(name: string): Promise<MolecularInteraction[]> {
         url: `https://www.ebi.ac.uk/intact/details/interaction/${id}`,
       }
     })
-  } catch {
-    return []
-  }
 }
 
 /**
@@ -118,14 +137,12 @@ async function legacyByName(name: string): Promise<MolecularInteraction[]> {
  * Drug names resolve to target UniProt accessions, then PSICQUIC IntAct.
  */
 export async function getMolecularInteractionsByName(name: string): Promise<MolecularInteraction[]> {
-  try {
     const q = name?.trim()
     if (!q) return []
 
     // Direct UniProt
     if (/^[OPQ][0-9][A-Z0-9]{3}[0-9]$|^[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2}$/i.test(q)) {
-      const rows = await psicquicByAccession(q.toUpperCase())
-      if (rows.length) return rows
+      return psicquicByAccession(q.toUpperCase())
     }
 
     const resolved = await resolveDrugTargets(q, 5)
@@ -151,8 +168,10 @@ export async function getMolecularInteractionsByName(name: string): Promise<Mole
       try {
         const url = `${PSICQUIC_URL}/${encodeURIComponent(`species:human AND gene:${gene}`)}?format=tab25&firstResult=0&maxResults=10`
         const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-        if (!res.ok) continue
+        throwIfHttpFailed(res, 'IntAct')
         const text = await res.text()
+        if (!text.trim()) continue
+        assertMitabBody(text)
         const out: MolecularInteraction[] = []
         for (const line of text.split('\n')) {
           if (!line.trim() || line.startsWith('#')) continue
@@ -161,13 +180,12 @@ export async function getMolecularInteractionsByName(name: string): Promise<Mole
           if (out.length >= 10) break
         }
         if (out.length) return out
-      } catch {
-        /* next */
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err)
+        if (/HTTP |HTML|non-MITAB|timeout|timed/i.test(msg)) throw err
+        /* parse miss — try next gene */
       }
     }
 
     return await legacyByName(q)
-  } catch {
-    return []
-  }
 }
