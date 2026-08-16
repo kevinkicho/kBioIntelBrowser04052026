@@ -29,12 +29,11 @@ describe('fetchTranslatorData', () => {
     expect(results[0].edgeLabel).toBe('biolink:ChemicalEntity')
   })
 
-  test('returns empty array when API response is not ok', async () => {
+  test('throws when API response is not ok (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse({}, { status: 500 })
     )
-    const response = await fetchTranslatorData('unknownxyz')
-    expect(response.data.associations).toEqual([])
+    await expect(fetchTranslatorData('unknownxyz')).rejects.toThrow(/HTTP/)
   })
 
   test('returns empty array when entities key is missing', async () => {
@@ -43,9 +42,8 @@ describe('fetchTranslatorData', () => {
     expect(response.data.associations).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const response = await fetchTranslatorData('metformin')
-    expect(response.data.associations).toEqual([])
+    await expect(fetchTranslatorData('metformin')).rejects.toThrow(/network/)
   })
-});
+})

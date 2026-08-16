@@ -34,10 +34,9 @@ describe('fetchNeuroMMSigData', () => {
     expect(results[0].evidence).toBe('Strong')
   })
 
-  test('returns empty array when API response is not ok', async () => {
+  test('throws when API response is not ok (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonResponse({}, { status: 500 }))
-    const response = await fetchNeuroMMSigData('unknownxyz')
-    expect(response.data.signatures).toEqual([])
+    await expect(fetchNeuroMMSigData('unknownxyz')).rejects.toThrow(/HTTP/)
   })
 
   test('returns empty array when signatures key is missing', async () => {
@@ -46,9 +45,8 @@ describe('fetchNeuroMMSigData', () => {
     expect(response.data.signatures).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const response = await fetchNeuroMMSigData('APOE')
-    expect(response.data.signatures).toEqual([])
+    await expect(fetchNeuroMMSigData('APOE')).rejects.toThrow(/network/)
   })
 })

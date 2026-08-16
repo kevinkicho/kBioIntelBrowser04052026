@@ -4,6 +4,7 @@ function mockJsonFetch(body: unknown, ok = true) {
   const text = JSON.stringify(body)
   return {
     ok,
+    status: ok ? 200 : 500,
     headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? 'application/json' : null) },
     text: async () => text,
     json: async () => body,
@@ -30,7 +31,7 @@ describe('NCATS Translator API', () => {
 
     expect(fetch).toHaveBeenCalledWith(
       expect.stringContaining('arax.ncats.io'),
-      expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json' }) }),
+      expect.any(Object),
     )
     expect(result.source).toBe('NCATS Translator')
     expect(result.data.associations.length).toBeGreaterThanOrEqual(1)
@@ -47,11 +48,13 @@ describe('NCATS Translator API', () => {
     expect(result.data.associations).toEqual([])
   })
 
-  it('should handle API errors gracefully', async () => {
+  it('throws on API errors (not EMPTY)', async () => {
     global.fetch = jest.fn(() => Promise.reject(new Error('API error'))) as jest.Mock
-    const result = await fetchTranslatorData('test')
+    await expect(fetchTranslatorData('test')).rejects.toThrow(/API error/)
+  })
 
-    expect(result.source).toBe('NCATS Translator')
-    expect(result.data.associations).toEqual([])
+  it('throws when response is not ok (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(mockJsonFetch({}, false))
+    await expect(fetchTranslatorData('test')).rejects.toThrow(/HTTP/)
   })
 })

@@ -34,12 +34,11 @@ describe('fetchAnvilData', () => {
     expect(results[0].participantCount).toBe(5000)
   })
 
-  test('returns empty array when API response is not ok', async () => {
+  test('throws when API response is not ok (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(
       mockJsonResponse({}, { status: 500 })
     )
-    const response = await fetchAnvilData('unknownxyz')
-    expect(response.data.datasets).toEqual([])
+    await expect(fetchAnvilData('unknownxyz')).rejects.toThrow(/HTTP/)
   })
 
   test('returns empty array when datasets key is missing', async () => {
@@ -48,9 +47,18 @@ describe('fetchAnvilData', () => {
     expect(response.data.datasets).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const response = await fetchAnvilData('diabetes')
-    expect(response.data.datasets).toEqual([])
+    await expect(fetchAnvilData('diabetes')).rejects.toThrow(/network/)
   })
-});
+
+  test('throws on HTML responses (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      new Response('<!doctype html><html></html>', {
+        status: 200,
+        headers: { 'content-type': 'text/html; charset=utf-8' },
+      }),
+    )
+    await expect(fetchAnvilData('diabetes')).rejects.toThrow(/HTML/)
+  })
+})

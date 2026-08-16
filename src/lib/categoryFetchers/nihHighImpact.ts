@@ -9,8 +9,9 @@ import { fetchNeuroMMSigData } from '@/lib/api/ninds-neurommsig'
 
 /**
  * NIH High-Impact category.
- * nci-cadsr (EVS) and niaid-immport are live free paths; other sources may still
- * short-circuit via sourceAvailability when disabled.
+ * All five leaf clients are live free paths. HTTP / HTML / timeout throw so
+ * trackedSafe records error|timeout instead of honest EMPTY. Disabled sources
+ * still short-circuit via sourceAvailability.
  */
 export async function fetchNihHighImpact(name: string, queryFor: (s: string) => string) {
   const tasks: Array<Promise<unknown>> = []
