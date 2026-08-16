@@ -1,20 +1,28 @@
 import { getChemblIndicationsByName } from '@/lib/api/chembl-indications'
 
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getChemblIndicationsByName', () => {
   test('returns parsed indications on success', async () => {
     ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValueOnce(
+        jsonRes({
           molecules: [{ molecule_chembl_id: 'CHEMBL25' }],
         }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      )
+      .mockResolvedValueOnce(
+        jsonRes({
           drug_indications: [
             {
               mesh_heading: 'Pain',
@@ -25,7 +33,7 @@ describe('getChemblIndicationsByName', () => {
             },
           ],
         }),
-      })
+      )
 
     const results = await getChemblIndicationsByName('aspirin')
     expect(results).toHaveLength(1)
@@ -36,41 +44,46 @@ describe('getChemblIndicationsByName', () => {
     expect(results[0].maxPhaseForIndication).toBe(4)
     expect(results[0].moleculeChemblId).toBe('CHEMBL25')
     expect(results[0].url).toContain('CHEMBL25')
-    expect(results[0].url).toContain('drug_indications')
+    expect(results[0].url).toMatch(/DrugIndications|drug_indications/)
     expect(results[0].url).not.toContain('/g/#')
   })
 
-  test('returns empty array when molecule search returns no results', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ molecules: [] }),
-    })
-    const results = await getChemblIndicationsByName('unknownxyz')
-    expect(results).toEqual([])
+  test('true empty molecule search JSON is [] (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ molecules: [] }))
+    expect(await getChemblIndicationsByName('unknownxyz')).toEqual([])
   })
 
-  test('returns empty array when molecule search fails', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    const results = await getChemblIndicationsByName('aspirin')
-    expect(results).toEqual([])
-  })
-
-  test('returns empty array when indication fetch fails', async () => {
+  test('true empty indication JSON is [] (not error)', async () => {
     ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          molecules: [{ molecule_chembl_id: 'CHEMBL25' }],
-        }),
-      })
-      .mockResolvedValueOnce({ ok: false })
-    const results = await getChemblIndicationsByName('aspirin')
-    expect(results).toEqual([])
+      .mockResolvedValueOnce(jsonRes({ molecules: [{ molecule_chembl_id: 'CHEMBL25' }] }))
+      .mockResolvedValueOnce(jsonRes({ drug_indications: [] }))
+    expect(await getChemblIndicationsByName('aspirin')).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws when molecule search HTTP-fail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getChemblIndicationsByName('aspirin')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws when indication fetch HTTP-fail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonRes({ molecules: [{ molecule_chembl_id: 'CHEMBL25' }] }))
+      .mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getChemblIndicationsByName('aspirin')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const results = await getChemblIndicationsByName('aspirin')
-    expect(results).toEqual([])
+    await expect(getChemblIndicationsByName('aspirin')).rejects.toThrow(/network/)
+  })
+
+  test('throws on HTML (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html></html>', 200, 'text/html'))
+    await expect(getChemblIndicationsByName('aspirin')).rejects.toThrow(/HTML/)
+  })
+
+  test('blank query is empty without fetch', async () => {
+    expect(await getChemblIndicationsByName('')).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
   })
 })
