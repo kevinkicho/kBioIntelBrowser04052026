@@ -2,7 +2,10 @@
  * Therapeutic Target Database via free BioThings / NCATS Knowledge Provider API.
  * @see https://biothings.ncats.io/ttd
  * No invented rows — empty when no hits.
+ * HTTP / HTML / timeout are not EMPTY.
  */
+
+import { timedFetch } from './timedFetch'
 
 export interface TTDTarget {
   id: string
@@ -49,10 +52,22 @@ type BtHit = {
   object?: Record<string, unknown>
 }
 
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
 async function queryTtd(q: string, size = 25): Promise<BtHit[]> {
   const url = `${BIOTHINGS_TTD}/query?q=${encodeURIComponent(q)}&size=${size}`
-  const res = await fetch(url, fetchOpts)
-  if (!res.ok) return []
+  const res = await timedFetch(url, { ...fetchOpts, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'TTD')
   const data = (await res.json()) as { hits?: BtHit[] }
   return Array.isArray(data.hits) ? data.hits : []
 }
@@ -116,88 +131,83 @@ export async function getTTDData(query: string): Promise<TTDResult> {
   const q = query.trim()
   if (q.length < 2) return { targets: [], drugs: [] }
 
-  try {
-    // Prefer drug-as-subject name matches; also try free-text
-    const [bySubject, byObject] = await Promise.all([
-      queryTtd(`subject.name:${JSON.stringify(q)}`, 30),
-      queryTtd(`object.name:${JSON.stringify(q)}`, 20),
-    ])
-    let hits = bySubject.length > 0 ? bySubject : []
-    if (hits.length === 0) {
-      hits = await queryTtd(q, 25)
+  // Prefer drug-as-subject name matches; also try free-text
+  const [bySubject, byObject] = await Promise.all([
+    queryTtd(`subject.name:${JSON.stringify(q)}`, 30),
+    queryTtd(`object.name:${JSON.stringify(q)}`, 20),
+  ])
+  let hits = bySubject.length > 0 ? bySubject : []
+  if (hits.length === 0) {
+    hits = await queryTtd(q, 25)
+  }
+  // Merge object-name hits (gene/target query)
+  const seen = new Set(hits.map((h) => h._id))
+  for (const h of byObject) {
+    if (h._id && !seen.has(h._id)) {
+      seen.add(h._id)
+      hits.push(h)
     }
-    // Merge object-name hits (gene/target query)
-    const seen = new Set(hits.map((h) => h._id))
-    for (const h of byObject) {
-      if (h._id && !seen.has(h._id)) {
-        seen.add(h._id)
-        hits.push(h)
+  }
+
+  const targetsById = new Map<string, TTDTarget>()
+  const drugsById = new Map<string, TTDDrug>()
+
+  for (const hit of hits) {
+    const subj = hit.subject
+    const obj = hit.object
+    const assoc = hit.association
+
+    if (isProtein(obj) && obj) {
+      const t = mapTarget(obj, assoc)
+      if (t.id || t.name) {
+        const key = t.id || t.name
+        if (!targetsById.has(key)) targetsById.set(key, t)
+      }
+    }
+    if (isProtein(subj) && subj) {
+      const t = mapTarget(subj, assoc)
+      if (t.id || t.name) {
+        const key = t.id || t.name
+        if (!targetsById.has(key)) targetsById.set(key, t)
       }
     }
 
-    const targetsById = new Map<string, TTDTarget>()
-    const drugsById = new Map<string, TTDDrug>()
-
-    for (const hit of hits) {
-      const subj = hit.subject
-      const obj = hit.object
-      const assoc = hit.association
-
-      if (isProtein(obj) && obj) {
-        const t = mapTarget(obj, assoc)
-        if (t.id || t.name) {
-          const key = t.id || t.name
-          if (!targetsById.has(key)) targetsById.set(key, t)
-        }
-      }
-      if (isProtein(subj) && subj) {
-        const t = mapTarget(subj, assoc)
-        if (t.id || t.name) {
-          const key = t.id || t.name
-          if (!targetsById.has(key)) targetsById.set(key, t)
-        }
-      }
-
-      if (isSmallMolecule(subj) && subj) {
-        const targetName = isProtein(obj) && obj ? String(obj.name || '') : undefined
-        const disease =
-          isProtein(obj) === false && obj && String(obj.type || '').includes('Disease')
-            ? String(obj.name || '')
-            : assoc?.clinical_trial?.[0]?.disease
-        const d = mapDrug(subj, targetName, disease)
-        if (d.id || d.name) {
-          const key = d.id || d.name
-          const existing = drugsById.get(key)
-          if (existing) {
-            if (targetName && !existing.targets.includes(targetName)) {
-              existing.targets.push(targetName)
-            }
-            if (disease && !existing.indications.includes(disease)) {
-              existing.indications.push(disease)
-            }
-          } else {
-            drugsById.set(key, d)
+    if (isSmallMolecule(subj) && subj) {
+      const targetName = isProtein(obj) && obj ? String(obj.name || '') : undefined
+      const disease =
+        isProtein(obj) === false && obj && String(obj.type || '').includes('Disease')
+          ? String(obj.name || '')
+          : assoc?.clinical_trial?.[0]?.disease
+      const d = mapDrug(subj, targetName, disease)
+      if (d.id || d.name) {
+        const key = d.id || d.name
+        const existing = drugsById.get(key)
+        if (existing) {
+          if (targetName && !existing.targets.includes(targetName)) {
+            existing.targets.push(targetName)
           }
+          if (disease && !existing.indications.includes(disease)) {
+            existing.indications.push(disease)
+          }
+        } else {
+          drugsById.set(key, d)
         }
       }
     }
+  }
 
-    // drugCount on targets (Array.from for TS targets without downlevelIteration)
-    for (const d of Array.from(drugsById.values())) {
-      for (const tn of d.targets) {
-        for (const t of Array.from(targetsById.values())) {
-          if (t.name === tn) t.drugCount += 1
-        }
+  // drugCount on targets (Array.from for TS targets without downlevelIteration)
+  for (const d of Array.from(drugsById.values())) {
+    for (const tn of d.targets) {
+      for (const t of Array.from(targetsById.values())) {
+        if (t.name === tn) t.drugCount += 1
       }
     }
+  }
 
-    return {
-      targets: Array.from(targetsById.values()).slice(0, 25),
-      drugs: Array.from(drugsById.values()).slice(0, 25),
-    }
-  } catch (err) {
-    console.error('[ttd] BioThings query failed', err instanceof Error ? err.message : err)
-    return { targets: [], drugs: [] }
+  return {
+    targets: Array.from(targetsById.values()).slice(0, 25),
+    drugs: Array.from(drugsById.values()).slice(0, 25),
   }
 }
 
