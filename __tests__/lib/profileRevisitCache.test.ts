@@ -113,10 +113,17 @@ describe('memory L1 profileClientCache', () => {
     expect(getProfileClientCache(profileCacheKey('pipeline', 10))).toEqual({ c: 3 })
   })
 
-  test('peekCategoryClientCache reads L1', () => {
+  test('peekCategoryClientCache reads L1 rows and skips empty shells', () => {
     const key = categoryProfileCacheKey(5, 'clinical-safety')
-    setProfileClientCache(key, { trials: [] }, 60_000, { skipIdb: true })
-    expect(peekCategoryClientCache(5, 'clinical-safety')).toEqual({ trials: [] })
+    setProfileClientCache(key, { trials: [{ nctId: 'NCT1' }] }, 60_000, { skipIdb: true })
+    expect(peekCategoryClientCache(5, 'clinical-safety')).toEqual({ trials: [{ nctId: 'NCT1' }] })
+    expect(peekCategoryClientCache(5, 'pharmaceutical')).toBeUndefined()
+    setProfileClientCache(
+      categoryProfileCacheKey(5, 'pharmaceutical'),
+      { companies: [], _emptyHonest: true },
+      60_000,
+      { skipIdb: true },
+    )
     expect(peekCategoryClientCache(5, 'pharmaceutical')).toBeUndefined()
   })
 

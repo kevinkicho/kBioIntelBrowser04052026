@@ -16,6 +16,27 @@ import { newPipelineRun, runStage } from './pipeline'
 import type { PipelineReport } from './pipeline'
 import { withCategorySlot } from './pipeline/categoryFetchScheduler'
 import { underResourcePressure } from './requestProtocol'
+import { shouldCacheHonestyEnvelope } from './honestyEnvelope'
+
+/** Same row test as the category route — underscore keys are not payload. */
+export function categoryHasPanelPayload(data: Record<string, unknown> | null | undefined): boolean {
+  if (!data) return false
+  return Object.keys(data)
+    .filter((k) => !k.startsWith('_'))
+    .some((k) => {
+      const v = data[k]
+      if (v == null) return false
+      if (Array.isArray(v)) return v.length > 0
+      if (typeof v === 'object') return Object.keys(v as object).length > 0
+      return true
+    })
+}
+
+function isReusableCategoryCache(data: unknown): data is Record<string, unknown> {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return false
+  const rec = data as Record<string, unknown>
+  return shouldCacheHonestyEnvelope(rec) && categoryHasPanelPayload(rec)
+}
 
 export type CategoryLoadState = 'idle' | 'loading' | 'loaded' | 'error'
 
@@ -61,9 +82,11 @@ export function peekCategoryClientCache(
   apiOverrides?: Record<string, ApiIdentifierType>,
   apiParams?: Record<string, ApiParamValue>,
 ): Record<string, unknown> | undefined {
-  return getProfileClientCache<Record<string, unknown>>(
+  const hit = getProfileClientCache<Record<string, unknown>>(
     categoryProfileCacheKey(cid, categoryId, apiOverrides, apiParams),
   )
+  // Skip leftover empty/timeout shells so they cannot pin as success.
+  return isReusableCategoryCache(hit) ? hit : undefined
 }
 
 export interface FetchCategoryResult {
@@ -115,7 +138,7 @@ export async function fetchCategoryDataDetailed(
       },
     )
     run.addStage(stage)
-    if (cached) {
+    if (isReusableCategoryCache(cached)) {
       logAgentActivity(
         'profile.cache.hit',
         { cid, categoryId, layer: 'l1_or_l2' },
@@ -211,7 +234,10 @@ export async function fetchCategoryDataDetailed(
   const { stage: storeStage } = await runStage(
     { id: 'cache_store', timeoutMs: 2_000, optional: true, signal },
     async () => {
-      setProfileClientCache(cacheKey, data)
+      // Empty-as-success / timeout / error must not pin as a revisit success shell.
+      if (isReusableCategoryCache(data)) {
+        setProfileClientCache(cacheKey, data)
+      }
       return true
     },
   )

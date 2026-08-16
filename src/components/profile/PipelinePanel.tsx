@@ -26,6 +26,42 @@ interface PipelineData {
   drugLabels: Array<{ title: string; labelerName?: string; publishedDate?: string }>
   drugShortages: Array<{ drugName: string; shortageStatus: string; shortageReason: string; estimatedResupplyDate?: string }>
   myChemAnnotations: Array<{ chembl?: { maxPhase: number; moleculeType: string }; drugbank?: { groups: string[] } }>
+  _timeout?: boolean
+  _partial?: boolean
+  _emptyHonest?: boolean
+  _agentStatus?: string
+  _error?: string
+  _honesty?: string
+}
+
+const PIPELINE_BAG_KEYS = [
+  'clinicalTrials',
+  'chemblIndications',
+  'chemblMechanisms',
+  'orangeBookEntries',
+  'ndcProducts',
+  'drugLabels',
+  'drugShortages',
+  'myChemAnnotations',
+] as const
+
+export function pipelineHasRows(data: PipelineData | null | undefined): boolean {
+  if (!data) return false
+  return PIPELINE_BAG_KEYS.some((k) => {
+    const v = data[k]
+    return Array.isArray(v) && v.length > 0
+  })
+}
+
+function isHonestyShell(data: PipelineData | null | undefined): boolean {
+  if (!data) return false
+  return (
+    data._timeout === true ||
+    data._emptyHonest === true ||
+    data._partial === true ||
+    data._agentStatus === 'timeout' ||
+    data._agentStatus === 'error'
+  )
 }
 
 const PHASE_ORDER = ['Preclinical', 'Phase I', 'Phase II', 'Phase III', 'Approved', 'Marketed']
@@ -63,7 +99,8 @@ export function PipelinePanel({ cid }: { cid: number }) {
       const cacheKey = profileCacheKey('pipeline', cid)
       // L1 memory or L2 IDB (history reopen / hard reload)
       const cached = await getProfileClientCacheAsync<PipelineData>(cacheKey)
-      if (cached) {
+      // Skip leftover empty/timeout shells so they cannot pin as success.
+      if (cached && pipelineHasRows(cached) && !isHonestyShell(cached)) {
         if (!cancelled) {
           setData(cached)
           setLoading(false)
@@ -79,7 +116,9 @@ export function PipelinePanel({ cid }: { cid: number }) {
         )
         if (!res.ok) throw new Error(`Failed to fetch pipeline data (${res.status})`)
         const json: PipelineData = await res.json()
-        setProfileClientCache(cacheKey, json)
+        if (pipelineHasRows(json) && !isHonestyShell(json)) {
+          setProfileClientCache(cacheKey, json)
+        }
         if (!cancelled) setData(json)
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : 'Failed to load pipeline data')
@@ -294,6 +333,35 @@ export function PipelinePanel({ cid }: { cid: number }) {
           <span>🏗️</span> Regulatory & Development Pipeline
         </h3>
         <p className="text-xs text-red-400">{error}</p>
+        <button
+          onClick={() => {
+            deleteProfileClientCache(profileCacheKey('pipeline', cid))
+            setRetryKey((k) => k + 1)
+          }}
+          className="text-xs text-indigo-400 hover:text-indigo-300 mt-2"
+        >
+          Retry
+        </button>
+      </div>
+    )
+  }
+
+  const timedOut = data?._timeout === true || data?._agentStatus === 'timeout'
+  const errored = data?._agentStatus === 'error' || (data?._partial === true && !timedOut)
+  if (data && !pipelineHasRows(data) && (timedOut || errored)) {
+    return (
+      <div
+        className="bg-slate-900/60 border border-amber-800/40 rounded-xl p-5 mb-2"
+        data-testid="pipeline-honesty"
+      >
+        <h3 className="text-sm font-semibold text-slate-300 mb-2 flex items-center gap-2">
+          <span>🏗️</span> Regulatory & Development Pipeline
+        </h3>
+        <p className="text-xs text-amber-200/90">
+          {timedOut
+            ? 'Pipeline lookup timed out this session — not proof of zero pipeline activity.'
+            : 'Pipeline lookup failed this session — retry rather than treating as empty.'}
+        </p>
         <button
           onClick={() => {
             deleteProfileClientCache(profileCacheKey('pipeline', cid))

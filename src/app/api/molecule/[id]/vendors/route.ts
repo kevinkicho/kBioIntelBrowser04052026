@@ -8,8 +8,17 @@ import {
 import { freeApiAgent } from '@/lib/api/freeApiAgent'
 import { runWithApiAbort } from '@/lib/api/apiAbort'
 import { timedFetch } from '@/lib/api/timedFetch'
+import { shouldCacheHonestyEnvelope } from '@/lib/honestyEnvelope'
 
 const CACHE_DURATION = 86400
+
+export function vendorsHasRows(data: { suppliers?: unknown; databases?: unknown }): boolean {
+  return (
+    (Array.isArray(data.suppliers) && data.suppliers.length > 0) ||
+    (Array.isArray(data.databases) && data.databases.length > 0)
+  )
+}
+
 
 interface VendorResult {
   name: string
@@ -207,14 +216,13 @@ export async function GET(
             { timeoutMs: 8000, next: { revalidate: CACHE_DURATION } },
           )
           if (!res.ok) {
-            return {
-              suppliers: [],
-              databases: [],
-              total: 0,
-              moleculeName: displayName,
-              cas,
-              inchiKey,
-            }
+            const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+            err.status = res.status
+            throw err
+          }
+          const contentType = (res.headers.get('content-type') || '').toLowerCase()
+          if (contentType.includes('text/html')) {
+            throw new Error('HTML response from PubChem vendors')
           }
           const data = await res.json()
           const sources: string[] = data.InformationList?.Information?.[0]?.SourceName ?? []
@@ -289,15 +297,27 @@ export async function GET(
     [request.signal],
   )
 
-  return NextResponse.json(
-    {
-      ...agent.data,
-      _agentStatus: agent.status,
-      _agentMs: agent.ms,
-      ...(agent.status === 'timeout' || agent.status === 'error'
-        ? { _partial: true, _timeout: agent.status === 'timeout', _error: agent.error }
-        : {}),
-    },
-    { headers: { 'Cache-Control': `public, s-maxage=${CACHE_DURATION}` } },
-  )
+  const hasRows = vendorsHasRows(agent.data)
+  const payload: Record<string, unknown> = {
+    ...agent.data,
+    _agentStatus: agent.status,
+    _agentMs: agent.ms,
+  }
+  if (agent.status === 'timeout' || agent.status === 'error') {
+    payload._partial = true
+    if (agent.status === 'timeout') payload._timeout = true
+    payload._error = agent.error
+  } else if (!hasRows) {
+    payload._emptyHonest = true
+    payload._notRetrieved = true
+    payload._honesty =
+      'Empty free-API sample this session — not proof of zero vendors forever.'
+  }
+
+  // Empty-as-success / timeout / error must not be stored as a 24h success shell.
+  const headers: Record<string, string> = {}
+  if (shouldCacheHonestyEnvelope(payload) && hasRows) {
+    headers['Cache-Control'] = `public, s-maxage=${CACHE_DURATION}`
+  }
+  return NextResponse.json(payload, { headers })
 }
