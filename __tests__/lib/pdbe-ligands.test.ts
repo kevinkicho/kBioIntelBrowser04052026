@@ -32,7 +32,7 @@ describe('getPdbeLigandsByName', () => {
 
   test('falls back to search endpoint when direct returns 404', async () => {
     ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: false })
+      .mockResolvedValueOnce({ ok: false, status: 404, headers: { get: () => 'application/json' } })
       .mockResolvedValueOnce({
         ok: true,
         json: async () => ({
@@ -56,17 +56,21 @@ describe('getPdbeLigandsByName', () => {
     expect(results[0].drugbankId).toBe('')
   })
 
-  test('returns empty array when both endpoints fail', async () => {
-    ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: false })
-    const results = await getPdbeLigandsByName('unknown')
-    expect(results).toEqual([])
+  test('throws when search returns HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      headers: { get: () => 'application/json' },
+      json: async () => ({}),
+    })
+    await expect(getPdbeLigandsByName('unknown')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array on network error', async () => {
-    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getPdbeLigandsByName('aspirin')).toEqual([])
+  test('throws on network error after HET fallback (not EMPTY)', async () => {
+    ;(fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockRejectedValueOnce(new Error('network'))
+    await expect(getPdbeLigandsByName('aspirin')).rejects.toThrow(/network/)
   })
 
   test('handles missing fields gracefully from direct endpoint', async () => {
@@ -76,7 +80,7 @@ describe('getPdbeLigandsByName', () => {
         XYZ: [{}],
       }),
     })
-    const results = await getPdbeLigandsByName('test')
+    const results = await getPdbeLigandsByName('XYZ')
     expect(results[0].name).toBe('')
     expect(results[0].formula).toBe('')
     expect(results[0].molecularWeight).toBe(0)

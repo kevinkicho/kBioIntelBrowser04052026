@@ -43,24 +43,36 @@ describe('getGeneInfoByName', () => {
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
-  test('returns empty array when search returns non-ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    expect(await getGeneInfoByName('ACE')).toEqual([])
+  test('throws when search returns HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce({
+      ok: false,
+      status: 503,
+      headers: { get: () => 'application/json' },
+      json: async () => ({}),
+    })
+    await expect(getGeneInfoByName('ACE')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array when summary returns non-ok', async () => {
+  test('throws when summary returns HTTP 503 (not EMPTY)', async () => {
     ;(fetch as jest.Mock)
       .mockResolvedValueOnce({
         ok: true,
+        status: 200,
+        headers: { get: () => 'application/json' },
         json: async () => ({ esearchresult: { idlist: ['1636'] } }),
       })
-      .mockResolvedValueOnce({ ok: false })
-    expect(await getGeneInfoByName('ACE')).toEqual([])
+      .mockResolvedValueOnce({
+        ok: false,
+        status: 503,
+        headers: { get: () => 'application/json' },
+        json: async () => ({}),
+      })
+    await expect(getGeneInfoByName('ACE')).rejects.toThrow(/HTTP 503/)
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getGeneInfoByName('ACE')).toEqual([])
+    await expect(getGeneInfoByName('ACE')).rejects.toThrow(/network/)
   })
 
   test('handles missing result entry gracefully', async () => {
