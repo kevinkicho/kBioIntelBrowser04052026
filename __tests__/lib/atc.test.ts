@@ -6,6 +6,7 @@ import {
   isWhoAtcCode,
 } from '@/lib/api/atc'
 import * as rxnorm from '@/lib/api/rxnorm'
+import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
 
 jest.mock('@/lib/api/rxnorm')
 global.fetch = jest.fn()
@@ -151,5 +152,79 @@ describe('dedupeAtcClassifications', () => {
     expect(out[0].code).toBe('L01EK')
     // Prefer the longer informative name
     expect(out[0].name).toContain('VEGFR')
+  })
+})
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
+describe('getAtcClassificationsByName honesty', () => {
+  beforeEach(() => {
+    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('1191')
+  })
+
+  test('404 no-classes is honest EMPTY', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 404))
+    expect(await getAtcClassificationsByName('aspirin')).toEqual([])
+  })
+
+  test('true empty JSON is empty (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}))
+    expect(await getAtcClassificationsByName('aspirin')).toEqual([])
+  })
+
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getAtcClassificationsByName('aspirin')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getAtcClassificationsByName('aspirin')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    await expect(getAtcClassificationsByName('aspirin')).rejects.toThrow(/network/)
+  })
+
+  test('propagates RxNorm HTTP failure (not EMPTY)', async () => {
+    ;(rxnorm.getRxcuiByName as jest.Mock).mockRejectedValueOnce(new Error('HTTP 503'))
+    await expect(getAtcClassificationsByName('aspirin')).rejects.toThrow(/HTTP 503/)
+    expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('ATC trackedSafe honesty', () => {
+  test('HTTP 503 is error, not empty, in category metrics', async () => {
+    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue('1191')
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('atc', getAtcClassificationsByName('aspirin'), []),
+    )
+    expect(value).toEqual([])
+    const atc = metrics.find((m) => m.source === 'atc')
+    expect(atc?.loadStatus).toBe('error')
+    expect(atc?.error).toMatch(/HTTP 503/)
+    expect(atc?.has_data).toBe(false)
+  })
+
+  test('true missing RxCUI is empty, not error', async () => {
+    ;(rxnorm.getRxcuiByName as jest.Mock).mockResolvedValue(null)
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('atc', getAtcClassificationsByName('zzz'), []),
+    )
+    expect(value).toEqual([])
+    const atc = metrics.find((m) => m.source === 'atc')
+    expect(atc?.loadStatus).not.toBe('error')
+    expect(atc?.loadStatus).not.toBe('timeout')
+    expect(atc?.error).toBeUndefined()
   })
 })
