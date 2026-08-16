@@ -112,6 +112,12 @@ import { getMetabolomicsData } from '@/lib/api/metabolomics'
  * Panel API Configuration
  * Maps panel IDs to their fetch functions and limits
  */
+
+/** Object shells like { genes: [] } are truthy — do not treat them as loaded. */
+function panelShell<T>(result: T | null | undefined, hasData: (r: T) => boolean): T[] {
+  return result && hasData(result) ? [result] : []
+}
+
 const PANEL_CONFIG: Record<string, {
   fetcher: (name: string, synonyms: string[], limit: number, offset: number) => Promise<PanelResponse<unknown>>
   category: string
@@ -382,7 +388,7 @@ const PANEL_CONFIG: Record<string, {
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getDrugCentralData(name)
       // Return as array for consistent panel handling
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.drug || r.targets?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -392,7 +398,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'PHARMGKB',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getPharmGKBData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.drugs?.length || r.genes?.length || r.guidelines?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -458,7 +464,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'SIDER',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getSIDERData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.sideEffects?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -531,7 +537,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'CTD',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getCTDData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.interactions?.length || r.diseaseAssociations?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -540,7 +546,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'IEDB',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getIEDBData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.epitopes?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -653,7 +659,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'CLINGEN',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getClinGenData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.geneDiseases?.length || r.variants?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -687,7 +693,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'DISGENET',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getDisGeNetData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.associations?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -740,7 +746,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'KEGG',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getKEGGData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.pathways?.length || r.compounds?.length || r.drugs?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -769,7 +775,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'BGEE',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getBgeeData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.expressions?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -786,7 +792,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'OMIM',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getOMIMData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.entries?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -795,7 +801,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'ORPHANET',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getOrphanetData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.diseases?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -822,7 +828,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'HMDB',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getHMDBData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.metabolites?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
@@ -880,7 +886,7 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'PEPTIDE_ATLAS',
     fetcher: async (name, _synonyms, _limit) => {
       const result = await getPeptideAtlasData(name)
-      const data = result ? [result] : []
+      const data = panelShell(result, (r) => Boolean(r.peptides?.length))
       return { data, total: data.length, hasMore: false }
     }
   },
