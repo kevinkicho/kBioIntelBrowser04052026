@@ -160,7 +160,7 @@ export async function fetchGene(
     trackedStatus('gtex', getGTExTopTissues(symbol, 10), []),
     trackedStatus('bgee', getBgeeData(symbol), { expressions: [] }),
     trackedStatus('expression-atlas', getGeneExpressionBySymbols([symbol]), []),
-    trackedStatus('gene-ontology', searchGOTerms(symbol).then((r) => r.terms).catch(() => []), []),
+    trackedStatus('gene-ontology', searchGOTerms(symbol).then((r) => r.terms), []),
   ])
 
   // Wave 3 — pathways + protein context + pharmacogenomics

@@ -2,11 +2,29 @@
 // Uses EBI QuickGO API for term search
 // http://api.geneontology.org/ used for bioentity queries (annotations)
 
+import { timedFetch } from './timedFetch'
+
 const QUICKGO_URL = 'https://www.ebi.ac.uk/QuickGO/services/ontology/go'
 const GO_API_URL = 'https://api.geneontology.org/api'
 
 const fetchOptions: RequestInit = {
   next: { revalidate: 86400 },
+}
+
+/**
+ * GO harvest leaf. HTTP / HTML / timeout are not EMPTY.
+ * True zero-hit JSON remains { terms: [], total: 0 } / [] / null.
+ */
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
 }
 
 export interface GOTerm {
@@ -47,41 +65,54 @@ function mapAspect(letter: string): 'biological_process' | 'molecular_function' 
   return 'unknown'
 }
 
+function mapGoTerm(term: Record<string, unknown>, fallbackId = ''): GOTerm {
+  return {
+    id: String(term.id ?? fallbackId),
+    label: String(term.name ?? ''),
+    definition: typeof term.definition === 'object' && term.definition
+      ? String((term.definition as Record<string, unknown>).text ?? '')
+      : String(term.definition ?? ''),
+    aspect: String(term.aspect ?? ''),
+    synonyms: Array.isArray(term.synonyms) ? term.synonyms.map(String) : [],
+    parents: [],
+    children: [],
+    xrefs: Array.isArray(term.xrefs) ? term.xrefs.map(String) : [],
+  }
+}
+
 /**
  * Search GO terms by keyword using QuickGO API
  */
 export async function searchGOTerms(query: string, limit = 20): Promise<GOSearchResponse> {
-  try {
-    const params = new URLSearchParams({
-      query: query,
-      page: '1',
-      limit: limit.toString(),
-    })
-    const url = `${QUICKGO_URL}/search?${params}`
-    const res = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) {
-      return { terms: [], total: 0 }
-    }
-    const data = await res.json()
+  const q = (query || '').trim()
+  if (!q) return { terms: [], total: 0 }
 
-    return {
-      terms: (data.results ?? []).map((doc: Record<string, unknown>) => ({
-        id: doc.id ?? '',
-        label: doc.name ?? '',
-        definition: typeof doc.definition === 'object' && doc.definition ? (doc.definition as Record<string, unknown>).text as string : (doc.definition as string ?? ''),
-        aspect: mapAspect(doc.aspect as string ?? 'unknown'),
-        synonyms: Array.isArray(doc.synonyms) ? doc.synonyms.map(String) : [],
-        parents: [],
-        children: [],
-        xrefs: [],
-      })),
-      total: data.numberOfHits ?? (data.results ?? []).length,
-    }
-  } catch {
-    return { terms: [], total: 0 }
+  const params = new URLSearchParams({
+    query: q,
+    page: '1',
+    limit: limit.toString(),
+  })
+  const url = `${QUICKGO_URL}/search?${params}`
+  const res = await timedFetch(url, {
+    ...fetchOptions,
+    headers: { Accept: 'application/json' },
+    timeoutMs: 8000,
+  })
+  throwIfHttpFailed(res, 'Gene Ontology')
+  const data = await res.json()
+
+  return {
+    terms: (data.results ?? []).map((doc: Record<string, unknown>) => ({
+      id: doc.id ?? '',
+      label: doc.name ?? '',
+      definition: typeof doc.definition === 'object' && doc.definition ? (doc.definition as Record<string, unknown>).text as string : (doc.definition as string ?? ''),
+      aspect: mapAspect(doc.aspect as string ?? 'unknown'),
+      synonyms: Array.isArray(doc.synonyms) ? doc.synonyms.map(String) : [],
+      parents: [],
+      children: [],
+      xrefs: [],
+    })),
+    total: data.numberOfHits ?? (data.results ?? []).length,
   }
 }
 
@@ -89,110 +120,82 @@ export async function searchGOTerms(query: string, limit = 20): Promise<GOSearch
  * Get GO term details by ID using QuickGO API
  */
 export async function getGOTerm(goId: string): Promise<GOTerm | null> {
-  try {
-    const url = `${QUICKGO_URL}/terms/${encodeURIComponent(goId)}`
-    const res = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) return null
-    const data = await res.json()
-    const results: Record<string, unknown>[] = data.results ?? []
-    const term = results[0]
-    if (!term) return null
-    return {
-      id: (term.id as string) ?? goId,
-      label: (term.name as string) ?? '',
-      definition: typeof term.definition === 'object' ? String((term.definition as Record<string, unknown>)?.text ?? '') : String(term.definition ?? ''),
-      aspect: String(term.aspect ?? ''),
-      synonyms: Array.isArray(term.synonyms) ? term.synonyms.map(String) : [],
-      parents: [],
-      children: [],
-      xrefs: Array.isArray(term.xrefs) ? term.xrefs.map(String) : [],
-    }
-  } catch {
-    return null
-  }
+  const id = (goId || '').trim()
+  if (!id) return null
+
+  const url = `${QUICKGO_URL}/terms/${encodeURIComponent(id)}`
+  const res = await timedFetch(url, {
+    ...fetchOptions,
+    headers: { Accept: 'application/json' },
+    timeoutMs: 8000,
+  })
+  throwIfHttpFailed(res, 'Gene Ontology')
+  const data = await res.json()
+  const results: Record<string, unknown>[] = data.results ?? []
+  const term = results[0]
+  if (!term) return null
+  return mapGoTerm(term, id)
 }
 
 /**
  * Get GO annotations for a gene using GO API
  */
 export async function getGOAnnotationsForGene(geneId: string): Promise<GOAnnotation[]> {
-  try {
-    const url = `${GO_API_URL}/bioentity/gene/${encodeURIComponent(geneId)}/function`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = await res.json()
-    return (data.results ?? []).map((ann: Record<string, unknown>) => {
-      const annotation = ann.annotation as Record<string, unknown> | undefined
-      const annotationObj = annotation?.object as Record<string, unknown> | undefined
-      const evidence = ann.evidence as Record<string, unknown> | undefined
-      return {
-        geneId: (ann.gene as string) ?? '',
-        geneSymbol: (ann.gene_label as string) ?? '',
-        goId: (annotationObj?.id as string) ?? '',
-        goLabel: (annotationObj?.label as string) ?? '',
-        aspect: (ann.aspect as string) ?? '',
-        evidence: (evidence?.type as string) ?? '',
-        reference: (evidence?.with_from as string) ?? '',
-        withFrom: (evidence?.with_from as string) ?? '',
-      }
-    })
-  } catch {
-    return []
-  }
+  const id = (geneId || '').trim()
+  if (!id) return []
+
+  const url = `${GO_API_URL}/bioentity/gene/${encodeURIComponent(id)}/function`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  throwIfHttpFailed(res, 'Gene Ontology')
+  const data = await res.json()
+  return (data.results ?? []).map((ann: Record<string, unknown>) => {
+    const annotation = ann.annotation as Record<string, unknown> | undefined
+    const annotationObj = annotation?.object as Record<string, unknown> | undefined
+    const evidence = ann.evidence as Record<string, unknown> | undefined
+    return {
+      geneId: (ann.gene as string) ?? '',
+      geneSymbol: (ann.gene_label as string) ?? '',
+      goId: (annotationObj?.id as string) ?? '',
+      goLabel: (annotationObj?.label as string) ?? '',
+      aspect: (ann.aspect as string) ?? '',
+      evidence: (evidence?.type as string) ?? '',
+      reference: (evidence?.with_from as string) ?? '',
+      withFrom: (evidence?.with_from as string) ?? '',
+    }
+  })
 }
 
 /**
  * Get GO term ancestors (parent hierarchy) using QuickGO API
  */
 export async function getGOTermAncestors(goId: string): Promise<GOTerm[]> {
-  try {
-    const url = `${QUICKGO_URL}/terms/${encodeURIComponent(goId)}/ancestors`
-    const res = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data.results ?? []) as Record<string, unknown>[]).map((term) => ({
-      id: String(term.id ?? ''),
-      label: String(term.name ?? ''),
-      definition: typeof term.definition === 'object' ? String((term.definition as Record<string, unknown>)?.text ?? '') : String(term.definition ?? ''),
-      aspect: String(term.aspect ?? ''),
-      synonyms: Array.isArray(term.synonyms) ? (term.synonyms as unknown[]).map(String) : [],
-      parents: [],
-      children: [],
-      xrefs: [],
-    }))
-  } catch {
-    return []
-  }
+  const id = (goId || '').trim()
+  if (!id) return []
+
+  const url = `${QUICKGO_URL}/terms/${encodeURIComponent(id)}/ancestors`
+  const res = await timedFetch(url, {
+    ...fetchOptions,
+    headers: { Accept: 'application/json' },
+    timeoutMs: 8000,
+  })
+  throwIfHttpFailed(res, 'Gene Ontology')
+  const data = await res.json()
+  return ((data.results ?? []) as Record<string, unknown>[]).map((term) => mapGoTerm(term))
 }
 
 export async function getGOTermDescendants(goId: string): Promise<GOTerm[]> {
-  try {
-    const url = `${QUICKGO_URL}/terms/${encodeURIComponent(goId)}/descendants`
-    const res = await fetch(url, {
-      ...fetchOptions,
-      headers: { Accept: 'application/json' },
-    })
-    if (!res.ok) return []
-    const data = await res.json()
-    return ((data.results ?? []) as Record<string, unknown>[]).map((term) => ({
-      id: String(term.id ?? ''),
-      label: String(term.name ?? ''),
-      definition: typeof term.definition === 'object' ? String((term.definition as Record<string, unknown>)?.text ?? '') : String(term.definition ?? ''),
-      aspect: String(term.aspect ?? ''),
-      synonyms: Array.isArray(term.synonyms) ? (term.synonyms as unknown[]).map(String) : [],
-      parents: [],
-      children: [],
-      xrefs: [],
-    }))
-  } catch {
-    return []
-  }
+  const id = (goId || '').trim()
+  if (!id) return []
+
+  const url = `${QUICKGO_URL}/terms/${encodeURIComponent(id)}/descendants`
+  const res = await timedFetch(url, {
+    ...fetchOptions,
+    headers: { Accept: 'application/json' },
+    timeoutMs: 8000,
+  })
+  throwIfHttpFailed(res, 'Gene Ontology')
+  const data = await res.json()
+  return ((data.results ?? []) as Record<string, unknown>[]).map((term) => mapGoTerm(term))
 }
 
 /**
