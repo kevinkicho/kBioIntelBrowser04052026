@@ -3,6 +3,17 @@ import {
   mapBaselineExperimentsToRows,
   hasAtlasExpressionLevel,
 } from '@/lib/api/expression-atlas'
+import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
 
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
@@ -36,7 +47,6 @@ describe('mapBaselineExperimentsToRows', () => {
     expect(rows[0].url).toContain('E-GTEX-8')
     expect(rows[0].url).toContain('BRCA1')
     expect(rows.map((r) => r.tissueName).sort()).toEqual(['breast', 'liver'].sort())
-    // Sorted high → low
     expect(rows[0].expressionLevel).toBeGreaterThanOrEqual(rows[1].expressionLevel)
   })
 
@@ -49,9 +59,8 @@ describe('mapBaselineExperimentsToRows', () => {
 
 describe('getGeneExpressionBySymbols', () => {
   test('prefers baseline_experiments with real levels', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      jsonRes({
         columnHeaders: [{ factorValue: 'breast' }, { factorValue: 'liver' }],
         profiles: {
           rows: [
@@ -65,25 +74,20 @@ describe('getGeneExpressionBySymbols', () => {
         },
         config: { expressionUnit: 'TPM', species: 'homo_sapiens' },
       }),
-    })
+    )
     const results = await getGeneExpressionBySymbols(['ACE'])
     expect(results.length).toBe(2)
     expect(results[0].expressionLevel).toBe(3.1)
     expect(results[0].tissueName).toBe('breast')
     expect(hasAtlasExpressionLevel(results[0])).toBe(true)
-    // Only baseline call — no second experiments fetch
     expect(fetch).toHaveBeenCalledTimes(1)
   })
 
   test('falls back to experiments catalog without inventing levels', async () => {
     ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ columnHeaders: [], profiles: { rows: [] } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+      .mockResolvedValueOnce(jsonRes({ columnHeaders: [], profiles: { rows: [] } }))
+      .mockResolvedValueOnce(
+        jsonRes({
           experiments: [
             {
               experimentAccession: 'E-MTAB-123',
@@ -93,7 +97,7 @@ describe('getGeneExpressionBySymbols', () => {
             },
           ],
         }),
-      })
+      )
     const results = await getGeneExpressionBySymbols(['ACE'])
     expect(results).toHaveLength(1)
     expect(results[0].experimentDescription).toBe('Baseline expression in tissues')
@@ -103,23 +107,17 @@ describe('getGeneExpressionBySymbols', () => {
   })
 
   test('deduplicates experiments across symbols', async () => {
-    const emptyBaseline = {
-      ok: true,
-      json: async () => ({ columnHeaders: [], profiles: { rows: [] } }),
-    }
-    const catalog = {
-      ok: true,
-      json: async () => ({
-        experiments: [
-          {
-            experimentAccession: 'E-MTAB-123',
-            experimentDescription: 'Shared experiment',
-            species: 'Homo sapiens',
-            experimentType: 'RNASEQ_MRNA_BASELINE',
-          },
-        ],
-      }),
-    }
+    const emptyBaseline = jsonRes({ columnHeaders: [], profiles: { rows: [] } })
+    const catalog = jsonRes({
+      experiments: [
+        {
+          experimentAccession: 'E-MTAB-123',
+          experimentDescription: 'Shared experiment',
+          species: 'Homo sapiens',
+          experimentType: 'RNASEQ_MRNA_BASELINE',
+        },
+      ],
+    })
     ;(fetch as jest.Mock)
       .mockResolvedValueOnce(emptyBaseline)
       .mockResolvedValueOnce(catalog)
@@ -131,30 +129,104 @@ describe('getGeneExpressionBySymbols', () => {
 
   test('limits symbols to 3', async () => {
     const symbols = ['A', 'B', 'C', 'D', 'E', 'F', 'G']
-    ;(fetch as jest.Mock).mockResolvedValue({
-      ok: true,
-      json: async () => ({ columnHeaders: [], profiles: { rows: [] }, experiments: [] }),
-      headers: new Headers({ 'content-type': 'application/json' }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValue(
+      jsonRes({ columnHeaders: [], profiles: { rows: [] }, experiments: [] }),
+    )
     await getGeneExpressionBySymbols(symbols)
-    // baseline + catalog per symbol, 3 symbols max
     expect(fetch).toHaveBeenCalledTimes(6)
   })
 
   test('returns empty array for empty symbols', async () => {
     expect(await getGeneExpressionBySymbols([])).toEqual([])
+    expect(fetch).not.toHaveBeenCalled()
   })
 
-  test('returns empty array when fetch returns non-ok', async () => {
+  test('404 + catalog zero-hit is honest EMPTY', async () => {
     ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: false })
-      .mockResolvedValueOnce({ ok: false })
-    const results = await getGeneExpressionBySymbols(['ACE'])
-    expect(results).toEqual([])
+      .mockResolvedValueOnce(jsonRes({}, 404))
+      .mockResolvedValueOnce(jsonRes({ experiments: [] }))
+    expect(await getGeneExpressionBySymbols(['ACE'])).toEqual([])
+    expect(fetch).toHaveBeenCalledTimes(2)
   })
 
-  test('returns empty array on network error', async () => {
-    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    expect(await getGeneExpressionBySymbols(['ACE'])).toEqual([])
+  test('true empty JSON + catalog empty is empty (not error)', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonRes({ columnHeaders: [], profiles: { rows: [] } }))
+      .mockResolvedValueOnce(jsonRes({ experiments: [] }))
+    expect(await getGeneExpressionBySymbols(['zzz'])).toEqual([])
+  })
+
+  test('baseline 503 + catalog 503 throws (not EMPTY)', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonRes({}, 503))
+      .mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getGeneExpressionBySymbols(['ACE'])).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('baseline 503 + catalog 404 throws primary (not EMPTY)', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonRes({}, 503))
+      .mockResolvedValueOnce(jsonRes({}, 404))
+    await expect(getGeneExpressionBySymbols(['ACE'])).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('baseline 503 + catalog rows uses fallback', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonRes({}, 503))
+      .mockResolvedValueOnce(
+        jsonRes({
+          experiments: [
+            {
+              experimentAccession: 'E-MTAB-9',
+              experimentDescription: 'Catalog fallback',
+              species: 'Homo sapiens',
+              experimentType: 'RNASEQ_MRNA_BASELINE',
+            },
+          ],
+        }),
+      )
+    const rows = await getGeneExpressionBySymbols(['ACE'])
+    expect(rows).toHaveLength(1)
+    expect(rows[0].experimentDescription).toBe('Catalog fallback')
+  })
+
+  test('throws on HTML body when fallback also fails (not EMPTY)', async () => {
+    ;(fetch as jest.Mock)
+      .mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+      .mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getGeneExpressionBySymbols(['ACE'])).rejects.toThrow(/HTML|HTTP 503/)
+  })
+
+  test('throws on network error when fallback also fails', async () => {
+    ;(fetch as jest.Mock)
+      .mockRejectedValueOnce(new Error('network'))
+      .mockRejectedValueOnce(new Error('network'))
+    await expect(getGeneExpressionBySymbols(['ACE'])).rejects.toThrow(/network/)
+  })
+})
+
+describe('Expression Atlas trackedSafe honesty', () => {
+  test('HTTP 503 is error, not empty, in category metrics', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('expression-atlas', getGeneExpressionBySymbols(['ACE']), []),
+    )
+    expect(value).toEqual([])
+    const row = metrics.find((m) => m.source === 'expression-atlas')
+    expect(row?.loadStatus).toBe('error')
+    expect(row?.error).toMatch(/HTTP 503/)
+    expect(row?.has_data).toBe(false)
+  })
+
+  test('true 404 is empty, not error', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 404))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('expression-atlas', getGeneExpressionBySymbols(['zzz']), []),
+    )
+    expect(value).toEqual([])
+    const row = metrics.find((m) => m.source === 'expression-atlas')
+    expect(row?.loadStatus).not.toBe('error')
+    expect(row?.loadStatus).not.toBe('timeout')
+    expect(row?.error).toBeUndefined()
   })
 })

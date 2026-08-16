@@ -1,13 +1,23 @@
 import { getNdcProductsByName } from '@/lib/api/fda-ndc'
+import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
 
 global.fetch = jest.fn()
 beforeEach(() => jest.resetAllMocks())
 
 describe('getNdcProductsByName', () => {
   test('returns parsed NDC products on success', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      jsonRes({
         results: [
           {
             product_ndc: '0002-3227',
@@ -24,7 +34,7 @@ describe('getNdcProductsByName', () => {
           },
         ],
       }),
-    })
+    )
     const results = await getNdcProductsByName('fluoxetine')
     expect(results).toHaveLength(1)
     expect(results[0].productNdc).toBe('0002-3227')
@@ -42,9 +52,8 @@ describe('getNdcProductsByName', () => {
   })
 
   test('joins multiple routes', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
+    ;(fetch as jest.Mock).mockResolvedValueOnce(
+      jsonRes({
         results: [
           {
             product_ndc: '0001-0001',
@@ -52,29 +61,59 @@ describe('getNdcProductsByName', () => {
           },
         ],
       }),
-    })
+    )
     const results = await getNdcProductsByName('test')
     expect(results[0].route).toBe('ORAL, INTRAVENOUS')
   })
 
-  test('returns empty array when API response is not ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    const results = await getNdcProductsByName('unknownxyz')
-    expect(results).toEqual([])
+  test('404 is honest EMPTY (openFDA no matches)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ error: { code: 'NOT_FOUND' } }, 404))
+    expect(await getNdcProductsByName('unknownxyz')).toEqual([])
   })
 
-  test('returns empty array when results key is missing', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({}),
-    })
-    const results = await getNdcProductsByName('aspirin')
-    expect(results).toEqual([])
+  test('true empty JSON is empty (not error)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}))
+    expect(await getNdcProductsByName('aspirin')).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on HTTP 503 (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getNdcProductsByName('aspirin')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getNdcProductsByName('aspirin')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const results = await getNdcProductsByName('aspirin')
-    expect(results).toEqual([])
+    await expect(getNdcProductsByName('aspirin')).rejects.toThrow(/network/)
+  })
+})
+
+describe('FDA NDC trackedSafe honesty', () => {
+  test('HTTP 503 is error, not empty, in category metrics', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('fda-ndc', getNdcProductsByName('aspirin'), []),
+    )
+    expect(value).toEqual([])
+    const row = metrics.find((m) => m.source === 'fda-ndc')
+    expect(row?.loadStatus).toBe('error')
+    expect(row?.error).toMatch(/HTTP 503/)
+    expect(row?.has_data).toBe(false)
+  })
+
+  test('true 404 is empty, not error', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 404))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('fda-ndc', getNdcProductsByName('zzz'), []),
+    )
+    expect(value).toEqual([])
+    const row = metrics.find((m) => m.source === 'fda-ndc')
+    expect(row?.loadStatus).not.toBe('error')
+    expect(row?.loadStatus).not.toBe('timeout')
+    expect(row?.error).toBeUndefined()
   })
 })
