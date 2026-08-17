@@ -1,4 +1,3 @@
-import { safe } from '@/lib/utils'
 import { allSettledValues, trackedSafe } from '@/lib/api-tracker'
 import { API_SOURCE_TIMEOUTS } from '@/lib/analytics/timeouts'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
@@ -23,13 +22,13 @@ import { searchFooDB } from '@/lib/api/foodb'
 
 async function fetchSynthesisRoutes(moleculeName: string): Promise<SynthesisRoute[]> {
   const [keggId, rheaRoutes] = await Promise.all([
-    safe(getKeggCompoundId(moleculeName), null),
+    getKeggCompoundId(moleculeName),
     trackedSafe('rhea', getRheaSynthesisRoutes(moleculeName), []),
   ])
   const keggRoutes: SynthesisRoute[] = []
   if (keggId) {
-    const reactionIds = await safe(getKeggReactions(keggId), [])
-    const details = await Promise.all((reactionIds as string[]).slice(0, 5).map(id => safe(getKeggReactionDetail(id), null)))
+    const reactionIds = await getKeggReactions(keggId)
+    const details = await Promise.all((reactionIds as string[]).slice(0, 5).map(id => getKeggReactionDetail(id)))
     for (const detail of details) {
       if (!detail) continue
       keggRoutes.push({
