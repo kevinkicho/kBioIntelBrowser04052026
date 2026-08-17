@@ -111,6 +111,7 @@ export const SOURCE_TO_PANEL: Record<string, string> = {
   omim: 'omim',
   'pubchem-properties': 'properties',
   'biologics-licensed': 'biologics-licensed',
+  'human-protein-atlas': 'human-protein-atlas',
   'pubchem-hazards': 'hazards',
   chebi: 'chebi',
   comptox: 'comptox',

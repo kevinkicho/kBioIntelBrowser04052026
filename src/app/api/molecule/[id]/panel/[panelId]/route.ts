@@ -59,6 +59,7 @@ import { getAlphaFoldPredictions } from '@/lib/api/alphafold'
 import { getProteinDomains } from '@/lib/api/interpro'
 import { getProteinFeaturesByAccessions } from '@/lib/api/ebi-proteins'
 import { getProteinAtlasBySymbols } from '@/lib/api/protein-atlas'
+import { getProteinAtlasData } from '@/lib/api/human-protein-atlas'
 import { getGoAnnotationsByAccessions } from '@/lib/api/quickgo'
 import { searchPRIDE } from '@/lib/api/pride'
 import { searchCATHDomains } from '@/lib/api/cath'
@@ -688,6 +689,15 @@ const PANEL_CONFIG: Record<string, {
       const allData = await getProteinAtlasBySymbols([name])
       const data = allData.slice(0, limit)
       return { data, total: allData.length, hasMore: allData.length > limit }
+    }
+  },
+  'humanProteinAtlas': {
+    category: 'protein-structure',
+    limitKey: 'PROTEIN_ATLAS',
+    fetcher: async (name) => {
+      const row = await getProteinAtlasData(name)
+      const data = row ? [row] : []
+      return { data, total: data.length, hasMore: false }
     }
   },
   'goAnnotations': {
