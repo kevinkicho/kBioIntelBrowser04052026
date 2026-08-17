@@ -5,6 +5,8 @@
  * @see docs/design/biologics-biosimilars-sources.md
  */
 
+import { timedFetch } from './timedFetch'
+
 const PATENT_LIST_URL = 'https://purplebooksearch.fda.gov/patent-list'
 const fetchOptions: RequestInit = {
   next: { revalidate: 604800 }, // 7 days
@@ -38,6 +40,23 @@ type Catalog = { meta: PurpleBookPatentMeta; patents: PurpleBookPatent[] }
 
 let memoryCatalog: Catalog | null = null
 let memoryLoad: Promise<Catalog | null> | null = null
+
+/**
+ * Purple Book patents harvest leaf (HTML table). HTTP / timeout / network are not EMPTY.
+ * 404 and a live page with zero parseable rows remain empty.
+ * HTML content-type is expected (official patent-list page).
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+}
 
 function stripTags(html: string): string {
   return html
@@ -122,23 +141,20 @@ export function parsePurpleBookPatentHtml(html: string): PurpleBookPatent[] {
 }
 
 async function fetchCatalog(): Promise<Catalog | null> {
-  try {
-    const res = await fetch(PATENT_LIST_URL, fetchOptions)
-    if (!res.ok) return null
-    const html = await res.text()
-    if (!html || html.length < 500) return null
-    const patents = parsePurpleBookPatentHtml(html)
-    if (patents.length === 0) return null
-    return {
-      meta: {
-        sourceUrl: PATENT_LIST_URL,
-        patentCount: patents.length,
-        loadedAt: new Date().toISOString(),
-      },
-      patents,
-    }
-  } catch {
-    return null
+  const res = await timedFetch(PATENT_LIST_URL, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res)
+  const html = await res.text()
+  if (!html || html.length < 500) return null
+  const patents = parsePurpleBookPatentHtml(html)
+  if (patents.length === 0) return null
+  return {
+    meta: {
+      sourceUrl: PATENT_LIST_URL,
+      patentCount: patents.length,
+      loadedAt: new Date().toISOString(),
+    },
+    patents,
   }
 }
 

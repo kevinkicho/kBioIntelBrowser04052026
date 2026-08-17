@@ -124,6 +124,7 @@ export const LIMITS = {
   NCBI_EUTILS: { initial: 10, loadMore: 50, max: 200 },
   GTEx: { initial: 5, loadMore: 20, max: 54 }, // 54 tissues
   FDA_DRUG_SHORTAGES: { initial: 5, loadMore: 20, max: 100 },
+  BIOSAMPLES: { initial: 5, loadMore: 20, max: 50 },
   LIPID_MAPS: { initial: 5, loadMore: 20, max: 50 },
   OPENAIRE: { initial: 5, loadMore: 20, max: 50 },
   BIOMODELS: { initial: 5, loadMore: 20, max: 50 },

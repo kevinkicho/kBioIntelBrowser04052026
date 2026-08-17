@@ -2,6 +2,8 @@
 // https://www.ebi.ac.uk/biosamples/
 // 2M+ biological sample metadata with links to experimental data
 
+import { timedFetch } from './timedFetch'
+
 const BASE_URL = 'https://www.ebi.ac.uk/biosamples/api/samples'
 
 const fetchOptions: RequestInit = {
@@ -53,6 +55,57 @@ export interface BioSamplesSearchResponse {
 }
 
 /**
+ * EMBL-EBI BioSamples harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Blank query, 404, and zero-hit JSON remain empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function mapSample(sample: Record<string, unknown>): BioSample {
+  return {
+    id: (sample.id as string) ?? '',
+    name: (sample.name as string) ?? '',
+    domain: (sample.domain as string) ?? '',
+    organism: ((sample.characteristics as Record<string, unknown> | undefined)?.organism as string) ?? '',
+    description: (sample.description as string) ?? '',
+    submitter: (sample.submitter as string) ?? '',
+    submissionDate: (sample.updateDate as string) ?? '',
+    updateDate: (sample.updateDate as string) ?? '',
+    attributes: ((sample.characteristics as Record<string, unknown> | undefined)?.attributes as (Record<string, unknown>)[] | undefined)?.map((attr: Record<string, unknown>) => ({
+      name: (attr.name as string) ?? '',
+      value: (attr.value as string) ?? '',
+      unit: (attr.unit as string) ?? undefined,
+      surface: (attr.surface as string) ?? undefined,
+    })) ?? [],
+    externalReferences: ((sample.externalReferences as (Record<string, unknown>)[] | undefined) ?? []).map((ref: Record<string, unknown>) => ({
+      url: (ref.url as string) ?? '',
+      label: (ref.label as string) ?? '',
+    })),
+    publications: ((sample.publications as (Record<string, unknown>)[] | undefined) ?? []).map((pub: Record<string, unknown>) => ({
+      pmid: (pub.pmid as string) ?? undefined,
+      doi: (pub.doi as string) ?? undefined,
+    })),
+    links: ((sample.links as (Record<string, unknown>)[] | undefined) ?? []).map((link: Record<string, unknown>) => ({
+      url: (link.href as string) ?? '',
+      type: (link.type as string) ?? '',
+    })),
+  }
+}
+
+/**
  * Search BioSamples by keyword
  */
 export async function searchBioSamples(
@@ -60,52 +113,24 @@ export async function searchBioSamples(
   page = 0,
   size = 20,
 ): Promise<BioSamplesSearchResponse> {
-  try {
-    const params = new URLSearchParams({
-      q: query,
-      page: page.toString(),
-      size: size.toString(),
-    })
-    const url = `${BASE_URL}?${params}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) throw new Error('BioSamples search failed')
-    const data = await res.json()
+  const q = query.trim()
+  if (!q) return { samples: [], total: 0, page, size }
+  const params = new URLSearchParams({
+    q,
+    page: page.toString(),
+    size: size.toString(),
+  })
+  const url = `${BASE_URL}?${params}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return { samples: [], total: 0, page, size }
+  throwIfHttpFailed(res, 'BioSamples')
+  const data = await res.json()
 
-    return {
-      samples: (data._embedded?.sample ?? []).map((sample: Record<string, unknown>) => ({
-        id: (sample.id as string) ?? '',
-        name: (sample.name as string) ?? '',
-        domain: (sample.domain as string) ?? '',
-        organism: ((sample.characteristics as Record<string, unknown> | undefined)?.organism as string) ?? '',
-        description: (sample.description as string) ?? '',
-        submitter: (sample.submitter as string) ?? '',
-        submissionDate: (sample.updateDate as string) ?? '',
-        updateDate: (sample.updateDate as string) ?? '',
-        attributes: ((sample.characteristics as Record<string, unknown> | undefined)?.attributes as (Record<string, unknown>)[] | undefined)?.map((attr: Record<string, unknown>) => ({
-          name: (attr.name as string) ?? '',
-          value: (attr.value as string) ?? '',
-          unit: (attr.unit as string) ?? undefined,
-          surface: (attr.surface as string) ?? undefined,
-        })) ?? [],
-        externalReferences: ((sample.externalReferences as (Record<string, unknown>)[] | undefined) ?? []).map((ref: Record<string, unknown>) => ({
-          url: (ref.url as string) ?? '',
-          label: (ref.label as string) ?? '',
-        })),
-        publications: ((sample.publications as (Record<string, unknown>)[] | undefined) ?? []).map((pub: Record<string, unknown>) => ({
-          pmid: (pub.pmid as string) ?? undefined,
-          doi: (pub.doi as string) ?? undefined,
-        })),
-        links: ((sample.links as (Record<string, unknown>)[] | undefined) ?? []).map((link: Record<string, unknown>) => ({
-          url: (link.href as string) ?? '',
-          type: (link.type as string) ?? '',
-        })),
-      })),
-      total: (data.page as Record<string, unknown> | undefined)?.totalElements as number ?? 0,
-      page: (data.page as Record<string, unknown> | undefined)?.number as number ?? page,
-      size: (data.page as Record<string, unknown> | undefined)?.size as number ?? size,
-    }
-  } catch {
-    return { samples: [], total: 0, page, size }
+  return {
+    samples: (data._embedded?.sample ?? []).map((sample: Record<string, unknown>) => mapSample(sample)),
+    total: (data.page as Record<string, unknown> | undefined)?.totalElements as number ?? 0,
+    page: (data.page as Record<string, unknown> | undefined)?.number as number ?? page,
+    size: (data.page as Record<string, unknown> | undefined)?.size as number ?? size,
   }
 }
 
@@ -113,44 +138,15 @@ export async function searchBioSamples(
  * Get BioSample by ID
  */
 export async function getBioSample(id: string): Promise<BioSample | null> {
-  try {
-    const encodedId = encodeURIComponent(id)
-    const url = `${BASE_URL}/${encodedId}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return null
-    const data = await res.json()
-
-    return {
-      id: (data.id as string) ?? '',
-      name: (data.name as string) ?? '',
-      domain: (data.domain as string) ?? '',
-      organism: ((data.characteristics as Record<string, unknown> | undefined)?.organism as string) ?? '',
-      description: (data.description as string) ?? '',
-      submitter: (data.submitter as string) ?? '',
-      submissionDate: (data.updateDate as string) ?? '',
-      updateDate: (data.updateDate as string) ?? '',
-      attributes: ((data.characteristics as Record<string, unknown> | undefined)?.attributes as (Record<string, unknown>)[] | undefined)?.map((attr: Record<string, unknown>) => ({
-        name: (attr.name as string) ?? '',
-        value: (attr.value as string) ?? '',
-        unit: (attr.unit as string) ?? undefined,
-        surface: (attr.surface as string) ?? undefined,
-      })) ?? [],
-      externalReferences: ((data.externalReferences as (Record<string, unknown>)[] | undefined) ?? []).map((ref: Record<string, unknown>) => ({
-        url: (ref.url as string) ?? '',
-        label: (ref.label as string) ?? '',
-      })),
-      publications: ((data.publications as (Record<string, unknown>)[] | undefined) ?? []).map((pub: Record<string, unknown>) => ({
-        pmid: (pub.pmid as string) ?? undefined,
-        doi: (pub.doi as string) ?? undefined,
-      })),
-      links: ((data.links as (Record<string, unknown>)[] | undefined) ?? []).map((link: Record<string, unknown>) => ({
-        url: (link.href as string) ?? '',
-        type: (link.type as string) ?? '',
-      })),
-    }
-  } catch {
-    return null
-  }
+  const q = id.trim()
+  if (!q) return null
+  const encodedId = encodeURIComponent(q)
+  const url = `${BASE_URL}/${encodedId}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res, 'BioSamples')
+  const data = await res.json()
+  return mapSample(data as Record<string, unknown>)
 }
 
 /**
