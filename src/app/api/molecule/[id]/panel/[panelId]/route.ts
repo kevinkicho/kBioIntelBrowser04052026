@@ -21,6 +21,7 @@ import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
 import { getOpenFdaLabelSectionsByName } from '@/lib/api/openFdaLabelSections'
 import { searchMassive } from '@/lib/api/massive'
 import { searchPurpleBookByName } from '@/lib/api/purpleBookCache'
+import { searchEmaBulkByName } from '@/lib/api/emaMedicinesBulk'
 import { searchCmsHospitalsByName } from '@/lib/api/cmsHospitals'
 
 import { getDrugCentralData } from '@/lib/api/drugcentral'
@@ -538,6 +539,15 @@ const PANEL_CONFIG: Record<string, {
     limitKey: 'PURPLE_BOOK',
     fetcher: async (name, _synonyms, limit) => {
       const result = await searchPurpleBookByName(name, limit)
+      const data = result.products ?? []
+      return { data, total: data.length, hasMore: data.length === limit }
+    }
+  },
+  'emaBulkMedicines': {
+    category: 'pharmaceutical',
+    limitKey: 'EMA_BULK',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await searchEmaBulkByName(name, { limit })
       const data = result.products ?? []
       return { data, total: data.length, hasMore: data.length === limit }
     }

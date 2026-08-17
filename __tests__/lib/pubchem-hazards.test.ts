@@ -1,7 +1,22 @@
 import { getGhsHazardsByCid } from '@/lib/api/pubchem-hazards'
+import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { resetRateLimitBuckets } from '@/lib/rateLimit'
 
 global.fetch = jest.fn()
-beforeEach(() => jest.resetAllMocks())
+beforeEach(() => {
+  jest.resetAllMocks()
+  resetRateLimitBuckets()
+})
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
 
 const mockGhsResponse = {
   Record: {
@@ -59,10 +74,7 @@ const mockGhsResponse = {
 
 describe('getGhsHazardsByCid', () => {
   test('returns parsed GHS data on success', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => mockGhsResponse,
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes(mockGhsResponse))
     const data = await getGhsHazardsByCid(702)
     expect(data).not.toBeNull()
     expect(data!.signalWord).toBe('Danger')
@@ -72,24 +84,55 @@ describe('getGhsHazardsByCid', () => {
     expect(data!.precautionaryStatements).toHaveLength(1)
   })
 
-  test('returns null when response is not ok', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({ ok: false })
-    const data = await getGhsHazardsByCid(702)
-    expect(data).toBeNull()
+  test('404 is honest EMPTY', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 404))
+    expect(await getGhsHazardsByCid(702)).toBeNull()
   })
 
-  test('returns null on network error', async () => {
+  test('throws when PubChem returns HTTP 503', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getGhsHazardsByCid(702)).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getGhsHazardsByCid(702)).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
-    const data = await getGhsHazardsByCid(702)
-    expect(data).toBeNull()
+    await expect(getGhsHazardsByCid(702)).rejects.toThrow(/network/)
   })
 
   test('returns null when no GHS section found', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ Record: { Section: [] } }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({ Record: { Section: [] } }))
     const data = await getGhsHazardsByCid(9999999)
     expect(data).toBeNull()
+  })
+})
+
+describe('PubChem hazards trackedSafe honesty', () => {
+  test('HTTP 503 is error, not empty, in category metrics', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('pubchem-hazards', getGhsHazardsByCid(702), null),
+    )
+    expect(value).toBeNull()
+    const row = metrics.find((m) => m.source === 'pubchem-hazards')
+    expect(row?.loadStatus).toBe('error')
+    expect(row?.error).toMatch(/HTTP 503/)
+    expect(row?.has_data).toBe(false)
+  })
+
+  test('true 404 is empty, not error', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 404))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('pubchem-hazards', getGhsHazardsByCid(702), null),
+    )
+    expect(value).toBeNull()
+    const row = metrics.find((m) => m.source === 'pubchem-hazards')
+    expect(row?.loadStatus).not.toBe('error')
+    expect(row?.loadStatus).not.toBe('timeout')
+    expect(row?.error).toBeUndefined()
   })
 })
