@@ -47,7 +47,7 @@ export interface CategoryApiTrace {
 }
 
 /** Map trackedSafe source keys → panel ids (best-effort). */
-export const SOURCE_TO_PANEL: Record<string, string> = {
+export const SOURCE_TO_PANEL: Record<string, string | readonly string[]> = {
   clinicaltrials: 'clinical-trials',
   adverseevents: 'adverse-events',
   recalls: 'recalls',
@@ -111,7 +111,7 @@ export const SOURCE_TO_PANEL: Record<string, string> = {
   patents: 'patents',
   nihreporter: 'nih-reporter',
   secedgar: 'sec',
-  'ncbi-gene': 'ncbi-gene',
+  'ncbi-gene': ['gene-info', 'gene-overview'],
   ensembl: 'ensembl',
   orphanet: 'orphanet',
   mygene: 'mygene',
@@ -146,9 +146,22 @@ export function categoryForPanel(panelId: string): CategoryId | null {
   return null
 }
 
-/** Panel id for a tracked source key (or the key itself if already a panel id). */
+/** Panel id(s) for a tracked source key. One tracker key may feed two cards. */
+export function panelsForSource(sourceKey: string): string[] {
+  const mapped = SOURCE_TO_PANEL[sourceKey]
+  if (!mapped) return [sourceKey]
+  return typeof mapped === 'string' ? [mapped] : [...mapped]
+}
+
+/** Primary panel id for a tracked source key (or the key itself if already a panel id). */
 export function panelIdForSource(sourceKey: string): string {
-  return SOURCE_TO_PANEL[sourceKey] || sourceKey
+  return panelsForSource(sourceKey)[0]
+}
+
+function sourceMapsToPanel(source: string, panelId: string): boolean {
+  const mapped = SOURCE_TO_PANEL[source]
+  if (!mapped) return false
+  return typeof mapped === 'string' ? mapped === panelId : mapped.includes(panelId)
 }
 
 export type SourceStatusLike = {
@@ -179,8 +192,8 @@ export function sourceStatusForPanel(
   }
   let worst: SourceStatusLike | undefined
   let worstRank = Infinity
-  for (const [source, pid] of Object.entries(SOURCE_TO_PANEL)) {
-    if (pid !== panelId) continue
+  for (const source of Object.keys(SOURCE_TO_PANEL)) {
+    if (!sourceMapsToPanel(source, panelId)) continue
     const val = map[source]
     if (!val) continue
     const r = ranks[val.status || ''] ?? 9
@@ -213,6 +226,7 @@ export function loadStatusFromPanelTrace(
     (s) =>
       s.panelId === panelId ||
       s.source === panelId ||
+      (s.source && sourceMapsToPanel(s.source, panelId)) ||
       (s.panelId && s.panelId.replace(/-/g, '') === compactPanel) ||
       (s.source && s.source.replace(/-/g, '') === compactPanel),
   )
@@ -305,11 +319,16 @@ export function enrichSourceTrace(m: {
   has_data: boolean
   loadStatus: string
 }): ApiSourceTrace {
-  const panelId = SOURCE_TO_PANEL[m.source] || m.source
+  const mapped = SOURCE_TO_PANEL[m.source]
+  const panelId = mapped
+    ? (typeof mapped === 'string' ? mapped : mapped[0])
+    : m.source
   const info = getPanelSource(panelId) || getPanelSource(m.source)
   return {
     source: m.source,
-    panelId: SOURCE_TO_PANEL[m.source],
+    panelId: mapped
+      ? (typeof mapped === 'string' ? mapped : mapped[0])
+      : undefined,
     status: m.status,
     loadStatus: m.loadStatus,
     duration_ms: m.duration_ms,
@@ -387,6 +406,7 @@ export function filterTraceForPanel(
     (s) =>
       s.panelId === panelId ||
       s.source === panelId ||
+      (s.source && sourceMapsToPanel(s.source, panelId)) ||
       (s.panelId && s.panelId.replace(/-/g, '') === compactPanel) ||
       (s.source && s.source.replace(/-/g, '') === compactPanel),
   )
