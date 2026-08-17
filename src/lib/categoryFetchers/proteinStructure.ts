@@ -23,10 +23,10 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
   const [uniprotEntries, pdbStructures, pdbeLigands, prideProjects, cathDomains, sabdabEntries] = await Promise.all([
     trackedSafe('uniprot', getUniprotEntriesByName(queryFor('uniprot')), []),
     trackedSafe('pdb', getPdbStructuresByName(queryFor('pdb')), []),
-    safe(getPdbeLigandsByName(name), []),
-    safe(searchPRIDE(name), []),
-    safe(searchCATHDomains(name), []),
-    safe(searchSAbDab(name), []),
+    trackedSafe('pdbe-ligands', getPdbeLigandsByName(name), []),
+    trackedSafe('pride', searchPRIDE(name), []),
+    trackedSafe('cath', searchCATHDomains(name), []),
+    trackedSafe('sabdab', searchSAbDab(name), []),
   ])
   const accessions = (uniprotEntries as Array<{accession: string}>).map(e => e.accession).filter(Boolean)
   const geneSymbols = (uniprotEntries as Array<{geneName: string}>).map(e => e.geneName).filter(Boolean)
