@@ -121,6 +121,7 @@ export const SOURCE_TO_PANEL: Record<string, string> = {
   'biologics-licensed': 'biologics-licensed',
   'human-protein-atlas': 'human-protein-atlas',
   'pubchem-hazards': 'hazards',
+  'synthesis-routes': 'synthesis',
   chebi: 'chebi',
   comptox: 'comptox',
   hmdb: 'hmdb',
