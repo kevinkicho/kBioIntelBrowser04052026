@@ -23,6 +23,7 @@ import { searchMassive } from '@/lib/api/massive'
 import { searchPurpleBookByName } from '@/lib/api/purpleBookCache'
 import { searchEmaBulkByName } from '@/lib/api/emaMedicinesBulk'
 import { searchCmsHospitalsByName } from '@/lib/api/cmsHospitals'
+import { getBiologicsLicensedByName } from '@/lib/api/biologicsLicensed'
 
 import { getDrugCentralData } from '@/lib/api/drugcentral'
 
@@ -549,6 +550,14 @@ const PANEL_CONFIG: Record<string, {
     fetcher: async (name, _synonyms, limit) => {
       const result = await searchEmaBulkByName(name, { limit })
       const data = result.products ?? []
+      return { data, total: data.length, hasMore: data.length === limit }
+    }
+  },
+  'biologicsLicensed': {
+    category: 'pharmaceutical',
+    limitKey: 'BIOLOGICS_LICENSED',
+    fetcher: async (name, _synonyms, limit) => {
+      const data = await getBiologicsLicensedByName(name, limit)
       return { data, total: data.length, hasMore: data.length === limit }
     }
   },

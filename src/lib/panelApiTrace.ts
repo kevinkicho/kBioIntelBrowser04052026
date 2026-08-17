@@ -110,6 +110,7 @@ export const SOURCE_TO_PANEL: Record<string, string> = {
   bgee: 'bgee',
   omim: 'omim',
   'pubchem-properties': 'properties',
+  'biologics-licensed': 'biologics-licensed',
   'pubchem-hazards': 'hazards',
   chebi: 'chebi',
   comptox: 'comptox',
