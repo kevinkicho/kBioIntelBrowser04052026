@@ -1,15 +1,28 @@
 import type { MassBankSpectrum } from '../types'
 import { LIMITS } from '../api-limits'
-import { fetchJsonWithSizeLimit, DEFAULT_MAX_RESPONSE_BYTES } from './fetchJsonWithSizeLimit'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://massbank.eu/MassBank-api'
+const fetchOptions: RequestInit = { cache: 'no-store' }
 
-async function fetchWithSizeLimit(url: string): Promise<unknown[] | null> {
-  const parsed = await fetchJsonWithSizeLimit<unknown>(url, {
-    maxBytes: DEFAULT_MAX_RESPONSE_BYTES,
-    timeoutMs: 12000,
-  })
-  return Array.isArray(parsed) ? parsed : null
+/**
+ * MassBank harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Blank query, 404, and zero-hit JSON remain empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
 }
 
 function parseRecord(record: Record<string, unknown>): MassBankSpectrum {
@@ -54,27 +67,28 @@ function parseRecord(record: Record<string, unknown>): MassBankSpectrum {
 }
 
 export async function searchMassBank(query: string, limit: number = LIMITS.MASSBANK.initial): Promise<MassBankSpectrum[]> {
-  try {
-    const url = `${BASE_URL}/records?compound_name=${encodeURIComponent(query)}&limit=${limit}`
-    const records = await fetchWithSizeLimit(url)
-    if (!records) return []
+  const q = (query || '').trim()
+  if (!q) return []
 
-    return records.slice(0, limit).map((r) => parseRecord(r as Record<string, unknown>))
-  } catch {
-    return []
-  }
+  const url = `${BASE_URL}/records?compound_name=${encodeURIComponent(q)}&limit=${limit}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 12000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'MassBank')
+  const records = await res.json()
+  if (!Array.isArray(records)) return []
+
+  return records.slice(0, limit).map((r) => parseRecord(r as Record<string, unknown>))
 }
 
 export async function getMassBankSpectrum(accession: string): Promise<MassBankSpectrum | null> {
-  try {
-    const spectrumUrl = `${BASE_URL}/records/${encodeURIComponent(accession)}`
-    const record = await fetchJsonWithSizeLimit<Record<string, unknown>>(spectrumUrl, {
-      maxBytes: DEFAULT_MAX_RESPONSE_BYTES,
-      timeoutMs: 12000,
-    })
-    if (!record || typeof record !== 'object') return null
-    return parseRecord(record)
-  } catch {
-    return null
-  }
+  const id = (accession || '').trim()
+  if (!id) return null
+
+  const spectrumUrl = `${BASE_URL}/records/${encodeURIComponent(id)}`
+  const res = await timedFetch(spectrumUrl, { ...fetchOptions, timeoutMs: 12000 })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res, 'MassBank')
+  const record = await res.json()
+  if (!record || typeof record !== 'object') return null
+  return parseRecord(record as Record<string, unknown>)
 }

@@ -1,5 +1,6 @@
 import type { IRISAssessment } from '../types'
 import { LIMITS } from '../api-limits'
+import { timedFetch } from './timedFetch'
 
 const COMPTOX_SEARCH_URL = 'https://comptox.epa.gov/dashboard-api/ccdapp1/search/chemical/equal'
 const COMPTOX_START_URL = 'https://comptox.epa.gov/dashboard-api/ccdapp1/search/chemical/start-with'
@@ -27,6 +28,48 @@ interface PubChemIrisFields {
   substanceName: string
   hasIrisSection: boolean
   irisUrl: string | null
+}
+
+/**
+ * EPA IRIS harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Blank query, 404, missing id, and zero-hit JSON remain empty.
+ * CompTox equal may fall through to start-with; CompTox and PubChem are
+ * cross-source fallbacks. If both sources fail, throw.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+type Outcome<T> = { ok: true; value: T } | { ok: false; error: unknown }
+
+function emptyIrisFields(): PubChemIrisFields {
+  return {
+    oralRfD: null,
+    oralRfDUnits: 'mg/kg-day',
+    oralRfDDisplay: '',
+    inhalationRfC: null,
+    inhalationRfCUnits: 'mg/m³',
+    inhalationRfCDisplay: '',
+    criticalEffects: [],
+    organsAffected: [],
+    cancerSites: [],
+    cancerWeightOfEvidence: '',
+    substanceName: '',
+    hasIrisSection: false,
+    irisUrl: null,
+  }
 }
 
 /** Parse values like "4 x 10 ^-3 mg/kg-day" or "0.004 mg/kg-day". */
@@ -106,48 +149,53 @@ export function mapCancerClassification(
 
 async function searchCompTox(query: string): Promise<CompToxSearchResult[]> {
   try {
-    const res = await fetch(`${COMPTOX_SEARCH_URL}/${encodeURIComponent(query)}`, fetchOptions)
-    let data: CompToxSearchResult[] = res.ok ? await res.json() : []
-    if (!Array.isArray(data) || data.length === 0) {
-      const fallbackRes = await fetch(
-        `${COMPTOX_START_URL}/${encodeURIComponent(query)}`,
-        fetchOptions,
-      )
-      if (!fallbackRes.ok) return []
-      data = await fallbackRes.json()
+    const res = await timedFetch(`${COMPTOX_SEARCH_URL}/${encodeURIComponent(query)}`, {
+      ...fetchOptions,
+      timeoutMs: 8000,
+    })
+    if (res.ok) {
+      throwIfHttpFailed(res, 'CompTox')
+      const data = await res.json()
+      if (Array.isArray(data) && data.length > 0) return data
     }
-    return Array.isArray(data) ? data : []
+    // 404 / 5xx / zero-hit: same-source start-with fallback
   } catch {
-    return []
+    // HTML / network / timeout: still try start-with
   }
+
+  const fallbackRes = await timedFetch(`${COMPTOX_START_URL}/${encodeURIComponent(query)}`, {
+    ...fetchOptions,
+    timeoutMs: 8000,
+  })
+  if (isAbsentStatus(fallbackRes.status)) return []
+  throwIfHttpFailed(fallbackRes, 'CompTox')
+  const data = await fallbackRes.json()
+  return Array.isArray(data) ? data : []
 }
 
 async function resolvePubChemCid(query: string): Promise<number | null> {
-  try {
-    const res = await fetch(
-      `${PUBCHEM_PUG}/compound/name/${encodeURIComponent(query)}/cids/JSON`,
-      fetchOptions,
-    )
-    if (!res.ok) return null
-    const data = await res.json()
-    const cid = data?.IdentifierList?.CID?.[0]
-    return typeof cid === 'number' ? cid : cid != null ? Number(cid) : null
-  } catch {
-    return null
-  }
+  const res = await timedFetch(
+    `${PUBCHEM_PUG}/compound/name/${encodeURIComponent(query)}/cids/JSON`,
+    { ...fetchOptions, timeoutMs: 8000 },
+  )
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res, 'PubChem')
+  const data = await res.json()
+  const cid = data?.IdentifierList?.CID?.[0]
+  return typeof cid === 'number' ? cid : cid != null ? Number(cid) : null
 }
 
 async function getPubChemCas(cid: number): Promise<string> {
-  try {
-    const res = await fetch(`${PUBCHEM_PUG}/compound/cid/${cid}/synonyms/JSON`, fetchOptions)
-    if (!res.ok) return ''
-    const data = await res.json()
-    const synonyms: string[] = data?.InformationList?.Information?.[0]?.Synonym ?? []
-    const cas = synonyms.find((s) => /^\d{2,7}-\d{2}-\d$/.test(s))
-    return cas || ''
-  } catch {
-    return ''
-  }
+  const res = await timedFetch(`${PUBCHEM_PUG}/compound/cid/${cid}/synonyms/JSON`, {
+    ...fetchOptions,
+    timeoutMs: 8000,
+  })
+  if (isAbsentStatus(res.status)) return ''
+  throwIfHttpFailed(res, 'PubChem')
+  const data = await res.json()
+  const synonyms: string[] = data?.InformationList?.Information?.[0]?.Synonym ?? []
+  const cas = synonyms.find((s) => /^\d{2,7}-\d{2}-\d$/.test(s))
+  return cas || ''
 }
 
 type PvSection = {
@@ -197,127 +245,105 @@ function namedValues(section: PvSection): Array<{ name: string; value: string }>
 }
 
 async function getPubChemIris(cid: number): Promise<PubChemIrisFields> {
-  const empty: PubChemIrisFields = {
-    oralRfD: null,
-    oralRfDUnits: 'mg/kg-day',
-    oralRfDDisplay: '',
-    inhalationRfC: null,
-    inhalationRfCUnits: 'mg/m³',
-    inhalationRfCDisplay: '',
-    criticalEffects: [],
-    organsAffected: [],
-    cancerSites: [],
-    cancerWeightOfEvidence: '',
-    substanceName: '',
-    hasIrisSection: false,
-    irisUrl: null,
-  }
+  const empty = emptyIrisFields()
+  const res = await timedFetch(
+    `${PUBCHEM_VIEW}/${cid}/JSON?heading=${encodeURIComponent('EPA IRIS Information')}`,
+    { ...fetchOptions, timeoutMs: 8000 },
+  )
+  if (isAbsentStatus(res.status)) return empty
+  throwIfHttpFailed(res, 'PubChem')
+  const data = await res.json()
+  const root: PvSection[] = data?.Record?.Section ?? []
 
-  try {
-    const res = await fetch(
-      `${PUBCHEM_VIEW}/${cid}/JSON?heading=${encodeURIComponent('EPA IRIS Information')}`,
-      fetchOptions,
-    )
-    if (!res.ok) return empty
-    const data = await res.json()
-    const root: PvSection[] = data?.Record?.Section ?? []
+  let irisRoot: PvSection | null = null
+  walkSections(root, (s) => {
+    if (s.TOCHeading === 'EPA IRIS Information') irisRoot = s
+  })
+  if (!irisRoot) return empty
 
-    let irisRoot: PvSection | null = null
-    walkSections(root, (s) => {
-      if (s.TOCHeading === 'EPA IRIS Information') irisRoot = s
-    })
-    if (!irisRoot) return empty
-
-    empty.hasIrisSection = true
-    const pairs: Array<{ name: string; value: string }> = []
-    walkSections([irisRoot], (s) => {
-      pairs.push(...namedValues(s))
-      // External IRIS links sometimes appear without Name
-      for (const item of s.Information ?? []) {
-        for (const url of item.Value?.ExternalDataURL ?? []) {
-          if (/iris|epa\.gov/i.test(url) && !empty.irisUrl) empty.irisUrl = url
-        }
-      }
-    })
-
-    for (const { name, value } of pairs) {
-      const n = name.toLowerCase()
-      if (n === 'substance' || n.includes('substance name')) {
-        empty.substanceName = value
-      } else if (n.includes('reference dose') && n.includes('chronic') && !n.includes('subchronic')) {
-        const parsed = parseToxValue(value)
-        empty.oralRfD = parsed.value
-        empty.oralRfDUnits = parsed.units || 'mg/kg-day'
-        empty.oralRfDDisplay = parsed.display || value
-      } else if (
-        n.includes('reference concentration') &&
-        n.includes('chronic') &&
-        !n.includes('subchronic') &&
-        !n.includes('acute')
-      ) {
-        const parsed = parseToxValue(value)
-        empty.inhalationRfC = parsed.value
-        empty.inhalationRfCUnits = parsed.units || 'mg/m³'
-        empty.inhalationRfCDisplay = parsed.display || value
-      } else if (n.includes('critical effect')) {
-        empty.criticalEffects.push(
-          ...value
-            .split(/[;,]/)
-            .map((x) => x.trim())
-            .filter(Boolean),
-        )
-      } else if (n.includes('cancer site')) {
-        empty.cancerSites.push(
-          ...value
-            .split(/[;,]/)
-            .map((x) => x.trim())
-            .filter(Boolean),
-        )
-      } else if (n.includes('organ') || n.includes('system')) {
-        empty.organsAffected.push(
-          ...value
-            .split(/[;,]/)
-            .map((x) => x.trim())
-            .filter(Boolean),
-        )
-      } else if (n.includes('weight') && n.includes('evidence')) {
-        empty.cancerWeightOfEvidence = value
+  empty.hasIrisSection = true
+  const pairs: Array<{ name: string; value: string }> = []
+  walkSections([irisRoot], (s) => {
+    pairs.push(...namedValues(s))
+    // External IRIS links sometimes appear without Name
+    for (const item of s.Information ?? []) {
+      for (const url of item.Value?.ExternalDataURL ?? []) {
+        if (/iris|epa\.gov/i.test(url) && !empty.irisUrl) empty.irisUrl = url
       }
     }
+  })
 
-    // De-dupe
-    empty.criticalEffects = Array.from(new Set(empty.criticalEffects)).slice(0, 12)
-    empty.organsAffected = Array.from(
-      new Set([...empty.organsAffected, ...empty.cancerSites]),
-    ).slice(0, 12)
-
-    return empty
-  } catch {
-    return empty
+  for (const { name, value } of pairs) {
+    const n = name.toLowerCase()
+    if (n === 'substance' || n.includes('substance name')) {
+      empty.substanceName = value
+    } else if (n.includes('reference dose') && n.includes('chronic') && !n.includes('subchronic')) {
+      const parsed = parseToxValue(value)
+      empty.oralRfD = parsed.value
+      empty.oralRfDUnits = parsed.units || 'mg/kg-day'
+      empty.oralRfDDisplay = parsed.display || value
+    } else if (
+      n.includes('reference concentration') &&
+      n.includes('chronic') &&
+      !n.includes('subchronic') &&
+      !n.includes('acute')
+    ) {
+      const parsed = parseToxValue(value)
+      empty.inhalationRfC = parsed.value
+      empty.inhalationRfCUnits = parsed.units || 'mg/m³'
+      empty.inhalationRfCDisplay = parsed.display || value
+    } else if (n.includes('critical effect')) {
+      empty.criticalEffects.push(
+        ...value
+          .split(/[;,]/)
+          .map((x) => x.trim())
+          .filter(Boolean),
+      )
+    } else if (n.includes('cancer site')) {
+      empty.cancerSites.push(
+        ...value
+          .split(/[;,]/)
+          .map((x) => x.trim())
+          .filter(Boolean),
+      )
+    } else if (n.includes('organ') || n.includes('system')) {
+      empty.organsAffected.push(
+        ...value
+          .split(/[;,]/)
+          .map((x) => x.trim())
+          .filter(Boolean),
+      )
+    } else if (n.includes('weight') && n.includes('evidence')) {
+      empty.cancerWeightOfEvidence = value
+    }
   }
+
+  empty.criticalEffects = Array.from(new Set(empty.criticalEffects)).slice(0, 12)
+  empty.organsAffected = Array.from(
+    new Set([...empty.organsAffected, ...empty.cancerSites]),
+  ).slice(0, 12)
+
+  return empty
 }
 
 async function getCancerEvidence(cid: number): Promise<string> {
-  try {
-    const res = await fetch(
-      `${PUBCHEM_VIEW}/${cid}/JSON?heading=${encodeURIComponent('Evidence for Carcinogenicity')}`,
-      fetchOptions,
-    )
-    if (!res.ok) return ''
-    const data = await res.json()
-    const snippets: string[] = []
-    walkSections(data?.Record?.Section ?? [], (s) => {
-      for (const v of namedValues(s)) {
-        if (v.value) snippets.push(v.value)
-      }
-      for (const raw of infoStrings(s.Information)) {
-        if (raw.length > 20) snippets.push(raw)
-      }
-    })
-    return snippets.slice(0, 6).join(' ')
-  } catch {
-    return ''
-  }
+  const res = await timedFetch(
+    `${PUBCHEM_VIEW}/${cid}/JSON?heading=${encodeURIComponent('Evidence for Carcinogenicity')}`,
+    { ...fetchOptions, timeoutMs: 8000 },
+  )
+  if (isAbsentStatus(res.status)) return ''
+  throwIfHttpFailed(res, 'PubChem')
+  const data = await res.json()
+  const snippets: string[] = []
+  walkSections(data?.Record?.Section ?? [], (s) => {
+    for (const v of namedValues(s)) {
+      if (v.value) snippets.push(v.value)
+    }
+    for (const raw of infoStrings(s.Information)) {
+      if (raw.length > 20) snippets.push(raw)
+    }
+  })
+  return snippets.slice(0, 6).join(' ')
 }
 
 function buildAssessment(input: {
@@ -366,102 +392,89 @@ export async function searchIRIS(
   query: string,
   limit: number = LIMITS.IRIS.initial,
 ): Promise<IRISAssessment[]> {
-  try {
-    const q = (query || '').trim()
-    if (!q) return []
+  const q = (query || '').trim()
+  if (!q) return []
 
-    const [comptoxHits, cid] = await Promise.all([searchCompTox(q), resolvePubChemCid(q)])
+  const [comptoxOutcome, cidOutcome]: [Outcome<CompToxSearchResult[]>, Outcome<number | null>] =
+    await Promise.all([
+      searchCompTox(q)
+        .then((value): Outcome<CompToxSearchResult[]> => ({ ok: true, value }))
+        .catch((error): Outcome<CompToxSearchResult[]> => ({ ok: false, error })),
+      resolvePubChemCid(q)
+        .then((value): Outcome<number | null> => ({ ok: true, value }))
+        .catch((error): Outcome<number | null> => ({ ok: false, error })),
+    ])
 
-    // Prefer PubChem-backed IRIS (real RfD/CAS) as primary record
-    if (cid != null && Number.isFinite(cid)) {
-      const [casNumber, iris, cancerText] = await Promise.all([
-        getPubChemCas(cid),
-        getPubChemIris(cid),
-        getCancerEvidence(cid),
-      ])
-      const dtxsid = comptoxHits[0]?.dtxsid
-      const chemicalName = iris.substanceName || comptoxHits[0]?.searchWord || q
+  if (!comptoxOutcome.ok && !cidOutcome.ok) {
+    const err = cidOutcome.error
+    throw err instanceof Error ? err : new Error('IRIS upstream failed')
+  }
 
-      // Only emit a row when we have identity (CAS/name) — always for resolved CID
-      const primary = buildAssessment({
-        id: dtxsid || `CID${cid}`,
-        chemicalName,
-        casNumber,
-        iris,
-        cancerText,
-        dtxsid,
-      })
+  const comptoxHits = comptoxOutcome.ok ? comptoxOutcome.value : []
+  const cid = cidOutcome.ok ? cidOutcome.value : null
 
-      const assessments: IRISAssessment[] = [primary]
+  // Prefer PubChem-backed IRIS (real RfD/CAS) as primary record
+  if (cid != null && Number.isFinite(cid)) {
+    const [casNumber, iris, cancerText] = await Promise.all([
+      getPubChemCas(cid),
+      getPubChemIris(cid),
+      getCancerEvidence(cid),
+    ])
+    const dtxsid = comptoxHits[0]?.dtxsid
+    const chemicalName = iris.substanceName || comptoxHits[0]?.searchWord || q
 
-      // Additional CompTox name matches (identity only) — skip primary dtxsid
-      for (const hit of comptoxHits.slice(0, limit)) {
-        if (hit.dtxsid && hit.dtxsid === dtxsid) continue
-        if (assessments.length >= limit) break
-        if (!hit.searchWord) continue
-        assessments.push(
-          buildAssessment({
-            id: hit.dtxsid,
-            chemicalName: hit.searchWord,
-            casNumber: hit.dtxsid === dtxsid ? casNumber : '',
-            iris: {
-              oralRfD: null,
-              oralRfDUnits: 'mg/kg-day',
-              oralRfDDisplay: '',
-              inhalationRfC: null,
-              inhalationRfCUnits: 'mg/m³',
-              inhalationRfCDisplay: '',
-              criticalEffects: [],
-              organsAffected: [],
-              cancerSites: [],
-              cancerWeightOfEvidence: '',
-              substanceName: hit.searchWord,
-              hasIrisSection: false,
-              irisUrl: null,
-            },
-            cancerText: '',
-            dtxsid: hit.dtxsid,
-          }),
-        )
-      }
+    const primary = buildAssessment({
+      id: dtxsid || `CID${cid}`,
+      chemicalName,
+      casNumber,
+      iris,
+      cancerText,
+      dtxsid,
+    })
 
-      return assessments.filter((a) => a.chemicalName).slice(0, limit)
-    }
+    const assessments: IRISAssessment[] = [primary]
 
-    // CompTox-only fallback (CAS often unavailable — CompTox detail API is deprecated)
-    const assessments: IRISAssessment[] = []
     for (const hit of comptoxHits.slice(0, limit)) {
-      if (!hit.dtxsid && !hit.searchWord) continue
+      if (hit.dtxsid && hit.dtxsid === dtxsid) continue
+      if (assessments.length >= limit) break
+      if (!hit.searchWord) continue
       assessments.push(
         buildAssessment({
-          id: hit.dtxsid || hit.searchWord,
-          chemicalName: hit.searchWord || q,
-          casNumber: '',
+          id: hit.dtxsid,
+          chemicalName: hit.searchWord,
+          casNumber: hit.dtxsid === dtxsid ? casNumber : '',
           iris: {
-            oralRfD: null,
-            oralRfDUnits: 'mg/kg-day',
-            oralRfDDisplay: '',
-            inhalationRfC: null,
-            inhalationRfCUnits: 'mg/m³',
-            inhalationRfCDisplay: '',
-            criticalEffects: [],
-            organsAffected: [],
-            cancerSites: [],
-            cancerWeightOfEvidence: '',
-            substanceName: hit.searchWord || q,
-            hasIrisSection: false,
-            irisUrl: null,
+            ...emptyIrisFields(),
+            substanceName: hit.searchWord,
           },
           cancerText: '',
           dtxsid: hit.dtxsid,
         }),
       )
     }
-    return assessments.filter((a) => a.chemicalName)
-  } catch (error) {
-    console.error('IRIS search error:', error)
-    return []
+
+    return assessments.filter((a) => a.chemicalName).slice(0, limit)
   }
+
+  // CompTox-only fallback (CAS often unavailable — CompTox detail API is deprecated)
+  const assessments: IRISAssessment[] = []
+  for (const hit of comptoxHits.slice(0, limit)) {
+    if (!hit.dtxsid && !hit.searchWord) continue
+    assessments.push(
+      buildAssessment({
+        id: hit.dtxsid || hit.searchWord,
+        chemicalName: hit.searchWord || q,
+        casNumber: '',
+        iris: {
+          ...emptyIrisFields(),
+          substanceName: hit.searchWord || q,
+        },
+        cancerText: '',
+        dtxsid: hit.dtxsid,
+      }),
+    )
+  }
+  return assessments.filter((a) => a.chemicalName)
 }
 
 export async function getIRISAssessment(id: string): Promise<IRISAssessment | null> {
@@ -472,7 +485,6 @@ export async function getIRISAssessment(id: string): Promise<IRISAssessment | nu
 export async function getIRISByCAS(casNumber: string): Promise<IRISAssessment | null> {
   const results = await searchIRIS(casNumber, 1)
   if (!results.length) return null
-  // Prefer the record that matched the CAS
   const match = results.find((r) => r.casNumber === casNumber) || results[0]
   return { ...match, casNumber: match.casNumber || casNumber }
 }

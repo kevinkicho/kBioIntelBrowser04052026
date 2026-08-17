@@ -1,25 +1,36 @@
 import { getDrugsByIngredient } from '@/lib/api/openfda'
+import { resetRateLimitBuckets } from '@/lib/rateLimit'
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
 
 global.fetch = jest.fn()
-beforeEach(() => jest.resetAllMocks())
+beforeEach(() => {
+  jest.resetAllMocks()
+  resetRateLimitBuckets()
+})
 
 describe('getDrugsByIngredient', () => {
   test('returns company products for a known drug ingredient', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        results: [{
-          openfda: {
-            manufacturer_name: ['Novo Nordisk'],
-            brand_name: ['Victoza'],
-            generic_name: ['LIRAGLUTIDE'],
-            product_type: ['HUMAN PRESCRIPTION DRUG'],
-            route: ['SUBCUTANEOUS'],
-            application_number: ['NDA022341'],
-          },
-        }],
-      }),
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({
+      results: [{
+        openfda: {
+          manufacturer_name: ['Novo Nordisk'],
+          brand_name: ['Victoza'],
+          generic_name: ['LIRAGLUTIDE'],
+          product_type: ['HUMAN PRESCRIPTION DRUG'],
+          route: ['SUBCUTANEOUS'],
+          application_number: ['NDA022341'],
+        },
+      }],
+    }))
 
     const products = await getDrugsByIngredient('liraglutide')
     expect(products).toHaveLength(1)
@@ -29,17 +40,13 @@ describe('getDrugsByIngredient', () => {
   })
 
   test('returns empty array when no drugs found', async () => {
-    ;(fetch as jest.Mock).mockResolvedValueOnce({
-      ok: false,
-      status: 404,
-    })
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 404))
     const products = await getDrugsByIngredient('xyznotadrug')
     expect(products).toEqual([])
   })
 
-  test('returns empty array on network error', async () => {
+  test('throws on network error (not EMPTY)', async () => {
     ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('Network error'))
-    const products = await getDrugsByIngredient('insulin')
-    expect(products).toEqual([])
+    await expect(getDrugsByIngredient('insulin')).rejects.toThrow(/Network error/)
   })
 })
