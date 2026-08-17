@@ -17,6 +17,9 @@ import { getDrugLabelsByName } from '@/lib/api/dailymed'
 import { getAtcClassificationsByName } from '@/lib/api/atc'
 import { searchDrugShortages } from '@/lib/api/fda-drug-shortages'
 import { searchBioSamples } from '@/lib/api/biosamples'
+import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
+import { getOpenFdaLabelSectionsByName } from '@/lib/api/openFdaLabelSections'
+import { searchMassive } from '@/lib/api/massive'
 
 import { getDrugCentralData } from '@/lib/api/drugcentral'
 
@@ -498,6 +501,34 @@ const PANEL_CONFIG: Record<string, {
     fetcher: async (name, _synonyms, limit) => {
       const data = await searchIRIS(name, limit)
       return { data, total: data.length, hasMore: data.length === limit }
+    }
+  },
+
+  'healthCanadaProducts': {
+    category: 'pharmaceutical',
+    limitKey: 'HEALTH_CANADA',
+    fetcher: async (name, _synonyms, limit) => {
+      const allData = await getHealthCanadaProductsByName(name, limit)
+      const data = allData.slice(0, limit)
+      return { data, total: allData.length, hasMore: allData.length > limit }
+    }
+  },
+  'openFdaLabelSections': {
+    category: 'pharmaceutical',
+    limitKey: 'OPENFDA',
+    fetcher: async (name, _synonyms, limit) => {
+      const allData = await getOpenFdaLabelSectionsByName(name, limit)
+      const data = allData.slice(0, limit)
+      return { data, total: allData.length, hasMore: allData.length > limit }
+    }
+  },
+  'massiveDatasets': {
+    category: 'genomics-disease',
+    limitKey: 'MASSIVE',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await searchMassive(name, limit)
+      const data = result.datasets ?? []
+      return { data, total: result.total ?? data.length, hasMore: data.length === limit }
     }
   },
   'drugShortages': {

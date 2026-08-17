@@ -6,6 +6,7 @@
  */
 
 import { getApiKey } from './utils'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.fda.gov/drug/label.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -70,6 +71,27 @@ function truncate(s: string, max = 900): string {
 }
 
 /**
+ * openFDA label harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Short query, 404 (no matches), and zero-hit / no-section JSON stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  // openFDA returns 404 when a drug name has no label matches.
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+/**
  * Fetch openFDA label records with key safety/use sections for a drug name.
  */
 export async function getOpenFdaLabelSectionsByName(
@@ -78,52 +100,49 @@ export async function getOpenFdaLabelSectionsByName(
 ): Promise<OpenFdaLabelRecord[]> {
   const q = name.trim()
   if (q.length < 2) return []
-  try {
-    const enc = encodeURIComponent(`"${q}"`)
-    const search = [
-      `openfda.brand_name:${enc}`,
-      `openfda.generic_name:${enc}`,
-      `openfda.substance_name:${enc}`,
-    ].join('+OR+')
-    const url = `${BASE_URL}?search=${search}&limit=${Math.min(10, Math.max(1, limit))}${keyParam()}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return []
-    const data = (await res.json()) as { results?: Record<string, unknown>[] }
-    const out: OpenFdaLabelRecord[] = []
+  const enc = encodeURIComponent(`"${q}"`)
+  const search = [
+    `openfda.brand_name:${enc}`,
+    `openfda.generic_name:${enc}`,
+    `openfda.substance_name:${enc}`,
+  ].join('+OR+')
+  const url = `${BASE_URL}?search=${search}&limit=${Math.min(10, Math.max(1, limit))}${keyParam()}`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'openFDA labels')
+  const data = (await res.json()) as { results?: Record<string, unknown>[] }
+  const out: OpenFdaLabelRecord[] = []
 
-    for (const r of data.results ?? []) {
-      const openfda = (r.openfda ?? {}) as Record<string, unknown>
-      const brand = firstText(openfda.brand_name).split('\n')[0] || ''
-      const generic = firstText(openfda.generic_name).split('\n')[0] || ''
-      const manufacturer = firstText(openfda.manufacturer_name).split('\n')[0] || ''
-      const setId = firstText(openfda.spl_set_id).split('\n')[0] || firstText(r.set_id) || ''
-      const id = String(r.id || setId || `${brand}-${generic}`).trim()
-      const sections: OpenFdaLabelSection[] = []
-      for (const meta of SECTION_META) {
-        const raw = firstText(r[meta.key])
-        if (!raw) continue
-        sections.push({
-          key: meta.key,
-          label: meta.label,
-          text: truncate(raw),
-        })
-      }
-      if (sections.length === 0) continue
-      out.push({
-        id,
-        brandName: brand || q,
-        genericName: generic,
-        manufacturer,
-        setId,
-        sections,
-        dailyMedUrl: setId
-          ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${encodeURIComponent(setId)}`
-          : null,
-        openFdaUrl: url.split('&api_key')[0] || BASE_URL,
+  for (const r of data.results ?? []) {
+    const openfda = (r.openfda ?? {}) as Record<string, unknown>
+    const brand = firstText(openfda.brand_name).split('\n')[0] || ''
+    const generic = firstText(openfda.generic_name).split('\n')[0] || ''
+    const manufacturer = firstText(openfda.manufacturer_name).split('\n')[0] || ''
+    const setId = firstText(openfda.spl_set_id).split('\n')[0] || firstText(r.set_id) || ''
+    const id = String(r.id || setId || `${brand}-${generic}`).trim()
+    const sections: OpenFdaLabelSection[] = []
+    for (const meta of SECTION_META) {
+      const raw = firstText(r[meta.key])
+      if (!raw) continue
+      sections.push({
+        key: meta.key,
+        label: meta.label,
+        text: truncate(raw),
       })
     }
-    return out
-  } catch {
-    return []
+    if (sections.length === 0) continue
+    out.push({
+      id,
+      brandName: brand || q,
+      genericName: generic,
+      manufacturer,
+      setId,
+      sections,
+      dailyMedUrl: setId
+        ? `https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=${encodeURIComponent(setId)}`
+        : null,
+      openFdaUrl: url.split('&api_key')[0] || BASE_URL,
+    })
   }
+  return out
 }
