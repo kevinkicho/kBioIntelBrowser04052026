@@ -3,9 +3,27 @@ import {
   parseToxValue,
   searchIRIS,
 } from '@/lib/api/iris'
+import { resetRateLimitBuckets } from '@/lib/rateLimit'
+
+function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: (h: string) => (h.toLowerCase() === 'content-type' ? contentType : null) },
+    json: async () => body,
+    text: async () => (typeof body === 'string' ? body : JSON.stringify(body)),
+  }
+}
+
+function mockByUrl(handler: (url: string) => ReturnType<typeof jsonRes>) {
+  ;(fetch as jest.Mock).mockImplementation(async (input: unknown) => handler(String(input)))
+}
 
 global.fetch = jest.fn()
-beforeEach(() => jest.resetAllMocks())
+beforeEach(() => {
+  jest.resetAllMocks()
+  resetRateLimitBuckets()
+})
 
 describe('parseToxValue', () => {
   test('parses scientific notation with units', () => {
@@ -34,32 +52,24 @@ describe('mapCancerClassification', () => {
 
 describe('searchIRIS', () => {
   test('fills CAS and RfD from PubChem EPA IRIS section', async () => {
-    ;(fetch as jest.Mock)
-      // CompTox equal search
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [
+    mockByUrl((url) => {
+      if (url.includes('comptox.epa.gov')) {
+        return jsonRes([
           { dtxsid: 'DTXSID3039242', searchWord: 'Benzene', searchMatch: 'Approved Name' },
-        ],
-      })
-      // PubChem CIDs
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ IdentifierList: { CID: [241] } }),
-      })
-      // synonyms (CAS)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+        ])
+      }
+      if (url.includes('/cids/')) {
+        return jsonRes({ IdentifierList: { CID: [241] } })
+      }
+      if (url.includes('/synonyms/')) {
+        return jsonRes({
           InformationList: {
             Information: [{ Synonym: ['benzene', '71-43-2', 'other'] }],
           },
-        }),
-      })
-      // EPA IRIS Information
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+        })
+      }
+      if (url.includes('EPA%20IRIS') || url.includes('EPA IRIS')) {
+        return jsonRes({
           Record: {
             Section: [
               {
@@ -89,28 +99,25 @@ describe('searchIRIS', () => {
               },
             ],
           },
-        }),
-      })
-      // Evidence for Carcinogenicity
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          Record: {
-            Section: [
-              {
-                TOCHeading: 'Evidence for Carcinogenicity',
-                Information: [
-                  {
-                    Value: {
-                      StringWithMarkup: [{ String: 'Cancer Classification: Carcinogenic to Humans' }],
-                    },
+        })
+      }
+      return jsonRes({
+        Record: {
+          Section: [
+            {
+              TOCHeading: 'Evidence for Carcinogenicity',
+              Information: [
+                {
+                  Value: {
+                    StringWithMarkup: [{ String: 'Cancer Classification: Carcinogenic to Humans' }],
                   },
-                ],
-              },
-            ],
-          },
-        }),
+                },
+              ],
+            },
+          ],
+        },
       })
+    })
 
     const results = await searchIRIS('benzene')
     expect(results.length).toBeGreaterThanOrEqual(1)
@@ -125,34 +132,24 @@ describe('searchIRIS', () => {
   })
 
   test('returns CAS even when chemical has no IRIS tox section', async () => {
-    ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => [
+    mockByUrl((url) => {
+      if (url.includes('comptox.epa.gov')) {
+        return jsonRes([
           { dtxsid: 'DTXSID5020108', searchWord: 'Aspirin', searchMatch: 'Approved Name' },
-        ],
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ IdentifierList: { CID: [2244] } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
+        ])
+      }
+      if (url.includes('/cids/')) {
+        return jsonRes({ IdentifierList: { CID: [2244] } })
+      }
+      if (url.includes('/synonyms/')) {
+        return jsonRes({
           InformationList: {
             Information: [{ Synonym: ['Aspirin', '50-78-2'] }],
           },
-        }),
-      })
-      // No IRIS section (empty / non-ok-ish structure)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ Record: { Section: [] } }),
-      })
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ Record: { Section: [] } }),
-      })
+        })
+      }
+      return jsonRes({ Record: { Section: [] } })
+    })
 
     const results = await searchIRIS('aspirin')
     expect(results[0].casNumber).toBe('50-78-2')
@@ -161,9 +158,11 @@ describe('searchIRIS', () => {
   })
 
   test('returns empty array when nothing resolves', async () => {
-    ;(fetch as jest.Mock)
-      .mockResolvedValueOnce({ ok: true, json: async () => [] })
-      .mockResolvedValueOnce({ ok: false })
+    mockByUrl((url) => {
+      if (url.includes('comptox.epa.gov')) return jsonRes([])
+      if (url.includes('/cids/')) return jsonRes({}, 404)
+      return jsonRes({}, 404)
+    })
     expect(await searchIRIS('zzzz-unknown-chem')).toEqual([])
   })
 })
