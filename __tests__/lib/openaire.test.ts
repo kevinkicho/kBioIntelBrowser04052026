@@ -3,7 +3,8 @@ import {
   getOpenAirePublicationsByName,
   getEuResearchProjectsByName,
 } from '@/lib/api/openaire'
-import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { metricsToSourceStatus, runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { sourceStatusForPanel } from '@/lib/panelApiTrace'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
   return {
@@ -143,6 +144,16 @@ describe('getEuResearchProjectsByName', () => {
 })
 
 describe('OpenAIRE trackedSafe honesty', () => {
+  test('publications HTTP 503 maps to openaire-publications so hideEmpty cannot hide ERROR', async () => {
+    ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('openaire-pubs', getOpenAirePublicationsByName('tafamidis'), []),
+    )
+    expect(value).toEqual([])
+    const row = metrics.find((m) => m.source === 'openaire-pubs')
+    expect(row?.loadStatus).toBe('error')
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'openaire-publications')?.status).toBe('error')
+  })
   test('HTTP 503 is error, not empty, in category metrics', async () => {
     ;(fetch as jest.Mock).mockResolvedValue(jsonRes({}, 503))
     const { value, metrics } = await runWithApiMetrics(async () =>
@@ -153,6 +164,7 @@ describe('OpenAIRE trackedSafe honesty', () => {
     expect(row?.loadStatus).toBe('error')
     expect(row?.error).toMatch(/HTTP 503/)
     expect(row?.has_data).toBe(false)
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'openaire-projects')?.status).toBe('error')
   })
 
   test('true 404 is empty, not error', async () => {

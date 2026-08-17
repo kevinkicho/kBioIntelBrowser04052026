@@ -34,6 +34,40 @@ describe('panelApiTrace accuracy helpers', () => {
     expect(sourceStatusForPanel(map, 'us-hospitals')?.status).toBe('error')
   })
 
+  test('sourceStatusForPanel maps openaire / ror keys so hideEmpty cannot hide ERROR', () => {
+    const map = {
+      openaire: { status: 'error', error: 'HTTP 503' },
+      'openaire-pubs': { status: 'error', error: 'HTTP 503' },
+      'ror-sponsors': { status: 'error', error: 'HTTP 503' },
+      'ror-grants': { status: 'error', error: 'HTTP 503' },
+      'ror-eu-pack': { status: 'error', error: 'HTTP 503' },
+    }
+    expect(sourceStatusForPanel(map, 'openaire-projects')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'openaire-publications')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'research-orgs')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'research-orgs-lit')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'eu-research-orgs')?.status).toBe('error')
+  })
+
+  test('sourceStatusForPanel picks worst among multiple ROR keys for one panel', () => {
+    const map = {
+      'ror-sponsors': { status: 'empty' },
+      'ror-query': { status: 'error', error: 'HTTP 503' },
+      'ror-grants': { status: 'empty' },
+      'ror-lit-query': { status: 'timeout', error: 'timed out' },
+    }
+    expect(sourceStatusForPanel(map, 'research-orgs')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'research-orgs-lit')?.status).toBe('timeout')
+  })
+
+  test('sourceStatusForPanel miss stays undefined so hideEmpty would hide empty ERROR fallback', () => {
+    const map = {
+      openaire: { status: 'error', error: 'HTTP 503' },
+    }
+    expect(sourceStatusForPanel(map, 'gene-info')).toBeUndefined()
+    expect(sourceStatusForPanel(map, 'gene-overview')).toBeUndefined()
+  })
+
   test('resolveCategoryFetchedAt prefers _clientFetchedAt over now', () => {
     const d = resolveCategoryFetchedAt({
       _clientFetchedAt: '2020-01-15T12:00:00.000Z',

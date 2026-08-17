@@ -130,6 +130,13 @@ export const SOURCE_TO_PANEL: Record<string, string> = {
   'gnps-library': 'gnps',
   'health-canada-dpd': 'health-canada',
   'cms-hospitals': 'us-hospitals',
+  openaire: 'openaire-projects',
+  'openaire-pubs': 'openaire-publications',
+  'ror-sponsors': 'research-orgs',
+  'ror-query': 'research-orgs',
+  'ror-grants': 'research-orgs-lit',
+  'ror-lit-query': 'research-orgs-lit',
+  'ror-eu-pack': 'eu-research-orgs',
 }
 
 export function categoryForPanel(panelId: string): CategoryId | null {
@@ -161,10 +168,28 @@ export function sourceStatusForPanel(
 ): SourceStatusLike | undefined {
   if (!map) return undefined
   if (map[panelId]) return map[panelId]
-  // Direct reverse: find any tracker key that maps to this panel
-  for (const [source, pid] of Object.entries(SOURCE_TO_PANEL)) {
-    if (pid === panelId && map[source]) return map[source]
+  // Reverse-map tracker keys to this panel. Pick worst so a sibling empty
+  // cannot hide another key's ERROR/timeout (ROR sponsors+query, grants+lit).
+  const ranks: Record<string, number> = {
+    timeout: 0,
+    error: 1,
+    disabled: 2,
+    empty: 3,
+    loaded: 4,
   }
+  let worst: SourceStatusLike | undefined
+  let worstRank = Infinity
+  for (const [source, pid] of Object.entries(SOURCE_TO_PANEL)) {
+    if (pid !== panelId) continue
+    const val = map[source]
+    if (!val) continue
+    const r = ranks[val.status || ''] ?? 9
+    if (r < worstRank) {
+      worst = val
+      worstRank = r
+    }
+  }
+  if (worst) return worst
   // Loose match (strip hyphens)
   const compact = panelId.replace(/-/g, '')
   for (const [key, val] of Object.entries(map)) {

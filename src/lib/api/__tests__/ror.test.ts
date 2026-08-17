@@ -3,7 +3,8 @@
  */
 
 import { searchRorOrganizations, resolveRorByNames } from '../ror'
-import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { metricsToSourceStatus, runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { sourceStatusForPanel } from '@/lib/panelApiTrace'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
   return {
@@ -95,6 +96,23 @@ describe('resolveRorByNames', () => {
 })
 
 describe('ROR trackedSafe honesty', () => {
+  test('ror-eu-pack HTTP 503 maps to eu-research-orgs so hideEmpty cannot hide ERROR', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('ror-eu-pack', searchRorOrganizations('Mayo Clinic'), []),
+    )
+    expect(value).toEqual([])
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'eu-research-orgs')?.status).toBe('error')
+  })
+
+  test('ror-query HTTP 503 maps to research-orgs so hideEmpty cannot hide ERROR', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      trackedSafe('ror-query', searchRorOrganizations('Mayo Clinic'), []),
+    )
+    expect(value).toEqual([])
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'research-orgs')?.status).toBe('error')
+  })
   test('HTTP 503 is error, not empty, in category metrics', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
     const { value, metrics } = await runWithApiMetrics(async () =>
@@ -105,6 +123,7 @@ describe('ROR trackedSafe honesty', () => {
     expect(row?.loadStatus).toBe('error')
     expect(row?.error).toMatch(/HTTP 503/)
     expect(row?.has_data).toBe(false)
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'research-orgs-lit')?.status).toBe('error')
   })
 
   test('true 404 is empty, not error', async () => {
