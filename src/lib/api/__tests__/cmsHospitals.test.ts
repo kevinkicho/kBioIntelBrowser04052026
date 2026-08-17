@@ -3,7 +3,8 @@
  */
 
 import { searchCmsHospitalsByName } from '../cmsHospitals'
-import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { metricsToSourceStatus, runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { sourceStatusForPanel } from '@/lib/panelApiTrace'
 import { resetRateLimitBuckets } from '@/lib/rateLimit'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
@@ -104,6 +105,7 @@ describe('CMS hospitals trackedSafe honesty', () => {
     expect(row?.loadStatus).toBe('error')
     expect(row?.error).toMatch(/HTTP 503/)
     expect(row?.has_data).toBe(false)
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'us-hospitals')?.status).toBe('error')
   })
 
   test('true 404 is empty, not error', async () => {

@@ -3,7 +3,8 @@
  */
 
 import { searchGNPSLibrary, searchGNPSNetworks } from '../gnps'
-import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { metricsToSourceStatus, runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { sourceStatusForPanel } from '@/lib/panelApiTrace'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
   return {
@@ -91,13 +92,14 @@ describe('GNPS trackedSafe honesty', () => {
   test('HTTP 503 is error, not empty, in category metrics', async () => {
     ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
     const { value, metrics } = await runWithApiMetrics(async () =>
-      trackedSafe('gnps', searchGNPSLibrary('aspirin'), []),
+      trackedSafe('gnps-library', searchGNPSLibrary('aspirin'), []),
     )
     expect(value).toEqual([])
-    const row = metrics.find((m) => m.source === 'gnps')
+    const row = metrics.find((m) => m.source === 'gnps-library')
     expect(row?.loadStatus).toBe('error')
     expect(row?.error).toMatch(/HTTP 503/)
     expect(row?.has_data).toBe(false)
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'gnps')?.status).toBe('error')
   })
 
   test('true 404 is empty, not error', async () => {

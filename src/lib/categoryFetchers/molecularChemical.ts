@@ -1,4 +1,4 @@
-import { allSettledValues, trackedSafe } from '@/lib/api-tracker'
+import { trackedSafe } from '@/lib/api-tracker'
 import { API_SOURCE_TIMEOUTS } from '@/lib/analytics/timeouts'
 import type { ApiParamValue } from '@/lib/apiIdentifiers'
 import type { SynthesisRoute } from '@/lib/types'
@@ -61,12 +61,9 @@ export async function fetchMolecularChemical(name: string, cid: number, molecula
     trackedSafe('metabolights', searchMetaboLights(name), []),
     trackedSafe(
       'gnps-library',
-      allSettledValues(
-        [searchGNPSLibrary(name), searchGNPSNetworks(name)] as Promise<unknown>[],
-        [],
-      ).then(([spectra, clusters]) => ({
-        spectra: Array.isArray(spectra) ? spectra : [],
-        clusters: Array.isArray(clusters) ? clusters : [],
+      Promise.all([searchGNPSLibrary(name), searchGNPSNetworks(name)]).then(([spectra, clusters]) => ({
+        spectra,
+        clusters,
       })),
       { spectra: [], clusters: [] },
     ),

@@ -62,6 +62,7 @@ import { metricsToSourceStatus, runWithApiMetrics } from '@/lib/api-tracker'
 import { sourceStatusForPanel } from '@/lib/panelApiTrace'
 import { getKeggCompoundId, getKeggReactions, getKeggReactionDetail } from '@/lib/api/kegg'
 import { getRheaSynthesisRoutes } from '@/lib/api/rhea'
+import { searchGNPSLibrary, searchGNPSNetworks } from '@/lib/api/gnps'
 
 describe('molecular-chemical synthesis category honesty', () => {
   beforeEach(() => {
@@ -134,5 +135,56 @@ describe('molecular-chemical synthesis category honesty', () => {
     expect(value.routes[0].source).toBe('kegg')
     expect(status['synthesis-routes']?.status).toBe('loaded')
     expect(sourceStatusForPanel(status, 'synthesis')?.status).toBe('loaded')
+  })
+})
+
+describe('molecular-chemical GNPS category honesty', () => {
+  beforeEach(() => {
+    jest.clearAllMocks()
+    ;(searchGNPSLibrary as jest.Mock).mockResolvedValue([])
+    ;(searchGNPSNetworks as jest.Mock).mockResolvedValue([])
+  })
+
+  it('HTTP 503 on GNPS library is ERROR on the GNPS card, not EMPTY', async () => {
+    ;(searchGNPSLibrary as jest.Mock).mockRejectedValue(new Error('HTTP 503'))
+
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      fetchMolecularChemical('aspirin', 2244, 180.16, (s) => s, {}),
+    )
+    const status = metricsToSourceStatus(metrics)
+
+    expect(value.gnpsData).toEqual({ spectra: [], clusters: [] })
+    expect(status['gnps-library']?.status).toBe('error')
+    expect(status['gnps-library']?.error).toMatch(/HTTP 503/)
+    expect(status['gnps-library']?.has_data).toBe(false)
+    expect(sourceStatusForPanel(status, 'gnps')?.status).toBe('error')
+  })
+
+  it('HTTP 503 on GNPS networks is ERROR, not EMPTY', async () => {
+    ;(searchGNPSNetworks as jest.Mock).mockRejectedValue(new Error('HTTP 503'))
+
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      fetchMolecularChemical('aspirin', 2244, 180.16, (s) => s, {}),
+    )
+    const status = metricsToSourceStatus(metrics)
+
+    expect(value.gnpsData).toEqual({ spectra: [], clusters: [] })
+    expect(status['gnps-library']?.status).toBe('error')
+    expect(status['gnps-library']?.error).toMatch(/HTTP 503/)
+    expect(sourceStatusForPanel(status, 'gnps')?.status).toBe('error')
+  })
+
+  it('true zero-hit GNPS is empty, not error', async () => {
+    const { value, metrics } = await runWithApiMetrics(async () =>
+      fetchMolecularChemical('aspirin', 2244, 180.16, (s) => s, {}),
+    )
+    const status = metricsToSourceStatus(metrics)
+
+    expect(value.gnpsData).toEqual({ spectra: [], clusters: [] })
+    expect(searchGNPSLibrary).toHaveBeenCalled()
+    expect(searchGNPSNetworks).toHaveBeenCalled()
+    expect(status['gnps-library']?.status).toBe('empty')
+    expect(status['gnps-library']?.error).toBeUndefined()
+    expect(sourceStatusForPanel(status, 'gnps')?.status).toBe('empty')
   })
 })
