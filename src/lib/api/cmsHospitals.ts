@@ -5,6 +5,8 @@
  * @see docs/design/orgs-hospitals-compendium.md
  */
 
+import { timedFetch } from './timedFetch'
+
 const DATASTORE =
   'https://data.cms.gov/provider-data/api/1/datastore/query/xubh-q36u/0'
 
@@ -55,6 +57,26 @@ function mapRow(r: Record<string, unknown>, matchSource?: string): CmsHospital |
 }
 
 /**
+ * CMS hospitals harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Short query, 404, and zero-hit JSON stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error('HTML response from CMS hospitals')
+  }
+}
+
+/**
  * Keyword search CMS Hospital General Information (public datastore API).
  */
 export async function searchCmsHospitalsByName(
@@ -68,17 +90,17 @@ export async function searchCmsHospitalsByName(
     offset: '0',
     keyword: q,
   })
-  try {
-    const res = await fetch(`${DATASTORE}?${params.toString()}`, fetchOptions)
-    if (!res.ok) return []
-    const data = (await res.json()) as { results?: Record<string, unknown>[] }
-    return (data.results ?? [])
-      .map((row) => mapRow(row, 'keyword'))
-      .filter((h): h is CmsHospital => h != null)
-      .slice(0, limit)
-  } catch {
-    return []
-  }
+  const res = await timedFetch(`${DATASTORE}?${params.toString()}`, {
+    ...fetchOptions,
+    timeoutMs: 8000,
+  })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res)
+  const data = (await res.json()) as { results?: Record<string, unknown>[] }
+  return (data.results ?? [])
+    .map((row) => mapRow(row, 'keyword'))
+    .filter((h): h is CmsHospital => h != null)
+    .slice(0, limit)
 }
 
 /**

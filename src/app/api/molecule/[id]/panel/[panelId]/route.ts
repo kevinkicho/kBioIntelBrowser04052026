@@ -20,6 +20,8 @@ import { searchBioSamples } from '@/lib/api/biosamples'
 import { getHealthCanadaProductsByName } from '@/lib/api/healthCanadaDpd'
 import { getOpenFdaLabelSectionsByName } from '@/lib/api/openFdaLabelSections'
 import { searchMassive } from '@/lib/api/massive'
+import { searchPurpleBookByName } from '@/lib/api/purpleBookCache'
+import { searchCmsHospitalsByName } from '@/lib/api/cmsHospitals'
 
 import { getDrugCentralData } from '@/lib/api/drugcentral'
 
@@ -529,6 +531,23 @@ const PANEL_CONFIG: Record<string, {
       const result = await searchMassive(name, limit)
       const data = result.datasets ?? []
       return { data, total: result.total ?? data.length, hasMore: data.length === limit }
+    }
+  },
+  'purpleBookProducts': {
+    category: 'pharmaceutical',
+    limitKey: 'PURPLE_BOOK',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await searchPurpleBookByName(name, limit)
+      const data = result.products ?? []
+      return { data, total: data.length, hasMore: data.length === limit }
+    }
+  },
+  'usHospitals': {
+    category: 'clinical-safety',
+    limitKey: 'CMS_HOSPITALS',
+    fetcher: async (name, _synonyms, limit) => {
+      const data = await searchCmsHospitalsByName(name, limit)
+      return { data, total: data.length, hasMore: data.length === limit }
     }
   },
   'drugShortages': {

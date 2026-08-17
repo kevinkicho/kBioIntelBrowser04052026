@@ -6,6 +6,7 @@
  */
 
 import { cellAt, headerIndexMap, parseCsv } from '@/lib/csv/parseCsv'
+import { timedFetch } from './timedFetch'
 
 const MONTHS = [
   'january',
@@ -181,26 +182,57 @@ export function parsePurpleBookCsv(text: string, sourceMonth: string, sourceUrl:
   }
 }
 
+/**
+ * Purple Book monthly CSV harvest leaf. Month-URL fallbacks stay in place.
+ * HTTP 5xx / HTML / timeout / network after every candidate fails are not EMPTY.
+ * 404, short/empty files, and a live CSV with zero matching rows stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+}
+
+let testMonthCount: number | undefined
+
+/** Test helper — limit month-URL probes so honesty tests stay fast. */
+export function setPurpleBookTestMonthCount(n?: number): void {
+  testMonthCount = n
+}
+
 async function fetchCatalog(): Promise<Catalog | null> {
-  for (const { year, month } of purpleBookCandidateMonths()) {
+  let lastHardError: unknown = null
+  for (const { year, month } of purpleBookCandidateMonths(new Date(), testMonthCount ?? 14)) {
     // FDA 2026 URLs mix lowercase and Title-case month folders/names
     for (const casing of ['lower', 'title'] as const) {
       const url = purpleBookCsvUrl(year, month, casing)
       try {
-        const res = await fetch(url, fetchOptions)
-        if (!res.ok) continue
-        const text = await res.text()
-        if (!text || text.length < 200) continue
-        if (!/bla number/i.test(text.slice(0, 4000))) continue
+        const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000, skipRateLimit: true })
+        if (isAbsentStatus(res.status)) continue
+        throwIfHttpFailed(res)
+        const body = await res.text()
+        if (!body || body.length < 200) continue
+        if (!/bla number/i.test(body.slice(0, 4000))) {
+          lastHardError = new Error('HTML or non-CSV response from Purple Book')
+          continue
+        }
         const sourceMonth = `${year}-${String(MONTHS.indexOf(month) + 1).padStart(2, '0')}`
-        const catalog = parsePurpleBookCsv(text, sourceMonth, url)
+        const catalog = parsePurpleBookCsv(body, sourceMonth, url)
         if (catalog.products.length === 0) continue
         return catalog
-      } catch {
+      } catch (err) {
+        lastHardError = err
         continue
       }
     }
   }
+  if (lastHardError) throw lastHardError
   return null
 }
 
