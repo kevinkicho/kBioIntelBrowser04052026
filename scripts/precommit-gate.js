@@ -332,6 +332,8 @@ const PRODUCT_PATTERNS = [
   'lib/pubchem-properties.test',
   'lib/api/__tests__/biologicsLicensed.test',
   'biologicsLicensedHonesty',
+  'humanProteinAtlasHonesty',
+  'lib/api/__tests__/human-protein-atlas.test',
   'meshHonesty',
   'lib/chemblRelated',
   'lib/chembl-indications.test',

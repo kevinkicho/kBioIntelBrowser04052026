@@ -65,7 +65,7 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
       ),
       null,
     ),
-    safe(geneSymbols.length > 0 ? getProteinAtlasData(geneSymbols[0]) : Promise.resolve(null), null),
+    trackedSafe('human-protein-atlas', geneSymbols.length > 0 ? getProteinAtlasData(geneSymbols[0]) : Promise.resolve(null), null),
   ])
   return {
     uniprotEntries,
