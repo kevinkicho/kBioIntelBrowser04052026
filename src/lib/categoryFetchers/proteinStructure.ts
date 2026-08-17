@@ -33,7 +33,7 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
   const [alphaFoldPredictions, proteinDomains, proteinFeatures, proteinAtlasEntries, goAnnotations, peptideAtlasData, gene3dEntries, uniprotProteins, ebiVariations, ebiProteomics, ebiCrossRefs, humanProteinAtlas] = await Promise.all([
     trackedSafe('alphafold', getAlphaFoldPredictions(accessions), []),
     trackedSafe('interpro', getProteinDomains(accessions), []),
-    trackedSafe('ebi-proteins', getProteinFeaturesByAccessions(accessions), []),
+    trackedSafe('ebi-protein-features', getProteinFeaturesByAccessions(accessions), []),
     trackedSafe('protein-atlas', getProteinAtlasBySymbols(geneSymbols), []),
     trackedSafe('quickgo', getGoAnnotationsByAccessions(accessions), []),
     trackedSafe('peptideatlas', getPeptideAtlasData(name), { peptides: [] }),
@@ -41,26 +41,30 @@ export async function fetchProteinStructure(name: string, queryFor: (s: string) 
       mapSettled(geneSymbols.slice(0, 5), (s) => searchGene3D(s), []).then((r) => r.flat()),
       [],
     ),
-    safe(
-      mapSettled(geneSymbols.slice(0, 5), (g) => getUniProtProtein(g), null).then((results) =>
+    trackedSafe(
+      'uniprot-extended',
+      Promise.all(geneSymbols.slice(0, 5).map((g) => getUniProtProtein(g))).then((results) =>
         results.filter((p): p is NonNullable<typeof p> => p !== null),
       ),
       [],
     ),
-    safe(
-      mapSettled(accessions.slice(0, 3), (a) => getProteinVariations(a), null).then(
+    trackedSafe(
+      'ebi-proteins',
+      Promise.all(accessions.slice(0, 3).map((a) => getProteinVariations(a))).then(
         (r) => r.find((x) => x) || null,
       ),
       null,
     ),
-    safe(
-      mapSettled(accessions.slice(0, 3), (a) => getProteomicsMappings(a), null).then(
+    trackedSafe(
+      'ebi-proteomics',
+      Promise.all(accessions.slice(0, 3).map((a) => getProteomicsMappings(a))).then(
         (r) => r.find((x) => x) || null,
       ),
       null,
     ),
-    safe(
-      mapSettled(accessions.slice(0, 3), (a) => getProteinCrossReferences(a), null).then(
+    trackedSafe(
+      'ebi-crossrefs',
+      Promise.all(accessions.slice(0, 3).map((a) => getProteinCrossReferences(a))).then(
         (r) => r.find((x) => x) || null,
       ),
       null,
