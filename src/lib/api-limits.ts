@@ -128,6 +128,7 @@ export const LIMITS = {
   HEALTH_CANADA: { initial: 5, loadMore: 20, max: 50 },
   MASSIVE: { initial: 5, loadMore: 20, max: 50 },
   PURPLE_BOOK: { initial: 5, loadMore: 20, max: 50 },
+  EMA_BULK: { initial: 5, loadMore: 20, max: 50 },
   CMS_HOSPITALS: { initial: 5, loadMore: 20, max: 50 },
   LIPID_MAPS: { initial: 5, loadMore: 20, max: 50 },
   OPENAIRE: { initial: 5, loadMore: 20, max: 50 },

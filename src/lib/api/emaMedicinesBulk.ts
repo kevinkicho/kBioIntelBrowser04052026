@@ -5,6 +5,7 @@
  */
 
 import { parseXlsxFirstSheet } from '@/lib/xlsx/parseSimpleSheet'
+import { timedFetch } from './timedFetch'
 
 const EMA_MEDICINES_XLSX =
   'https://www.ema.europa.eu/en/documents/report/medicines-output-medicines-report_en.xlsx'
@@ -129,21 +130,50 @@ export function parseEmaMedicinesSheet(rows: string[][], sourceUrl = EMA_MEDICIN
   }
 }
 
-async function fetchCatalog(): Promise<Catalog | null> {
-  try {
-    const res = await fetch(EMA_MEDICINES_XLSX, fetchOptions)
-    if (!res.ok) return null
-    const ab = await res.arrayBuffer()
-    const buf = Buffer.from(ab)
-    if (buf.length < 1000) return null
-    const rows = parseXlsxFirstSheet(buf)
-    if (rows.length < 2) return null
-    const catalog = parseEmaMedicinesSheet(rows)
-    if (catalog.products.length === 0) return null
-    return catalog
-  } catch {
-    return null
+/**
+ * EMA medicines Excel dump harvest leaf. HTTP / HTML / timeout / network
+ * on the official catalog URL are not EMPTY.
+ * 404, short/empty files, and a live sheet with zero matching rows stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
   }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error('HTML response from EMA medicines dump')
+  }
+}
+
+function looksLikeXlsx(buf: Buffer): boolean {
+  return buf.length >= 4 && buf[0] === 0x50 && buf[1] === 0x4b
+}
+
+async function fetchCatalog(): Promise<Catalog | null> {
+  const res = await timedFetch(EMA_MEDICINES_XLSX, {
+    ...fetchOptions,
+    timeoutMs: 16_000,
+    skipRateLimit: true,
+  })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res)
+  const ab = await res.arrayBuffer()
+  const buf = Buffer.from(ab)
+  if (buf.length < 1000) return null
+  if (!looksLikeXlsx(buf)) {
+    throw new Error('HTML or non-XLSX response from EMA medicines dump')
+  }
+  const rows = parseXlsxFirstSheet(buf)
+  if (rows.length < 2) return null
+  const catalog = parseEmaMedicinesSheet(rows)
+  if (catalog.products.length === 0) return null
+  return catalog
 }
 
 export async function getEmaMedicinesBulkCatalog(): Promise<Catalog | null> {

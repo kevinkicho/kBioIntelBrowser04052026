@@ -31,12 +31,32 @@ function findSection(sections: PugViewSection[], heading: string): PugViewSectio
   return undefined
 }
 
+/**
+ * PubChem GHS hazards harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * 404 and a live record with no GHS section stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error('HTML response from PubChem GHS')
+  }
+}
+
 export async function getGhsHazardsByCid(cid: number): Promise<GhsHazardData | null> {
-  try {
-    const url = `${BASE_URL}/${cid}/JSON?heading=GHS+Classification`
-    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return null
-    const data = await res.json()
+  const url = `${BASE_URL}/${cid}/JSON?heading=GHS+Classification`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res)
+  const data = await res.json()
 
     const ghsSection = findSection(data.Record?.Section ?? [], 'GHS Classification')
     if (!ghsSection?.Information) return null
@@ -71,7 +91,4 @@ export async function getGhsHazardsByCid(cid: number): Promise<GhsHazardData | n
     }
 
     return { signalWord, pictogramUrls, hazardStatements, precautionaryStatements }
-  } catch {
-    return null
-  }
 }
