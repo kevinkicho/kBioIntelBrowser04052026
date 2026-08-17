@@ -15,6 +15,8 @@ import { getDrugPricesByName } from '@/lib/api/nadac'
 import { getDrugInteractionsByName } from '@/lib/api/rxnorm'
 import { getDrugLabelsByName } from '@/lib/api/dailymed'
 import { getAtcClassificationsByName } from '@/lib/api/atc'
+import { searchDrugShortages } from '@/lib/api/fda-drug-shortages'
+import { searchBioSamples } from '@/lib/api/biosamples'
 
 import { getDrugCentralData } from '@/lib/api/drugcentral'
 
@@ -263,6 +265,15 @@ const PANEL_CONFIG: Record<string, {
       return { data, total: data.length, hasMore: data.length === limit }
     }
   },
+  'bioSamples': {
+    category: 'genomics-disease',
+    limitKey: 'BIOSAMPLES',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await searchBioSamples(name, 0, limit)
+      const data = result.samples ?? []
+      return { data, total: result.total ?? data.length, hasMore: data.length === limit }
+    }
+  },
   'dbSnpVariants': {
     category: 'genomics-disease',
     limitKey: 'DBSNP',
@@ -487,6 +498,15 @@ const PANEL_CONFIG: Record<string, {
     fetcher: async (name, _synonyms, limit) => {
       const data = await searchIRIS(name, limit)
       return { data, total: data.length, hasMore: data.length === limit }
+    }
+  },
+  'drugShortages': {
+    category: 'clinical-safety',
+    limitKey: 'FDA_DRUG_SHORTAGES',
+    fetcher: async (name, _synonyms, limit) => {
+      const result = await searchDrugShortages(name)
+      const data = (result.shortages ?? []).slice(0, limit)
+      return { data, total: result.total ?? data.length, hasMore: data.length === limit }
     }
   },
 

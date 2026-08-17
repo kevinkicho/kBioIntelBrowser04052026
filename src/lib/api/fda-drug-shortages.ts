@@ -2,6 +2,9 @@
 // https://www.fda.gov/drugs/drug-safety-and-availability/drug-shortages
 // Current drug shortage database
 
+import { getApiKey } from './utils'
+import { timedFetch } from './timedFetch'
+
 const BASE_URL = 'https://api.fda.gov/drug/shortage.json'
 
 const fetchOptions: RequestInit = {
@@ -27,33 +30,68 @@ export interface DrugShortageResponse {
 }
 
 /**
+ * FDA Drug Shortages harvest leaf (openFDA). HTTP / HTML / timeout / network are not EMPTY.
+ * Blank query, 404 (no matches), and zero-hit JSON remain empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  // openFDA returns 404 when a drug name has no shortage matches.
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function mapShortage(r: Record<string, unknown>): DrugShortage {
+  return {
+    id: String(r.id ?? ''),
+    drugName: String(r.drug_name ?? ''),
+    genericName: String(r.generic_name ?? ''),
+    company: String(r.company ?? ''),
+    shortageStatus: (r.shortage_status as DrugShortage['shortageStatus']) ?? 'Shortage',
+    shortageType: String(r.shortage_type ?? ''),
+    shortageReason: String(r.reason_for_shortage ?? ''),
+    estimatedResupplyDate: r.estimated_resupply_date ? String(r.estimated_resupply_date) : undefined,
+    shortageDuration: r.shortage_duration ? String(r.shortage_duration) : undefined,
+    url: 'https://www.fda.gov/drugs/drug-safety-and-availability/drug-shortages',
+  }
+}
+
+async function fetchShortages(url: string): Promise<{ results: Record<string, unknown>[]; total: number }> {
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return { results: [], total: 0 }
+  throwIfHttpFailed(res, 'FDA drug shortages')
+  const data = await res.json()
+  return {
+    results: Array.isArray(data.results) ? data.results : [],
+    total: data.meta?.results?.total ?? 0,
+  }
+}
+
+function apiKeyParam(): string {
+  const apiKey = getApiKey('OPENFDA_API_KEY')
+  return apiKey ? `&api_key=${apiKey}` : ''
+}
+
+/**
  * Search FDA drug shortages by drug name
  */
 export async function searchDrugShortages(query: string): Promise<DrugShortageResponse> {
-  try {
-    const searchTerm = encodeURIComponent(query)
-    const url = `${BASE_URL}?search=${searchTerm}&limit=50`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) throw new Error('FDA shortage search failed')
-    const data = await res.json()
-
-    return {
-      shortages: (data.results ?? []).map((r: Record<string, unknown>) => ({
-        id: r.id ?? '',
-        drugName: r.drug_name ?? '',
-        genericName: r.generic_name ?? '',
-        company: r.company ?? '',
-        shortageStatus: r.shortage_status ?? 'Unknown',
-        shortageType: r.shortage_type ?? '',
-        shortageReason: r.reason_for_shortage ?? '',
-        estimatedResupplyDate: r.estimated_resupply_date,
-        shortageDuration: r.shortage_duration,
-        url: `https://www.fda.gov/drugs/drug-safety-and-availability/drug-shortages`,
-      })),
-      total: data.meta?.results?.total ?? 0,
-    }
-  } catch {
-    return { shortages: [], total: 0 }
+  const q = query.trim()
+  if (!q) return { shortages: [], total: 0 }
+  const url = `${BASE_URL}?search=${encodeURIComponent(q)}&limit=50${apiKeyParam()}`
+  const data = await fetchShortages(url)
+  return {
+    shortages: data.results.map(mapShortage),
+    total: data.total,
   }
 }
 
@@ -61,37 +99,15 @@ export async function searchDrugShortages(query: string): Promise<DrugShortageRe
  * Get all current drug shortages
  */
 export async function getAllDrugShortages(): Promise<DrugShortage[]> {
-  try {
-    const url = `${BASE_URL}?limit=100`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) throw new Error('FDA shortages request failed')
-    const data = await res.json()
-
-    return (data.results ?? []).map((r: Record<string, unknown>) => ({
-      id: r.id ?? '',
-      drugName: r.drug_name ?? '',
-      genericName: r.generic_name ?? '',
-      company: r.company ?? '',
-      shortageStatus: r.shortage_status ?? 'Unknown',
-      shortageType: r.shortage_type ?? '',
-      shortageReason: r.reason_for_shortage ?? '',
-      estimatedResupplyDate: r.estimated_resupply_date,
-      shortageDuration: r.shortage_duration,
-      url: `https://www.fda.gov/drugs/drug-safety-and-availability/drug-shortages`,
-    }))
-  } catch {
-    return []
-  }
+  const url = `${BASE_URL}?limit=100${apiKeyParam()}`
+  const data = await fetchShortages(url)
+  return data.results.map(mapShortage)
 }
 
 /**
  * Get shortages by company/manufacturer
  */
 export async function getShortagesByCompany(company: string): Promise<DrugShortage[]> {
-  try {
-    const result = await searchDrugShortages(company)
-    return result.shortages
-  } catch {
-    return []
-  }
+  const result = await searchDrugShortages(company)
+  return result.shortages
 }
