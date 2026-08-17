@@ -127,6 +127,8 @@ export const LIMITS = {
   BIOSAMPLES: { initial: 5, loadMore: 20, max: 50 },
   HEALTH_CANADA: { initial: 5, loadMore: 20, max: 50 },
   MASSIVE: { initial: 5, loadMore: 20, max: 50 },
+  PURPLE_BOOK: { initial: 5, loadMore: 20, max: 50 },
+  CMS_HOSPITALS: { initial: 5, loadMore: 20, max: 50 },
   LIPID_MAPS: { initial: 5, loadMore: 20, max: 50 },
   OPENAIRE: { initial: 5, loadMore: 20, max: 50 },
   BIOMODELS: { initial: 5, loadMore: 20, max: 50 },
