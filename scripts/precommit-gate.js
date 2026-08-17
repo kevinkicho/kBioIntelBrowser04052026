@@ -335,6 +335,7 @@ const PRODUCT_PATTERNS = [
   'humanProteinAtlasHonesty',
   'lib/api/__tests__/human-protein-atlas.test',
   'proteinStructureHonesty',
+  'lib/api/__tests__/ebi-proteins-variation.test',
   'meshHonesty',
   'lib/chemblRelated',
   'lib/chembl-indications.test',

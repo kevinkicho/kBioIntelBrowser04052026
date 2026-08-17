@@ -3,6 +3,7 @@ import {
   getUniprotEntriesByName,
   getUniProtProtein,
 } from '@/lib/api/uniprot'
+import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
   return {
@@ -91,6 +92,42 @@ describe('getUniProtProtein', () => {
     expect(p!.geneName).toBe('F2')
     expect(p!.subcellularLocation).toBe('Secreted')
     expect(p!.variants?.[0]?.sequence).toBe('A→V')
+  })
+
+  test('blank accession is empty without network', async () => {
+    expect(await getUniProtProtein('')).toBeNull()
+    expect(await getUniProtProtein('   ')).toBeNull()
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  test('404 is honest EMPTY', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 404))
+    expect(await getUniProtProtein('P04637')).toBeNull()
+  })
+
+  test('throws on HTTP 503 for detail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    await expect(getUniProtProtein('P04637')).rejects.toThrow(/HTTP 503/)
+  })
+
+  test('throws on HTML body for detail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes('<html>nope</html>', 200, 'text/html'))
+    await expect(getUniProtProtein('P04637')).rejects.toThrow(/HTML/)
+  })
+
+  test('throws on network error for detail (not EMPTY)', async () => {
+    ;(fetch as jest.Mock).mockRejectedValueOnce(new Error('network'))
+    await expect(getUniProtProtein('P04637')).rejects.toThrow(/network/)
+  })
+
+  test('trackedSafe records HTTP 503 as error, not empty', async () => {
+    ;(fetch as jest.Mock).mockResolvedValueOnce(jsonRes({}, 503))
+    const { metrics } = await runWithApiMetrics(async () => {
+      await trackedSafe('uniprot-extended', getUniProtProtein('P04637'), null)
+    })
+    expect(metrics[0].loadStatus).toBe('error')
+    expect(metrics[0].has_data).toBe(false)
+    expect(metrics[0].error).toMatch(/HTTP 503/)
   })
 })
 

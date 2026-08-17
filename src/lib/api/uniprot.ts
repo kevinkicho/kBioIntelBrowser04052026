@@ -206,12 +206,18 @@ function extractSubcellularLocation(comments: unknown): string | undefined {
   return text || undefined
 }
 
+/**
+ * UniProt extended harvest leaf (detail by accession). HTTP / HTML / timeout
+ * / network are not EMPTY. 404 and missing accession remain empty.
+ */
 export async function getUniProtProtein(accession: string): Promise<UniProtProtein | null> {
-  try {
-    const url = `${DETAIL_URL}/${accession}.json`
-    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return null
-    const data = await res.json()
+  const id = (accession || '').trim()
+  if (!id) return null
+  const url = `${DETAIL_URL}/${id}.json`
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (res.status === 404) return null
+  throwIfHttpFailed(res, 'UniProt')
+  const data = await res.json()
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const d = data as any
@@ -246,24 +252,17 @@ export async function getUniProtProtein(accession: string): Promise<UniProtProte
         })),
     }
     /* eslint-enable @typescript-eslint/no-explicit-any */
-  } catch {
-    return null
-  }
 }
 
 /**
  * Get protein by gene symbol
  */
 export async function getUniProtByGene(geneSymbol: string): Promise<UniProtProtein[]> {
-  try {
-    const searchResult = await searchUniProt(`gene:${geneSymbol} AND reviewed:true`, 10)
-    const proteins = await Promise.all(
-      searchResult.results.slice(0, 5).map((r) => getUniProtProtein(r.accession)),
-    )
-    return proteins.filter((p): p is UniProtProtein => p !== null)
-  } catch {
-    return []
-  }
+  const searchResult = await searchUniProt(`gene:${geneSymbol} AND reviewed:true`, 10)
+  const proteins = await Promise.all(
+    searchResult.results.slice(0, 5).map((r) => getUniProtProtein(r.accession)),
+  )
+  return proteins.filter((p): p is UniProtProtein => p !== null)
 }
 
 /**
