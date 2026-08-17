@@ -2,6 +2,8 @@
 // https://massive.ucsd.edu/
 // UCSD proteomics data repository for MS/MS mass spectrometry data
 
+import { timedFetch } from './timedFetch'
+
 const BASE_URL = 'https://massive.ucsd.edu/ProteoSAFe'
 
 const fetchOptions: RequestInit = {
@@ -36,48 +38,90 @@ export interface MassIVESearchResponse {
 }
 
 /**
- * Search MassIVE datasets by keyword
+ * MassIVE harvest leaf. HTTP / HTML / timeout / network are not EMPTY
+ * after the recent-datasets fallback. Blank query, 404, and zero-hit JSON stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+function mapDataset(d: Record<string, unknown>): MassIVEDataset {
+  return {
+    id: (d.id as string) ?? '',
+    title: (d.title as string) ?? '',
+    description: (d.description as string) ?? '',
+    doi: (d.doi as string) ?? '',
+    submitter: (d.submitter as string) ?? '',
+    submissionDate: (d.submissionDate as string) ?? '',
+    updateDate: (d.updateDate as string) ?? '',
+    organism: (d.organism as string) ?? '',
+    instrumentType: (d.instrumentType as string) ?? '',
+    datasetType: (d.datasetType as string) ?? '',
+    sampleType: (d.sampleType as string) ?? '',
+    lab: (d.lab as string) ?? '',
+    contactName: (d.contactName as string) ?? '',
+    contactEmail: (d.contactEmail as string) ?? '',
+    publication: (d.publication as string) ?? undefined,
+    pubmedId: (d.pubmedId as string) ?? undefined,
+    fileCount: (d.fileCount as number) ?? 0,
+    fileSize: (d.fileSize as number) ?? 0,
+    url: `https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?accession=${d.id}`,
+  }
+}
+
+function mapResponse(data: { datasets?: Record<string, unknown>[]; total?: number }): MassIVESearchResponse {
+  return {
+    datasets: (data.datasets ?? []).map(mapDataset),
+    total: data.total ?? 0,
+  }
+}
+
+async function fetchMassive(url: string): Promise<MassIVESearchResponse> {
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return { datasets: [], total: 0 }
+  throwIfHttpFailed(res, 'MassIVE')
+  const data = await res.json()
+  return mapResponse(data)
+}
+
+/**
+ * Search MassIVE datasets by keyword.
+ * Search HTTP 5xx/timeout/network falls back to recent datasets; if that
+ * also fails with HTTP/timeout/network, the error is not swallowed as EMPTY.
  */
 export async function searchMassive(
   query: string,
   limit = 20,
 ): Promise<MassIVESearchResponse> {
+  const q = query.trim()
+  if (!q) return { datasets: [], total: 0 }
+  const url = `${BASE_URL}/datasets?search=${encodeURIComponent(q)}&format=json&limit=${limit}`
   try {
-    // MassIVE uses a REST API for search
-    const url = `${BASE_URL}/datasets?search=${encodeURIComponent(query)}&format=json&limit=${limit}`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) {
-      // Fallback: try the main datasets endpoint
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+    if (isAbsentStatus(res.status) || !res.ok) {
       return await getRecentDatasets(limit)
     }
+    throwIfHttpFailed(res, 'MassIVE')
     const data = await res.json()
-
-    return {
-      datasets: (data.datasets ?? []).map((d: Record<string, unknown>) => ({
-        id: (d.id as string) ?? '',
-        title: (d.title as string) ?? '',
-        description: (d.description as string) ?? '',
-        doi: (d.doi as string) ?? '',
-        submitter: (d.submitter as string) ?? '',
-        submissionDate: (d.submissionDate as string) ?? '',
-        updateDate: (d.updateDate as string) ?? '',
-        organism: (d.organism as string) ?? '',
-        instrumentType: (d.instrumentType as string) ?? '',
-        datasetType: (d.datasetType as string) ?? '',
-        sampleType: (d.sampleType as string) ?? '',
-        lab: (d.lab as string) ?? '',
-        contactName: (d.contactName as string) ?? '',
-        contactEmail: (d.contactEmail as string) ?? '',
-        publication: (d.publication as string) ?? undefined,
-        pubmedId: (d.pubmedId as string) ?? undefined,
-        fileCount: (d.fileCount as number) ?? 0,
-        fileSize: (d.fileSize as number) ?? 0,
-        url: `https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?accession=${d.id}`,
-      })),
-      total: (data.total as number) ?? 0,
+    return mapResponse(data)
+  } catch (err) {
+    try {
+      return await getRecentDatasets(limit)
+    } catch {
+      throw err
     }
-  } catch {
-    return { datasets: [], total: 0 }
   }
 }
 
@@ -85,74 +129,30 @@ export async function searchMassive(
  * Get recent MassIVE datasets
  */
 export async function getRecentDatasets(limit = 20): Promise<MassIVESearchResponse> {
-  try {
-    const url = `${BASE_URL}/datasets?format=json&limit=${limit}&sort=submissionDate&order=desc`
-    const res = await fetch(url, fetchOptions)
-    if (!res.ok) return { datasets: [], total: 0 }
-    const data = await res.json()
-
-    return {
-      datasets: (data.datasets ?? []).map((d: Record<string, unknown>) => ({
-        id: (d.id as string) ?? '',
-        title: (d.title as string) ?? '',
-        description: (d.description as string) ?? '',
-        doi: (d.doi as string) ?? '',
-        submitter: (d.submitter as string) ?? '',
-        submissionDate: (d.submissionDate as string) ?? '',
-        updateDate: (d.updateDate as string) ?? '',
-        organism: (d.organism as string) ?? '',
-        instrumentType: (d.instrumentType as string) ?? '',
-        datasetType: (d.datasetType as string) ?? '',
-        sampleType: (d.sampleType as string) ?? '',
-        lab: (d.lab as string) ?? '',
-        contactName: (d.contactName as string) ?? '',
-        contactEmail: (d.contactEmail as string) ?? '',
-        publication: (d.publication as string) ?? undefined,
-        pubmedId: (d.pubmedId as string) ?? undefined,
-        fileCount: (d.fileCount as number) ?? 0,
-        fileSize: (d.fileSize as number) ?? 0,
-        url: `https://massive.ucsd.edu/ProteoSAFe/dataset.jsp?accession=${d.id}`,
-      })),
-      total: (data.total as number) ?? 0,
-    }
-  } catch {
-    return { datasets: [], total: 0 }
-  }
+  const url = `${BASE_URL}/datasets?format=json&limit=${limit}&sort=submissionDate&order=desc`
+  return fetchMassive(url)
 }
 
 /**
  * Get MassIVE dataset by accession ID
  */
 export async function getMassiveDataset(accession: string): Promise<MassIVEDataset | null> {
-  try {
-    // Search by specific accession
-    const result = await searchMassive(accession, 1)
-    return result.datasets[0] ?? null
-  } catch {
-    return null
-  }
+  const result = await searchMassive(accession, 1)
+  return result.datasets[0] ?? null
 }
 
 /**
  * Get datasets by organism
  */
 export async function getMassiveByOrganism(organism: string, limit = 20): Promise<MassIVEDataset[]> {
-  try {
-    const result = await searchMassive(`organism:"${organism}"`, limit)
-    return result.datasets
-  } catch {
-    return []
-  }
+  const result = await searchMassive(`organism:"${organism}"`, limit)
+  return result.datasets
 }
 
 /**
  * Get datasets by sample type
  */
 export async function getMassiveBySampleType(sampleType: string, limit = 20): Promise<MassIVEDataset[]> {
-  try {
-    const result = await searchMassive(`sample_type:"${sampleType}"`, limit)
-    return result.datasets
-  } catch {
-    return []
-  }
+  const result = await searchMassive(`sample_type:"${sampleType}"`, limit)
+  return result.datasets
 }

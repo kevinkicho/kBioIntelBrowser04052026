@@ -5,6 +5,8 @@
  * @see docs/design/public-apis-international.md
  */
 
+import { timedFetch } from './timedFetch'
+
 export interface HealthCanadaDpdProduct {
   drugCode: number
   din: string
@@ -31,10 +33,35 @@ export interface HealthCanadaDpdProduct {
 const BASE = 'https://health-products.canada.ca/api/drug'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
-async function fetchJson<T>(url: string): Promise<T | null> {
+/**
+ * Health Canada DPD harvest leaf. HTTP / HTML / timeout / network on the
+ * brand search are not EMPTY. Blank/short query, 404, and zero-hit JSON stay empty.
+ * Enrichment (status/form/route/ingredient) stays soft so a live product row
+ * is not discarded when a detail endpoint is down.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+/** Soft JSON GET for enrichment only — never used for the of-record search. */
+async function fetchJsonSoft<T>(url: string): Promise<T | null> {
   try {
-    const res = await fetch(url, fetchOptions)
+    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
     if (!res.ok) return null
+    const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+    if (contentType.includes('text/html')) return null
     return (await res.json()) as T
   } catch {
     return null
@@ -73,7 +100,10 @@ export async function getHealthCanadaProductsByName(
   }
 
   const listUrl = `${BASE}/drugproduct/?brandname=${encodeURIComponent(q)}&lang=en&type=json`
-  const raw = await fetchJson<DrugProductRow[] | DrugProductRow>(listUrl)
+  const res = await timedFetch(listUrl, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return []
+  throwIfHttpFailed(res, 'Health Canada DPD')
+  const raw = (await res.json()) as DrugProductRow[] | DrugProductRow | null
   const rows = asArray(raw).slice(0, Math.min(25, Math.max(1, limit)))
   if (rows.length === 0) return []
 
@@ -83,19 +113,19 @@ export async function getHealthCanadaProductsByName(
       if (!Number.isFinite(code) || code <= 0) return null
 
       const [statusRaw, formRaw, routeRaw, ingRaw] = await Promise.all([
-        fetchJson<
+        fetchJsonSoft<
           | { status?: string; history_date?: string; original_market_date?: string }
           | Array<{ status?: string; history_date?: string; original_market_date?: string }>
         >(`${BASE}/status/?id=${code}&lang=en&type=json`),
-        fetchJson<
+        fetchJsonSoft<
           | { pharmaceutical_form_name?: string }
           | Array<{ pharmaceutical_form_name?: string }>
         >(`${BASE}/form/?id=${code}&lang=en&type=json`),
-        fetchJson<
+        fetchJsonSoft<
           | { route_of_administration_name?: string }
           | Array<{ route_of_administration_name?: string }>
         >(`${BASE}/route/?id=${code}&lang=en&type=json`),
-        fetchJson<
+        fetchJsonSoft<
           | {
               ingredient_name?: string
               strength?: string
