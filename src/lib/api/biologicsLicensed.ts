@@ -6,6 +6,7 @@
  */
 
 import { getApiKey } from './utils'
+import { timedFetch } from './timedFetch'
 
 const BASE_URL = 'https://api.fda.gov/drug/drugsfda.json'
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
@@ -121,6 +122,79 @@ function isBla(app: string): boolean {
 }
 
 /**
+ * Licensed biologics harvest leaf (openFDA Drugs@FDA BLAs).
+ * HTTP / HTML / timeout / network are not EMPTY after both queries fail.
+ * Short query, 404 (no matches), and zero-hit JSON stay empty.
+ */
+function isAbsentStatus(status: number): boolean {
+  // openFDA returns 404 when a drug name has no Drugs@FDA matches.
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error('HTML response from openFDA biologics')
+  }
+}
+
+function ingestResults(
+  results: DrugsFdaResult[] | undefined,
+  byApp: Map<string, BiologicLicensedProduct>,
+  allNonprop: string[],
+  q: string,
+): void {
+  for (const r of results ?? []) {
+    const app = (r.application_number || '').trim()
+    if (!app || !isBla(app)) continue
+    const productList =
+      r.products && r.products.length > 0
+        ? r.products.slice(0, 6)
+        : [
+            {
+              brand_name: r.openfda?.brand_name?.[0],
+              active_ingredients: r.openfda?.generic_name?.[0]
+                ? [{ name: r.openfda.generic_name[0] }]
+                : undefined,
+            },
+          ]
+    for (const product of productList) {
+      const brand = product?.brand_name || r.openfda?.brand_name?.[0] || ''
+      const nonprop =
+        product?.active_ingredients?.[0]?.name || r.openfda?.generic_name?.[0] || ''
+      if (!brand && !nonprop) continue
+      allNonprop.push(nonprop)
+      const orig = r.submissions?.find((s) => s.submission_type === 'ORIG')
+      const approvalDate = formatDateCompact(
+        orig?.submission_status_date || r.submissions?.[0]?.submission_status_date,
+      )
+      const sponsor = r.sponsor_name || r.openfda?.manufacturer_name?.[0] || ''
+      const key = `${app.toUpperCase()}::${brand}::${nonprop}::${product?.active_ingredients?.[0]?.strength || ''}`
+      const row: BiologicLicensedProduct = {
+        applicationNumber: app.toUpperCase(),
+        sponsorName: sponsor,
+        brandName: brand,
+        nonproprietaryName: nonprop,
+        strength: product?.active_ingredients?.[0]?.strength || '',
+        dosageForm: product?.dosage_form || '',
+        marketingStatus: product?.marketing_status || '',
+        roleGuess: 'unknown',
+        approvalDate,
+        drugsAtFdaUrl: drugsAtFdaUrl(app),
+        purpleBookSearchUrl: purpleBookSearchUrl(brand || nonprop || q),
+        establishmentSearchUrl: fdaEstablishmentSearchUrl(sponsor),
+      }
+      if (!byApp.has(key)) byApp.set(key, row)
+    }
+  }
+}
+
+/**
  * Licensed BLA products matching brand or nonproprietary name (openFDA Drugs@FDA).
  * Includes originator + US biosimilar BLAs that share the stem when query is the stem.
  */
@@ -145,69 +219,38 @@ export async function getBiologicsLicensedByName(
 
   const byApp = new Map<string, BiologicLicensedProduct>()
   const allNonprop: string[] = []
+  let sawSuccess = false
+  let lastError: Error | null = null
 
-  try {
-    for (const qs of queries) {
-      const url = `${BASE_URL}?${qs}${openFdaKeyParam()}`
-      const res = await fetch(url, fetchOptions)
-      if (!res.ok) continue
-      const data = (await res.json()) as { results?: DrugsFdaResult[] }
-      for (const r of data.results ?? []) {
-        const app = (r.application_number || '').trim()
-        if (!app || !isBla(app)) continue
-        // Expand multi-product BLAs (strengths / presentations); fall back to one synthetic row
-        const productList =
-          r.products && r.products.length > 0
-            ? r.products.slice(0, 6)
-            : [
-                {
-                  brand_name: r.openfda?.brand_name?.[0],
-                  active_ingredients: r.openfda?.generic_name?.[0]
-                    ? [{ name: r.openfda.generic_name[0] }]
-                    : undefined,
-                },
-              ]
-        for (const product of productList) {
-          const brand = product?.brand_name || r.openfda?.brand_name?.[0] || ''
-          const nonprop =
-            product?.active_ingredients?.[0]?.name || r.openfda?.generic_name?.[0] || ''
-          if (!brand && !nonprop) continue
-          allNonprop.push(nonprop)
-          const orig = r.submissions?.find((s) => s.submission_type === 'ORIG')
-          const approvalDate = formatDateCompact(
-            orig?.submission_status_date || r.submissions?.[0]?.submission_status_date,
-          )
-          const sponsor = r.sponsor_name || r.openfda?.manufacturer_name?.[0] || ''
-          const key = `${app.toUpperCase()}::${brand}::${nonprop}::${product?.active_ingredients?.[0]?.strength || ''}`
-          const row: BiologicLicensedProduct = {
-            applicationNumber: app.toUpperCase(),
-            sponsorName: sponsor,
-            brandName: brand,
-            nonproprietaryName: nonprop,
-            strength: product?.active_ingredients?.[0]?.strength || '',
-            dosageForm: product?.dosage_form || '',
-            marketingStatus: product?.marketing_status || '',
-            roleGuess: 'unknown',
-            approvalDate,
-            drugsAtFdaUrl: drugsAtFdaUrl(app),
-            purpleBookSearchUrl: purpleBookSearchUrl(brand || nonprop || q),
-            establishmentSearchUrl: fdaEstablishmentSearchUrl(sponsor),
-          }
-          if (!byApp.has(key)) byApp.set(key, row)
-        }
+  for (const qs of queries) {
+    const url = `${BASE_URL}?${qs}${openFdaKeyParam()}`
+    try {
+      const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+      if (isAbsentStatus(res.status)) {
+        sawSuccess = true
+        continue
       }
-      if (byApp.size >= limit) break
+      throwIfHttpFailed(res)
+      sawSuccess = true
+      const data = (await res.json()) as { results?: DrugsFdaResult[] }
+      ingestResults(data.results, byApp, allNonprop, q)
+    } catch (e) {
+      lastError = e instanceof Error ? e : new Error(String(e))
     }
-  } catch {
-    return []
+    if (byApp.size >= limit) break
   }
 
-  const rows = Array.from(byApp.values())
-  const names = allNonprop.concat(rows.map((r) => r.nonproprietaryName))
-  return rows
+  const collected = Array.from(byApp.values())
+  const names = allNonprop.concat(collected.map((r) => r.nonproprietaryName))
+  const rows = collected
     .map((r) => ({
       ...r,
       roleGuess: guessBiologicRole(r.nonproprietaryName, names),
     }))
     .slice(0, limit)
+
+  if (rows.length > 0) return rows
+  if (sawSuccess) return []
+  if (lastError) throw lastError
+  return []
 }
