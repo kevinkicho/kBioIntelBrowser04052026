@@ -127,6 +127,9 @@ export const SOURCE_TO_PANEL: Record<string, string> = {
   hmdb: 'hmdb',
   massbank: 'massbank',
   chemspider: 'chemspider',
+  'gnps-library': 'gnps',
+  'health-canada-dpd': 'health-canada',
+  'cms-hospitals': 'us-hospitals',
 }
 
 export function categoryForPanel(panelId: string): CategoryId | null {

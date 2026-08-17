@@ -23,6 +23,17 @@ describe('panelApiTrace accuracy helpers', () => {
     expect(sourceStatusForPanel(map, 'clinical-trials')?.status).toBe('loaded')
   })
 
+  test('sourceStatusForPanel maps gnps-library / health-canada-dpd / cms-hospitals so hideEmpty cannot hide ERROR', () => {
+    const map = {
+      'gnps-library': { status: 'error', error: 'HTTP 503' },
+      'health-canada-dpd': { status: 'error', error: 'HTTP 503' },
+      'cms-hospitals': { status: 'error', error: 'HTTP 503' },
+    }
+    expect(sourceStatusForPanel(map, 'gnps')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'health-canada')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'us-hospitals')?.status).toBe('error')
+  })
+
   test('resolveCategoryFetchedAt prefers _clientFetchedAt over now', () => {
     const d = resolveCategoryFetchedAt({
       _clientFetchedAt: '2020-01-15T12:00:00.000Z',
