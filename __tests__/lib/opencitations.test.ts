@@ -1,7 +1,21 @@
 import { getCitationMetrics } from '@/lib/api/opencitations'
+import { resetRateLimitBuckets } from '@/lib/rateLimit'
 
 global.fetch = jest.fn()
-beforeEach(() => jest.resetAllMocks())
+beforeEach(() => {
+  jest.resetAllMocks()
+  resetRateLimitBuckets()
+})
+
+function jsonRes(body: unknown, status = 200) {
+  return {
+    ok: status >= 200 && status < 300,
+    status,
+    headers: { get: () => 'application/json' },
+    json: async () => body,
+    text: async () => JSON.stringify(body),
+  }
+}
 
 /** Each DOI fans out to 4 OpenCitations endpoints (count, refs, meta, citations). */
 function mockDoiFanout(opts: {
@@ -12,42 +26,33 @@ function mockDoiFanout(opts: {
   pub_date?: string
   refs?: Array<{ cited?: string }>
   cites?: Array<{ citing?: string }>
-  failCount?: boolean
 }) {
-  const countRes = opts.failCount
-    ? { ok: false }
-    : { ok: true, json: async () => [{ count: opts.count ?? '0' }] }
-  const refRes = {
-    ok: true,
-    json: async () => opts.refs ?? [],
-  }
-  const metaRes = {
-    ok: true,
-    json: async () =>
-      opts.title
-        ? [
-            {
-              id: `doi:10.1000/x openalex:W1 pmid:123`,
-              title: opts.title,
-              author: opts.author ?? 'Doe, Jane',
-              pub_date: opts.pub_date ?? '2020-01-01',
-              venue: opts.venue ?? 'Nature [issn:0028-0836]',
-              type: 'journal article',
-              volume: '1',
-              page: '1-2',
-            },
-          ]
-        : [],
-  }
-  const citeRes = {
-    ok: true,
-    json: async () => opts.cites ?? [],
-  }
-  ;(fetch as jest.Mock)
-    .mockResolvedValueOnce(countRes)
-    .mockResolvedValueOnce(refRes)
-    .mockResolvedValueOnce(metaRes)
-    .mockResolvedValueOnce(citeRes)
+  const countRes = jsonRes([{ count: opts.count ?? '0' }])
+  const refRes = jsonRes(opts.refs ?? [])
+  const metaRes = jsonRes(
+    opts.title
+      ? [
+          {
+            id: `doi:10.1000/x openalex:W1 pmid:123`,
+            title: opts.title,
+            author: opts.author ?? 'Doe, Jane',
+            pub_date: opts.pub_date ?? '2020-01-01',
+            venue: opts.venue ?? 'Nature [issn:0028-0836]',
+            type: 'journal article',
+            volume: '1',
+            page: '1-2',
+          },
+        ]
+      : [],
+  )
+  const citeRes = jsonRes(opts.cites ?? [])
+  ;(fetch as jest.Mock).mockImplementation(async (input: unknown) => {
+    const url = String(input)
+    if (url.includes('citation-count')) return countRes
+    if (url.includes('/references/')) return refRes
+    if (url.includes('/metadata/')) return metaRes
+    return citeRes
+  })
 }
 
 describe('getCitationMetrics', () => {
@@ -77,14 +82,12 @@ describe('getCitationMetrics', () => {
 
   test('limits to 12 unique DOIs', async () => {
     const dois = Array.from({ length: 20 }, (_, i) => `10.1000/test${i}`)
-    for (let i = 0; i < 12; i++) {
-      mockDoiFanout({ count: '1', title: `T${i}` })
-    }
+    mockDoiFanout({ count: '1', title: 'T' })
     const results = await getCitationMetrics(dois)
     expect(results).toHaveLength(12)
-    // 12 DOIs × 4 requests
+    // 12 DOIs x 4 requests
     expect(fetch).toHaveBeenCalledTimes(48)
-  })
+  }, 15000)
 
   test('returns empty array for empty DOI list', async () => {
     expect(await getCitationMetrics([])).toEqual([])
@@ -102,8 +105,8 @@ describe('getCitationMetrics', () => {
     expect(results[0].citationCount).toBe(0)
   })
 
-  test('returns empty array when all fetches reject', async () => {
+  test('throws when all fetches reject', async () => {
     ;(fetch as jest.Mock).mockRejectedValue(new Error('network'))
-    expect(await getCitationMetrics(['10.1000/test'])).toEqual([])
+    await expect(getCitationMetrics(['10.1000/test'])).rejects.toThrow(/network/)
   })
 })

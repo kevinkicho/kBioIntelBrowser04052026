@@ -3,6 +3,29 @@ import { timedFetch } from './timedFetch'
 
 const fetchOptions: RequestInit = { next: { revalidate: 86400 } }
 
+/**
+ * OpenCitations harvest leaf. HTTP / HTML / timeout / network are not EMPTY.
+ * Blank / invalid DOI lists, 404, and zero-hit JSON remain empty.
+ * The four OC endpoints are same-source fallbacks. All-fail throws.
+ */
+function isAbsentStatus(status: number): boolean {
+  return status === 404
+}
+
+function throwIfHttpFailed(res: Response, source: string): void {
+  if (!res.ok) {
+    const err = new Error(`HTTP ${res.status}`) as Error & { status?: number }
+    err.status = res.status
+    throw err
+  }
+  const contentType = (res.headers?.get?.('content-type') || '').toLowerCase()
+  if (contentType.includes('text/html')) {
+    throw new Error(`HTML response from ${source}`)
+  }
+}
+
+type Outcome<T> = { ok: true; value: T } | { ok: false; error: unknown }
+
 function normalizeDoi(raw: string): string {
   return raw
     .trim()
@@ -43,13 +66,118 @@ function yearFromPubDate(pubDate: string | undefined): string | undefined {
 }
 
 async function fetchJson(url: string): Promise<unknown | null> {
+  const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
+  if (isAbsentStatus(res.status)) return null
+  throwIfHttpFailed(res, 'OpenCitations')
+  return await res.json()
+}
+
+async function fetchJsonOutcome(url: string): Promise<Outcome<unknown | null>> {
   try {
-    const res = await timedFetch(url, { ...fetchOptions, timeoutMs: 8000 })
-    if (!res.ok) return null
-    return await res.json()
-  } catch {
-    return null
+    const value = await fetchJson(url)
+    return { ok: true, value }
+  } catch (error) {
+    return { ok: false, error }
   }
+}
+
+function buildMetric(
+  doi: string,
+  countJson: unknown | null,
+  refJson: unknown | null,
+  metaJson: unknown | null,
+  citeJson: unknown | null,
+): CitationMetric {
+  const countArr = Array.isArray(countJson) ? countJson : []
+  const citationCount = Number((countArr[0] as { count?: string | number } | undefined)?.count) || 0
+
+  const refs = Array.isArray(refJson) ? refJson : []
+  const referenceCount = refs.length
+  const referenceDois = refs
+    .map((r: { cited?: string }) => {
+      const c = r.cited || ''
+      const m = c.match(/doi:([^\s]+)/i) || c.match(/10\.\d{4,}\/[^\s]+/)
+      return m ? (m[1] || m[0]).replace(/^doi:/i, '') : ''
+    })
+    .filter(Boolean)
+    .slice(0, 8)
+
+  const cites = Array.isArray(citeJson) ? citeJson : []
+  const citedByDois = cites
+    .map((r: { citing?: string }) => {
+      const c = r.citing || ''
+      const m = c.match(/doi:([^\s]+)/i)
+      return m?.[1] || ''
+    })
+    .filter(Boolean)
+    .slice(0, 8)
+
+  const metaArr = Array.isArray(metaJson) ? metaJson : []
+  const meta = (metaArr[0] || {}) as {
+    id?: string
+    title?: string
+    author?: string
+    pub_date?: string
+    venue?: string
+    type?: string
+    volume?: string
+    issue?: string
+    page?: string
+    publisher?: string
+  }
+  const ids = parseIds(meta.id)
+  const title = (meta.title || '').trim()
+
+  return {
+    doi,
+    title: title || undefined,
+    citationCount,
+    referenceCount,
+    citedBy: citedByDois,
+    references: referenceDois,
+    url: `https://doi.org/${doi}`,
+    authors: cleanOcText(meta.author, 120) || undefined,
+    venue: cleanOcText(meta.venue, 80) || undefined,
+    year: yearFromPubDate(meta.pub_date),
+    type: meta.type || undefined,
+    openAlexId: ids.openAlexId,
+    pmid: ids.pmid,
+    volume: meta.volume || undefined,
+    pages: meta.page || undefined,
+  }
+}
+
+async function metricsForDoi(doi: string): Promise<Outcome<CitationMetric | null>> {
+  const doiEnc = encodeURIComponent(`doi:${doi}`)
+  const doiBare = encodeURIComponent(doi)
+
+  const [countOut, refOut, metaOut, citeOut] = await Promise.all([
+    fetchJsonOutcome(`https://opencitations.net/index/api/v2/citation-count/${doiEnc}`),
+    fetchJsonOutcome(`https://opencitations.net/index/coci/api/v1/references/${doiBare}`),
+    fetchJsonOutcome(`https://opencitations.net/meta/api/v1/metadata/doi:${doiBare}`),
+    fetchJsonOutcome(`https://opencitations.net/index/api/v2/citations/${doiEnc}`),
+  ])
+
+  const parts = [countOut, refOut, metaOut, citeOut]
+  const anyData = parts.some((p) => p.ok && p.value != null)
+  if (anyData) {
+    return {
+      ok: true,
+      value: buildMetric(
+        doi,
+        countOut.ok ? countOut.value : null,
+        refOut.ok ? refOut.value : null,
+        metaOut.ok ? metaOut.value : null,
+        citeOut.ok ? citeOut.value : null,
+      ),
+    }
+  }
+
+  const allAbsent = parts.every((p) => p.ok && p.value == null)
+  if (allAbsent) return { ok: true, value: null }
+
+  const err = parts.find((p) => !p.ok)
+  return { ok: false, error: err && !err.ok ? err.error : new Error('OpenCitations upstream failed') }
 }
 
 /**
@@ -57,95 +185,17 @@ async function fetchJson(url: string): Promise<unknown | null> {
  * (title, authors, venue, year). Prefer free public OC endpoints only.
  */
 export async function getCitationMetrics(dois: string[]): Promise<CitationMetric[]> {
-  try {
-    const limited = Array.from(
-      new Set(dois.map(normalizeDoi).filter((d) => d.length > 5 && d.includes('/'))),
-    ).slice(0, 12)
-    if (limited.length === 0) return []
+  const limited = Array.from(
+    new Set(dois.map(normalizeDoi).filter((d) => d.length > 5 && d.includes('/'))),
+  ).slice(0, 12)
+  if (limited.length === 0) return []
 
-    const results = await Promise.all(
-      limited.map(async (doi): Promise<CitationMetric | null> => {
-        const doiEnc = encodeURIComponent(`doi:${doi}`)
-        const doiBare = encodeURIComponent(doi)
+  const outcomes = await Promise.all(limited.map((doi) => metricsForDoi(doi)))
+  const metrics = outcomes
+    .filter((o): o is { ok: true; value: CitationMetric } => o.ok && o.value != null)
+    .map((o) => o.value)
 
-        const [countJson, refJson, metaJson, citeJson] = await Promise.all([
-          // Index citation count (v2)
-          fetchJson(`https://opencitations.net/index/api/v2/citation-count/${doiEnc}`),
-          // Outgoing references (works this paper cites)
-          fetchJson(`https://opencitations.net/index/coci/api/v1/references/${doiBare}`),
-          // Bibliographic metadata
-          fetchJson(`https://opencitations.net/meta/api/v1/metadata/doi:${doiBare}`),
-          // Incoming citations sample (who cites this paper)
-          fetchJson(`https://opencitations.net/index/api/v2/citations/${doiEnc}`),
-        ])
-
-        // All four failed (network / 5xx) — skip this DOI
-        if (countJson == null && refJson == null && metaJson == null && citeJson == null) {
-          return null
-        }
-
-        const countArr = Array.isArray(countJson) ? countJson : []
-        const citationCount = Number((countArr[0] as { count?: string | number } | undefined)?.count) || 0
-
-        const refs = Array.isArray(refJson) ? refJson : []
-        const referenceCount = refs.length
-        const referenceDois = refs
-          .map((r: { cited?: string }) => {
-            const c = r.cited || ''
-            const m = c.match(/doi:([^\s]+)/i) || c.match(/10\.\d{4,}\/[^\s]+/)
-            return m ? (m[1] || m[0]).replace(/^doi:/i, '') : ''
-          })
-          .filter(Boolean)
-          .slice(0, 8)
-
-        const cites = Array.isArray(citeJson) ? citeJson : []
-        const citedByDois = cites
-          .map((r: { citing?: string }) => {
-            const c = r.citing || ''
-            const m = c.match(/doi:([^\s]+)/i)
-            return m?.[1] || ''
-          })
-          .filter(Boolean)
-          .slice(0, 8)
-
-        const metaArr = Array.isArray(metaJson) ? metaJson : []
-        const meta = (metaArr[0] || {}) as {
-          id?: string
-          title?: string
-          author?: string
-          pub_date?: string
-          venue?: string
-          type?: string
-          volume?: string
-          issue?: string
-          page?: string
-          publisher?: string
-        }
-        const ids = parseIds(meta.id)
-        const title = (meta.title || '').trim()
-
-        return {
-          doi,
-          title: title || undefined,
-          citationCount,
-          referenceCount,
-          citedBy: citedByDois,
-          references: referenceDois,
-          url: `https://doi.org/${doi}`,
-          authors: cleanOcText(meta.author, 120) || undefined,
-          venue: cleanOcText(meta.venue, 80) || undefined,
-          year: yearFromPubDate(meta.pub_date),
-          type: meta.type || undefined,
-          openAlexId: ids.openAlexId,
-          pmid: ids.pmid,
-          volume: meta.volume || undefined,
-          pages: meta.page || undefined,
-        }
-      }),
-    )
-
-    const metrics = results.filter((r): r is CitationMetric => r !== null)
-    // Most informative first: cited papers, then those with titles, then rest
+  if (metrics.length > 0) {
     metrics.sort((a, b) => {
       const score = (m: CitationMetric) =>
         (m.citationCount > 0 ? 1000 + m.citationCount : 0) +
@@ -154,7 +204,15 @@ export async function getCitationMetrics(dois: string[]): Promise<CitationMetric
       return score(b) - score(a)
     })
     return metrics
-  } catch {
-    return []
   }
+
+  const allFailed = outcomes.every((o) => !o.ok)
+  if (allFailed) {
+    const err = outcomes.find((o) => !o.ok)
+    throw err && !err.ok && err.error instanceof Error
+      ? err.error
+      : new Error('OpenCitations upstream failed')
+  }
+
+  return []
 }
