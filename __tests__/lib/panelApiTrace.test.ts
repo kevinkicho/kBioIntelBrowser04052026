@@ -60,12 +60,20 @@ describe('panelApiTrace accuracy helpers', () => {
     expect(sourceStatusForPanel(map, 'research-orgs-lit')?.status).toBe('timeout')
   })
 
+  test('sourceStatusForPanel maps ncbi-gene to gene-info and gene-overview so hideEmpty cannot hide ERROR', () => {
+    const map = {
+      'ncbi-gene': { status: 'error', error: 'HTTP 503' },
+    }
+    expect(sourceStatusForPanel(map, 'gene-info')?.status).toBe('error')
+    expect(sourceStatusForPanel(map, 'gene-overview')?.status).toBe('error')
+  })
+
   test('sourceStatusForPanel miss stays undefined so hideEmpty would hide empty ERROR fallback', () => {
     const map = {
       openaire: { status: 'error', error: 'HTTP 503' },
     }
-    expect(sourceStatusForPanel(map, 'gene-info')).toBeUndefined()
-    expect(sourceStatusForPanel(map, 'gene-overview')).toBeUndefined()
+    expect(sourceStatusForPanel(map, 'us-colleges')).toBeUndefined()
+    expect(sourceStatusForPanel(map, 'go')).toBeUndefined()
   })
 
   test('resolveCategoryFetchedAt prefers _clientFetchedAt over now', () => {

@@ -3,7 +3,8 @@
  */
 
 import { getGeneInfoByName } from '../ncbi-gene'
-import { runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { metricsToSourceStatus, runWithApiMetrics, trackedSafe } from '@/lib/api-tracker'
+import { sourceStatusForPanel } from '@/lib/panelApiTrace'
 
 function jsonRes(body: unknown, status = 200, contentType = 'application/json') {
   return {
@@ -92,6 +93,8 @@ describe('NCBI Gene trackedSafe honesty', () => {
     expect(row?.loadStatus).toBe('error')
     expect(row?.error).toMatch(/HTTP 503/)
     expect(row?.has_data).toBe(false)
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'gene-info')?.status).toBe('error')
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'gene-overview')?.status).toBe('error')
   })
 
   test('true 404 is empty, not error', async () => {
@@ -104,5 +107,7 @@ describe('NCBI Gene trackedSafe honesty', () => {
     expect(row?.loadStatus).not.toBe('error')
     expect(row?.loadStatus).not.toBe('timeout')
     expect(row?.error).toBeUndefined()
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'gene-info')?.status).not.toBe('error')
+    expect(sourceStatusForPanel(metricsToSourceStatus(metrics), 'gene-overview')?.status).not.toBe('error')
   })
 })
